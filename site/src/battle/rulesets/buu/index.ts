@@ -558,18 +558,23 @@ export class BuuRuleset implements Ruleset {
     const camera = (w2: World) => {
       const tx = ((player.px * 2 + player.footW) >> 1) - 120
       const ty = ((player.py * 2 + player.footH) >> 1) - 84
+      // a screen shake replaces the camera controller: no follow while it lasts nor in the frame it ended
+      const shaking = ctx.cameraHeldByShake()
       if (!camInit) {
         camX = tx << 10
         camY = ty << 10
         camInit = true
-      } else {
+      } else if (!shaking) {
         camX += ((tx << 10) - camX) * 3 >> 6
         camY += ((ty << 10) - camY) * 9 >> 7
       }
+      // (the clamp 0x08009744: past the last whole pixel the position snaps to it, a position on it keeps its
+      // fraction - wf-core battle::camera / field clamp_cam)
       const v = w2.viewRect()
       if (v) {
-        camX = Math.max(v.x0 << 10, Math.min(camX, Math.max(v.x0, v.x1 - GBA_W) << 10))
-        camY = Math.max(v.y0 << 10, Math.min(camY, Math.max(v.y0, v.y1 - GBA_H) << 10))
+        const clamp = (p: number, lo: number, hi: number) => (p < lo << 10 ? lo << 10 : p >> 10 > hi ? hi << 10 : p)
+        camX = clamp(camX, v.x0, Math.max(v.x0, v.x1 - GBA_W))
+        camY = clamp(camY, v.y0, Math.max(v.y0, v.y1 - GBA_H))
       }
       const cx = camX >> 10
       const cy = camY >> 10
@@ -591,10 +596,15 @@ export class BuuRuleset implements Ruleset {
       preStep(w2, inp) {
         // the input object 0x03003300 (0x0804023C) records this frame's presses (stamped with the frame counter)
         ctx.noteInput(ctx.fc0 + w2.frame + 1, inp.pressed)
+        // (the shake-end mark lives one frame: wf-core session `step_begin`)
+        ctx.shakeEnded = false
         // enemy grid marks follow positions set outside the enemy step (spawns, teleports, deaths)
         if (ctx.col) for (const e of ctx.enemies as Enemy[]) e.syncMark()
       },
       postStep(w2) {
+        // the task list (screen shakes) after the whole object pass, before the camera (wf-core battle::post_step)
+        ctx.tickShakes(w2)
+        w2.viewShake = ctx.shakeOff
         camera(w2)
         // HUD 0x0800BA3A: low-HP beep (sound 41, volume 32) when 0 < HP <= maxHP / 5, more than 60 frames apart
         if (player.hp !== 0 && 5 * player.hp <= player.maxHp && w2.frame - ctx.lastBeep > 60) {

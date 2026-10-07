@@ -956,11 +956,10 @@ fn enter_state(w: &mut World, i: usize, gs: Gs) {
             }
             sfx_stop(w, 54);
             // the state deletes its aura effect itself: its tiles go this frame (segment sb 19-3; an effect that
-            // ends by itself gives them a frame later). Field only: battles keep the TypeScript reference's entity
-            // list (the effect entity ends by itself there, cross_ts)
+            // ends by itself gives them a frame later). Battles too (the TS reference mirrors it: `auraFx`)
             let me = w.ents[i].id;
             let auras: Vec<usize> = (0..w.ents.len())
-                .filter(|&k| w.field.is_some() && !w.ents[k].removed && matches!(&w.ents[k].body, Body::Fx(f) if matches!(**f, Fx::Loop { alive: Alive::Transform { p }, .. } if p == me)))
+                .filter(|&k| !w.ents[k].removed && matches!(&w.ents[k].body, Body::Fx(f) if matches!(**f, Fx::Loop { alive: Alive::Transform { p }, .. } if p == me)))
                 .collect();
             for k in auras {
                 let id = w.ents[k].id;
@@ -1037,10 +1036,10 @@ fn enter_state(w: &mut World, i: usize, gs: Gs) {
             // the state object's ctor (`0x0801C3EC`) makes the aura effect; a transformation started by the player made
             // it already (segment sb 19-3: s457's play_anim(0, 23) takes the effect's 0x400 tile bytes)
             if gs == Gs::SsUp {
-                // (field: at the footprint's centre + (0, 1) - 0x0800FDFA's box halved, the variant byte 0x03002BB0 = 0
-                // branch; emulator sb_006 f9,320: Gotenks' footprint 16 x 8 at (184, 136), the effect object at
-                // (192, 141); battles keep the reference's body-box centre)
-                let (ax, ay) = if w.field.is_some() { pr(w, i).a.fc() } else { pr(w, i).a.center() };
+                // (at the footprint's centre + (0, 1) - 0x0800FDFA's box halved, the variant byte 0x03002BB0 = 0 branch;
+                // emulator sb_006 f9,320: Gotenks' footprint 16 x 8 at (184, 136), the effect object at (192, 141);
+                // battles too - the TS reference mirrors it)
+                let (ax, ay) = pr(w, i).a.fc();
                 let me = w.ents[i].id;
                 fx::add(
                     w,
@@ -1694,11 +1693,7 @@ pub fn update(w: &mut World, i: usize) {
     if ko >= 0 && w.frame as i64 - ko == 200 && w.field.is_none() {
         w.events.push(Event::Song { id: 8 });
     }
-    // the task list (screen shakes) runs after the objects; the first player is the last object updated
-    // (field: once after the whole pass, World::step_entities_list - the player can be updated twice in a frame)
-    if pr(w, i).slot == 0 && w.field.is_none() {
-        w.tick_shakes();
-    }
+    // (the task list - screen shakes - runs after the whole object pass: `battle::post_step`, the field's step_post)
 }
 
 fn tick_once(a: &mut AnimPos, n: i32, shift: i32) -> bool {
@@ -3709,8 +3704,8 @@ fn start_transform(w: &mut World, i: usize, to: i32) {
     }
     enter_state(w, i, Gs::Skill(20));
     p(w, i).a.blocking = false;
-    // (field: the footprint's centre + (0, 1), as the state ctor 0x0801C3EC)
-    let (ax, ay) = if w.field.is_some() { pr(w, i).a.fc() } else { pr(w, i).a.center() };
+    // (the footprint's centre + (0, 1), as the state ctor 0x0801C3EC - battles too)
+    let (ax, ay) = pr(w, i).a.fc();
     let me = w.ents[i].id;
     fx::add(
         w,
@@ -4020,9 +4015,7 @@ fn it_select(w: &mut World, i: usize) {
         if let Some(k) = hitk {
             s.cand[k].1 = true;
             s.picks.push(s.cand[k].0);
-            if w.field.is_some() {
-                s.order.push(ItPick::Ent(s.cand[k].0));
-            }
+            s.order.push(ItPick::Ent(s.cand[k].0));
             s.n -= 1;
             if s.n == 0 {
                 s.cursor = false;
@@ -4193,89 +4186,10 @@ fn ctl_it_field(w: &mut World, i: usize) {
     }
 }
 
+/// the Instant Transmission run: the game's (`ctl_it_field`, update 0x0801BB1A) for battles too - its return vanish plays
+/// sound 31 with no pick left (the old reference run did not; the TS reference mirrors it)
 fn ctl_it(w: &mut World, i: usize) {
-    if w.field.is_some() {
-        return ctl_it_field(w, i);
-    }
-    let Some(mut it) = pr(w, i).it.clone() else {
-        return set_anim_id(w, i, 0);
-    };
-    p(w, i).a.hittable = false;
-    it.t += 1;
-    let t = it.t;
-    let save = |w: &mut World, it: ItRun| p(w, i).it = Some(it);
-    if t < 0 {
-        if t == -23 && it.targets.len() > it.idx {
-            let c = [40, 80, 480][it.idx.min(2)];
-            spend(w, i, c, false);
-            sfx(w, 31, 64);
-        }
-        let pl = p(w, i);
-        pl.ap.raw = 20;
-        pl.ap.frame = -t >> 3;
-        return save(w, it);
-    }
-    if t == 0 {
-        while it.idx < it.targets.len() && w.is_removed(it.targets[it.idx]) {
-            it.idx += 1;
-        }
-        if it.idx >= it.targets.len() {
-            let pl = p(w, i);
-            pl.a.x = it.origin.0 << 8;
-            pl.a.y = it.origin.1 << 8;
-            pl.a.facing = it.dir;
-            return save(w, it);
-        }
-        let e = w.actor_by_id(it.targets[it.idx]).cloned().unwrap();
-        let pl = p(w, i);
-        pl.a.x = (((e.px() * 2 + e.foot_w) >> 1) - 8) << 8;
-        pl.a.y = (e.py() + e.foot_h + 8) << 8;
-        pl.a.facing = 1;
-        return save(w, it);
-    }
-    if t < 24 {
-        p(w, i).ap.frame = (24 - t) >> 3;
-        return save(w, it);
-    }
-    if it.idx >= it.targets.len() {
-        p(w, i).it = None;
-        set_anim_id(w, i, 0);
-        return it_markers_end(w, i);
-    }
-    if t == 24 {
-        let a = &pr(w, i).a;
-        let rect = Rect::at(PUNCH_RECT[a.facing as usize], a.px(), a.py());
-        let me = w.ents[i].id;
-        let mut m = HitMsg {
-            team: 1,
-            rect,
-            dir: a.facing,
-            mult: 0x600,
-            atk: atk(2),
-            attacker: me,
-            att_stats: a.stats,
-            att_is_player: true,
-            source: me,
-            crit: false,
-            raw: 0,
-            dmg: 0,
-            no_react: false,
-            foot: false,
-        };
-        if broadcast(w, &mut m, false) {
-            let r = 48 + w.rng.rand(2);
-            sfx(w, r, 64);
-        }
-    }
-    p(w, i).ap.frame = (t - 24) >> 2;
-    if pr(w, i).ap.frame >= pr(w, i).anim_n(w) {
-        let pl = p(w, i);
-        pl.ap.frame = 0;
-        pl.ap.raw = 20;
-        it.idx += 1;
-        it.t = -24;
-    }
-    save(w, it);
+    ctl_it_field(w, i)
 }
 
 // ---- held ---------------------------------------------------------------------------------------------------------------

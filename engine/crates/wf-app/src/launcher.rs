@@ -28,6 +28,8 @@ use wf_core::menu::save::Saves;
 pub use wf_core::menu::save::SLOTS;
 use wf_core::session::Session;
 use wf_render::font as tiny;
+
+mod battle_page;
 use wf_render::ui::Font;
 use wf_render::ViewMode;
 
@@ -309,7 +311,6 @@ enum Row {
     TitleScreen,
     NewGame,
     Slot(usize),
-    Kind,
     /// the character picker: Character (`Fighter`), Form, Outfit (looks; shown when the form has several)
     Fighter,
     Form,
@@ -367,6 +368,11 @@ pub struct Launcher {
     arenas: Vec<(String, String)>,
     font: Option<Font>,
     bg: Option<Rgba>,
+    /// the Battle page's animation clock: seconds the shell reported ([`Launcher::advance`]) and the frame it makes
+    clock: f64,
+    tick: u32,
+    /// the Battle page's renderer and caches
+    page: battle_page::PageState,
 }
 
 fn wrap(i: i32, n: usize) -> usize {
@@ -463,6 +469,9 @@ impl Launcher {
             arenas,
             font: Font::load(packs, "menu").ok(),
             bg,
+            clock: 0.0,
+            tick: 0,
+            page: Default::default(),
         }
     }
 
@@ -492,8 +501,10 @@ impl Launcher {
                 v
             }
             Screen::Battle => {
+                // the character select (`battle_page`), in its reading order: the fighter, the opponent (any enemy or
+                // a story fight in one list), the fight; A on any row starts it, B goes back
                 let b = &self.settings.battle;
-                let mut v = vec![Row::Kind, Row::Fighter, Row::Form];
+                let mut v = vec![Row::Fighter, Row::Form];
                 if self.outfits().len() > 1 {
                     v.push(Row::Outfit);
                 }
@@ -503,7 +514,7 @@ impl Launcher {
                 } else {
                     v.extend([Row::Enemy, Row::Count]);
                 }
-                v.extend([Row::Arena, Row::Players, Row::Fight, Row::Back]);
+                v.extend([Row::Arena, Row::Players]);
                 v
             }
             Screen::Mods => {
@@ -521,6 +532,13 @@ impl Launcher {
                 v
             }
         }
+    }
+
+    /// Time for the Battle page's animated previews: the shells call this once per displayed frame with the seconds
+    /// since the last one; the idle animations run at the game's 60 frames a second whatever the display rate.
+    pub fn advance(&mut self, seconds: f64) {
+        self.clock += seconds.clamp(0.0, 0.25);
+        self.tick = (self.clock * wf_view::GBA_FPS) as u32;
     }
 
     /// The character picker's rows (Character, Form, Outfit -> fighter, form record)
@@ -699,20 +717,25 @@ impl Launcher {
             return Choice::None;
         }
         match row {
-            Row::Kind => b.preset_mode = !b.preset_mode,
             // (the picker's rows and the level: above)
             Row::Fighter | Row::Form | Row::Outfit | Row::Level => {}
-            Row::Enemy => {
-                let k = self.enemies.iter().position(|e| e.0 == b.enemy).unwrap_or(0) as i32;
-                if let Some(e) = self.enemies.get(wrap(k + d, self.enemies.len())) {
+            // the opponent: the story fights, then every enemy, in one list
+            Row::Enemy | Row::Preset => {
+                let n = PRESETS.len() + self.enemies.len();
+                let k = if b.preset_mode {
+                    PRESETS.iter().position(|p| p.0 == b.preset).unwrap_or(0)
+                } else {
+                    PRESETS.len() + self.enemies.iter().position(|e| e.0 == b.enemy).unwrap_or(0)
+                };
+                let k = wrap(k as i32 + d, n);
+                b.preset_mode = k < PRESETS.len();
+                if b.preset_mode {
+                    b.preset = PRESETS[k].0.into();
+                } else if let Some(e) = self.enemies.get(k - PRESETS.len()) {
                     b.enemy = e.0.clone();
                 }
             }
             Row::Count => b.count = (b.count as i32 + d).clamp(1, 8) as u32,
-            Row::Preset => {
-                let k = PRESETS.iter().position(|p| p.0 == b.preset).unwrap_or(0) as i32;
-                b.preset = PRESETS[wrap(k + d, PRESETS.len())].0.into();
-            }
             Row::Arena => {
                 // "" (auto) then every arena
                 let k = if b.arena.is_empty() { 0 } else { self.arenas.iter().position(|a| a.0 == b.arena).map(|i| i as i32 + 1).unwrap_or(0) };
@@ -797,7 +820,13 @@ impl Launcher {
                 self.message = "That slot is empty.".into();
             }
             Row::Fight => return Choice::Battle(self.battle_config()),
-            Row::Mod(_) | Row::Kind | Row::Fullscreen | Row::Pacing | Row::AutoZoom => return self.change(row, 1),
+            // the character select: A on any of its rows starts the fight
+            Row::Fighter | Row::Form | Row::Outfit | Row::Level | Row::Enemy | Row::Preset | Row::Count | Row::Arena | Row::Players
+                if self.screen == Screen::Battle =>
+            {
+                return Choice::Battle(self.battle_config())
+            }
+            Row::Mod(_) | Row::Fullscreen | Row::Pacing | Row::AutoZoom => return self.change(row, 1),
             Row::ModsFolder => return if self.native { Choice::OpenModsFolder } else { Choice::AddMod },
             Row::Controls => {
                 self.rebind.toggle();
@@ -825,7 +854,6 @@ impl Launcher {
             Row::TitleScreen => (t("Title screen"), t("New Game / Continue")),
             Row::NewGame => (t("Quick start"), t("Snakeway, no prologue")),
             Row::Slot(i) => (format!("Continue {}", i + 1), self.slots.get(i).cloned().flatten().unwrap_or_else(|| t("- empty -"))),
-            Row::Kind => (t("Fight"), if b.preset_mode { t("< Story preset >") } else { t("< Any enemy >") }),
             Row::Fighter => (t("Character"), format!("< {} >", self.picks.get(self.pick_idx()).map(|p| p.character.as_str()).unwrap_or("?"))),
             Row::Form => (t("Form"), format!("< {} >", self.picks.get(self.pick_idx()).map(|p| p.form.as_str()).unwrap_or("?"))),
             Row::Outfit => (t("Outfit"), format!("< {} >", self.picks.get(self.pick_idx()).map(|p| p.outfit.as_str()).unwrap_or("?"))),
@@ -871,6 +899,14 @@ impl Launcher {
                         fb[py as usize * w + px as usize] = if main { 0xFF00_0000 | ((c >> 1) & 0x007F_7F7F) } else { 0xFF00_0000 | ((c >> 2) & 0x003F_3F3F) };
                     }
                 }
+            }
+        }
+        // the Battle page: a character select in the game's menu style (the plain list without the game's menu data)
+        if self.screen == Screen::Battle && !self.rebind.open {
+            let n = self.rows().len();
+            self.cursor = self.cursor.min(n.saturating_sub(1));
+            if battle_page::draw(self, packs, fb, w, h) {
+                return;
             }
         }
         let font = self.font.as_ref();

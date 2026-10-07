@@ -7027,3 +7027,16 @@ every fighting animation. Saved settings: `PICK_ALIASES` moves unlisted records 
 25 -> 24, 32 / 33 -> 31, 42 / 43 / 44 -> 41). Test: wf-app `tests/launcher.rs` `battle_picker_rows_are_distinct_and_playable`
 (distinct labels, every row starts in its record with the fighting animations and lands hits; up / down stay on the
 picker with the same look).
+
+**§12 (6), user-bugs agent - launcher Battle page as a character select (2026-10-07).** `wf-app/src/launcher/battle_page.rs`:
+the page is a display list for the game's own menu renderer (`wf_core::menu::text::Canvas` -> `wf_render::menu::MenuRenderer`:
+the pause pages' striped background and bevelled panels, the menu / bold / small fonts, the UI palette, the Status
+page's portrait (form portrait byte 0), the Skills page's skill icons, the A button picture). Stage: the fighter's
+name and level, portrait, moves (skill icons), its idle animation at 2x facing right (shadow, halo), VS, the opponent's
+idle animation facing left (2x when it fits) with its name and level byte. Setup panel: Form, Outfit (grey when the form
+has one look), Level, Enemies (or the story fight's count), Players, Arena, and the fighter's HP / EP / STR / POW / END
+/ SPD as the battle builds them (a battle world made once per choice, ~3-6 ms). Rows (UP / DOWN): Character, Form,
+[Outfit], Level, Opponent (story fights then every enemy in one list - the old Fight-kind row is gone), [Count], Arena,
+Players; LEFT / RIGHT change, A / Enter on any row starts, B / Esc back. Animation clock: `Launcher::advance(seconds)`,
+called by the native shell per drawn frame (wall clock) and by the web shell per animation frame (1/60 s). Without the
+game's menu data the plain list is drawn. Screenshots: `work/ub/battle_select_{1..4}.png`.

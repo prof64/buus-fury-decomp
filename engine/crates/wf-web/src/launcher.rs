@@ -105,6 +105,8 @@ pub extern "C" fn wf_launcher_frame(win_w: u32, win_h: u32) -> u32 {
         let mut s = s.borrow_mut();
         let Some(st) = s.as_mut() else { return 1 };
         let mut fb = vec![0u32; 240 * 160];
+        // (one animation frame: the Battle page's idle animations)
+        st.l.advance(1.0 / 60.0);
         st.l.draw(&st.packs, &mut fb, 240, 160);
         for (o, &p) in st.rgba.chunks_exact_mut(4).zip(fb.iter()) {
             o[0] = (p >> 16) as u8;

@@ -1412,6 +1412,22 @@ pub fn damage_number_shown(w: &mut World, target: EntityId, dmg: i64, crit: bool
         _ => None,
     });
     let now = w.frame;
+    // a battle (no sprite-memory model, no limit): the same object, reused within 8 frames, 16 frames on show
+    if w.field.is_none() {
+        let (stamp, pass_at) = (w.next_id, w.battle.pass_at);
+        let b = &mut w.battle.popups;
+        b.retain(|p| p.2 > now);
+        if let Some(p) = b.iter_mut().find(|p| p.0 == target && now.wrapping_sub(p.1) < 8) {
+            // (a number older than the object being updated has had this frame's update: it ends a frame earlier)
+            let pending = pass_at != 0 && p.7 <= pass_at;
+            p.2 = now + POPUP_LIFE - pending as u32;
+            p.5 += dmg;
+            p.6 |= crit;
+        } else if let Some(r) = at {
+            b.push((target, now, now + POPUP_LIFE, (((r.x0 + r.x1) >> 1) - 16) * 8, r.y0 * 8, dmg, crit, stamp));
+        }
+        return;
+    }
     let stamp = w.next_id;
     let objects = w.ents.iter().filter(|e| !e.removed).count();
     let Some(v) = st(w) else { return };
@@ -1455,6 +1471,18 @@ pub fn damage_number_shown(w: &mut World, target: EntityId, dmg: i64, crit: bool
 
 /// the damage numbers on show: (top-left x, y, value, crit) - each update moves it up 0.5 px (y8 - 4)
 pub fn damage_numbers(w: &World) -> Vec<(i32, i32, i32, bool)> {
+    if w.field.is_none() {
+        return w
+            .battle
+            .popups
+            .iter()
+            .filter(|p| p.2 > w.frame)
+            .map(|p| {
+                let y8 = p.4 - 4 * w.frame.wrapping_sub(p.1) as i32;
+                (p.3 >> 3, y8 >> 3, ((p.5 + 0x3FF) >> 10) as i32, p.6)
+            })
+            .collect();
+    }
     let Some(v) = w.field.as_ref().and_then(|f| f.vram.as_ref()) else { return vec![] };
     v.popups
         .iter()

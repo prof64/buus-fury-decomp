@@ -98,6 +98,11 @@ export abstract class Actor implements Entity, Receiver {
     const b = this.body[this.facing] ?? this.body[0]
     return { x0: this.px + b[0], y0: this.py + b[1] + this.z, x1: this.px + b[2], y1: this.py + b[3] + this.z }
   }
+  /** the body box at the ground position (no height) */
+  bodyBoxGround(): Rect {
+    const b = this.body[this.facing] ?? this.body[0]
+    return { x0: this.px + b[0], y0: this.py + b[1], x1: this.px + b[2], y1: this.py + b[3] }
+  }
   footBox(): Rect {
     return { x0: this.px, y0: this.py, x1: this.px + this.footW, y1: this.py + this.footH }
   }

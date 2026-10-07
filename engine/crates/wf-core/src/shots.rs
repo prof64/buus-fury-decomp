@@ -147,7 +147,7 @@ pub struct StraightOpts {
     /// its next update ends it)
     #[serde(default)]
     pub beam_hit: bool,
-    /// field, the ki blast class: its hit was accepted (`+0x54` from its own update): it bursts in its next update,
+    /// the ki blast class: its hit was accepted (`+0x54` from its own update): it bursts in its next update,
     /// the burst counter already one tick down (16 -> 15 in that update), and takes messages until then
     #[serde(default)]
     pub taken: bool,
@@ -1663,9 +1663,9 @@ fn straight_update(w: &mut World, i: usize) {
         // field: the ki blast class (update 0x08019888) marks any accepted hit the same way (+0x54 = 1 at 0x080199E0)
         // and bursts in its next update - until then it still takes messages (handler 0x080199F6 tests only its
         // burst counter +0x4C): run 2 row 124,907, the tank's new shell meets the blast that hit the tank the frame
-        // before - the shell bursts on it (its hit sound) and the blast bursts in its own update. Battles keep the
-        // reference's immediate end.
-        if w.field.is_some() && o.name == SName::KiBlast && o.fx_end == 16 && !o.fragile {
+        // before - the shell bursts on it (its hit sound) and the blast bursts in its own update. Battles too (the TS
+        // reference mirrors it: `taken`)
+        if o.name == SName::KiBlast && o.fx_end == 16 && !o.fragile {
             if let ShotKind::Straight(x) = &mut w.shot(i).kind {
                 x.taken = true;
             }

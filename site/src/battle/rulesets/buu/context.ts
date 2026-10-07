@@ -140,6 +140,14 @@ export class BuuCtx {
   /** screen shakes 0x0800797C(duration, intensity) (task 0x080079BC) and the camera offset they set (px) */
   shakes: { left: number; intensity: number; period: number; cnt: number }[] = []
   shakeOff: [number, number] = [0, 0]
+  /** a shake ended in this frame's task list: the camera holds once more (wf-core `camera_held_by_shake`) */
+  shakeEnded = false
+  /** the camera follow is replaced by a running shake (and the frame one ended in) */
+  cameraHeldByShake(): boolean {
+    const held = this.shakes.length > 0 || this.shakeEnded
+    this.shakeEnded = false
+    return held
+  }
   /** 0x0800797C: dash into a wall (8, 100), critical melee hit (15, 75) */
   shake(duration: number, intensity: number) {
     this.shakes.push({ left: duration, intensity, period: Math.trunc((100 - intensity) / 16) + 1, cnt: 1 })
@@ -147,9 +155,15 @@ export class BuuCtx {
   /** the shake tasks run after the objects each frame (first in their creation frame): every `period` frames two
    *  draws of the game RNG pick the offset ((next - 0x8000) * intensity) >> 19 per axis; at the end offset 0 */
   tickShakes(w: World) {
-    for (const s of this.shakes) {
+    // the screen-effect slot holds one shake at a time: a newer one suspends the older until it ends (wf-core
+    // world.rs `tick_shakes`; sc_janemba: the summon shake pauses through a crit shake)
+    const n = this.shakes.length
+    for (let k = 0; k < n; k++) {
+      const s = this.shakes[k]
+      if (k + 1 !== n) continue
       if (--s.left === 0) {
         this.shakeOff = [0, 0]
+        this.shakeEnded = true
         continue
       }
       if (--s.cnt === 0) {

@@ -456,7 +456,7 @@ export const GHOST_SLOTS: [number, number][][] = [
 export const ENERGY_PUNCH_POS: [number, number][] = [[13, 8], [0, -19], [-8, -3], [24, -3]]
 export const ENERGY_PUNCH_TABLE = 0x08762270
 
-/** the Super Saiyan transform aura: looping 3 records of 0x08752D28 at rate 0x4000 at the body-box centre + (0, 1) */
+/** the Super Saiyan transform aura: looping 3 records of 0x08752D28 at rate 0x4000 at the footprint centre + (0, 1) */
 export const SS_AURA = { id: 'fx_08752d28', n: 3, rate: 0x4000 }
 
 export { drawRec }

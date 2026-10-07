@@ -722,6 +722,8 @@ struct LauncherState {
     l: wf_app::launcher::Launcher,
     packs: Packs,
     gilrs: Option<gilrs::Gilrs>,
+    /// the last drawn frame's time (the Battle page's animations: `Launcher::advance`)
+    last: Instant,
 }
 
 /// gamepad buttons -> launcher key codes (d-pad, South = confirm, East = back, triggers = page)
@@ -798,7 +800,7 @@ impl Shell {
         match load_packs(&self.args) {
             Ok(packs) => {
                 let l = new_launcher(&self.args, &packs);
-                self.phase = Phase::Launcher(Box::new(LauncherState { l, packs, gilrs: gilrs::Gilrs::new().ok() }));
+                self.phase = Phase::Launcher(Box::new(LauncherState { l, packs, gilrs: gilrs::Gilrs::new().ok(), last: Instant::now() }));
             }
             Err(e) => self.phase = Phase::Failed(e.to_string()),
         }
@@ -1117,6 +1119,9 @@ impl Shell {
                 let (w, h) = (240usize, 160usize);
                 self.ui.clear();
                 self.ui.resize(w * h, 0xFF00_0000);
+                let now = Instant::now();
+                ls.l.advance(now.duration_since(ls.last).as_secs_f64());
+                ls.last = now;
                 ls.l.draw(&ls.packs, &mut self.ui, w, h);
                 for c in codes {
                     self.launcher_key(c);

@@ -277,6 +277,15 @@ pub struct BattleState {
     pub phase: usize,
     pub next_phase_at: u32,
     pub phase_start: u32,
+    /// the damage numbers on show (the field keeps them with its sprite-memory model, `vram::damage_number_shown`;
+    /// a battle has no memory limit): (target, frame made, end frame, x8, y8, damage in 1/1024 HP, crit, its place in
+    /// the world list - the entity id the next object got when it was made)
+    #[serde(default)]
+    pub popups: Vec<(EntityId, u32, u32, i32, i32, i64, bool, EntityId)>,
+    /// the entity the object pass is updating (0 outside it): a number older than that object has had this frame's
+    /// update when it is restarted (`vram::damage_number_shown`'s `pending`, as the field's)
+    #[serde(default)]
+    pub pass_at: EntityId,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -649,19 +658,27 @@ pub fn camera(w: &mut World, slot: usize) {
     let tx = ((a.px() * 2 + a.foot_w) >> 1) - 120;
     let ty = ((a.py() * 2 + a.foot_h) >> 1) - 84;
     let view = w.arena.view;
+    // a screen shake replaces the camera controller (the shake object 0x0804A720 takes the mode's camera slot): the
+    // follow does not run while it lasts, nor in the frame it ended (as the field's `field::camera`; TS mirrors it)
+    let shaking = w.camera_held_by_shake();
     let c = &mut w.cameras[slot];
     c.shown = if c.init { c.rect } else { Rect::default() };
     if !c.init {
         c.x = tx << 10;
         c.y = ty << 10;
         c.init = true;
+    } else if shaking {
     } else {
         c.x += (((tx << 10) - c.x) * 3) >> 6;
         c.y += (((ty << 10) - c.y) * 9) >> 7;
     }
+    // (the clamp 0x08009744 as the field's `clamp_cam`: past the last whole pixel the position snaps to it, a
+    // position on it keeps its fraction - the next ease and the OBJs' shake rounding (`view::obj_shake_baked`) see
+    // it; TS mirrors it)
     if let Some(v) = view {
-        c.x = (v.x0 << 10).max(c.x.min(v.x0.max(v.x1 - GBA_W) << 10));
-        c.y = (v.y0 << 10).max(c.y.min(v.y0.max(v.y1 - GBA_H) << 10));
+        let clamp = |p: i32, lo: i32, hi: i32| if p < lo << 10 { lo << 10 } else if (p >> 10) > hi { hi << 10 } else { p };
+        c.x = clamp(c.x, v.x0, v.x0.max(v.x1 - GBA_W));
+        c.y = clamp(c.y, v.y0, v.y0.max(v.y1 - GBA_H));
     }
     let (cx, cy) = (c.x >> 10, c.y >> 10);
     c.rect = Rect::new(cx, cy, cx + GBA_W, cy + GBA_H);
@@ -711,9 +728,14 @@ pub fn pre_step(w: &mut World) {
 
 /// after the world update: cameras, the HUD low-HP beep, phases
 pub fn post_step(w: &mut World) {
+    // the task list (screen shakes) after the whole object pass, before the camera (as the field's step_post: the
+    // OBJs take the new offset, the BG layers the one before - `view::render_view`); the TS reference mirrors it
+    w.tick_shakes();
     for s in 0..w.players.len() {
         camera(w, s);
     }
+    let now = w.frame;
+    w.battle.popups.retain(|p| p.2 > now);
     if let Some(pi) = w.player_idx(0) {
         let (hp, max) = (w.pl_ref(pi).hp(), w.pl_ref(pi).max_hp());
         if hp != 0 && 5 * hp <= max && w.frame as i64 - w.g.last_beep > 60 {

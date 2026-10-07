@@ -7,7 +7,7 @@ import { DIR_VEC, facingToward, inflate, overlaps, type Dir, type Rect } from '.
 import type { Renderer } from '../../core/renderer'
 import type { World } from '../../core/world'
 import { drawText } from '../../core/pixelfont'
-import { Actor, broadcast, hitsBody, type HitMsg } from './actor'
+import { Actor, broadcast, type HitMsg } from './actor'
 import { AiController } from './ai'
 import type { BuuCtx, EnemyLike, PlayerLike } from './context'
 import { ATK, computeDamage, type AttackType } from './damage'
@@ -145,6 +145,12 @@ export class Enemy extends Actor implements EnemyLike {
   /** Babidi's hover controller 0x03003014 (tick 0x0802AD58) is the current state: rises to z -50, tick 1..23 then
    *  8..23 (cel = tick >> 3) every frame, also while a scene holds the AI */
   hoverCtl = false
+  /** the jump smash's landing dust: clouds still to make on the controller's next ticks */
+  smashPuffs = 0
+  /** the landing's three dust clouds (0x08035D04 ..: each rate 0x1000 + rand(0x1000)) */
+  smashDust() {
+    for (let k = -1; k <= 1; k++) this.ctx.puffRng(this.w, this.center()[0] + k * 12, this.py + 4)
+  }
   update(w: World) {
     this.w = w
     // the player's death script (0x08799D0C) blocks every object update at KO + 199; from KO + 200 an enemy only
@@ -156,6 +162,10 @@ export class Enemy extends Actor implements EnemyLike {
     }
     this.tickAnim()
     if (this.spitCtl >= 0 && this.spitCtl++ === 0) this.shot('spit')
+    if (this.smashPuffs > 0) {
+      this.smashPuffs--
+      this.smashDust()
+    }
     if (this.contactCd > 0) this.contactCd--
     if (this.defeated) {
       this.ko++
@@ -278,6 +288,18 @@ export class Enemy extends Actor implements EnemyLike {
     this.ea.pos.raw = raw
     const a = this.sprite?.anim(raw)
     if (a) this.anim = a
+  }
+  /** the pose setter (vt+0x30, 0x0800ED3E): the raw only (the tick stays), the given frame, under the hold state
+   *  (nothing ticks) - Rust `nodes::hold_pose` */
+  holdPose(raw: number, frame: number) {
+    this.setRaw(raw)
+    this.ea.pos.frame = frame
+    this.ea.r = { rule: 'hold' }
+    this.ea.done = false
+    this.ownState = true
+    this.animEnded = false
+    this.animSeq++
+    this.frameIdx = frame
   }
   /** SetState(a node's own state object): no tick of its own here (the hook runs it); frame / tick kept */
   private useState(name: string, run: () => void) {
@@ -780,6 +802,9 @@ export class Enemy extends Actor implements EnemyLike {
    *  0x08752EB4 = down, up, left, right); blocked -> facing = rand(4) (no move). Never finishes. */
   wanderStep(speed: number, turnP: number) {
     const w = this.w
+    // the update starts with SetAnim(1) unless IsAnim(1) (0x0802B710..): whatever is showing is replaced (Northern
+    // Wilderness 15-8: a Ghoul walks on without the hurt's end going through idle)
+    if (!this.isAnim(1)) this.setAnim(1, true, true)
     this.markMoving()
     if (w.rng.chance(turnP, 'wander turn')) this.facing = w.rng.rand(4, 'wander dir') as Dir
     const [dx, dy] = DIR_VEC[this.facing]
@@ -877,7 +902,8 @@ export class Enemy extends Actor implements EnemyLike {
    *  the hurt box follow (lockstep f02_vs_enemy_t48); same footprint (shadow 16 x 8). */
   swapGfx() {
     const g = this.gfxNow ?? this.type.gfx
-    const PAIRS: Record<number, number> = { 0xbb: 0xbc, 0xbc: 0xbb, 0xe6: 0xe7, 0xe7: 0xe6, 0x85: 0x86, 0x86: 0x85 }
+    // (+ the vampires' bat forms: VampireSummon / VampireSummon2, 0x112 / 0x114, 0x120 / 0x121, the Nosferatu's 0xCA / 0xCB)
+    const PAIRS: Record<number, number> = { 0xbb: 0xbc, 0xbc: 0xbb, 0xe6: 0xe7, 0xe7: 0xe6, 0x85: 0x86, 0x86: 0x85, 0x112: 0x114, 0x114: 0x112, 0x120: 0x121, 0x121: 0x120, 0xca: 0xcb, 0xcb: 0xca }
     const to = g != null ? PAIRS[g] : undefined
     if (to == null) return
     const s = this.ctx.data.sprites.index(to - GFX_OFFSET)
@@ -1007,22 +1033,37 @@ export class Enemy extends Actor implements EnemyLike {
     if (!rect) return false
     return p.onMessage(this.w, { team: 0, rect, dir: this.facing, mult, atk, attacker: this, source: this })
   }
-  /** HeavyStrike 0x0802F77C: rect from the body edge toward the player, reaching ~60 px (centre to centre) */
+  /** HeavyStrike 0x0802F77C: sound 62, then the standard strike (0x0802F7B6..: the turn and the rect from the
+   *  body-box centres' dominant axis, `strikeRect`; Northern Wilderness 15-12) */
   heavyStrike(): boolean {
     const p = this.player
     if (!p || !p.hittable) return false
     // sound 62 first (0x0802F7B2), whether the hit lands or not
     audioEvent('sfx', { id: 62, vol: 64 })
-    this.facePlayer()
-    const b = this.bodyBox()
-    const [cx, cy] = this.center()
-    // measured: hits at dx <= 60 px centre to centre, misses at 65 (Goku side-on body half-width 4)
-    const R = 57
-    const rect: Rect = this.facing === 3 ? { x0: cx, y0: b.y0, x1: cx + R, y1: b.y1 } : this.facing === 2 ? { x0: cx - R, y0: b.y0, x1: cx, y1: b.y1 } : this.facing === 0 ? { x0: b.x0, y0: cy, x1: b.x1, y1: cy + R } : { x0: b.x0, y0: cy - R, x1: b.x1, y1: cy }
+    const rect = this.strikeRect(true)
+    if (!rect) return true
     // accepted -> the hit sound 48 + rand(2) (0x0802F8AC)
     const ok = p.onMessage(this.w, { team: 0, rect, dir: this.facing, mult: 0x400, atk: ATK[2], attacker: this, source: this })
     if (ok) audioEvent('sfx', { id: 48 + this.w.rng.rand(2, 'enemy melee hit sfx'), vol: 64 })
     return true
+  }
+  /** the hit nodes' condition 0x080361B8 (IfContactHit / IfMeleeHit): the strike rect toward the player on the
+   *  body-box centres' dominant axis (`strikeRect` with the turn), the message carries that direction; `restore`
+   *  (IfContactHit, a tank's crush) puts the enemy's own facing back before the message is sent; accepted -> sound
+   *  48 + rand(2) */
+  contactStrike(mult: number, restore: boolean): boolean {
+    const p = this.player
+    if (!p) return false
+    const saved = this.facing
+    const rect = this.strikeRect(true)
+    if (!rect) return false
+    const dir = this.facing
+    if (restore) this.facing = saved
+    if (p.onMessage(this.w, { team: 0, rect, dir, mult, atk: ATK[2], attacker: this, source: this })) {
+      audioEvent('sfx', { id: 48 + this.w.rng.rand(2, 'enemy melee hit sfx'), vol: 64 })
+      return true
+    }
+    return false
   }
   /** contact damage (worm, blood cell, mini-yakon): standard melee x1.0 with the body box */
   contactHit(foot = false): boolean {
@@ -1324,7 +1365,9 @@ export class Enemy extends Actor implements EnemyLike {
    *  (melee EP / HP hooks) when it did damage, then the top state's on-hit tree, whose ApplyDamage node takes the HP */
   onMessage(w: World, msg: HitMsg): boolean {
     if (msg.team === 0 || this.part || this.defeated || this.removed || !this.hittable) return false
-    if (!hitsBody(msg, this)) return false
+    // the body box (0x0800FE78) is at the ground position - the height does not lift it (wf-core enemy.rs
+    // on_message; sc_janemba: a punch lands on Janemba 66 px up in its ascent)
+    if (!overlaps(msg.rect, msg.foot ? this.footBox() : this.bodyBoxGround())) return false
     this.w = w
     const blocking = this.blocking && (msg.dir ^ 1) === this.facing
     const res = computeDamage(msg.atk, msg.mult, msg.attacker.stats, this.stats, blocking, w.rng)

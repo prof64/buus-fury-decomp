@@ -172,6 +172,9 @@ export class StraightShot extends Shot {
   }
   /** its hit message was taken by a beam's head (+0x54) */
   beamHit = false
+  /** the ki blast class (update 0x08019888): its hit was accepted (+0x54 = 1 at 0x080199E0) - it bursts in its next
+   *  update (the burst counter already one tick down) and takes messages until then */
+  taken = false
   rect(): Rect {
     const [ox, oy, w, h] = this.o.recBox ? kiBlastBox(this.dir, this.t) : this.o.box
     return { x0: this.px - ox, y0: this.py - oy, x1: this.px - ox + w, y1: this.py - oy + h }
@@ -184,6 +187,11 @@ export class StraightShot extends Shot {
       return
     }
     if (this.o.delay && this.t <= this.o.delay) return
+    if (this.taken) {
+      this.end(w, true)
+      this.dead = 1
+      return
+    }
     // its hit was taken by a beam's head last frame and no beam burst it: it ends now (+0x54)
     if (this.beamHit) return this.end(w, true)
     this.x += this.o.vx
@@ -205,6 +213,12 @@ export class StraightShot extends Shot {
       if (this.o.sfxHit != null) audioEvent('sfx', { id: this.o.sfxHit + (r[0] ?? 0), vol: 64 })
       // taken by a beam's head: the blast flies on until the beam's message bursts it (0x080199E0: +0x54 only)
       if (this.beamHit) return
+      // the ki blast class marks any accepted hit (+0x54) and bursts in its next update (run 2 row 124,907: the tank's
+      // new shell meets the blast that hit the tank the frame before)
+      if (this.o.name === 'kiblast' && this.o.fxEnd?.ticks === 16 && !this.o.fragile) {
+        this.taken = true
+        return
+      }
       if (hitP && this.o.onHitPlayer) this.o.onHitPlayer(w)
       this.end(w, true)
     }

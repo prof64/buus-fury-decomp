@@ -642,10 +642,14 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         const ay = Math.abs(dy)
         return e.facing === 0 ? ax < 16 && dy > 16 : e.facing === 1 ? ax < 16 && dy < -16 : e.facing === 2 ? ay < 16 && dx < -16 : ay < 16 && dx > 16
       })
+    // the game's shared condition 0x080361B8: IfContactHit restores the facing, IfMeleeHit keeps the turn; the power
+    // multiplier is node+0xC (IfMeleeHit's factory 0x08036329 - the jump smash's landing hit - builds it with 2)
     case 'IfContactHit':
-      return new Cond(n, c, () => e.meleeStrike(1024, false))
-    case 'IfMeleeHit':
-      return new Cond(n, c, () => e.meleeStrike(1024, false))
+      return new Cond(n, c, () => e.contactStrike(1024, true))
+    case 'IfMeleeHit': {
+      const k = n.fn === '0x8036329' ? 2 : P(n, 'k', 1)
+      return new Cond(n, c, () => e.contactStrike(1024 * k, false))
+    }
     case 'IfContactExplode':
       return new Cond(n, c, () => e.contactExplode())
     case 'IfLandedOnRock':
@@ -755,16 +759,39 @@ export function create(n: AiNodeJ, c: AiController): RNode {
     case 'SpawnPuff':
     case 'VampireSummon':
     case 'VampireSummon2':
-      return new Instant(n, c, () => {
-        // the node enemy_ai.json calls SpawnPuff (create 0x0802F21C, singleton 0x030030FC, vtable 0x08049A5C): its
-        // enter 0x0804E53C detaches the enemy from the enemy grid for good (0x0800F924: obj+0x291 = 1, tiles freed;
-        // the Ghost's first state - Kyodai Pyramid 14-17)
-        if (n.name === 'SpawnPuff') {
-          e.unmarkSelf()
-          e.detached = true
-        }
-        e.ctx.puff(e.w, ...e.center())
-      })
+      return new Act(
+        n,
+        c,
+        () => {
+          // (HFIL's Nosferatu, sc_hfil 18-8: the vampires' puff appears in the frame the state is entered, its rate
+          // drawn 0x1000 + rand(0x1000) (0x0804E733), at the shown frame's record box centre; the enters 0x0804E714 /
+          // 0x0804E8xx need 0x400 bytes of sprite memory - always there in a battle)
+          if (n.name !== 'SpawnPuff') {
+            const b = e.frameBox()
+            e.ctx.puffRng(e.w, (b.x0 + b.x1) >> 1, (b.y0 + b.y1) >> 1)
+          }
+        },
+        () => {
+          // the node enemy_ai.json calls SpawnPuff (create 0x0802F21C, singleton 0x030030FC, vtable 0x08049A5C): its
+          // enter 0x0804E53C detaches the enemy from the enemy grid for good (0x0800F924: obj+0x291 = 1, tiles freed;
+          // the Ghost's first state - Kyodai Pyramid 14-17) - and that is all (no effect object: sc_hfil)
+          if (n.name === 'SpawnPuff') {
+            e.unmarkSelf()
+            e.detached = true
+          } else if (n.name === 'VampireSummon') {
+            // the bat form (0x08033B4C: gfx 0x112 / 0x114, 0xCA / 0xCB, 0x120 / 0x121), off the enemy grid
+            e.swapGfx()
+            e.unmarkSelf()
+            e.detached = true
+          } else {
+            // the vampire form back (0x08033908), on the enemy grid
+            e.swapGfx()
+            e.detached = false
+            e.markSelf()
+          }
+          return true
+        },
+      )
     case 'SelfDestruct':
       return new Instant(n, c, () => e.die(true))
     case 'TriggerSelf':
@@ -1119,7 +1146,8 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       // state (its end SetAnim(0), before the AI) (lockstep f02_vs_enemy_t3e: GotoState 228, strike 288, idle 304)
       return new Act(n, c, (a) => {
         a.data.ok = e.player?.hittable ? 1 : 0
-        if (a.data.ok) e.facePlayer()
+        // the pose: SetAnim id 4's raw, frame 0, held; no turn (the facing is IfPlayerInMeleeRange's)
+        if (a.data.ok) e.holdPose(5, 0)
       }, (f, a) => {
         if (!a.data.ok) return true
         if (f === 60) {
@@ -1133,7 +1161,11 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       return new Act(n, c, () => {
         e.facePlayer()
         e.setAnim(18, true, true)
+        // the controller's enter (0x08035F8C) clears +0x1CC: no hits for its first cel (its update gives them back at
+        // cel 1, 0x08035FCC; run 3 row 1,517,941, Volcano 15-32)
+        e.hittable = false
       }, (f) => {
+        if (f === 4) e.hittable = true
         // controller 0x03003278 (update 0x08036044): no animation change at the strike; at tick 0x8C the MeleeAttack
         // hit (0x0802A0C4's turn + strike rect, x1.5) and on an accepted hit the sound 48 + rand(2) (after the
         // damage roll); the controller's tick ends it at tick 148 with SetAnim(0) (one SetAnim(0): the recorded
@@ -2057,7 +2089,9 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         }
       })
     case 'JumpSmash':
-      return new Act(n, c, () => e.setAnim(18, true, true), (f) => {
+      // the jump is SetAnim id 0x13 = raw 20 under its own controller (the type's recorded sequence, 249 ticks:
+      // Volcano Summit 15-32); the three dust clouds draw their rate on tick 248 and the controller's next two ticks
+      return new Act(n, c, () => e.setAnim(19, true, true), (f) => {
         if (f >= 8 && f < 56) e.z -= 8
         else if (f >= 56 && f < 200) {
           const [dx, dy] = e.toPlayer()
@@ -2067,13 +2101,22 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         } else if (f >= 200 && f < 248) e.z = Math.min(0, e.z + 8)
         if (f === 248) {
           e.z = 0
-          for (let i = -1; i <= 1; i++) e.ctx.puff(e.w, e.center()[0] + i * 12, e.py + 4)
+          e.smashDust()
+          e.smashPuffs = 2
           return true
         }
         return false
       })
     case 'FinishLandingAnim':
-      return wait(n, c, 11, 'idle')
+      // controller 0x0300326C plays the jump's cels 6 and 7 (4 ticks each, its own tick from 0), then SetAnim(0)
+      // (15-32: the idle draw comes 8 frames after the landing hit)
+      return new Act(n, c, () => undefined, (f) => {
+        if (f >= 0 && f <= 7) {
+          e.holdPose(20, 6 + (f >> 2))
+          e.ea.pos.tick = f
+        } else if (f === 8) e.setAnim(0, true, true)
+        return f >= 8
+      })
     case 'StunnedAnim':
     case 'StunnedAnim21':
     case 'PlayAnimHold':
@@ -2096,9 +2139,12 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       // node vtable 0x0804A110: enter 0x0804E5E8 installs the fragment state 0x03003158 (enemy.ts fragEnter); update
       // 0x0804FF0C: done once the actor left that state; exit 0x0804F570 nothing
       return new Act(n, c, () => e.fragEnter(), () => e.stateHook?.name !== 'fragment')
+    case 'PlayAnim12Swarm':
+      // the swarm minion's appear is anim 0x12 (raw 19: 3 cels of 4 ticks, one-shot 0x03001B38), done when it ends
+      // (run 2 row 1,484,953 / 1,484,966, 20-5)
+      return new Act(n, c, () => e.setAnim(18, true, false, { rule: 'once_stop', shift: 2, end: 'none' }), (f) => f >= 1 && e.animDone())
     case 'PlayAnim12':
     case 'PlayAnim12b':
-    case 'PlayAnim12Swarm':
     case 'PlayAnim12Yakon':
     case 'PlayAnim12Yakon2':
       return playAnim(n, c, 17, false, 16)

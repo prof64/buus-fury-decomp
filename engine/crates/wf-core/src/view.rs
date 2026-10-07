@@ -1175,17 +1175,15 @@ impl Sim for Session {
                 None => AudioEvent::StopSong,
             }));
         }
-        if self.world.field.is_some() {
-            self.presenter.before_step(&self.world);
-        }
+        // (battles too: their arena is a field map drawn by the same hardware - the OBJs, the HUD, the boxes and the
+        // numbers show the frame before's, the BGs the frame's own)
+        self.presenter.before_step(&self.world);
         Session::step(self, inputs);
         sim_events(&self.world, events);
     }
     fn view(&self, out: &mut RenderView) {
         render_view(&self.world, out);
-        if self.world.field.is_some() {
-            self.presenter.apply(out);
-        }
+        self.presenter.apply(out);
     }
     fn frame(&self) -> u64 {
         self.world.frame as u64

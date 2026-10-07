@@ -1751,10 +1751,10 @@ pub fn walk_to_player(w: &mut World, i: usize, speed: i32, st: &mut i32, anim_fr
 
 /// Wander update 0x0802B708
 pub fn wander_step(w: &mut World, i: usize, speed: i32, turn_p: i64) {
-    // field: the update starts with SetAnim(1) unless IsAnim(1) (0x0802B710..): whatever is showing is replaced - a
-    // hurt animation still running when the reaction state has popped (Northern Wilderness 15-8: a Ghoul walks on
-    // without the hurt's end going through idle). Battles keep the reference (the walk follows the move)
-    if w.field.is_some() && !w.en_ref(i).is_anim(1) {
+    // the update starts with SetAnim(1) unless IsAnim(1) (0x0802B710..): whatever is showing is replaced - a hurt
+    // animation still running when the reaction state has popped (Northern Wilderness 15-8: a Ghoul walks on without
+    // the hurt's end going through idle); battles too
+    if !w.en_ref(i).is_anim(1) {
         set_anim(w, i, &[AnimRef::N(1)], true, Some(true));
     }
     mark_moving(w, i);
@@ -2111,33 +2111,14 @@ pub fn heavy_strike(w: &mut World, i: usize) -> bool {
         return false;
     }
     w.sfx(62, 64);
-    // field: 0x0802F7B6.. is the standard strike - the turn and the rect from the body-box centres' dominant axis
+    // 0x0802F7B6.. is the standard strike - the turn and the rect from the body-box centres' dominant axis
     // (`strike_rect`; Northern Wilderness 15-12: a Knight Destroyer, 64 px wide, turns left toward a player its
-    // top-left position has above it). Battles keep the reference's rect
-    if w.field.is_some() {
-        let Some(rect) = strike_rect(w, i, true) else {
-            return true;
-        };
-        let dir = w.en_ref(i).a.facing;
-        let mut m = msg_from(w, i, 0, rect, dir, 0x400, atk(2));
-        if player::on_message(w, pi, &mut m) {
-            let s = 48 + w.rng.rand(2);
-            w.sfx(s, 64);
-        }
+    // top-left position has above it) - battles too
+    let Some(rect) = strike_rect(w, i, true) else {
         return true;
-    }
-    face_player(w, i);
-    let a = &w.en_ref(i).a;
-    let b = a.body_box();
-    let (cx, cy) = a.center();
-    const R: i32 = 57;
-    let rect = match a.facing {
-        3 => Rect::new(cx, b.y0, cx + R, b.y1),
-        2 => Rect::new(cx - R, b.y0, cx, b.y1),
-        0 => Rect::new(b.x0, cy, b.x1, cy + R),
-        _ => Rect::new(b.x0, cy - R, b.x1, cy),
     };
-    let mut m = msg_from(w, i, 0, rect, a.facing, 0x400, atk(2));
+    let dir = w.en_ref(i).a.facing;
+    let mut m = msg_from(w, i, 0, rect, dir, 0x400, atk(2));
     if player::on_message(w, pi, &mut m) {
         let s = 48 + w.rng.rand(2);
         w.sfx(s, 64);
@@ -3356,13 +3337,9 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
         {
             return false;
         }
-        // field: the body box (0x0800FE78) is at the ground position - the height does not lift it (sc_janemba:
-        // a punch lands on Janemba 66 px up in its ascent)
-        let body = if w.field.is_some() {
-            e.a.body_box_ground()
-        } else {
-            e.a.body_box()
-        };
+        // the body box (0x0800FE78) is at the ground position - the height does not lift it (sc_janemba: a punch
+        // lands on Janemba 66 px up in its ascent; battles too: a punch under Broly's jump smash)
+        let body = e.a.body_box_ground();
         if !overlaps(&msg.rect, &if msg.foot { e.a.foot_box() } else { body }) {
             return false;
         }

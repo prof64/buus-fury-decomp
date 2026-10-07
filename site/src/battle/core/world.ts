@@ -114,16 +114,27 @@ export class World {
     return e
   }
 
-  /** Advance one game frame. Objects are updated last-to-first; objects added this frame wait until the next. */
+  /** Advance one game frame. Objects are updated last-to-first by index into the list of live objects (0x080115B0):
+   *  the list compacts at once when an object is destroyed, so an update that destroys an older object runs the
+   *  same object again at the next index (wf-core world.rs `step_entities`); objects added this frame wait until the
+   *  next. */
   step(input: InputFrame) {
     this.frame++
     this.stats.frames++
     this.rng.frame = this.frame
     this.input = input
-    const n = this.entities.length
-    for (let i = n - 1; i >= 0; i--) {
-      const e = this.entities[i]
-      if (!e.removed && (!this.modal || this.modal.includes(e))) e.update(this)
+    let c = this.entities.reduce((n, e) => n + (e.removed ? 0 : 1), 0) - 1
+    while (c >= 0) {
+      let k = -1
+      let e: Entity | undefined
+      for (const x of this.entities) {
+        if (!x.removed && ++k === c) {
+          e = x
+          break
+        }
+      }
+      if (e && (!this.modal || this.modal.includes(e))) e.update(this)
+      c--
     }
     this.entities = this.entities.filter((e) => !e.removed)
     for (const p of this.popups) {

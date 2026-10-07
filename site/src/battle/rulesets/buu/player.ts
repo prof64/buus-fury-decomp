@@ -177,6 +177,8 @@ export class Player extends Actor implements PlayerLike {
   walk = 0
   dashSpd = 0
   transformTo = -1
+  /** the transformation state's aura effect (0x08752D28): the state deletes it when it exits */
+  auraFx: LoopFx | null = null
   formsAllowed: number[]
   punchAnim = 0
   /** the game's state object at obj+0x14 (lockstep name, tools/battle/lockstep/emu_lockstep.py STATE_NAMES) */
@@ -624,6 +626,11 @@ export class Player extends Actor implements PlayerLike {
         else this.ssGauge = 0
       }
       this.sfxStop(54)
+      // the state deletes its aura effect itself (gone this frame - not at the effect's next update; segment sb 19-3)
+      if (this.auraFx) {
+        this.auraFx.removed = true
+        this.auraFx = null
+      }
     }
     if (this.state === 'skill' && !gs.startsWith('skill')) this.endSkill(w)
     this.gs = gs
@@ -673,9 +680,11 @@ export class Player extends Actor implements PlayerLike {
         break
       case 'skill20':
       case 'ss_up':
-        // 0x0801C3EC: the transformation sound 54 (+ the aura effect object)
+        // 0x0801C3EC: the transformation sound 54 (+ the aura effect object: the player's transformation makes it
+        // in startTransform, after this enter; the story form's SsUp here)
         a.tick = a.frame = 0
         this.transformDone = false
+        if (gs === 'ss_up') this.addAura(w)
         this.sfx(54)
         break
       case 'ss_revert':
@@ -777,9 +786,7 @@ export class Player extends Actor implements PlayerLike {
     this.syncAnim()
     // KO: the death script (0x08799D0C) starts the game-over song 8 200 frames later
     if (this.koAt >= 0 && w.frame - this.koAt === 200) audioEvent('song', { id: 8 })
-    // the task list (screen shakes) runs after the objects; the player is the last object updated
-    this.ctx.tickShakes(w)
-    w.viewShake = this.ctx.shakeOff
+    // (the task list - screen shakes - runs after the whole object pass: index.ts postStep)
   }
 
   /** the state's tick (vtable +4) */
@@ -1910,8 +1917,14 @@ export class Player extends Actor implements PlayerLike {
     this.enterState(w, 'skill20')
     this.blocking = false
     w.logEvent('info', `transforming -> form ${to}`)
-    const [ax, ay] = this.center()
-    w.add(new LoopFx(this.ctx.fx(SS_AURA.id), ax, ay + 1, 0, SS_AURA.n, SS_AURA.rate, () => this.state === 'transform', 1))
+    // (the state ctor 0x0801C3EC: the footprint's centre + (0, 1) - 0x0800FDFA's box halved; emulator sb_006 f9,320)
+    this.addAura(w)
+  }
+  /** the transformation state's aura (0x0801C3EC): 0x08752D28 at the footprint's centre + (0, 1) */
+  private addAura(w: World) {
+    const [ax, ay] = this.footCenter()
+    this.auraFx = new LoopFx(this.ctx.fx(SS_AURA.id), ax, ay + 1, 0, SS_AURA.n, SS_AURA.rate, () => this.state === 'transform', 1)
+    w.add(this.auraFx)
   }
   /** transformation control 0x0801C4F4: the gauge fills to maxEP * tick / (16 * nframes) (the SS3 gauge when the
    *  current form is SS) */
@@ -2048,8 +2061,10 @@ export class Player extends Actor implements PlayerLike {
     const a = this.ap
     const t = ++it.t
     if (t < 0) {
-      if (t === -23 && it.targets.length > it.idx) {
-        this.spend(w, [40, 80, 480][Math.min(2, it.idx)])
+      // (update 0x0801BB1A: the pick's EP only while a pick is left, sound 31 on every vanish - the return's too;
+      // wf-core ctl_it_field)
+      if (t === -23) {
+        if (it.targets.length > it.idx) this.spend(w, [40, 80, 480][Math.min(2, it.idx)])
         this.sfx(31)
       }
       a.raw = 20

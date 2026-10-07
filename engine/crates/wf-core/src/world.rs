@@ -894,14 +894,13 @@ impl World {
     /// shake tasks: every `period` frames two RNG draws pick the offset ((next - 0x8000) * intensity) >> 19
     pub fn tick_shakes(&mut self) {
         let mut shakes = std::mem::take(&mut self.g.shakes);
-        // field: the screen-effect slot holds one shake at a time; a newer one suspends the older until it ends
-        // (sc_janemba: the summon shake pauses through a crit shake, then goes on)
+        // the screen-effect slot holds one shake at a time; a newer one suspends the older until it ends (sc_janemba:
+        // the summon shake pauses through a crit shake, then goes on) - battles too (TS `tickShakes` mirrors it)
         let n = shakes.len();
         self.g.shake_shown = self.g.shake_off;
         self.g.shakes_ticked = self.frame;
-        let stacked = self.field.is_some();
         for (k, s) in shakes.iter_mut().enumerate() {
-            if stacked && k + 1 != n {
+            if k + 1 != n {
                 continue;
             }
             s.left -= 1;
@@ -932,18 +931,25 @@ impl World {
             self.step_entities_list();
             return;
         }
-        let n = self.ents.len();
-        for i in (0..n).rev() {
-            if self.ents[i].removed {
-                continue;
-            }
-            if let Some(m) = &self.modal {
-                if !m.contains(&self.ents[i].id) {
-                    continue;
+        // the game's world list (0x080115B0), as the field's (`step_entities_list`): updated from the last object to
+        // the first by index into a list that compacts at once when an object is destroyed; objects created during
+        // the pass are appended (not updated this frame). An update that destroys an older object therefore runs
+        // the same object again at the next index (a Kamehameha that kills the enemy steps twice in that frame -
+        // the field's pixel-verified drawing). The TS reference mirrors it (core/world.ts `step`).
+        let live = |w: &World| -> Vec<usize> { (0..w.ents.len()).filter(|&k| !w.ents[k].removed).collect() };
+        let mut c = live(self).len() as i64 - 1;
+        while c >= 0 {
+            let l = live(self);
+            if let Some(&i) = l.get(c as usize) {
+                if self.modal.as_ref().is_none_or(|m| m.contains(&self.ents[i].id)) {
+                    // (the damage numbers' place in the pass: `vram::damage_number_shown`)
+                    self.battle.pass_at = self.ents[i].id;
+                    self.update_entity(i);
                 }
             }
-            self.update_entity(i);
+            c -= 1;
         }
+        self.battle.pass_at = 0;
         crate::vram::reap(self);
         self.ents.retain(|e| !e.removed);
     }

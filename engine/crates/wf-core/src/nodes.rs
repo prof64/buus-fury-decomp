@@ -700,12 +700,11 @@ fn cond(w: &mut World, c: &C, n: u16) -> bool {
                 _ => dy.abs() < 16 && dx > 16,
             }
         }
-        // the field: the game's shared condition 0x080361B8 (IfContactHit restores the facing, IfMeleeHit keeps the
-        // turn); battles keep the rule cross_ts pins
-        K::IfContactHit if w.field.is_some() => en::contact_strike(w, i, 1024, true),
+        // the game's shared condition 0x080361B8 (IfContactHit restores the facing, IfMeleeHit keeps the turn) -
+        // battles too (a tank's crush sounds 48 + rand(2))
+        K::IfContactHit => en::contact_strike(w, i, 1024, true),
         // (the power multiplier is node+0xC << 10: 2 for the jump smash's landing hit, `ai::push_node`)
-        K::IfMeleeHit if w.field.is_some() => en::contact_strike(w, i, 1024 * par(c, n, P::K, 1) as i32, false),
-        K::IfContactHit | K::IfMeleeHit => en::melee_strike(w, i, 1024, false, false, atk(2)),
+        K::IfMeleeHit => en::contact_strike(w, i, 1024 * par(c, n, P::K, 1) as i32, false),
         K::IfContactExplode => en::contact_explode(w, i),
         K::IfLandedOnRock => en::land_on_rock(w, i),
         K::IfPlayerPetrified => en::player(w, i).is_some_and(|pi| w.pl_ref(pi).is_stone()),
@@ -1174,12 +1173,8 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             if r.d[0] != 0 {
                 // field: the enter 0x0802F74C only poses - vt+0x30(4, 0): SetAnim id 4's raw, frame 0, held - and
                 // starts the 60-frame count; the facing is what IfPlayerInMeleeRange's turn left (Northern Wilderness
-                // 15-12: a Knight Destroyer winds up facing left). Battles keep the reference (a turn, no pose)
-                if w.field.is_some() {
-                    hold_pose(w, i, SETANIM_RAW[4], 0);
-                } else {
-                    en::face_player(w, i);
-                }
+                // 15-12: a Knight Destroyer winds up facing left); battles too
+                hold_pose(w, i, SETANIM_RAW[4], 0);
             }
         }
         K::ChargedPunch => {
@@ -1187,10 +1182,8 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             set_anim(w, i, &[an(18)], true, Some(true));
             // field: the controller's enter (0x08035F8C) clears +0x1CC - no hits for its first cel (ticks 0..3; its
             // update gives them back at cel 1, 0x08035FCC; run 3 row 1,517,941, Volcano 15-32: a punch on Broly's
-            // wind-up's first frames is refused); battles keep the reference
-            if w.field.is_some() {
-                w.en(i).a.hittable = false;
-            }
+            // wind-up's first frames is refused); battles too
+            w.en(i).a.hittable = false;
         }
         K::MiniYakonLunge => {
             r.d[0] = en::player(w, i).is_some_and(|pi| w.pl_ref(pi).a.hittable) as i32;
@@ -1370,11 +1363,11 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             let h = w.data.anim.hold;
             set_anim_r(w, i, &[an(20)], true, h);
         }
-        // field (HFIL's Nosferatu, sc_hfil 18-8): the puff appears in the frame the state is entered, its rate drawn
-        // (0x1000 + rand(0x1000), 0x0804E733); battle keeps the reference's fixed-rate puff on the node's update
+        // (HFIL's Nosferatu, sc_hfil 18-8): the puff appears in the frame the state is entered, its rate drawn
+        // (0x1000 + rand(0x1000), 0x0804E733) - battles too, the TS reference mirrors it
         // (enters 0x0804E714 / 0x0804E8xx: only with 0x400 bytes of sprite memory free - else no puff and no rand
         // (tour castle_pw_10_9 f151) - at the shown frame's record box centre, 0x0800FE34)
-        K::VampireSummon | K::VampireSummon2 if w.field.is_some() => {
+        K::VampireSummon | K::VampireSummon2 => {
             if crate::vram::room_of(w).is_none_or(|r| r >= 0x400) {
                 let (cx, cy) = en::frame_box(w, i).center();
                 crate::fx::puff_rng(w, cx, cy);
@@ -1668,12 +1661,10 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         K::SuperJanembaWave => timed_enter(w, i, &[an(19), an(3)], true),
         // field: the jump is SetAnim id 0x13 = raw 20 under its own controller 0x0804D310@0x0300325C (the type's
         // recorded sequence, 249 ticks: Volcano Summit 15-32 - Broly's animation runs to the landing; raw 19 is the
-        // ChargedPunch's, whose one-shot ends at tick 148 with an idle draw). Battles keep the reference
-        K::JumpSmash if w.field.is_some() => set_anim(w, i, &[an(19)], true, Some(true)),
-        K::JumpSmash => set_anim(w, i, &[an(18)], true, Some(true)),
-        // (field: the update plays the landing's cels first)
-        K::FinishLandingAnim if w.field.is_some() => {}
-        K::FinishLandingAnim => set_anim(w, i, &[nm("idle")], true, Some(true)),
+        // ChargedPunch's, whose one-shot ends at tick 148 with an idle draw); battles too
+        K::JumpSmash => set_anim(w, i, &[an(19)], true, Some(true)),
+        // (the update plays the landing's cels first)
+        K::FinishLandingAnim => {}
         // node 0x0874CA2C (Ronin / Samurai / Shogun guard): the enemy's SetAnim(0x11) (vfunc +0x28 -> 0x0800FAB6):
         // raw 19 under the one-shot state 0x03001B18 (16 ticks, then SetAnim(0)); restarted by every enter
         // (13-51: the Samurai's stance restarts every 3 frames while its state loops, and runs out when it does not).
@@ -1693,14 +1684,13 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         // enter 0x0804E5E8 installs the fragment state 0x03003158
         K::PlayAnim0 => en::frag_enter(w, i),
         // field: the swarm minion's appear is anim 0x12 (raw 19 in the recording, 3 cels of 4 ticks; run 2 row
-        // 1,484,953, 20-5) - an(17) is a raw this sprite does not have, the minion stood in its idle
-        K::PlayAnim12Swarm if w.field.is_some() => {
+        // 1,484,953, 20-5) - an(17) is a raw this sprite does not have, the minion stood in its idle; battles too
+        K::PlayAnim12Swarm => {
             let rule = w.data.anim.once_stop2;
             set_anim_r(w, i, &[an(18)], false, rule);
         }
         K::PlayAnim12
         | K::PlayAnim12b
-        | K::PlayAnim12Swarm
         | K::PlayAnim12Yakon
         | K::PlayAnim12Yakon2 => set_anim(w, i, &[an(17)], true, Some(false)),
         // GhostAnimA / B: enters 0x0804EBC8 / 0x0804EB38 = SetAnimRaw(0x12) under the one-shot state 0x03001B30
@@ -2041,29 +2031,22 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             if matches!(kind(c, n), K::SpawnPuff) {
                 en::unmark_self(w, i);
                 w.en(i).detached = true;
-                // field: that is all it does - no effect object, no tiles (HFIL's Janemba Hands: the object list
-                // and the tile allocator at the area's start; segments sc_hfil). Battle keeps the reference's puff
-                if w.field.is_some() {
-                    return true;
-                }
-            }
-            // field: the puff came with the node's enter; the form's sprite changes here, on the update (the
-            // Nosferatu, type 0x52: gfx 203 the bat, 202 the vampire - 0x0800EE64 writes the object's gfx def)
-            if w.field.is_some() {
-                // ... and the bat is off the enemy grid (obj+0x291 = 1: it flies over walls), the vampire back on it
-                if matches!(kind(c, n), K::VampireSummon) {
-                    en::swap_gfx(w, i);
-                    en::unmark_self(w, i);
-                    w.en(i).detached = true;
-                } else if matches!(kind(c, n), K::VampireSummon2) {
-                    en::swap_gfx(w, i);
-                    w.en(i).detached = false;
-                    en::mark_self(w, i);
-                }
+                // that is all it does - no effect object, no tiles (HFIL's Janemba Hands: the object list and the tile
+                // allocator at the area's start; segments sc_hfil). Battles too (TS mirrors it)
                 return true;
             }
-            let (cx, cy) = w.en_ref(i).a.center();
-            crate::fx::puff(w, cx, cy, 0x1800);
+            // the puff came with the node's enter; the form's sprite changes here, on the update (the Nosferatu, type
+            // 0x52: gfx 203 the bat, 202 the vampire - 0x0800EE64 writes the object's gfx def) - battles too
+            // ... and the bat is off the enemy grid (obj+0x291 = 1: it flies over walls), the vampire back on it
+            if matches!(kind(c, n), K::VampireSummon) {
+                en::swap_gfx(w, i);
+                en::unmark_self(w, i);
+                w.en(i).detached = true;
+            } else if matches!(kind(c, n), K::VampireSummon2) {
+                en::swap_gfx(w, i);
+                w.en(i).detached = false;
+                en::mark_self(w, i);
+            }
             true
         }
         K::SelfDestruct => {
@@ -2381,7 +2364,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         // controller 0x03003278: at tick 0x8C the MeleeAttack hit (x1.5; accepted -> 48 + rand(2)); its end at 148
         // (one SetAnim(0))
         K::ChargedPunch => {
-            if f == 4 && w.field.is_some() {
+            if f == 4 {
                 w.en(i).a.hittable = true;
             }
             if f == 140 {
@@ -3625,27 +3608,18 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 w.en(i).a.z = z;
             }
             // field: the three dust clouds draw their rate (rand(0x1000) each, 0x08035D04 ..) on tick 248, where the
-            // node is over, and on the controller's next two ticks (`Enemy.smash_puffs`; 15-32)
-            if w.field.is_some() && f == 248 {
+            // node is over, and on the controller's next two ticks (`Enemy.smash_puffs`; 15-32) - battles too
+            if f == 248 {
                 w.en(i).a.z = 0;
                 en::smash_dust(w, i);
                 w.en(i).smash_puffs = 2;
                 return true;
             }
-            if f == 248 {
-                w.en(i).a.z = 0;
-                for k in -1..=1 {
-                    let (cx, _) = w.en_ref(i).a.center();
-                    let py = w.en_ref(i).a.py();
-                    crate::fx::puff(w, cx + k * 12, py + 4, 0x1800);
-                }
-                return true;
-            }
             false
         }
         // field: controller 0x0300326C plays the jump's cels 6 and 7 (4 ticks each, its own tick from 0), then
-        // SetAnim(0) (15-32: the idle draw comes 8 frames after the landing hit)
-        K::FinishLandingAnim if w.field.is_some() => {
+        // SetAnim(0) (15-32: the idle draw comes 8 frames after the landing hit); battles too
+        K::FinishLandingAnim => {
             if (0..=7).contains(&f) {
                 hold_pose(w, i, 20, 6 + (f >> 2));
                 w.en(i).ea.pos.tick = f;
@@ -3655,7 +3629,6 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             }
             f >= 8
         }
-        K::FinishLandingAnim => f >= 11,
         // Babidi's controller tick 0x0802ADC8: cel = (tick >> 3) & 3; at tick 0x60: SetAnim(0) (idle rand(255)), and
         // the node (0x0802AE06) is finished
         K::PlayAnimHold if w.en_ref(i).ty == 0x1d => {
@@ -3714,7 +3687,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             let d = Arc::clone(&w.data);
             // (field: the swarm minion's one-shot 0x03001B38 is shorter than 16 updates - it ends when the animation
             // does: run 2 row 1,484,966, 20-5, Super Buu's minion leaves its state 0x52 after 13)
-            let min = if w.field.is_some() && matches!(kind(c, n), K::PlayAnim12Swarm) { 1 } else { 16 };
+            let min = if matches!(kind(c, n), K::PlayAnim12Swarm) { 1 } else { 16 };
             let done = f >= min && w.en_ref(i).anim_done(&d);
             if done
                 && matches!(kind(c, n), K::PlayAnimOnce)
