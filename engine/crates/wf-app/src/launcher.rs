@@ -62,6 +62,80 @@ pub const PRESETS: &[(&str, &str, &[(&str, i32)], &str)] = &[
     ("majin_fighters", "4 Majin Fighters", &[("t68", 4)], "forest"),
 ];
 
+/// The Battle page's character picker: (Character, Form, Outfit, fighter id, form record). The chosen row is the exact
+/// form record the battle starts in, so transforming up / down follows the game's chain (a halo Super Saiyan 3 Goku
+/// drops back to the halo Goku). Built from the form table (`forms/*.json`, sprite folder = gfx id - 9):
+/// * a Form is a difference in play - stats, transformations, the Super Saiyan gauge's drain; an Outfit is a look
+///   only (same stats, same chain shape). Teen / Mystic / tournament (form 15: the Saiyaman suit without helmet and
+///   cape, s307) Gohan are looks of the same base form (no stat bonus; Mystic Gohan has no Super Saiyan form); the
+///   Great Saiyaman is a form (+5 STR / POW / END, faster - the Saiyaman skill's transformation).
+/// * "no limit": the story's records of a Super Saiyan form whose controller does not drain the gauge
+///   (`player.rs` `drains`: 0x03001B78 / 0x03001B80 / 0x03001B68 / 0x03001B6C do, 0x03001B7C / 0x03001B84 do not) -
+///   Goku 7 / 8, Gohan 17, Vegeta 30, Gotenks 36 -> 37 -> 38 (and the KO keeps the form: no flag 0x40).
+/// * "Unstable Super Saiyan": Trunks 24, the story's unstable Trunks (controller 0x03001B88: a quarter walking speed,
+///   turns Super Saiyan by itself after 120 + rand(180) frames into 25, which turns back after 240 + rand(120)) - one
+///   entry, starting in 24.
+/// * labels fit the page's value column (~27 characters).
+/// * not listed: records with the same play as a listed one (Gogeta 44 = 41: only the fusion-dance flag 0x08 / the
+///   controller 0x03001B60 differ, neither read in a battle) and records whose sprite lacks the fighting animations
+///   (Goku 1 Other World clothes, Gohan 9 / 11 / 12, Trunks 23, the failed fusions Gotenks 32 / 33 and Gogeta 42 / 43
+///   have only 2 - 10 of the 20 animations: no ki blast / attacks; Android 18, Krillin, Tien, Yamcha likewise).
+/// * Hercule, Videl and Pikkon (the Dojo's Balanced roster): record slot 8 never grows (50 HP, STR 17 at any level -
+///   no damage on a Majin Fighter, KO'd in seconds), so their battles take Goku's record at the chosen level
+///   ([`Launcher::battle_config`]); their own sprites have every fighting animation.
+pub const PICKS: &[(&str, &str, &str, &str, i32)] = &[
+    ("Goku", "Base", "Normal", "goku", 0),
+    ("Goku", "Base", "Halo (Other World)", "goku", 2),
+    ("Goku", "Super Saiyan", "Normal", "goku", 3),
+    ("Goku", "Super Saiyan", "Halo (Other World)", "goku", 4),
+    ("Goku", "Super Saiyan 3", "Normal", "goku", 5),
+    ("Goku", "Super Saiyan 3", "Halo (Other World)", "goku", 6),
+    ("Goku", "Super Saiyan 3, no limit", "Normal", "goku", 8),
+    ("Goku", "Super Saiyan 3, no limit", "Halo (Other World)", "goku", 7),
+    ("Gohan", "Base", "Teen Gohan (school clothes)", "gohan", 10),
+    ("Gohan", "Base", "Saiyaman suit, no helmet", "gohan", 15),
+    ("Gohan", "Base", "Mystic Gohan (orange gi)", "gohan", 13),
+    ("Gohan", "Super Saiyan", "Teen Gohan (school clothes)", "gohan", 16),
+    ("Gohan", "Super Saiyan", "Saiyaman suit, no helmet", "gohan", 18),
+    ("Gohan", "Super Saiyan, no limit", "Teen Gohan (school clothes)", "gohan", 17),
+    ("Gohan", "Great Saiyaman", "Normal", "gohan", 14),
+    ("Goten", "Base", "Normal", "goten", 19),
+    ("Goten", "Super Saiyan", "Normal", "goten", 20),
+    ("Trunks", "Base", "Normal", "trunks", 21),
+    ("Trunks", "Super Saiyan", "Normal", "trunks", 22),
+    ("Trunks", "Unstable Super Saiyan", "Normal", "trunks", 24),
+    ("Vegeta", "Base", "Normal", "vegeta", 26),
+    ("Vegeta", "Base", "Halo (Other World)", "vegeta", 27),
+    ("Vegeta", "Super Saiyan", "Normal", "vegeta", 28),
+    ("Vegeta", "Super Saiyan", "Halo (Other World)", "vegeta", 29),
+    ("Vegeta", "Super Saiyan, no limit", "Normal", "vegeta", 30),
+    ("Gotenks", "Base", "Normal", "gotenks", 31),
+    ("Gotenks", "Super Saiyan", "Normal", "gotenks", 34),
+    ("Gotenks", "Super Saiyan 3", "Normal", "gotenks", 35),
+    ("Gotenks", "Base, no-limit transforms", "Normal", "gotenks", 36),
+    ("Gotenks", "Super Saiyan, no limit", "Normal", "gotenks", 37),
+    ("Gotenks", "Super Saiyan 3, no limit", "Normal", "gotenks", 38),
+    ("Vegito", "Base", "Normal", "vegito", 39),
+    ("Vegito", "Super Saiyan", "Normal", "vegito", 40),
+    ("Gogeta", "Super Saiyan", "Normal", "gogeta", 41),
+    ("Hercule", "Base", "Normal", "f47", 47),
+    ("Videl", "Base", "Normal", "f52", 52),
+    ("Pikkon", "Base", "Normal", "f50", 50),
+];
+
+/// form records the picker does not list -> the listed record a saved setting moves to (same character and look)
+const PICK_ALIASES: &[(i32, i32)] = &[(1, 0), (9, 10), (11, 10), (12, 10), (23, 21), (25, 24), (32, 31), (33, 31), (42, 41), (43, 41), (44, 41)];
+
+/// One row of the character picker ([`PICKS`], then fighters a mod adds: each form record its own Form)
+#[derive(Clone, Debug, PartialEq)]
+pub struct Pick {
+    pub character: String,
+    pub form: String,
+    pub outfit: String,
+    pub fighter: String,
+    pub form_id: i32,
+}
+
 /// boss enemy types (catalog's `BOSS_TYPES`): listed first
 const BOSS_TYPES: &[i32] = &[
     0x00, 0x06, 0x0a, 0x0b, 0x12, 0x1a, 0x1b, 0x1c, 0x23, 0x25, 0x27, 0x28, 0x33, 0x3c, 0x3d, 0x3f, 0x46, 0x50, 0x51, 0x5a, 0x5b, 0x60, 0x64, 0x6f, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79,
@@ -236,8 +310,10 @@ enum Row {
     NewGame,
     Slot(usize),
     Kind,
+    /// the character picker: Character (`Fighter`), Form, Outfit (looks; shown when the form has several)
     Fighter,
     Form,
+    Outfit,
     Level,
     Enemy,
     Count,
@@ -279,8 +355,10 @@ pub struct Launcher {
     /// a line under the menu (errors from the shell)
     pub message: String,
     data: Option<Arc<GameData>>,
-    /// (fighter id, name, forms, default form)
-    fighters: Vec<(String, String, Vec<i32>, i32)>,
+    /// the character picker's rows ([`PICKS`] present in the content, then mod fighters)
+    picks: Vec<Pick>,
+    /// fighter id -> its default form record (a saved setting with no form)
+    default_forms: Vec<(String, i32)>,
     /// (id, name)
     enemies: Vec<(String, String)>,
     /// enemy type -> its definition's level byte (`enemies/*.json` `level_byte`)
@@ -307,17 +385,47 @@ fn cap(s: &str) -> String {
     }
 }
 
+/// a mod fighter's form record as a Form label: Base / Super Saiyan / Super Saiyan 3 by its flags
+fn form_label(d: &GameData, id: i32) -> String {
+    match d.form(id) {
+        Some(f) if f.ss3 => "Super Saiyan 3".into(),
+        Some(f) if f.ss => "Super Saiyan".into(),
+        Some(_) => "Base".into(),
+        None => format!("form {id}"),
+    }
+}
+
 impl Launcher {
     pub fn new(packs: &Packs, settings: Settings, native: bool) -> Launcher {
         let data = crate::battle::game_data(packs).ok();
-        let mut fighters = Vec::new();
+        let mut picks = Vec::new();
+        let mut default_forms = Vec::new();
         let mut enemies = Vec::new();
         let mut arenas = Vec::new();
         if let Some(d) = &data {
-            for f in d.fighters.iter().filter(|f| !(f.id.starts_with('f') && f.id[1..].chars().all(|c| c.is_ascii_digit()))) {
+            // the game's fighters: the curated rows whose fighter and form record the content has
+            for &(c, f, o, fid, id) in PICKS {
+                if d.fighter(fid).is_some_and(|fd| fd.forms.contains(&id)) && d.form(id).is_some() {
+                    picks.push(Pick { character: c.into(), form: f.into(), outfit: o.into(), fighter: fid.into(), form_id: id });
+                }
+            }
+            // fighters a mod adds: every form record a Form of its own
+            let builtin: Vec<&str> = wf_core::battle::FIGHTERS.iter().map(|f| f.0).collect();
+            for f in d.fighters.iter() {
+                default_forms.push((f.id.clone(), f.default_form));
+                if builtin.contains(&f.id.as_str()) {
+                    continue;
+                }
                 let name = if f.name == f.id { d.chars.iter().find(|c| c.index == f.character).map(|c| c.name.clone()).unwrap_or_else(|| cap(&f.id)) } else { f.name.clone() };
-                let name = if f.fusion.is_some() && f.name == f.id { cap(&f.id) } else { name };
-                fighters.push((f.id.clone(), name, f.forms.clone(), f.default_form));
+                let mut seen: Vec<String> = Vec::new();
+                for &id in &f.forms {
+                    let mut label = form_label(d, id);
+                    if seen.contains(&label) {
+                        label = format!("{label} ({id})");
+                    }
+                    seen.push(label.clone());
+                    picks.push(Pick { character: name.clone(), form: label, outfit: "Normal".into(), fighter: f.id.clone(), form_id: id });
+                }
             }
             let mut es: Vec<(bool, String, String)> = d
                 .enemies
@@ -348,7 +456,8 @@ impl Launcher {
             rebind: RebindMenu::default(),
             message: String::new(),
             data,
-            fighters,
+            picks,
+            default_forms,
             enemies,
             enemy_levels,
             arenas,
@@ -384,7 +493,11 @@ impl Launcher {
             }
             Screen::Battle => {
                 let b = &self.settings.battle;
-                let mut v = vec![Row::Kind, Row::Fighter, Row::Form, Row::Level];
+                let mut v = vec![Row::Kind, Row::Fighter, Row::Form];
+                if self.outfits().len() > 1 {
+                    v.push(Row::Outfit);
+                }
+                v.push(Row::Level);
                 if b.preset_mode {
                     v.push(Row::Preset);
                 } else {
@@ -410,19 +523,77 @@ impl Launcher {
         }
     }
 
-    fn fighter_idx(&self) -> usize {
-        self.fighters.iter().position(|f| f.0 == self.settings.battle.fighter).unwrap_or(0)
+    /// The character picker's rows (Character, Form, Outfit -> fighter, form record)
+    pub fn picks(&self) -> &[Pick] {
+        &self.picks
     }
 
-    fn form_name(&self, id: i32) -> String {
-        let Some(f) = self.data.as_ref().and_then(|d| d.form(id)) else { return format!("form {id}") };
-        if f.ss3 {
-            format!("SS3 {}", f.name)
-        } else if f.ss {
-            format!("SS {}", f.name)
-        } else {
-            f.name.clone()
+    /// the picker row the saved battle setting names: its fighter and form record (no form = the fighter's default;
+    /// a record the picker does not list = its [`PICK_ALIASES`] replacement); else the fighter's first row, else the
+    /// first row
+    pub fn pick_idx(&self) -> usize {
+        let b = &self.settings.battle;
+        let form = b.form.or_else(|| self.default_forms.iter().find(|f| f.0 == b.fighter).map(|f| f.1));
+        let form = form.map(|id| PICK_ALIASES.iter().find(|a| a.0 == id).map(|a| a.1).unwrap_or(id));
+        self.picks
+            .iter()
+            .position(|p| p.fighter == b.fighter && Some(p.form_id) == form)
+            .or_else(|| self.picks.iter().position(|p| p.fighter == b.fighter))
+            .unwrap_or(0)
+    }
+
+    /// distinct values of a picker column among `rows`, in order
+    fn distinct<'a>(rows: impl Iterator<Item = &'a str>) -> Vec<&'a str> {
+        let mut v: Vec<&str> = Vec::new();
+        for r in rows {
+            if !v.contains(&r) {
+                v.push(r);
+            }
         }
+        v
+    }
+
+    /// the Outfit row is shown when the chosen character has more than one look for the chosen form
+    fn outfits(&self) -> Vec<&str> {
+        let Some(cur) = self.picks.get(self.pick_idx()) else { return Vec::new() };
+        Self::distinct(self.picks.iter().filter(|p| p.character == cur.character && p.form == cur.form).map(|p| p.outfit.as_str()))
+    }
+
+    /// step the picker: column 0 Character, 1 Form, 2 Outfit by `d`; the other columns keep their value where the
+    /// new choice has it (Goku's Super Saiyan -> Vegeta's Super Saiyan; a halo stays a halo), else the first
+    fn step_pick(&mut self, col: usize, d: i32) -> Choice {
+        let Some(cur) = self.picks.get(self.pick_idx()).cloned() else { return Choice::None };
+        let pick = |c: &str, f: &str, o: &str, picks: &[Pick]| -> Option<Pick> {
+            let rows: Vec<&Pick> = picks.iter().filter(|p| p.character == c).collect();
+            let form = rows.iter().find(|p| p.form == f).map(|p| p.form.clone()).or_else(|| rows.first().map(|p| p.form.clone()))?;
+            let rows: Vec<&&Pick> = rows.iter().filter(|p| p.form == form).collect();
+            rows.iter().find(|p| p.outfit == o).or_else(|| rows.first()).map(|p| (**p).clone())
+        };
+        let next = match col {
+            0 => {
+                let cs = Self::distinct(self.picks.iter().map(|p| p.character.as_str()));
+                let k = cs.iter().position(|c| *c == cur.character).unwrap_or(0) as i32;
+                let c = cs[wrap(k + d, cs.len())].to_string();
+                pick(&c, &cur.form, &cur.outfit, &self.picks)
+            }
+            1 => {
+                let fs = Self::distinct(self.picks.iter().filter(|p| p.character == cur.character).map(|p| p.form.as_str()));
+                let k = fs.iter().position(|f| *f == cur.form).unwrap_or(0) as i32;
+                let f = fs[wrap(k + d, fs.len())].to_string();
+                pick(&cur.character, &f, &cur.outfit, &self.picks)
+            }
+            _ => {
+                let os = self.outfits();
+                let k = os.iter().position(|o| *o == cur.outfit).unwrap_or(0) as i32;
+                let o = os.get(wrap(k + d, os.len())).map(|o| o.to_string()).unwrap_or_default();
+                pick(&cur.character, &cur.form, &o, &self.picks)
+            }
+        };
+        if let Some(p) = next {
+            self.settings.battle.fighter = p.fighter;
+            self.settings.battle.form = Some(p.form_id);
+        }
+        Choice::None
     }
 
     fn preset_idx(&self) -> usize {
@@ -471,8 +642,8 @@ impl Launcher {
 
     pub fn battle_config(&self) -> BattleConfig {
         let b = &self.settings.battle;
-        let (fid, forms, def) = self.fighters.get(self.fighter_idx()).map(|f| (f.0.clone(), f.2.clone(), f.3)).unwrap_or(("goku".into(), vec![2], 2));
-        let form = b.form.filter(|f| forms.contains(f)).unwrap_or(def);
+        // the picker's row: the exact form record (its transformations follow the game's chain from it)
+        let (fid, form) = self.picks.get(self.pick_idx()).map(|p| (p.fighter.clone(), p.form_id)).unwrap_or(("goku".into(), 2));
         let level = self.battle_level();
         // the skill level the story has reached at this level: the level-up hook (event #3) raises the five main
         // characters' two upgradable skills at 75 / 100 / 125 / 150 - the later of each pair to index 1 at 100, both
@@ -487,7 +658,14 @@ impl Launcher {
         };
         // a quick battle as a story player would have it: the level's stat points spent (evenly), full EP, and an
         // SS / SS3 form with its gauge full (a form reached by transforming always is)
-        let f = FighterSetup { fighter: fid, form, level, auto_spend: "even".into(), skill_level, full_gauge: true, ..Default::default() };
+        let mut f = FighterSetup { fighter: fid, form, level, auto_spend: "even".into(), skill_level, full_gauge: true, ..Default::default() };
+        // Hercule, Videl, Pikkon (record slot 8): the slot never grows in the game (50 HP, STR 17 at every level), so
+        // the battle takes Goku's record at this level - HP, EP, stats with the points spent evenly - and keeps their
+        // own skill list (Energy Blast)
+        if let Some(d) = self.data.as_ref().filter(|d| d.fighter(&f.fighter).is_some_and(|fd| fd.character == 8 && fd.fusion.is_none())) {
+            let (r, _, _) = wf_core::battle::build_record(d, &FighterSetup { fighter: "goku".into(), level, auto_spend: "even".into(), ..Default::default() });
+            f.fixed = Some(wf_core::battle::FixedRecord { hp: r.max_hp, ep: r.max_ep, stats: [r.str_, r.pow, r.end, r.spd], skills: None });
+        }
         let phases = if b.preset_mode {
             PRESETS[self.preset_idx()].2.iter().map(|(e, n)| Phase { enemy: e.to_string(), count: *n }).collect()
         } else {
@@ -498,6 +676,13 @@ impl Launcher {
     }
 
     fn change(&mut self, row: Row, d: i32) -> Choice {
+        // the character picker: Character / Form / Outfit
+        match row {
+            Row::Fighter => return self.step_pick(0, d),
+            Row::Form => return self.step_pick(1, d),
+            Row::Outfit => return self.step_pick(2, d),
+            _ => {}
+        }
         // the Level row: Auto (the enemies' level) and 50 .. 200 by 5 in a ring - from Auto the steps start at the
         // automatic level; past 200 / below 50 it is Auto again
         let auto = self.auto_level();
@@ -515,20 +700,8 @@ impl Launcher {
         }
         match row {
             Row::Kind => b.preset_mode = !b.preset_mode,
-            Row::Fighter => {
-                let k = self.fighters.iter().position(|f| f.0 == b.fighter).unwrap_or(0) as i32;
-                if let Some(f) = self.fighters.get(wrap(k + d, self.fighters.len())) {
-                    b.fighter = f.0.clone();
-                    b.form = None;
-                }
-            }
-            Row::Form => {
-                let Some(f) = self.fighters.iter().find(|f| f.0 == b.fighter) else { return Choice::None };
-                let cur = b.form.filter(|x| f.2.contains(x)).unwrap_or(f.3);
-                let k = f.2.iter().position(|&x| x == cur).unwrap_or(0) as i32;
-                b.form = f.2.get(wrap(k + d, f.2.len())).copied();
-            }
-            Row::Level => {}
+            // (the picker's rows and the level: above)
+            Row::Fighter | Row::Form | Row::Outfit | Row::Level => {}
             Row::Enemy => {
                 let k = self.enemies.iter().position(|e| e.0 == b.enemy).unwrap_or(0) as i32;
                 if let Some(e) = self.enemies.get(wrap(k + d, self.enemies.len())) {
@@ -653,12 +826,9 @@ impl Launcher {
             Row::NewGame => (t("Quick start"), t("Snakeway, no prologue")),
             Row::Slot(i) => (format!("Continue {}", i + 1), self.slots.get(i).cloned().flatten().unwrap_or_else(|| t("- empty -"))),
             Row::Kind => (t("Fight"), if b.preset_mode { t("< Story preset >") } else { t("< Any enemy >") }),
-            Row::Fighter => (t("Fighter"), format!("< {} >", self.fighters.get(self.fighter_idx()).map(|f| f.1.as_str()).unwrap_or("?"))),
-            Row::Form => {
-                let f = self.fighters.get(self.fighter_idx());
-                let id = f.map(|f| b.form.filter(|x| f.2.contains(x)).unwrap_or(f.3)).unwrap_or(0);
-                (t("Form"), format!("< {} >", self.form_name(id)))
-            }
+            Row::Fighter => (t("Character"), format!("< {} >", self.picks.get(self.pick_idx()).map(|p| p.character.as_str()).unwrap_or("?"))),
+            Row::Form => (t("Form"), format!("< {} >", self.picks.get(self.pick_idx()).map(|p| p.form.as_str()).unwrap_or("?"))),
+            Row::Outfit => (t("Outfit"), format!("< {} >", self.picks.get(self.pick_idx()).map(|p| p.outfit.as_str()).unwrap_or("?"))),
             Row::Level if b.level_auto => (t("Level"), format!("< Auto: {} >", self.auto_level())),
             Row::Level => (t("Level"), format!("< {} >", b.level.clamp(50, 200))),
             Row::Enemy => (t("Enemy"), format!("< {} >", self.enemies.iter().find(|e| e.0 == b.enemy).map(|e| e.1.as_str()).unwrap_or(b.enemy.as_str()))),

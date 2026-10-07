@@ -83,3 +83,80 @@ fn quick_battle_defaults_follow_the_enemy() {
     // settings saved before the automatic level existed get it
     assert!(Settings::from_json(r#"{"battle":{"level":60}}"#).unwrap().battle.level_auto);
 }
+
+/// The Battle page's character picker (Character / Form / Outfit): no two rows with the same labels, every row starts
+/// a battle in exactly its form record, that form's sprite has the fighting animations and the fighter lands hits on
+/// Majin Fighters; a form's transformations stay on the picker (a halo stays a halo); settings naming a record the
+/// picker no longer lists move to its replacement.
+#[test]
+fn battle_picker_rows_are_distinct_and_playable() {
+    let Some(rom) = wf_rom::testutil::rom() else { return };
+    let (c, _) = wf_extract::extract_rom(&rom, &Default::default(), &mut |_| {});
+    let p = packs(&c.files);
+    let data = wf_app::battle::load_data(&p).unwrap();
+    let l = Launcher::new(&p, Settings::default(), true);
+    let picks = l.picks().to_vec();
+    let chars: Vec<&str> = picks.iter().map(|k| k.character.as_str()).fold(vec![], |mut v, c| {
+        if !v.contains(&c) {
+            v.push(c);
+        }
+        v
+    });
+    assert_eq!(chars, ["Goku", "Gohan", "Goten", "Trunks", "Vegeta", "Gotenks", "Vegito", "Gogeta", "Hercule", "Videl", "Pikkon"]);
+    for (i, a) in picks.iter().enumerate() {
+        for b in &picks[i + 1..] {
+            assert!((&a.character, &a.form, &a.outfit) != (&b.character, &b.form, &b.outfit), "duplicate row {a:?}");
+            assert!((&a.fighter, a.form_id) != (&b.fighter, b.form_id), "one record twice {a:?} {b:?}");
+        }
+        // up / down lead to a row of the same character, with the same look when that form has it
+        let f = data.form(a.form_id).unwrap();
+        for to in [f.up, f.down].into_iter().filter(|&t| t != 255) {
+            let to = [(25, 24)].iter().find(|x| x.0 == to).map(|x| x.1).unwrap_or(to);
+            let t = picks.iter().find(|q| q.fighter == a.fighter && q.form_id == to).unwrap_or_else(|| panic!("{a:?}: transforms into {to}, not on the picker"));
+            let looks: Vec<&str> = picks.iter().filter(|q| q.character == t.character && q.form == t.form).map(|q| q.outfit.as_str()).collect();
+            if looks.contains(&a.outfit.as_str()) {
+                assert_eq!(t.outfit, a.outfit, "{a:?} transforms into {t:?}");
+            }
+        }
+    }
+    for k in &picks {
+        let mut s = Settings::default();
+        s.battle.fighter = k.fighter.clone();
+        s.battle.form = Some(k.form_id);
+        s.battle.enemy = "t68".into();
+        s.battle.count = 2;
+        let l = Launcher::new(&p, s, true);
+        let cfg = l.battle_config();
+        assert_eq!((cfg.players[0].fighter.as_str(), cfg.players[0].form), (k.fighter.as_str(), k.form_id));
+        let mut ses = wf_core::session::Session::new(data.clone(), cfg);
+        let hp = |w: &wf_core::world::World| -> i64 { w.ents.iter().filter_map(|e| if let wf_core::world::Body::Enemy(n) = &e.body { Some(n.hp1024) } else { None }).sum() };
+        let hp0 = hp(&ses.world);
+        {
+            let w = &ses.world;
+            let pl = w.pl_ref(w.player_idx(0).unwrap());
+            assert_eq!(pl.form, k.form_id);
+            let sp = pl.a.sprite.and_then(|s| w.data.sprite(s)).unwrap_or_else(|| panic!("{k:?}: no sprite"));
+            for raw in [1, 2, 3, 4, 5, 6, 7, 8, 10] {
+                assert!(sp.anim_raw(raw).is_some(), "{k:?}: no animation {raw}");
+            }
+        }
+        // walk in, punch, Energy Blasts
+        for f in 0..900usize {
+            let keys: u16 = match (f / 30) % 3 {
+                0 => 0x10,
+                1 => (f % 6 < 2) as u16,
+                _ => if f % 10 < 2 { 2 } else { 0 },
+            };
+            ses.step(&[keys]);
+        }
+        assert!(hp(&ses.world) < hp0, "{k:?}: no hit landed");
+    }
+    // saved settings: a record the picker does not list, and no form at all
+    for (fighter, form, want) in [("goku", Some(1), 0), ("gohan", Some(11), 10), ("gogeta", Some(44), 41), ("goku", None, 2), ("f48", Some(48), 0)] {
+        let mut s = Settings::default();
+        s.battle.fighter = fighter.into();
+        s.battle.form = form;
+        let l = Launcher::new(&p, s, true);
+        assert_eq!(l.battle_config().players[0].form, want, "{fighter} {form:?}");
+    }
+}

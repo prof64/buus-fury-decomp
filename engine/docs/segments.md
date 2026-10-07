@@ -7010,3 +7010,20 @@ every skill but Super Saiyan usable (the game's rule in an SS3 form); Kid Buu's 
 Test: wf-app `tests/launcher.rs` `quick_battle_defaults_follow_the_enemy`. Open: the battle's skill list is the
 character's new-game list (no SS3 skill 22 for Goku, so an SS3 start cannot revert by hand); one skill level for
 every skill.
+
+**§12 (5), user-bugs agent - launcher Battle character picker (2026-10-07).** Character / Form / Outfit rows
+(`launcher::PICKS`; Outfit only when the form has several looks); the chosen row is the exact form record, so
+transformations follow the game's chain (halo SS3 Goku -> halo Goku). Form = a difference in play (stats, the chain,
+the gauge's drain); Outfit = a look only. Checked per record (forms table + `player.rs`): the "duplicate" records differ
+by the controller - 0x03001B7C / 0x03001B84 do not drain the Super Saiyan gauge (Goku 7 / 8, Gohan 17, Vegeta 30,
+Gotenks 36 -> 37 -> 38: listed as "..., no limit"), 0x03001B88 / 0x03001B8C are the story's unstable Trunks (24: a
+quarter walking speed, SS by itself after 120 + rand(180), 25 back after 240 + rand(120): one row "Unstable Super
+Saiyan"); Gogeta 44 = 41 in a battle (flag 0x08 / controller 0x03001B60 are read nowhere): one row. Dropped (sprite
+without the fighting animations - 2 to 10 of 20: no ki blast / attacks): Goku 1 (Other World clothes), Gohan 9 / 11 /
+12, Trunks 23, failed fusions Gotenks 32 / 33, Gogeta 42 / 43, Android 18, Krillin, Tien, Yamcha. Hercule / Videl /
+Pikkon: record slot 8 never grows (50 HP, STR 17 at every level: no damage on a Majin Fighter, KO'd in seconds) - their
+battles take Goku's record at the level (HP, EP, stats, points spent evenly; their own Energy Blast); their sprites have
+every fighting animation. Saved settings: `PICK_ALIASES` moves unlisted records (1 -> 0, 9 / 11 / 12 -> 10, 23 -> 21,
+25 -> 24, 32 / 33 -> 31, 42 / 43 / 44 -> 41). Test: wf-app `tests/launcher.rs` `battle_picker_rows_are_distinct_and_playable`
+(distinct labels, every row starts in its record with the fighting animations and lands hits; up / down stay on the
+picker with the same look).
