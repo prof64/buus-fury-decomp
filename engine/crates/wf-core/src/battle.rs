@@ -177,6 +177,13 @@ pub struct FighterSetup {
     pub skill_level: i32,
     #[serde(default)]
     pub holy_water: bool,
+    /// start a Super Saiyan / SS3 form with its gauge full (= max EP), as every way into the form leaves it in the
+    /// game (the transformation's end fills it, `player::finish_transform`; the record keeps it - run 1's Kid Buu
+    /// fight: Goku's SS and SS3 gauges 1434 = max EP). Off (the reference's and the lockstep scenarios' setup): the
+    /// gauge starts at 0 - every skill of the form is greyed out (its cost is paid from the gauge) and a draining
+    /// form reverts within a few frames.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub full_gauge: bool,
     /// a record given as is (link play's Dojo): replaces what the level / growth / points give (`FixedRecord`)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed: Option<FixedRecord>,
@@ -219,6 +226,7 @@ impl Default for FighterSetup {
             equip: d_equip(),
             skill_level: 0,
             holy_water: false,
+            full_gauge: false,
             fixed: None,
         }
     }
@@ -524,6 +532,14 @@ pub fn create(data: Arc<GameData>, cfg: &BattleConfig) -> World {
                 forms_allowed: forms,
             },
         );
+        if f.full_gauge {
+            let (ss, ss3) = data.form(form).map(|x| (x.ss, x.ss3)).unwrap_or((false, false));
+            if ss3 {
+                pl.ss3_gauge = pl.rec.max_ep as i64 * 65536;
+            } else if ss {
+                pl.ss_gauge = pl.rec.max_ep;
+            }
+        }
         let (sx, sy) = match (&w.col, spawn) {
             (Some(c), Some((x, y))) => {
                 let region = w.arena.region.clone();

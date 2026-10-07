@@ -99,7 +99,12 @@ pub struct BattlePrefs {
     pub fighter: String,
     /// None = the fighter's default form
     pub form: Option<i32>,
+    /// the level chosen on the Level row (used when `level_auto` is off)
     pub level: i32,
+    /// the fighter's level follows the opponents: the highest level byte of the enemies' ROM definitions (the
+    /// story's level for them - Kid Buu 150; run 1 fought him with Goku at 158). On by default (also for settings
+    /// saved before it existed)
+    pub level_auto: bool,
     pub enemy: String,
     pub count: u32,
     /// "" = automatic (the preset's / the enemy's usual arena)
@@ -115,6 +120,7 @@ impl Default for BattlePrefs {
             fighter: "goku".into(),
             form: None,
             level: 60,
+            level_auto: true,
             enemy: "t60".into(),
             count: 1,
             arena: String::new(),
@@ -277,6 +283,8 @@ pub struct Launcher {
     fighters: Vec<(String, String, Vec<i32>, i32)>,
     /// (id, name)
     enemies: Vec<(String, String)>,
+    /// enemy type -> its definition's level byte (`enemies/*.json` `level_byte`)
+    enemy_levels: std::collections::BTreeMap<i32, i32>,
     /// (id, name)
     arenas: Vec<(String, String)>,
     font: Option<Font>,
@@ -322,6 +330,13 @@ impl Launcher {
             arenas = d.arenas.iter().map(|a| (a.id.clone(), a.name.clone())).collect();
         }
         let bg = packs.read("ui/images/screen_title.png").and_then(|b| decode_rgba(&b).ok());
+        let enemy_levels = packs
+            .list()
+            .into_iter()
+            .filter(|p| p.starts_with("enemies/") && p.ends_with(".json"))
+            .filter_map(|p| packs.read(&p).and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok()))
+            .filter_map(|v| Some((v["type"].as_i64()? as i32, v["level_byte"].as_i64()? as i32)))
+            .collect();
         Launcher {
             screen: Screen::Main,
             cursor: 0,
@@ -335,6 +350,7 @@ impl Launcher {
             data,
             fighters,
             enemies,
+            enemy_levels,
             arenas,
             font: Font::load(packs, "menu").ok(),
             bg,
@@ -427,11 +443,51 @@ impl Launcher {
     }
 
     /// The battle the Battle page describes.
+    /// The Level row's automatic level: the highest level byte among the fight's enemies (helpers `~tN` aside) -
+    /// the ROM's level for them, which follows the story (Majin Buu 100-110, Super Buu 125-147, Kid Buu 150)
+    pub fn auto_level(&self) -> i32 {
+        let b = &self.settings.battle;
+        let groups: Vec<&str> = if b.preset_mode { PRESETS[self.preset_idx()].2.iter().map(|(e, _)| *e).collect() } else { vec![b.enemy.as_str()] };
+        groups
+            .iter()
+            .flat_map(|g| g.split('+'))
+            .filter(|p| !p.starts_with('~'))
+            .filter_map(|p| p.trim_start_matches('t').parse::<i32>().ok())
+            .filter_map(|t| self.enemy_levels.get(&t).copied())
+            .max()
+            .unwrap_or(60)
+            .clamp(50, 200)
+    }
+
+    /// the fighter's level the battle uses (the Level row)
+    pub fn battle_level(&self) -> i32 {
+        let b = &self.settings.battle;
+        if b.level_auto {
+            self.auto_level()
+        } else {
+            b.level.clamp(50, 200)
+        }
+    }
+
     pub fn battle_config(&self) -> BattleConfig {
         let b = &self.settings.battle;
         let (fid, forms, def) = self.fighters.get(self.fighter_idx()).map(|f| (f.0.clone(), f.2.clone(), f.3)).unwrap_or(("goku".into(), vec![2], 2));
         let form = b.form.filter(|f| forms.contains(f)).unwrap_or(def);
-        let f = FighterSetup { fighter: fid, form, level: b.level.clamp(50, 200), ..Default::default() };
+        let level = self.battle_level();
+        // the skill level the story has reached at this level: the level-up hook (event #3) raises the five main
+        // characters' two upgradable skills at 75 / 100 / 125 / 150 - the later of each pair to index 1 at 100, both
+        // to index 2 by 150 (Goku: Instant Transmission 75 / 125, Kamehameha 100 / 150). The battle keeps one level
+        // for every skill: the lower one. Fusions and the extra characters get no upgrades (run 1's Kid Buu records:
+        // all 0)
+        let ch = self.data.as_ref().and_then(|d| d.fighter(&fid)).filter(|fd| fd.fusion.is_none()).map(|fd| fd.character);
+        let skill_level = match ch {
+            Some(0..=4) if level >= 150 => 2,
+            Some(0..=4) if level >= 100 => 1,
+            _ => 0,
+        };
+        // a quick battle as a story player would have it: the level's stat points spent (evenly), full EP, and an
+        // SS / SS3 form with its gauge full (a form reached by transforming always is)
+        let f = FighterSetup { fighter: fid, form, level, auto_spend: "even".into(), skill_level, full_gauge: true, ..Default::default() };
         let phases = if b.preset_mode {
             PRESETS[self.preset_idx()].2.iter().map(|(e, n)| Phase { enemy: e.to_string(), count: *n }).collect()
         } else {
@@ -442,7 +498,21 @@ impl Launcher {
     }
 
     fn change(&mut self, row: Row, d: i32) -> Choice {
+        // the Level row: Auto (the enemies' level) and 50 .. 200 by 5 in a ring - from Auto the steps start at the
+        // automatic level; past 200 / below 50 it is Auto again
+        let auto = self.auto_level();
         let b = &mut self.settings.battle;
+        if row == Row::Level {
+            let cur = if b.level_auto { auto } else { b.level.clamp(50, 200) };
+            let next = cur + d.signum() * 5;
+            if !b.level_auto && !(50..=200).contains(&next) {
+                b.level_auto = true;
+            } else {
+                b.level_auto = false;
+                b.level = next.clamp(50, 200);
+            }
+            return Choice::None;
+        }
         match row {
             Row::Kind => b.preset_mode = !b.preset_mode,
             Row::Fighter => {
@@ -458,7 +528,7 @@ impl Launcher {
                 let k = f.2.iter().position(|&x| x == cur).unwrap_or(0) as i32;
                 b.form = f.2.get(wrap(k + d, f.2.len())).copied();
             }
-            Row::Level => b.level = (b.level + d * 5).clamp(50, 200),
+            Row::Level => {}
             Row::Enemy => {
                 let k = self.enemies.iter().position(|e| e.0 == b.enemy).unwrap_or(0) as i32;
                 if let Some(e) = self.enemies.get(wrap(k + d, self.enemies.len())) {
@@ -589,6 +659,7 @@ impl Launcher {
                 let id = f.map(|f| b.form.filter(|x| f.2.contains(x)).unwrap_or(f.3)).unwrap_or(0);
                 (t("Form"), format!("< {} >", self.form_name(id)))
             }
+            Row::Level if b.level_auto => (t("Level"), format!("< Auto: {} >", self.auto_level())),
             Row::Level => (t("Level"), format!("< {} >", b.level.clamp(50, 200))),
             Row::Enemy => (t("Enemy"), format!("< {} >", self.enemies.iter().find(|e| e.0 == b.enemy).map(|e| e.1.as_str()).unwrap_or(b.enemy.as_str()))),
             Row::Count => (t("How many"), format!("< {} >", b.count)),

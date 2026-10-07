@@ -319,6 +319,10 @@ export class BuuRuleset implements Ruleset {
         hint: 'rec+0x2E: set by story scripts in the game; applies to every upgradable skill',
       },
       { key: 'holyWater', label: 'Start with Holy Water (+25 all, 30 s)', kind: 'boolean', default: false },
+      {
+        key: 'fullGauge', label: 'SS / SS3 form starts with a full gauge', kind: 'boolean', default: true,
+        hint: 'as a transformation leaves it (gauge = max EP); off: 0 - the form\'s skills are greyed out and a draining form reverts at once (wf-core FighterSetup.full_gauge)',
+      },
       { key: 'xp', label: 'Gain XP / level up mid-fight', kind: 'boolean', default: false },
     ]
   }
@@ -432,6 +436,11 @@ export class BuuRuleset implements Ruleset {
       holyWater: !!cfg.fighter.options.holyWater,
       formsAllowed: fd.forms,
     })
+    // an SS / SS3 start form with its gauge full, as the transformation leaves it (wf-core FighterSetup.full_gauge)
+    if (cfg.fighter.options.fullGauge) {
+      if (player.form.ss3) player.ss3Gauge = player.maxEp * 65536
+      else if (player.form.ss) player.ssGauge = player.maxEp
+    }
     const b = w.arena.bounds
     const arena = ARENAS.find((a) => a.id === w.arena.id)
     const grid = arena && this.d.collision.get(arena.map)

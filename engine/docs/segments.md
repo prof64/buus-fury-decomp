@@ -6993,3 +6993,20 @@ ours holds its 32 + 64 + 64 tile blocks, the game's has none yet / any more - `m
 open in RAM`), anim 25 (7 of them a second player / puppet in a script pose, raw 22, whose clock the compare reads
 from somewhere the row pass doesn't set), rng 13, missing 12 (the player not made: 4 with `held 600` - an arrival
 never finishing), cam 7, text 5, snd 5, hp 5, extra 3, dir 2, fade 1. Continuing.
+
+**§12 (4), user-bugs agent - launcher Battle: SS3 Goku vs Kid Buu, every skill greyed and one hit a KO
+(2026-10-06).** Both were the launcher's setup, not game rules. (a) A battle started in an SS / SS3 form had its
+gauge at 0 (the reference's setup too): the form pays every skill from the gauge, so all were greyed, and a draining
+SS3 form (5 / 6) reverted within frames. In the game every way into the form fills it (`finish_transform`: gauge =
+max EP; run 1's Kid Buu records: Goku's SS / SS3 gauges 1434 = max EP). New `FighterSetup::full_gauge` (opt-in,
+default off - lockstep / cross_ts setups unchanged; mirrored in the reference as option `fullGauge`, cross_ts 0
+failures). (b) Level 60 with the stat points left unspent: Goku 135 HP, END 26 - Kid Buu's heavy hit does 420 (the
+game's damage formula: a one-hit KO is faithful at that level). Run 1 met Kid Buu with Goku at level 158 (END 157,
+2991 HP): about 150 a hit. The Level row now defaults to **Auto** = the highest level byte of the fight's enemies (ROM
+defs: Kid Buu 150, Super Buu 125-147, Majin Buu 100-110; `BattlePrefs::level_auto`, also for old settings files);
+points spent evenly; skill level from the level-up hook's thresholds (index 1 from 100, 2 from 150; fusions 0). SS3
+Goku vs Kid Buu now: level 150, 2608 HP, 1205 EP, SS3 gauge 1205, STR 95 / POW 95 / END 93 / SPD 117, skill level 2,
+every skill but Super Saiyan usable (the game's rule in an SS3 form); Kid Buu's heavy hit ~270 (about 10 to a KO).
+Test: wf-app `tests/launcher.rs` `quick_battle_defaults_follow_the_enemy`. Open: the battle's skill list is the
+character's new-game list (no SS3 skill 22 for Goku, so an SS3 start cannot revert by hand); one skill level for
+every skill.

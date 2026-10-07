@@ -54,3 +54,32 @@ fn wf_core_save(s: &wf_app::story::StorySim) -> wf_core_saves::SaveData {
 }
 
 use wf_core::menu::save as wf_core_saves;
+
+/// A quick battle is set up as the story would have the fighter (user report: SS3 Goku vs Kid Buu at level 60 -
+/// every skill greyed out, one hit from Kid Buu a KO): the enemies' level (Kid Buu's level byte 150), the level's
+/// stat points spent, the story's skill level and a full SS3 gauge - every skill of the form usable at the start.
+#[test]
+fn quick_battle_defaults_follow_the_enemy() {
+    let Some(rom) = wf_rom::testutil::rom() else { return };
+    let (c, _) = wf_extract::extract_rom(&rom, &Default::default(), &mut |_| {});
+    let p = packs(&c.files);
+    let mut s = Settings::default();
+    s.battle.fighter = "goku".into();
+    s.battle.form = Some(5);
+    s.battle.enemy = "t60".into();
+    let l = Launcher::new(&p, s, true);
+    let cfg = l.battle_config();
+    let f = &cfg.players[0];
+    assert_eq!((f.form, f.level, f.skill_level, f.full_gauge, f.auto_spend.as_str()), (5, 150, 2, true, "even"));
+    let mut ses = wf_core::session::Session::new(wf_app::battle::load_data(&p).unwrap(), cfg);
+    ses.step(&[0]);
+    let w = &ses.world;
+    let pi = w.player_idx(0).unwrap();
+    assert!(w.pl_ref(pi).ss3_gauge >> 16 > 1000, "SS3 gauge {}", w.pl_ref(pi).ss3_gauge >> 16);
+    // (Super Saiyan itself is not usable in an SS3 form - the game's check)
+    for &sk in w.pl_ref(pi).skills.iter().filter(|&&s| s != 20) {
+        assert!(wf_core::player::can_use_skill(w, pi, sk), "skill {sk} greyed out");
+    }
+    // settings saved before the automatic level existed get it
+    assert!(Settings::from_json(r#"{"battle":{"level":60}}"#).unwrap().battle.level_auto);
+}
