@@ -295,7 +295,14 @@ fn record_add(w: &World, id: u32, addr: u32, x: i32, y: i32, out: &mut RenderVie
     }
 }
 
-fn effect(id: u32, run: u32, index: i32, x: i32, y: i32, out: &mut RenderView) {
+/// record `index` of the effect run at `run` (the run's step `index`: record run + 12 * index - its own frame and flip;
+/// the runs share frames between records, so the step is not the frame: the Energy Blast facing right is steps 12 ..
+/// 15 of run 0x0871370C, frames 9 .. 12 - drawn as the missing frames 12 .. 15 it was invisible)
+fn effect(w: &World, id: u32, run: u32, index: i32, x: i32, y: i32, out: &mut RenderView) {
+    let addr = run.wrapping_add(12 * index.max(0) as u32);
+    if w.data.record_frames.contains_key(&addr) {
+        return record(w, id, addr, x, y, out);
+    }
     out.sprites.push(SpriteDraw {
         entity: id,
         sheet: format!("effects/fx_{run:08x}"),
@@ -592,7 +599,7 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                 actor_draw(w, id, &h.a, step, out);
             }
             Body::Rock { x, y, hp } => {
-                effect(id, 0x0875_f7ac, if *hp >= 2 { 0 } else { 1 }, *x, *y, out)
+                effect(w, id, 0x0875_f7ac, if *hp >= 2 { 0 } else { 1 }, *x, *y, out)
             }
             Body::Fx(f) => match f.as_ref() {
                 Fx::Anim {
@@ -600,7 +607,7 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                 }
                 | Fx::Loop {
                     id: run, x, y, rec, ..
-                } => effect(id, *run, *rec, *x, *y, out),
+                } => effect(w, id, *run, *rec, *x, *y, out),
                 // the beam object in its charge state (0x080206B8 state 0): the sparkle at owner + off[facing], record
                 // charge_index for t < 4, then charge_index + 1 + ((t >> 2) & 1) (reference fx.ts `drawCharge`; the
                 // set: the player's selected beam skill at its level, an enemy's Kamehameha Lv1)
@@ -616,16 +623,24 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                     if let (Some(a), Some((run, ci))) = (a, w.data.beams.get(&name).and_then(|b| b.charge.clone())) {
                         let r = if *t < 4 { ci } else { ci + 1 + ((t >> 2) & 1) };
                         let (ox, oy) = off[(a.facing & 3) as usize];
-                        out.sprites.push(SpriteDraw {
-                            entity: id,
-                            sheet: format!("effects/{run}"),
-                            frame: FrameSel::Frame { index: r.max(0) as u16, flip: false },
-                            x: a.px() + ox,
-                            y: a.py() + oy,
-                            priority: 3,
-                            mirror: false,
-                            effect: SpriteEffect::None,
-                        });
+                        // the run's record r (12-byte records from the run's address; the reference draws the run's
+                        // step r - not frame r: run 0x08721164 shares frames, Lv3's charge records 12..14 are frames
+                        // 9..11)
+                        match u32::from_str_radix(run.trim_start_matches("fx_"), 16) {
+                            Ok(base) if w.data.record_frames.contains_key(&(base + 12 * r.max(0) as u32)) => {
+                                record(w, id, base + 12 * r.max(0) as u32, a.px() + ox, a.py() + oy, out)
+                            }
+                            _ => out.sprites.push(SpriteDraw {
+                                entity: id,
+                                sheet: format!("effects/{run}"),
+                                frame: FrameSel::Frame { index: r.max(0) as u16, flip: false },
+                                x: a.px() + ox,
+                                y: a.py() + oy,
+                                priority: 3,
+                                mirror: false,
+                                effect: SpriteEffect::None,
+                            }),
+                        }
                     }
                 }
                 Fx::Debris { x, y, .. } => out.sprites.push(SpriteDraw {
@@ -689,6 +704,93 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                         }
                     }
                 }
+                // record objects (class 0x080507A0): the Flame Kamehameha charge (run 0x08721164 record 12 + f, f = t >> 3,
+                // > 3 -> 2 + (f & 1), at owner + FLAME_CHARGE) and the Energy Punch Lv3 aura (0x08762270 + 12 * (3 * dir
+                // + (state tick >= 56)) at owner + ENERGY_PUNCH_POS) - reference player.ts RecObj
+                Fx::RecObj { what, owner, t, .. } => {
+                    if let Some(pk) = w.find(*owner) {
+                        if let Body::Player(p) = &w.ents[pk].body {
+                            let d = (p.a.facing & 3) as usize;
+                            let (addr, (ox, oy)) = match what {
+                                crate::fx::RecWhat::FlameCharge => {
+                                    let f = t >> 3;
+                                    let r = 12 + if f > 3 { 2 + (f & 1) } else { f };
+                                    (0x0872_1164 + 12 * r as u32, [(8, -2), (12, -2), (12, -2), (4, -2)][d])
+                                }
+                                crate::fx::RecWhat::EnergyPunch => (
+                                    0x0876_2270 + 12 * (3 * d as u32 + (p.ap.tick >= 56) as u32),
+                                    [(13, 8), (0, -19), (-8, -3), (24, -3)][d],
+                                ),
+                            };
+                            record(w, id, addr, p.a.px() + ox, p.a.py() + oy, out);
+                        }
+                    }
+                }
+                // Energy Sword (table 0x0876CBD8) at the owner: charging records base + min(4, min(79, t) >> 4) (base 0,
+                // facing right 5); slashing k = (slash - 1) & 7: facing right [14,13,12,11,10,17,16,15][k], else 10 + k
+                // (reference skillfx.ts EnergySwordFx)
+                Fx::EnergySword { owner, slash, t, .. } => {
+                    if let Some(a) = w.actor_by_id(*owner) {
+                        let right = a.facing == 3;
+                        let rec = if *slash >= 0 {
+                            let k = ((slash - 1).max(0) & 7) as usize;
+                            if right {
+                                [14, 13, 12, 11, 10, 17, 16, 15][k]
+                            } else {
+                                10 + k as i32
+                            }
+                        } else {
+                            (if right { 5 } else { 0 }) + 4.min(79.min(*t) >> 4)
+                        };
+                        record(w, id, 0x0876_cbd8 + 12 * rec as u32, a.px(), a.py(), out);
+                    }
+                }
+                // Big Bang Kamehameha flare (effects/bbk_flare): flare + mirror piece k = (t >> 2) & 3, the ball
+                // ((t >> 2) & 1) until the attack ends (reference skillfx.ts BbkFlareFx)
+                Fx::BbkFlare { x, y, dir, t, ended, .. } => {
+                    let k = ((t >> 2) & 3) as u32;
+                    let mut ps = vec![("flare", 4 * k), ("mirror", 4 * k)];
+                    if !*ended {
+                        ps.push(("ball", 4 * ((t >> 2) & 1) as u32));
+                    }
+                    for (anim, tt) in ps.into_iter().rev() {
+                        out.sprites.push(SpriteDraw {
+                            entity: id,
+                            sheet: "effects/bbk_flare".into(),
+                            frame: FrameSel::Anim { anim: anim.into(), dir: *dir, t: tt, looping: true },
+                            x: *x,
+                            y: *y,
+                            priority: 3,
+                            mirror: false,
+                            effect: SpriteEffect::None,
+                        });
+                    }
+                }
+                // Flame Kamehameha links (table 0x087568B4 + 0x54 * dir + 12 * frame): non-last links cycle 2,1,2,3 from
+                // frame 4, the last 4,5,6,5 from 7; shifted across the facing by the stored half-steps (reference
+                // skillfx.ts FlameKameFx)
+                Fx::FlameKame { dir, n, links, .. } => {
+                    let (dx, _) = crate::geom::DIR_VEC[(*dir & 3) as usize];
+                    for (k, l) in links.iter().enumerate().rev() {
+                        let mut f = l[2] >> 2;
+                        if k as i32 == n - 1 {
+                            if f >= 7 {
+                                f = (f & 3) + 4;
+                                if f == 7 {
+                                    f = 5;
+                                }
+                            }
+                        } else if f >= 4 {
+                            f &= 3;
+                            if f == 0 {
+                                f = 2;
+                            }
+                        }
+                        let sh = l[3] / 2;
+                        let (lx, ly) = (l[0] + if dx != 0 { 0 } else { sh }, l[1] + if dx != 0 { sh } else { 0 });
+                        record(w, id, 0x0875_68b4 + 0x54 * *dir as u32 + 12 * f as u32, lx, ly, out);
+                    }
+                }
                 _ => {}
             },
             Body::Shot(s) => {
@@ -731,7 +833,7 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                             ),
                             SName::Volley => (0x0876_e264, 3 * d + 2),
                         };
-                        effect(id, run, idx, x, y, out);
+                        effect(w, id, run, idx, x, y, out);
                     }
                     ShotKind::Flame { .. } => {
                         if (t >> 2) <= 4 {
@@ -755,6 +857,7 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                     // a flying mummy bandage (records 0x087571F4: straight 3 * (dir >> 1) + tick >> 3, diagonal + 6); stuck
                     // ones are drawn with the player
                     ShotKind::Wrap(m) if !m.stuck => effect(
+                        w,
                         id,
                         0x0875_71f4,
                         (if m.diag { 6 } else { 0 }) + 3 * (d >> 1) + (m.tick >> 3),
@@ -802,6 +905,118 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                         }
                     }
                     ShotKind::Kame(k) if !k.charging => beam(w, id, &k.set, d, x, y, k.len, k.vt, !k.done, k.stopped, out),
+                    // the Final Flash (class 0x08036FA2; tables 0x0875FE2C / 0x08760A8C / 0x087616EC): start record
+                    // 2 * dir at the visible origin, body 2 * dir + 1 every 32 px from 16 while < len - 1; growing /
+                    // shrinking (scale < 0x100) as affine OBJs: inv = 0x10000 / scale, (pa, pd) down (inv, -0x80), up
+                    // (inv, 0x100), left (-0x80, inv), right (0x100, inv) (reference skillfx.ts drawFinalFlash)
+                    ShotKind::FullBeam(b) => {
+                        if let Some(tb) = b.table {
+                            let table = [0x0875_fe2c, 0x0876_0a8c, 0x0876_16ec][(tb as usize).min(2)];
+                            let (vx, vy) = b.vis.unwrap_or((x, y));
+                            let (dx, dy) = crate::geom::DIR_VEC[(d & 3) as usize];
+                            let l = ((x + dx * b.len - vx) * dx + (y + dy * b.len - vy) * dy).max(0);
+                            let base = table + 24 * d as u32;
+                            let mut ps = vec![(base, vx, vy)];
+                            let mut o = 16;
+                            while o < l - 1 {
+                                ps.push((base + 12, vx + dx * o, vy + dy * o));
+                                o += 32;
+                            }
+                            let eff = if b.scale >= 0x100 {
+                                Some(SpriteEffect::None)
+                            } else if b.scale > 0 {
+                                let inv = (0x10000 / b.scale).min(0x7fff) as i16;
+                                let (pa, pd) = [(inv, -0x80), (inv, 0x100), (-0x80, inv), (0x100, inv)][(d & 3) as usize];
+                                Some(SpriteEffect::Affine { pa, pd })
+                            } else {
+                                None
+                            };
+                            if let Some(effect) = eff {
+                                for (addr, px, py) in ps.into_iter().rev() {
+                                    if let Some((eff, idx)) = w.data.record_frames.get(&addr) {
+                                        out.sprites.push(SpriteDraw {
+                                            entity: id,
+                                            sheet: format!("effects/{eff}"),
+                                            frame: FrameSel::Frame { index: *idx, flip: w.data.record_flip.contains(&addr) },
+                                            x: px,
+                                            y: py,
+                                            priority: 3,
+                                            mirror: false,
+                                            effect,
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // the Big Bang ball (0x08037650): table (level 0 / 1: 0x08764E00, 2: 0x0876AAE0) + dir * 120 + 12 * f
+                    ShotKind::BigBang(b) => {
+                        let table = if b.lv >= 2 { 0x0876_aae0 } else { 0x0876_4e00 };
+                        record(w, id, table + 120 * d as u32 + 12 * b.f.clamp(0, 9) as u32, x, y, out);
+                    }
+                    // the Ultra Volleyball wave (table 0x0876E264 + 36 * dir, pieces at position + origin): tail at the
+                    // position, body every 8 px while < len - 1, head at dir * len (reference drawVolleyPieces)
+                    ShotKind::Volley { len, .. } => {
+                        let base = 0x0876_e264 + 36 * d as u32;
+                        let (dx, dy) = crate::geom::DIR_VEC[(d & 3) as usize];
+                        let mut ps = vec![(base, x, y)];
+                        let mut k = 8;
+                        while k < len + 8 - 9 {
+                            ps.push((base + 12, x + dx * k, y + dy * k));
+                            k += 8;
+                        }
+                        ps.push((base + 24, x + dx * len, y + dy * len));
+                        for (a, px, py) in ps.into_iter().rev() {
+                            record_add(w, id, a, px, py, out);
+                        }
+                    }
+                    // Masenko: the aiming cursor (record 0x0872509C) until the release; the ball - charging: spark record
+                    // L + k (k = (t >> 3) & 3, 3 -> 1), flying: L + 1 + ((t >> 3) & 1) (run 0x08721164, L = 9 / 9 / 12),
+                    // its blast: (0x0872A5DC / 0x0872A60C / 0x0872A648) + 12 * min(n - 1, tb >> 2) (reference MasenkoBall)
+                    ShotKind::MasenkoCursor(c) => {
+                        if c.released < 0 {
+                            record(w, id, 0x0872_509c, x, y, out);
+                        }
+                    }
+                    ShotKind::MasenkoBall(m) => {
+                        let lv = m.lv.clamp(0, 2) as usize;
+                        let spark = [9, 9, 12][lv];
+                        let r = match m.phase {
+                            crate::shots::MPhase::Charge => {
+                                let k = match (t >> 3) & 3 {
+                                    3 => 1,
+                                    k => k,
+                                };
+                                0x0872_1164 + 12 * (spark + k) as u32
+                            }
+                            crate::shots::MPhase::Fly => 0x0872_1164 + 12 * (spark + 1 + ((t >> 3) & 1)) as u32,
+                            crate::shots::MPhase::Blast => {
+                                let n = [4, 5, 6][lv];
+                                [0x0872_a5dc, 0x0872_a60c, 0x0872_a648][lv] + 12 * (n - 1).min(m.tb >> 2) as u32
+                            }
+                        };
+                        record(w, id, r, x, y, out);
+                    }
+                    // a Kamikaze ghost: the ghost sprite (148) in its own animation state, like an actor
+                    ShotKind::Ghost(g) => {
+                        let cel = w.data.sprite(crate::shots::GHOST_SPRITE).and_then(|sp| {
+                            let an = sp.anim_raw(g.ea.pos.raw).or_else(|| sp.anim_raw(1))?;
+                            let st = an.steps(g.facing);
+                            st.get((g.ea.pos.frame.max(0) as usize).min(st.len().saturating_sub(1))).map(|s| (sp.id.clone(), s.frame, s.flip))
+                        });
+                        if let Some((sid, frame, flip)) = cel {
+                            out.sprites.push(SpriteDraw {
+                                entity: id,
+                                sheet: format!("sprites/{sid}"),
+                                frame: FrameSel::Frame { index: frame, flip },
+                                x,
+                                y,
+                                priority: 3,
+                                mirror: false,
+                                effect: SpriteEffect::None,
+                            });
+                        }
+                    }
                     _ => {}
                 }
             }

@@ -240,7 +240,9 @@ pub unsafe extern "C" fn wf_app_init(cfg_ptr: *const u8, cfg_len: usize) -> u32 
     };
     let bindings = serde_json::from_value(cfg["bindings"].clone()).unwrap_or_default();
     let hotkeys: Hotkeys = serde_json::from_value(cfg["hotkeys"].clone()).unwrap_or_default();
-    let ctl = Control::new(&mut app, hotkeys, cfg["now"].as_f64().unwrap_or(0.0) as u64);
+    let mut ctl = Control::new(&mut app, hotkeys, cfg["now"].as_f64().unwrap_or(0.0) as u64);
+    // a battle ends on the game's "You Win!!" / "You Lose!!" with Retry / Change fighter
+    ctl.end_screen = true;
     let n = dc.players;
     GAME.with(|g| {
         *g.borrow_mut() = Some(Game {
@@ -579,7 +581,7 @@ pub extern "C" fn wf_app_set_clock(unix: f64) {
 
 /// Next host request: 0 none; 1 save replay (string = `{"id", "header"}`, blob = file); 2 save state (string =
 /// `{"slot"}`, blob = file); 3 load state (string = `{"slot"}`: answer with `wf_app_load_state`); 4 open the
-/// replay browser.
+/// replay browser; 5 back to the launcher's Battle page (the battle's end screen: "Change fighter").
 #[no_mangle]
 pub extern "C" fn wf_app_next_request() -> u32 {
     with_game(|g| {
@@ -604,6 +606,10 @@ pub extern "C" fn wf_app_next_request() -> u32 {
             Some(Request::OpenReplays) => {
                 g.ctl.finalize(&g.app);
                 4
+            }
+            Some(Request::BattleSelect) => {
+                g.ctl.finalize(&g.app);
+                5
             }
         }
     })

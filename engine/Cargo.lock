@@ -5287,6 +5287,7 @@ dependencies = [
  "serde_json",
  "softbuffer",
  "wf-app",
+ "wf-core",
  "wf-extract",
  "wf-net",
  "wf-rom",

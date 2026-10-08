@@ -434,6 +434,10 @@ pub enum SpriteEffect {
     /// OAM vertical flip, mirrored around the frame's anchor row (the Instant Transmission ring's lower half: the
     /// upper half's record drawn flipped just below it).
     VFlip,
+    /// An affine OBJ without double size (the Final Flash growing / shrinking): the frame's own box, each screen pixel
+    /// sampling the frame at `(pa * (x - centre) >> 8) + w / 2`, `(pd * (y - centre) >> 8) + h / 2` (8.8 screen ->
+    /// texture; negative = mirrored), clipped to the box.
+    Affine { pa: i16, pd: i16 },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]

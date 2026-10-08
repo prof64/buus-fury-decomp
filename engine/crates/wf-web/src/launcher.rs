@@ -47,7 +47,8 @@ pub fn launch_app(cfg: &serde_json::Value, packs: Packs) -> Option<Result<App, S
     }
 }
 
-/// Start the launcher. `cfg` = `{"settings": {...}, "slots": [hex, ...], "mods": [{"name", "enabled"}], "bindings"}`.
+/// Start the launcher. `cfg` = `{"settings": {...}, "slots": [hex, ...], "mods": [{"name", "enabled"}], "bindings"}`
+/// (+ `"screen": "battle"`: open on the Battle page - a battle's end screen chose "Change fighter").
 ///
 /// # Safety
 /// `ptr`/`len` must describe readable memory.
@@ -71,6 +72,9 @@ pub unsafe extern "C" fn wf_launcher_init(ptr: *const u8, len: usize) -> u32 {
         .map(|m| ModEntry { name: m["name"].as_str().unwrap_or("?").into(), enabled: m["enabled"].as_bool().unwrap_or(true) })
         .collect();
     l.bindings = serde_json::from_value(cfg["bindings"].clone()).unwrap_or_default();
+    if cfg["screen"].as_str() == Some("battle") {
+        l.show(wf_app::launcher::Screen::Battle);
+    }
     L.with(|s| *s.borrow_mut() = Some(State { l, packs, rgba: vec![0; 240 * 160 * 4], last_ms: unsafe { crate::now_ms() } }));
     0
 }

@@ -424,7 +424,9 @@ export class BuuRuleset implements Ruleset {
     const { rec, equip, fd } = this.build(cfg.fighter)
     const formId = fd.forms.includes(cfg.fighter.form) ? cfg.fighter.form : fd.defaultForm
     const fixedSkills = (cfg.fighter.options.fixed as { skills?: number[] } | undefined)?.skills
-    const skills = fixedSkills ?? (fd.char === 8 ? [7] : d.chars[fd.char].skills)
+    // (wf-core FighterSetup.skills: the skills the story has given by then; a fixed record's list still wins)
+    const listSkills = cfg.fighter.options.skills as number[] | undefined
+    const skills = fixedSkills ?? listSkills ?? (fd.char === 8 ? [7] : d.chars[fd.char].skills)
     const player = new Player(ctx, {
       name: fd.name || d.forms[formId].name,
       form: formId,

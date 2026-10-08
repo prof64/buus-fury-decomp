@@ -244,6 +244,12 @@ async function boot(baseTarBytes) {
     const settings = lsGet('wf.launcher') || {};
     const off = settings.disabled_mods || [];
     const init = { settings, slots: readSlots(), mods: all.map((name) => ({ name, enabled: !off.includes(name) })), bindings: lsGet('wf.bindings') };
+    // back from a battle's end screen ("Change fighter"): open on the Battle page
+    const screen = sessionStorage.getItem('wf.launcher.screen');
+    if (screen) {
+      init.screen = screen;
+      sessionStorage.removeItem('wf.launcher.screen');
+    }
     if (withStr(JSON.stringify(init), (p, n) => x.wf_launcher_init(p, n)) !== 0) return { error: str() };
     $('stage').hidden = false;
     show('');
@@ -381,9 +387,9 @@ async function boot(baseTarBytes) {
     } catch {}
   };
   const applyMode = () => {
-    const [k, z] = (prefs.mode || 'pc:0').split(':');
+    const [k, z] = (prefs.mode || 'gba:0').split(':');
     x.wf_app_set_mode(k === 'gba' ? 1 : 0, Number(z));
-    $('mode').value = prefs.mode || 'pc:0';
+    $('mode').value = prefs.mode || 'gba:0';
   };
   applyMode();
   // launcher Settings "Original pacing" (story mode; presentation only)
@@ -589,6 +595,20 @@ async function boot(baseTarBytes) {
     if (e.code === 'Escape') {
       if (replays.open()) replays.close();
       else toggleSettings();
+      return;
+    }
+    // F1: Classic 240x160 <-> PC wide (kept as the launcher's View setting too)
+    if (e.code === 'F1') {
+      e.preventDefault();
+      const classic = (prefs.mode || 'gba:0').startsWith('gba');
+      prefs.mode = classic ? prefs.last_pc || 'pc:0' : 'gba:0';
+      if (classic === false) prefs.last_pc = $('mode').value;
+      savePrefs();
+      applyMode();
+      const ls = lsGet('wf.launcher') || {};
+      ls.view = prefs.mode;
+      lsSet('wf.launcher', ls);
+      x.wf_app_toast && withStr(prefs.mode.startsWith('gba') ? 'Classic 240x160 (F1)' : 'PC wide (F1)', (p, n) => x.wf_app_toast(p, n));
       return;
     }
     if (e.code === 'F3') {
@@ -802,6 +822,11 @@ async function boot(baseTarBytes) {
             if (!b) toast(`State slot ${meta.slot} is empty`);
             else if (withBytes(b, (p, n) => x.wf_app_load_state(p, n))) toast(str());
           } else if (k === 4) show();
+          // the battle's end screen: "Change fighter" -> the launcher's Battle page (after the recording is stored)
+          else if (k === 5) {
+            sessionStorage.setItem('wf.launcher.screen', 'battle');
+            location.href = location.pathname;
+          }
         }
       } catch (e) {
         console.error('replays', e);

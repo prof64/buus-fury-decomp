@@ -48,7 +48,32 @@ pub enum Request {
     LoadState { slot: u8 },
     /// Show the replay browser.
     OpenReplays,
+    /// The battle's end screen chose "Change fighter": back to the launcher's Battle page (the recording is saved
+    /// first, [`Control::finalize`]).
+    BattleSelect,
 }
+
+/// The battle's end (live play only): some frames after the outcome the game's "You Win!!" / "You Lose!!" (the link
+/// Dojo's strings 111 / 112, its big title font) over the arena and its choice box "Retry" / "Change fighter" (the
+/// dialogue box with the choice cursor). The world runs on without the player's buttons meanwhile (recorded as
+/// such); UP / DOWN pick, A / START confirm. Retry rebuilds the same battle (a new recording); Change fighter asks
+/// the host for the launcher's Battle page ([`Request::BattleSelect`]).
+#[derive(Clone, Debug)]
+struct EndScreen {
+    outcome: Outcome,
+    /// the frame the outcome came
+    at: u64,
+    sel: u8,
+    /// player 1's buttons last step (edges)
+    prev: u16,
+}
+
+/// frames between the outcome and the end screen (the last enemy's death / the KO's fall play out)
+const END_DELAY: u64 = 90;
+/// frames the end screen ignores the buttons once up (a fight's button mashing does not pick a choice)
+const END_LOCK: u64 = 40;
+/// the choices of the end screen
+const END_CHOICES: &str = "- Retry\n- Change fighter";
 
 struct Playback {
     id: String,
@@ -106,6 +131,13 @@ pub struct Control {
     outcome: Option<Outcome>,
     /// Seconds between automatic saves of the live recording.
     pub autosave_secs: f64,
+    /// the battle's end screen ([`EndScreen`])
+    end: Option<EndScreen>,
+    /// show the end screen when a live battle ends (the shells turn it on; off: the fight just runs on, as tools
+    /// and tests drive it)
+    pub end_screen: bool,
+    /// "Change fighter" was chosen (native shell: [`Control::take_battle_select`])
+    battle_select: bool,
 }
 
 fn fmt_time(frames: u64) -> String {
@@ -184,6 +216,9 @@ impl Control {
             seq: 0,
             outcome: None,
             autosave_secs: 30.0,
+            end: None,
+            end_screen: false,
+            battle_select: false,
         };
         if enabled {
             c.timeline.capture(app.sim.as_ref());
@@ -274,8 +309,75 @@ impl Control {
         self.enabled && self.step_once(app, live, true)
     }
 
+    /// The end screen chose "Change fighter" (cleared by the call): the host goes back to the launcher's Battle page.
+    pub fn take_battle_select(&mut self) -> bool {
+        std::mem::take(&mut self.battle_select)
+    }
+
+    /// whether the end screen is up (its choice box takes player 1's buttons)
+    fn end_shown(&self, frame: u64) -> bool {
+        self.play.is_none() && self.end.as_ref().is_some_and(|e| frame >= e.at + END_DELAY)
+    }
+
+    /// The end screen's input (player 1's button edges) and the buttons the world gets meanwhile (none). Some(choice)
+    /// once A / START picks one.
+    fn end_input(&mut self, app: &mut App, live: &mut Vec<u16>) -> Option<u8> {
+        let f = app.sim.frame();
+        let shown = self.end_shown(f);
+        let e = self.end.as_mut()?;
+        let held = live.first().copied().unwrap_or(0);
+        let pressed = held & !e.prev;
+        e.prev = held;
+        if !shown {
+            return None;
+        }
+        live.iter_mut().for_each(|b| *b = 0);
+        if f < e.at + END_DELAY + END_LOCK {
+            return None;
+        }
+        use wf_core::input::{A, DOWN, START, UP};
+        if pressed & (UP | DOWN) != 0 {
+            e.sel ^= 1;
+            app.audio_out.push(AudioEvent::PlaySfx { id: wf_core::menu::SFX_CURSOR as u8, volume: 64, pan: 0 });
+        }
+        if pressed & (A | START) != 0 {
+            app.audio_out.push(AudioEvent::PlaySfx { id: wf_core::menu::SFX_ACCEPT as u8, volume: 64, pan: 0 });
+            return Some(e.sel);
+        }
+        None
+    }
+
+    /// Retry: the same battle again from its start (the finished one's recording is saved, a new one starts)
+    fn retry(&mut self, app: &mut App) {
+        let Some((kind, config, _, _)) = start_of(app) else { return };
+        let Ok(sim) = self.build_sim(app, kind, &config) else { return };
+        self.finalize(app);
+        self.install(app, sim);
+        self.timeline.clear();
+        self.timeline.capture(app.sim.as_ref());
+        self.end = None;
+        self.start_recording(app, None);
+        app.paused = false;
+        app.sim.view(&mut app.view);
+    }
+
     /// One simulation step (live inputs or the replay's). False at the end of a replay.
     fn step_once(&mut self, app: &mut App, live: &[u16], audio: bool) -> bool {
+        let mut live = live.to_vec();
+        if self.play.is_none() {
+            match self.end_input(app, &mut live) {
+                Some(0) => {
+                    self.retry(app);
+                    return true;
+                }
+                Some(_) => {
+                    self.battle_select = true;
+                    self.requests.push(Request::BattleSelect);
+                }
+                None => {}
+            }
+        }
+        let live = &live[..];
         let f = app.sim.frame();
         let inputs: Vec<u16> = match &self.play {
             Some(p) => match p.replay.inputs.get(f) {
@@ -346,6 +448,12 @@ impl Control {
                 if s.outcome != Outcome::Running {
                     self.autosave(app);
                 }
+            }
+            // the end screen follows the outcome (a rewind back into the fight takes it away again)
+            if s.outcome == Outcome::Running {
+                self.end = None;
+            } else if self.end_screen && self.play.is_none() && self.end.is_none() {
+                self.end = Some(EndScreen { outcome: s.outcome, at: nf, sel: 0, prev: self.last_inputs.first().copied().unwrap_or(0) });
             }
         }
         if let Some(g) = &mut self.ghost {
@@ -815,6 +923,7 @@ impl Control {
     /// Render local player `player` (with the ghost) and draw the tool overlays.
     pub fn render(&mut self, app: &mut App, player: usize, win_w: u32, win_h: u32) -> Fit {
         app.sim.view(&mut app.view);
+        self.end_view(app);
         if let Some(g) = &self.ghost {
             let mut gv = RenderView::default();
             g.sim.view(&mut gv);
@@ -834,6 +943,28 @@ impl Control {
         let f = app.render(player, win_w, win_h);
         self.draw_overlays(app, player, f.view_w as usize, f.view_h as usize);
         f
+    }
+
+    /// the end screen over the arena: the result in the game's big title font, the choice box with its cursor
+    fn end_view(&self, app: &mut App) {
+        if !self.end_shown(app.sim.frame()) {
+            return;
+        }
+        let Some(e) = &self.end else { return };
+        let Some(md) = CoreSim::of(app.sim.as_ref()).and_then(|s| s.data.menu.clone()) else { return };
+        let won = e.outcome == Outcome::Won;
+        app.view.title = vec![wf_view::TitleView { text: md.text.s(if won { 111 } else { 112 }).to_vec(), x: 120, y: 44 }];
+        app.view.dialog = Some(wf_view::DialogView {
+            text: END_CHOICES.into(),
+            style: 1,
+            page: 0,
+            position: wf_view::DialogPos::Bottom,
+            portrait: None,
+            portrait_left: false,
+            cursor: Some(e.sel),
+        });
+        // fully typed, full size, the cursor shown
+        app.view.dialog_anim = Some(wf_view::DialogAnim { scale: 0, typed: None, cursor_draws: Some(0) });
     }
 
     fn draw_overlays(&mut self, app: &mut App, player: usize, w: usize, h: usize) {

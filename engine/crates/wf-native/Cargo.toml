@@ -11,6 +11,7 @@ path = "src/main.rs"
 
 [dependencies]
 wf-app = { path = "../wf-app" }
+wf-core = { path = "../wf-core" }
 wf-view = { path = "../wf-view" }
 wf-net = { path = "../wf-net", features = ["webrtc"] }
 wf-extract = { path = "../wf-extract" }

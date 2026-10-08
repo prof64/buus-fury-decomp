@@ -82,6 +82,15 @@ fn quick_battle_defaults_follow_the_enemy() {
     }
     // settings saved before the automatic level existed get it
     assert!(Settings::from_json(r#"{"battle":{"level":60}}"#).unwrap().battle.level_auto);
+    // the story's skills at that level: Goku learned Super Saiyan 3 (#27, level 100); Teen Gohan has the Saiyaman
+    // skill; settings saved with the old PC default move to Classic once
+    assert!(l.battle_config().players[0].skills.as_ref().is_some_and(|s| s.contains(&22)));
+    let mut s = Settings::default();
+    s.battle.fighter = "gohan".into();
+    s.battle.form = Some(10);
+    assert!(Launcher::new(&p, s, true).battle_config().players[0].skills.as_ref().is_some_and(|s| s.contains(&18)));
+    assert_eq!(Settings::from_json(r#"{"view":"pc:0"}"#).unwrap().view, "gba:0");
+    assert_eq!(Settings::default().view, "gba:0");
 }
 
 /// The Battle page's character picker (Character / Form / Outfit): no two rows with the same labels, every row starts

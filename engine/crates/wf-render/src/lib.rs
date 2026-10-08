@@ -925,6 +925,39 @@ impl Renderer {
             _ => None,
         };
         let (w, h) = (self.w as i32, self.h as i32);
+        if let SpriteEffect::Affine { pa, pd } = eff {
+            // the frame's box (mirrored about the anchor when flipped), sampled through the matrix around its centre
+            let (fw, fh) = (f.w as i32, f.h as i32);
+            let x0 = if flip { x + f.anchor.x - fw } else { x - f.anchor.x };
+            let y0 = y - f.anchor.y;
+            for j in 0..fh {
+                let sy = y0 + j;
+                if sy < 0 || sy >= h {
+                    continue;
+                }
+                let v = ((pd as i32 * (2 * j + 1 - fh)) >> 9) + fh / 2;
+                if v < 0 || v >= fh {
+                    continue;
+                }
+                for i in 0..fw {
+                    let sx = x0 + i;
+                    if sx < 0 || sx >= w {
+                        continue;
+                    }
+                    let u = ((pa as i32 * (2 * i + 1 - fw)) >> 9) + fw / 2;
+                    if u < 0 || u >= fw {
+                        continue;
+                    }
+                    let tu = if flip { fw - 1 - u } else { u };
+                    let c = img.px[((f.y as i32 + v) as u32 * img.w + (f.x as i32 + tu) as u32) as usize];
+                    if c >> 24 == 0 {
+                        continue;
+                    }
+                    self.put(sy as usize * self.w + sx as usize, c & 0xFF_FFFF, L_OBJ, 0);
+                }
+            }
+            return;
+        }
         for j in 0..f.h as i32 {
             let sy = if vflip { y + f.anchor.y - 1 - j } else { y - f.anchor.y + j };
             if sy < 0 || sy >= h {

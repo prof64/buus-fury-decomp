@@ -225,17 +225,39 @@ pub struct Settings {
     /// the window; zooms up to 6x on small maps)
     #[serde(default)]
     pub auto_zoom_max: bool,
+    /// the view default became "Classic 240x160": settings saved before it (false) move to it once
+    /// ([`Settings::migrate`]); F1 in a game switches Classic <-> PC wide
+    #[serde(default)]
+    pub classic_default: bool,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { view: "pc:0".into(), volume: 100, fullscreen: false, disabled_mods: Vec::new(), battle: BattlePrefs::default(), original_pacing: false, auto_zoom_max: false }
+        Settings {
+            view: "gba:0".into(),
+            volume: 100,
+            fullscreen: false,
+            disabled_mods: Vec::new(),
+            battle: BattlePrefs::default(),
+            original_pacing: false,
+            auto_zoom_max: false,
+            classic_default: true,
+        }
     }
 }
 
 impl Settings {
     pub fn from_json(s: &str) -> Option<Settings> {
-        serde_json::from_str(s).ok()
+        let mut st: Settings = serde_json::from_str(s).ok()?;
+        st.migrate();
+        Some(st)
+    }
+    /// settings saved before the Classic default: the view moves to Classic once
+    pub fn migrate(&mut self) {
+        if !self.classic_default {
+            self.view = "gba:0".into();
+            self.classic_default = true;
+        }
     }
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).unwrap_or_default()
@@ -391,6 +413,36 @@ fn cap(s: &str) -> String {
     }
 }
 
+/// The skills a battle gives a fighter at `level` in form `form`: the character's new-game list plus what the story
+/// teaches by then. The game gates Super Saiyan 3 by the skill (22) being learned - `learn_skill(0, 22)` after Goku's
+/// fight with Majin Buu (event #27; Majin Buu's level 100), `learn_skill(5, 22)` in Gotenks' fights with Super Buu
+/// (#228 / #233; level 125) - and uses it from Super Saiyan (`can_use_skill`: an SS form with a form above); the
+/// same skill turns it back. A start form that is already SS3 gets it whatever the level (its way back). Teen Gohan
+/// and the Great Saiyaman get the Saiyaman skill (18: Teen Gohan <-> Great Saiyaman; the story swaps it for Super
+/// Saiyan at the World Tournament, #184 - here both stay). Fusion Dance (12) does nothing in a battle: left out.
+/// None = the fighter's own list as it is (mods, extra characters).
+fn story_skills(d: &GameData, fighter: &str, form: i32, level: i32) -> Option<Vec<i32>> {
+    let fd = d.fighter(fighter)?;
+    if fd.skills.is_some() {
+        return None;
+    }
+    let ch = d.chars.iter().find(|c| c.index == fd.character)?;
+    let mut v: Vec<i32> = ch.skills.iter().copied().filter(|&s| s != 12).collect();
+    let ss3 = d.form(form).is_some_and(|f| f.ss3);
+    let add = |v: &mut Vec<i32>, s: i32| {
+        if !v.contains(&s) {
+            v.push(s);
+        }
+    };
+    match fighter {
+        "goku" if level >= 100 || ss3 => add(&mut v, 22),
+        "gotenks" if level >= 125 || ss3 => add(&mut v, 22),
+        "gohan" if form == 10 || form == 14 => add(&mut v, 18),
+        _ => {}
+    }
+    Some(v)
+}
+
 /// a mod fighter's form record as a Form label: Base / Super Saiyan / Super Saiyan 3 by its flags
 fn form_label(d: &GameData, id: i32) -> String {
     match d.form(id) {
@@ -402,7 +454,8 @@ fn form_label(d: &GameData, id: i32) -> String {
 }
 
 impl Launcher {
-    pub fn new(packs: &Packs, settings: Settings, native: bool) -> Launcher {
+    pub fn new(packs: &Packs, mut settings: Settings, native: bool) -> Launcher {
+        settings.migrate();
         let data = crate::battle::game_data(packs).ok();
         let mut picks = Vec::new();
         let mut default_forms = Vec::new();
@@ -676,7 +729,8 @@ impl Launcher {
         };
         // a quick battle as a story player would have it: the level's stat points spent (evenly), full EP, and an
         // SS / SS3 form with its gauge full (a form reached by transforming always is)
-        let mut f = FighterSetup { fighter: fid, form, level, auto_spend: "even".into(), skill_level, full_gauge: true, ..Default::default() };
+        let skills = self.data.as_ref().and_then(|d| story_skills(d, &fid, form, level));
+        let mut f = FighterSetup { fighter: fid, form, level, auto_spend: "even".into(), skill_level, full_gauge: true, skills, ..Default::default() };
         // Hercule, Videl, Pikkon (record slot 8): the slot never grows in the game (50 HP, STR 17 at every level), so
         // the battle takes Goku's record at this level - HP, EP, stats with the points spent evenly - and keeps their
         // own skill list (Energy Blast)

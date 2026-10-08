@@ -184,6 +184,11 @@ pub struct FighterSetup {
     /// form reverts within a few frames.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub full_gauge: bool,
+    /// the skill list (menu order) instead of the fighter's / character's new-game one: the skills the story has
+    /// given by then (the launcher: Super Saiyan 3 learned in events #27 / #228 / #233, the Saiyaman skill of Teen
+    /// Gohan); None = the new-game list. A fixed record's own list still wins.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skills: Option<Vec<i32>>,
     /// a record given as is (link play's Dojo): replaces what the level / growth / points give (`FixedRecord`)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed: Option<FixedRecord>,
@@ -227,6 +232,7 @@ impl Default for FighterSetup {
             skill_level: 0,
             holy_water: false,
             full_gauge: false,
+            skills: None,
             fixed: None,
         }
     }
@@ -360,10 +366,11 @@ pub fn build_record(d: &GameData, f: &FighterSetup) -> (Record, Vec<i32>, Vec<i3
     rec.end = 255.min(rec.end + spent[2]);
     rec.spd = 255.min(rec.spd + spent[3]);
     rec.points = free;
-    let mut skills = fd
-        .skills
-        .clone()
-        .unwrap_or_else(|| ch(fd.character).skills.clone());
+    let mut skills = f.skills.clone().unwrap_or_else(|| {
+        fd.skills
+            .clone()
+            .unwrap_or_else(|| ch(fd.character).skills.clone())
+    });
     if let Some(fx) = &f.fixed {
         rec.hp = fx.hp;
         rec.max_hp = fx.hp;

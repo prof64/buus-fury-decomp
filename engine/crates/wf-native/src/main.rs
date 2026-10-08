@@ -12,6 +12,8 @@
 //! forward, P pause, N frame advance, -/= speed, [ ] seek, Home start, F6-F9 load / Shift+F6-F9 save state, F10
 //! replays, B take over, I input display, F4 training overlay, G ghost; rebindable in `<data dir>/hotkeys.json`.
 //! Headless: `--replay FILE` verifies and plays a recording, `--record FILE` writes the run's recording (battles and story mode).
+//! Headless frame dumps: `--dump DIR [--dump-every N]` writes `DIR/fNNNNNN.png` every N frames (default 10) at `--size`,
+//! and `DIR/launcher_KKK.png` after each `--launcher-keys` key (off by default).
 //! Mods (engine/docs/modding.md): every folder in `<content>/mods/` loads; `--mod DIR` (repeatable) adds a mod
 //! folder from anywhere (e.g. `--mod engine/mods-examples/new-skill`), `--no-mods` loads only those given;
 //! `--modcheck [DIR...]` checks mod folders (default: `<content>/mods/*`) and exits (1 on problems).
@@ -137,6 +139,9 @@ struct Args {
     link_report: Option<PathBuf>,
     /// `--link-quick`: the Dojo's short test rules
     link_quick: bool,
+    /// headless: `--dump DIR` writes a PNG every `--dump-every N` frames (default 10) and after each launcher key
+    dump: Option<PathBuf>,
+    dump_every: u64,
 }
 
 /// Running from a macOS `.app` bundle (Finder gives no terminal, which would otherwise mean "automation, headless").
@@ -198,6 +203,8 @@ fn parse_args() -> Args {
         link_bot: None,
         link_report: None,
         link_quick: false,
+        dump: None,
+        dump_every: 10,
     };
     if a.headless && in_app_bundle() && std::env::var_os("WF_HEADLESS").is_none() && std::env::var_os("WF_AGENT").is_none() && std::env::var_os("CI").is_none() {
         a.headless = false;
@@ -332,6 +339,8 @@ fn parse_args() -> Args {
             }
             "--link-report" => a.link_report = Some(PathBuf::from(next(&mut i))),
             "--link-quick" => a.link_quick = true,
+            "--dump" => a.dump = Some(PathBuf::from(next(&mut i))),
+            "--dump-every" => a.dump_every = next(&mut i).parse().unwrap_or(10).max(1),
             s if s.starts_with("--net") || matches!(s, "--pvp" | "--pvp-enemies" | "--signal" | "--room") => {
                 a.cli_mode = true;
                 a.signal_given |= s == "--signal";
@@ -885,7 +894,9 @@ impl Shell {
                     let _ = std::fs::write(&bpath, b.to_json());
                     b
                 });
-                let ctl = Control::new(&mut app, load_hotkeys(&self.args.data), now_unix());
+                let mut ctl = Control::new(&mut app, load_hotkeys(&self.args.data), now_unix());
+                // a battle ends on the game's "You Win!!" / "You Lose!!" with Retry / Change fighter
+                ctl.end_screen = true;
                 let a = &self.args;
                 let local = wf_app::battle::config(&a.arena, &a.enemy, a.count, &a.fighter, a.form, a.level, a.players, a.seed);
                 let mut online = online::Online::new(a.net.clone(), &a.data, local, a.signal_given);
@@ -964,6 +975,24 @@ impl Shell {
         self.last = now;
 
         // phase transitions
+        // a battle's end screen chose "Change fighter": its recording saved, back to the launcher's Battle page
+        let back = match &mut self.phase {
+            Phase::Ready(r) => {
+                let back = r.ctl.take_battle_select();
+                if back {
+                    r.ctl.finalize(&r.app);
+                    replays::service(&r.store, &mut r.ctl, &mut r.app, &mut r.replay_menu);
+                }
+                back
+            }
+            _ => false,
+        };
+        if back {
+            self.enter_launcher();
+            if let Phase::Launcher(ls) = &mut self.phase {
+                ls.l.show(wf_app::launcher::Screen::Battle);
+            }
+        }
         if let Phase::Extracting(rx, status, frac) = &mut self.phase {
             let mut next = None;
             while let Ok(p) = rx.try_recv() {
@@ -1037,6 +1066,7 @@ impl Shell {
                 // (after the frame's steps: a safe point for a dev reload; the restarted scene records afresh)
                 if dev_poll(&mut r.dev, &self.args, &mut r.app) {
                     r.ctl = Control::new(&mut r.app, load_hotkeys(&self.args.data), now_unix());
+                    r.ctl.end_screen = true;
                     r.dirty = true;
                 }
                 persist_saves(&self.args.data, &r.app, &mut r.saves_gen);
@@ -1167,6 +1197,42 @@ impl Shell {
             }
             let _ = buf.present();
         }
+    }
+}
+
+/// `--dump`: a compact state line for the dumped frame (players, enemies, outcome, field area) - battle and story
+fn obs_line(app: &App) -> Option<String> {
+    let any = app.sim.as_any()?;
+    let s = match any.downcast_ref::<wf_app::battle::CoreSim>() {
+        Some(c) => &c.0,
+        None => &any.downcast_ref::<wf_app::story::StorySim>()?.session,
+    };
+    let o = wf_core::observe::observe(&s.world, 0);
+    let pl: Vec<_> = o
+        .players
+        .iter()
+        .map(|p| serde_json::json!({"hp": p.hp, "hp_max": p.hp_max, "ep": p.ep, "ep_max": p.ep_max, "form": p.form, "state": p.state, "skill": p.selected_skill, "skills": p.skills, "ss": p.ss_gauge, "dead": p.dead, "x": p.actor.x, "y": p.actor.y, "facing": p.actor.facing, "lv": p.level}))
+        .collect();
+    let en: Vec<_> = o
+        .enemies
+        .iter()
+        .map(|e| serde_json::json!({"name": e.name, "ty": e.ty, "hp": e.hp, "hp_max": e.hp_max, "x": e.actor.x, "y": e.actor.y, "defeated": e.defeated, "primary": e.primary}))
+        .collect();
+    let field = o.field.as_ref().map(|f| serde_json::json!({"area": f.area, "name": f.name, "busy": f.busy, "transition": f.transition, "zenie": f.zenie}));
+    Some(
+        serde_json::json!({"frame": o.frame, "outcome": format!("{:?}", s.outcome), "players": pl, "enemies": en, "shots": o.projectiles.len(), "camera": o.camera, "field": field})
+            .to_string(),
+    )
+}
+
+/// `--dump`: an ARGB frame as a PNG
+fn write_png(path: &Path, fb: &[u32], w: usize, h: usize) {
+    let rgba: Vec<u8> = fb[..w * h].iter().flat_map(|&p| [(p >> 16) as u8, (p >> 8) as u8, p as u8, 255]).collect();
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    if let Ok(b) = wf_app::wf_content::image::encode_rgba(w as u32, h as u32, &rgba) {
+        let _ = std::fs::write(path, b);
     }
 }
 
@@ -1331,11 +1397,17 @@ impl ApplicationHandler for Shell {
                 if down && !event.repeat {
                     match code {
                         KeyCode::Escape => r.app.paused = !r.app.paused,
+                        // F1: Classic 240x160 <-> PC wide, kept as the launcher's View setting
                         KeyCode::F1 => {
                             r.app.mode = match r.app.mode {
                                 ViewMode::Pc { .. } => ViewMode::Gba { scale: 0 },
                                 ViewMode::Gba { .. } => ViewMode::Pc { zoom: 0 },
-                            }
+                            };
+                            let classic = matches!(r.app.mode, ViewMode::Gba { .. });
+                            r.ctl.toast(if classic { "Classic 240x160 (F1)" } else { "PC wide (F1)" });
+                            let mut st = load_settings(&self.args.data);
+                            st.view = if classic { "gba:0" } else { "pc:0" }.into();
+                            save_settings(&self.args.data, &st);
                         }
                         KeyCode::F2 => {
                             if let ViewMode::Pc { zoom } = r.app.mode {
@@ -1366,7 +1438,7 @@ impl ApplicationHandler for Shell {
 
 /// `--headless`: no window, no event loop, no audio device (the driver still runs muted; its commands are
 /// logged). Extract if needed, step `--frames` (default 120; with `--spectate` and no `--frames`: forever) with
-/// the `--input` script (`R60,D40,RU10`: letters R L U D A B S(tart) E(select), then frames), render a
+/// the `--input` script (`R60,D40,RU10`: letters R L U D A B S(tart) E(select), l / r the shoulders, then frames), render a
 /// `--size` window-sized frame on demand, write `--shot` (PPM). `--spectate ADDR` serves a read-only viewer
 /// (http://ADDR/) and paces the simulation in real time; `--realtime` paces without a viewer.
 fn headless(a: &mut Args) -> Result<(), String> {
@@ -1393,9 +1465,14 @@ fn headless(a: &mut Args) -> Result<(), String> {
     if a.launcher == Some(true) || (!a.cli_mode && !a.launcher_keys.is_empty()) {
         let mut l = new_launcher(a, &packs);
         let mut started = false;
-        for k in a.launcher_keys.clone() {
+        for (ki, k) in a.launcher_keys.clone().into_iter().enumerate() {
             let c = l.key(&k);
             eprintln!("launcher: {k} -> {:?}", c.to_json()["kind"]);
+            if let Some(d) = &a.dump {
+                let mut fb = vec![0u32; 240 * 160];
+                l.draw(&packs, &mut fb, 240, 160);
+                write_png(&d.join(format!("launcher_{ki:03}.png")), &fb, 240, 160);
+            }
             if apply_choice(a, &l, &c) {
                 started = true;
                 break;
@@ -1446,6 +1523,9 @@ fn headless(a: &mut Args) -> Result<(), String> {
                 'B' => b::B,
                 'S' => b::START,
                 'E' => b::SELECT,
+                // the shoulder buttons: lower case (upper R / L are the d-pad)
+                'l' => b::L,
+                'r' => b::R,
                 _ => 0,
             }
         });
@@ -1496,6 +1576,17 @@ fn headless(a: &mut Args) -> Result<(), String> {
             break; // end of the replay
         }
         f += 1;
+        if let Some(d) = a.dump.as_ref().filter(|_| f % a.dump_every == 0) {
+            // (as the window draws it: the replay / end-screen overlays included)
+            let fit = ctl.render(&mut s.app, 0, a.size.0, a.size.1);
+            write_png(&d.join(format!("f{f:06}.png")), &s.app.renderer.fb, fit.view_w as usize, fit.view_h as usize);
+            if let Some(line) = obs_line(&s.app) {
+                use std::io::Write;
+                if let Ok(mut o) = std::fs::OpenOptions::new().create(true).append(true).open(d.join("state.jsonl")) {
+                    let _ = writeln!(o, "{{\"dump\":{f},{}", &line[1..]);
+                }
+            }
+        }
         // (between frames: a safe point for a dev reload; the restarted scene records afresh)
         if dev_poll(&mut dev, a, &mut s.app) {
             ctl = Control::new(&mut s.app, Hotkeys::default(), now_unix());

@@ -7079,3 +7079,23 @@ has one look), Level, Enemies (or the story fight's count), Players, Arena, and 
 Players; LEFT / RIGHT change, A / Enter on any row starts, B / Esc back. Animation clock: `Launcher::advance(seconds)` -
 elapsed time from both shells (native: the wall clock per drawn frame; web: the host's `now_ms`). Without the
 game's menu data the plain list is drawn. Screenshots: `work/ub/battle_select_{1..4}.png`.
+
+**§12 (7), user-bugs agent - battle end, transformations, Classic view (2026-10-07).** Checked in the app's own loop
+(`App::battle` + `Control`, the launcher's config, frames from `Control::render`).
+* *A battle now ends:* `wf_app::control` `EndScreen` (opt-in `Control::end_screen`, on in the native and web shells;
+  live play only, never in playback): 90 frames after the outcome the game's "You Win!!" / "You Lose!!" (link Dojo
+  strings 111 / 112, the big title font) over the arena and the dialogue box's choice "Retry" / "Change fighter" with
+  its cursor; the world runs on with no buttons (recorded as such); 40 frames of input lock (fight mashing does not
+  pick). Retry rebuilds the battle from its config (the finished recording saved, a new one started); Change fighter:
+  `Request::BattleSelect` / `Control::take_battle_select` - native goes back to the launcher's Battle page, web
+  (`wf_app_next_request` 5) stores the recording and reloads into the launcher's Battle page (`"screen": "battle"`).
+  A rewind into the fight takes the screen away.
+* *Transformations:* the game gates Super Saiyan 3 by the skill being learned - `learn_skill(0, 22)` after Goku vs
+  Majin Buu (#27), `learn_skill(5, 22)` in Gotenks vs Super Buu (#228 / #233) - and uses it from SS. Battles took the
+  new-game skill list (no 22). New `FighterSetup::skills` (opt-in; TS option `skills`, cross_ts 0): the launcher
+  gives the story's list at the level (`story_skills`: Goku + 22 from level 100, Gotenks + 22 from 125, an SS3 start
+  form always; Teen Gohan / Great Saiyaman + Saiyaman 18; Fusion Dance left out). Verified in the app: Goku 0, SS 3,
+  SS3 5, back to 0; Gotenks 31, 34, 35, back; Gohan 10 to 14 and back.
+* *View:* Classic 240x160 is the default (`Settings::classic_default`: settings saved before move to Classic once);
+  F1 switches Classic / PC wide in a game (native: saved as the launcher's View; web: the same, `wf.prefs` /
+  `wf.launcher`), with a toast.
