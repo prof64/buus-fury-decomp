@@ -117,6 +117,8 @@ probe for these checks. `probe.mjs` is a scratch tool: launcher keys in, screens
   keeps the sound driver running **muted** (its commands are logged in `audio_log`, voice usage observable), and
   renders on demand: `session.screenshot(player, w, h)` → `Shot` (`.ppm()`, `.bmp()`) — screenshots or video
   frames. CLI: `--frames N --input R60,D40 (or --input-file F) --size 1920x1080 --shot out.ppm [--realtime]`.
+  Playtesting: `--dump DIR [--dump-every N]` writes PNGs as the window draws them plus `state.jsonl`; `l` / `r` in
+  the input script are the shoulder buttons (docs/playtest.md).
 * **`--mute`**: windowed but never opens an audio device; the driver is still clocked and fed.
 * **Automation default**: a non-interactive launch is headless + muted unless a human asks for a window
   (`--window` / `WF_WINDOW=1`): `WF_AGENT=1`, `WF_HEADLESS=1`, `CI`, `WF_MUTE=1` (mute only), or neither stdin nor
