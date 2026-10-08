@@ -84,13 +84,23 @@ fn quick_battle_defaults_follow_the_enemy() {
     }
     // settings saved before the automatic level existed get it
     assert!(Settings::from_json(r#"{"battle":{"level":60}}"#).unwrap().battle.level_auto);
-    // the story's skills at that level: Goku learned Super Saiyan 3 (#27, level 100); the Great Saiyaman has the
-    // Saiyaman skill in Super Saiyan's place; settings saved with the old PC default move to Classic once
+    // the full moveset whatever the level (Battle mode is an arena): Goku and Gotenks have Super Saiyan 3 from base;
+    // the Great Saiyaman is a form of its own - no Super Saiyan above it, no story suit toggle (18); settings saved
+    // with the old PC default move to Classic once
     assert!(l.battle_config().players[0].skills.as_ref().is_some_and(|s| s.contains(&22)));
+    for (fighter, form) in [("goku", 2), ("gotenks", 31)] {
+        let mut s = Settings::default();
+        s.battle.fighter = fighter.into();
+        s.battle.form = Some(form);
+        s.battle.enemy = "t68".into();
+        let cfg = Launcher::new(&p, s, true).battle_config();
+        assert!(cfg.players[0].skills.as_ref().is_some_and(|s| s.contains(&22)), "{fighter}: no SS3");
+        assert_eq!(cfg.players[0].skill_level, 2);
+    }
     let mut s = Settings::default();
     s.battle.fighter = "gohan".into();
     s.battle.form = Some(14);
-    assert!(Launcher::new(&p, s, true).battle_config().players[0].skills.as_ref().is_some_and(|s| s.contains(&18) && !s.contains(&20)));
+    assert!(Launcher::new(&p, s, true).battle_config().players[0].skills.as_ref().is_some_and(|s| !s.contains(&18) && !s.contains(&20)));
     assert_eq!(Settings::from_json(r#"{"view":"pc:0"}"#).unwrap().view, "gba:0");
     assert_eq!(Settings::default().view, "gba:0");
 }
@@ -173,25 +183,34 @@ fn battle_picker_rows_are_distinct_and_playable() {
     }
 }
 
-/// The Battle page's opponent list (playtest #10): no Janemba's summoned hand (invisible, never acts - a fight with no
-/// end), no name twice (Broly, Yakon, Airship Warlord, Majin Vegeta were both a one-enemy story fight and an enemy);
-/// settings naming such an enemy open its story fight - the same battle
+/// Battle mode is a plain arena fighter: one opponent per fight from a list with no part / summon / story actor and
+/// no name twice, an open arena picked on its own (no automatic story arena), the arena rules on; settings saved with
+/// a story preset keep its opponent when it was one enemy, and an arena no longer offered moves to the default
 #[test]
-fn opponent_list_has_no_hand_and_no_twins() {
+fn battle_mode_is_an_arena() {
     let Some(rom) = wf_rom::testutil::rom() else { return };
     let (c, _) = wf_extract::extract_rom(&rom, &Default::default(), &mut |_| {});
     let p = packs(&c.files);
     let l = Launcher::new(&p, Settings::default(), true);
     let es = l.enemy_list();
     assert!(!es.iter().any(|e| e.0 == "t57"), "Janemba's hand offered");
-    let mut names: Vec<String> = launcher::PRESETS.iter().map(|p| p.1.to_uppercase()).collect();
-    names.extend(es.iter().map(|e| e.1.to_uppercase()));
+    let mut names: Vec<String> = es.iter().map(|e| e.1.to_uppercase()).collect();
     let n = names.len();
     names.sort();
     names.dedup();
     assert_eq!(names.len(), n, "a name twice");
-    let mut s = Settings::default();
-    s.battle.enemy = "t10".into();
+    let cfg = l.battle_config();
+    assert!(cfg.arena_rules);
+    assert_eq!((cfg.phases.len(), cfg.phases[0].count, cfg.arena.as_str()), (1, 1, launcher::DEFAULT_ARENA));
+    let s = Settings::from_json(r#"{"battle":{"preset_mode":true,"preset":"broly","arena":"","count":4}}"#).unwrap();
     let cfg = Launcher::new(&p, s, true).battle_config();
-    assert_eq!((cfg.phases.len(), cfg.arena.as_str()), (1, "volcano"));
+    assert_eq!((cfg.phases[0].enemy.as_str(), cfg.phases[0].count, cfg.arena.as_str()), ("t10", 1, launcher::DEFAULT_ARENA));
+    let mut s = Settings::default();
+    s.battle.arena = "forest".into();
+    assert_eq!(Launcher::new(&p, s, true).battle_config().arena, launcher::DEFAULT_ARENA);
+    for a in launcher::BATTLE_ARENAS {
+        let mut s = Settings::default();
+        s.battle.arena = a.to_string();
+        assert_eq!(Launcher::new(&p, s, true).battle_config().arena, *a);
+    }
 }

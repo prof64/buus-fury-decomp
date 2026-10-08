@@ -15,6 +15,8 @@ fn cfg(enemy: &str, arena: &str) -> BattleConfig {
         rng: RngInit::Seed(4242),
         xp: true,
         spawn_near: None,
+        arena_rules: false,
+        even_level: None,
     }
 }
 /// a deterministic input script (pseudo-random buttons, changing every few frames)

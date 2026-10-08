@@ -733,7 +733,23 @@ pub fn update(w: &mut World, i: usize) {
     }
     // the player's death script (0x08799D0C) blocks every object update at KO + 199; from KO + 200 an enemy only runs
     // its state tick (caller 0x0800F5E0: no AI)
-    let ko_at = if w.players.len() == 1 {
+    // (Battle mode's arena rules: no death script and no freeze - once the fight is lost (every player KO'd
+    // `battle::ARENA_KO` frames ago) the opponent stands down: its beam ends, it plays its animation only)
+    if w.opts.arena && w.field.is_none() {
+        let all_ko = !w.players.is_empty() && w.players.iter().all(|&id| w.find(id).is_none_or(|k| w.pl_ref(k).dead));
+        let last = w.players.iter().filter_map(|&id| w.find(id)).map(|k| w.pl_ref(k).ko_at).max().unwrap_or(-1);
+        if all_ko && w.frame as i64 - last >= crate::battle::ARENA_KO {
+            if w.frame as i64 - last == crate::battle::ARENA_KO {
+                crate::nodes::stop_beam_of(w, i);
+                if !w.en_ref(i).defeated && w.en_ref(i).a.z == 0 {
+                    set_anim(w, i, &[nm("idle")], true, Some(true));
+                }
+            }
+            tick_anim(w, i);
+            return;
+        }
+    }
+    let ko_at = if w.players.len() == 1 && !w.opts.arena {
         ctx_player(w, i).map(|pi| w.pl_ref(pi).ko_at).unwrap_or(-1)
     } else {
         -1
@@ -2597,6 +2613,11 @@ pub fn kid_buu_split(w: &mut World, i: usize) {
             }
             mark_self(w, ci);
             w.en(ci).hp1024 = hp;
+            // Battle mode's arena rules: the copy is half of the opponent - the fight is won when both halves are
+            // down (or merged and the merged Buu is down), not with a Kid Buu still standing
+            if w.opts.arena && w.en_ref(i).primary {
+                w.en(ci).primary = true;
+            }
         }
         return;
     }
@@ -2988,7 +3009,7 @@ const MINI_PTS: [(i32, i32); 5] = [(104, 112), (120, 136), (152, 144), (184, 136
 /// field: the puffs announcing the minis the next top-up creates (one per missing mini, at its spot)
 /// returns the missing count, which the top-up 16 frames later creates as it is (sc_janemba: a mini killed in
 /// between is not replaced - 4 new minis with none left)
-pub fn mini_puffs(w: &mut World) -> usize {
+pub fn mini_puffs(w: &mut World, i: usize) -> usize {
     let live = w
         .live_enemies()
         .into_iter()
@@ -2996,16 +3017,37 @@ pub fn mini_puffs(w: &mut World) -> usize {
         .count();
     let n = 5usize.saturating_sub(live);
     // (at the spot itself: the game's puffs at f5130 are records at (104, 112) .. - emulator OAM, sc_janemba)
-    for &(x, y) in MINI_PTS.iter().take(n) {
+    for &(x, y) in mini_spots(w, i).iter().take(n) {
         crate::fx::puff_rng(w, x, y);
     }
     n
+}
+/// the minis' spots: the story's fixed HFIL spots (the field and the game's own battles); Battle mode's arena rules -
+/// any arena, Janemba anywhere in it: around Janemba, each on ground the player can walk to (the fixed spots were off
+/// the walkable ground of other arenas: the minis never came, Janemba waited for them for ever)
+fn mini_spots(w: &World, i: usize) -> [(i32, i32); 5] {
+    if !w.opts.arena {
+        return MINI_PTS;
+    }
+    let fb = w.en_ref(i).a.foot_box();
+    let (cx, cy) = ((fb.x0 + fb.x1) / 2, (fb.y0 + fb.y1) / 2);
+    let b = w.arena.bounds;
+    let region = w.arena.region.clone();
+    let mut out = MINI_PTS;
+    for (k, &(dx, dy)) in [(-72, -8), (-48, 28), (0, 36), (48, 28), (72, -8)].iter().enumerate() {
+        let (x, y) = (b.x0.max((b.x1 - 16).min(cx + dx - 8)), b.y0.max((b.y1 - 8).min(cy + dy - 4)));
+        out[k] = match &w.col {
+            Some(c) => c.free_spot(crate::world::Layer::Walk, x, y, 16, 8, Some(&b), region.as_deref().map(|v| v.as_slice())),
+            None => (x, y),
+        };
+    }
+    out
 }
 /// field: the top-up of `mini_puffs`'s count (at the fixed spots, in order)
 pub fn mini_create(w: &mut World, i: usize, n: usize) {
     let b = w.arena.bounds;
     let me = w.ents[i].id;
-    for &(x, y) in MINI_PTS.iter().take(n) {
+    for &(x, y) in mini_spots(w, i).iter().take(n) {
         crate::battle::spawn_enemy(
             w,
             0x38,
@@ -3120,6 +3162,25 @@ pub fn worm_head_step(w: &mut World, i: usize) {
             d ^= 1;
         }
         w.en(i).worm_dir = d;
+    }
+    // Battle mode's arena rules: in the open the worm's random turns took it away for good (in the game the Stomach's
+    // corridor holds it near the player) - every 40 frames, more than 72 px from its player, it turns toward him (the
+    // longer axis; never straight back into its own body: then the other axis)
+    if w.opts.arena && w.frame % 40 == 0 {
+        if let Some(pi) = player(w, i) {
+            let (hx, hy) = w.en_ref(i).a.center();
+            let (tx, ty) = w.pl_ref(pi).a.center();
+            let (ddx, ddy) = (tx - hx, ty - hy);
+            // (near the player it wanders as in the game: a chase there left no room to fight back)
+            if ddx.abs().max(ddy.abs()) > 72 {
+            // DIR_VEC order: 0 down, 1 up, 2 left, 3 right
+            let along_x = if ddx < 0 { 2 } else { 3 };
+            let along_y = if ddy < 0 { 1 } else { 0 };
+            let (first, second) = if ddx.abs() >= ddy.abs() { (along_x, along_y) } else { (along_y, along_x) };
+            let cur = w.en_ref(i).worm_dir;
+            w.en(i).worm_dir = if first == cur ^ 1 { second } else { first };
+            }
+        }
     }
     for _ in 0..4 {
         let (dx, dy) = DIR_VEC[w.en_ref(i).worm_dir as usize];
@@ -3320,6 +3381,8 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
         blocking,
         &mut w.rng,
     );
+    // (Battle mode's arena rules: the even match and the per-hit cap)
+    let res = if msg.att_is_player { crate::battle::arena_damage(w, res, false, w.en_ref(i).max_hp1024) } else { res };
     msg.crit = res.crit;
     msg.raw = res.raw;
     msg.dmg = res.dmg;

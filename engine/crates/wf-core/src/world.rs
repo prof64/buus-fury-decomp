@@ -636,6 +636,14 @@ pub struct Options {
     /// `BattleConfig::spawn_near` (later phases spawn by it too)
     #[serde(default)]
     pub spawn_near: Option<i32>,
+    /// Battle mode's arena rules (`BattleConfig::arena_rules`): a plain arena fighter on top of the faithful core -
+    /// no story scripting, gimmicks that read as bugs get fair rules. Off everywhere the game is reproduced (the field,
+    /// replays, the reference and lockstep scenarios).
+    #[serde(default)]
+    pub arena: bool,
+    /// the arena rules' even match (`battle::arena_scale`): damage to the enemies, to the players, in 1/256
+    #[serde(default)]
+    pub arena_scale: [i32; 2],
 }
 impl Hash for Options {
     fn hash<H: Hasher>(&self, h: &mut H) {
@@ -655,6 +663,10 @@ impl Hash for Options {
         }
         if let Some(g) = self.spawn_near {
             g.hash(h);
+        }
+        if self.arena {
+            self.arena.hash(h);
+            self.arena_scale.hash(h);
         }
     }
 }

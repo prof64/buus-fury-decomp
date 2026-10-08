@@ -232,6 +232,8 @@ fn setup(t: &Value) -> Setup {
         rng: RngInit::State(0, 0),
         xp: false,
         spawn_near: None,
+        arena_rules: false,
+        even_level: None,
     };
     let mut s = Session::new(d, cfg);
     let w = &mut s.world;

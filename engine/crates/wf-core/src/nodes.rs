@@ -1050,15 +1050,30 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         K::MoveToPoint => {
             r.path.gx = (par(c, n, P::X, 0) as i32) << 8;
             r.path.gy = (par(c, n, P::Y, 0) as i32) << 8;
+            // Battle mode's arena rules: the point is a spot of the story's own room (Yakon's corner at (216, 96)) -
+            // in another arena it was off the ground and the enemy stood trying to reach it for ever; there it is
+            // the enemy's corner of this arena (`arena_corner`)
+            if w.opts.arena {
+                let (x, y) = arena_corner(w, i);
+                r.path.gx = x << 8;
+                r.path.gy = y << 8;
+            }
             let mut p = r.path;
             crate::path::enter(w, i, &mut p);
             r.path = p;
         }
         K::WanderToRandomPoint => {
             r.path.counter = 0;
+            // (Battle mode's arena rules: anywhere in this arena, not the story room's rectangle)
+            let b = w.arena.bounds;
+            let (ox, oy, rw, rh) = if w.opts.arena {
+                (b.x0 + 8, b.y0 + 8, (b.x1 - b.x0 - 40).max(1), (b.y1 - b.y0 - 32).max(1))
+            } else {
+                (0x60, 0x70, 0x126, 0xf0)
+            };
             for _ in 0..1000 {
-                let gx = (0x60 + w.rng.rand(0x126)) << 8;
-                let gy = (0x70 + w.rng.rand(0xf0)) << 8;
+                let gx = (ox + w.rng.rand(rw as u32)) << 8;
+                let gy = (oy + w.rng.rand(rh as u32)) << 8;
                 // the game's own-mark-included test (`grid_free`) - battles too
                 if !en::grid_free(w, i, gx >> 8, gy >> 8) {
                     continue;
@@ -3248,7 +3263,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                     // 0x08039A90: the shake, then a puff (rate 0x1000 + rand(0x1000)) at each missing mini's spot; the
                     // minis come out 16 frames later
                     w.shake(70, 30);
-                    r.d[2] = en::mini_puffs(w) as i32;
+                    r.d[2] = en::mini_puffs(w, i) as i32;
                 }
                 if r.d[0] == 0 {
                     en::mini_create(w, i, r.d[2] as usize);
@@ -3636,8 +3651,11 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             true
         }
         K::SummonMiniYakons => {
+            // (the minis are Yakon's own - kept in Battle mode; the arena rules put the row at Yakon, not at the story
+            // map's fixed spot (192.., 96), off the ground of other arenas)
+            let (bx, by) = if w.opts.arena { (w.en_ref(i).a.px() - 40, w.en_ref(i).a.py() + 24) } else { (192, 96) };
             for k in 0..5 {
-                crate::battle::spawn_enemy(w, 0x92, 192 + 20 * k, 96, me, None);
+                crate::battle::spawn_enemy(w, 0x92, bx + 20 * k, by, me, None);
             }
             true
         }
@@ -4128,4 +4146,21 @@ fn shield_gfx(w: &mut World, i: usize, map: &[(i32, i32)]) {
     let e = w.en(i);
     e.gfx_now = to;
     e.a.set_sprite(&d, Some(idx));
+}
+
+/// Battle mode's arena rules: the spot an enemy's story "go to your corner" point stands for in this arena - free
+/// ground on the enemy grid 80 px right of and 40 px above the players' start (where the opponent starts, a little
+/// back)
+pub fn arena_corner(w: &World, i: usize) -> (i32, i32) {
+    let spawn = w.data.arena(&w.arena.id).map(|a| a.spawn).unwrap_or(((w.arena.bounds.x0 + w.arena.bounds.x1) / 2, (w.arena.bounds.y0 + w.arena.bounds.y1) / 2));
+    let b = w.arena.bounds;
+    let a = &w.en_ref(i).a;
+    let (x, y) = (b.x0.max((b.x1 - a.foot_w).min(spawn.0 + 80)), b.y0.max((b.y1 - a.foot_h).min(spawn.1 - 40)));
+    match &w.col {
+        Some(c) => {
+            let region = w.arena.region.clone();
+            c.free_spot(crate::world::Layer::Walk, x, y, a.foot_w, a.foot_h, Some(&b), region.as_deref().map(|v| v.as_slice()))
+        }
+        None => (x, y),
+    }
 }

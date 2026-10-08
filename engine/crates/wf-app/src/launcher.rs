@@ -64,9 +64,14 @@ pub const PRESETS: &[(&str, &str, &[(&str, i32)], &str)] = &[
     ("majin_fighters", "4 Majin Fighters", &[("t68", 4)], "crater"),
 ];
 
-/// The arena of a fight with no story place of its own (every regular enemy): open ground. The Southwest Forest
-/// (8-3) it was hid the fighters under its tree tops (BG0 at priority 2 over the OBJs) - playtest #6.
-pub const DEFAULT_ARENA: &str = "plateau";
+/// Battle mode's arenas (a plain arena fighter, not the story): open floors with nothing to hide behind or get stuck
+/// on, picked on their own - no opponent is tied to a story place. Left out: the Southwest Forest and the villages
+/// (tree tops / houses over the fighters, playtest #6), the Rocky Plateau's cliffs, the Barren Wasteland's rock
+/// pillars (wide beams fizzled on them), HFIL's and the Demon World's obstacles, the crater after the blast (its pit),
+/// Yakon's planet, the Stomach's corridor. Mods' own arenas follow these.
+pub const BATTLE_ARENAS: &[&str] = &["crater", "canyon", "stadium", "htc", "volcano", "dojo"];
+/// the Arena row's first choice
+pub const DEFAULT_ARENA: &str = "crater";
 
 /// The Battle page's character picker: (Character, Form, Outfit, fighter id, form record). The chosen row is the exact
 /// form record the battle starts in, so transforming up / down follows the game's chain (a halo Super Saiyan 3 Goku
@@ -109,7 +114,6 @@ pub const PICKS: &[(&str, &str, &str, &str, i32)] = &[
     ("Goten", "Super Saiyan", "Normal", "goten", 20),
     ("Trunks", "Base", "Normal", "trunks", 21),
     ("Trunks", "Super Saiyan", "Normal", "trunks", 22),
-    ("Trunks", "Unstable Super Saiyan", "Normal", "trunks", 24),
     ("Vegeta", "Base", "Normal", "vegeta", 26),
     ("Vegeta", "Base", "Halo (Other World)", "vegeta", 27),
     ("Vegeta", "Super Saiyan", "Normal", "vegeta", 28),
@@ -137,7 +141,7 @@ pub const PICKS: &[(&str, &str, &str, &str, i32)] = &[
 const FUSION_LEVELS: &[(&str, i32)] = &[("gogeta", 105), ("gotenks", 125), ("vegito", 142)];
 
 /// form records the picker does not list -> the listed record a saved setting moves to (same character and look)
-const PICK_ALIASES: &[(i32, i32)] = &[(1, 0), (9, 10), (11, 10), (12, 10), (23, 21), (25, 24), (32, 31), (33, 31), (42, 41), (43, 41), (44, 41)];
+const PICK_ALIASES: &[(i32, i32)] = &[(1, 0), (9, 10), (11, 10), (12, 10), (23, 21), (24, 22), (25, 22), (32, 31), (33, 31), (42, 41), (43, 41), (44, 41)];
 
 /// One row of the character picker ([`PICKS`], then fighters a mod adds: each form record its own Form)
 #[derive(Clone, Debug, PartialEq)]
@@ -168,6 +172,15 @@ const LAST_GAME_ENEMY: i32 = 149;
 /// Grand Mechanoid, Mechanoid, Nosferatu, Phantom, Poltergeist, Power Mechandoid, Vampire, Vlad), the disguised
 /// Ninja / Shinobi / Shadow Warrior, Ninja Boss (variant), Spopovich's and Yamu's tournament copies, Super Buu
 /// (script-created / 0 XP)
+/// Game enemies that make no fair arena fight (Battle mode is a plain arena fighter; `examples/arena_audit.rs`, each
+/// played with the arena rules): Super Buu with Gohan absorbed (0x77 / 0x78: no state of his takes damage - he glides
+/// between the story's waypoints); Blister's Enzyme (latches on for ~1 HP hits, never KOs) and Buu's Blood Cell (drifts
+/// away, never attacks) - hazards of Buu's insides, not fighters; the armoured vehicles and keep-away shooters that
+/// fire from ~144 px - off the 240 px screen most of the fight - Juggernaut (punches take ~0.5% even with the even
+/// match), Tank, War Machine, Hessian, Marauder; the Mini-Yakon (hops in place, never attacks - it stays in Yakon's
+/// fight, his own summon)
+const ARENA_UNFIT: &[i32] = &[0x77, 0x78, 24, 7, 58, 127, 140, 46, 71, 146];
+
 const NOT_OPPONENTS: &[i32] = &[
     84, 141, 34, 114, 126, 30, 135, 144, 52, 53, 55, 54, 143, 13, 14, 61, 4, 25, 29, 136, 137, 38, 26, 27, 28, 11, 31, 42, 73,
     83, 87, 92, 95, 134, 139, 79, 105, 102, 81, 109, 110, 111, 147, 117, 120, 57,
@@ -212,7 +225,7 @@ pub fn view_mode(s: &str) -> ViewMode {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct BattlePrefs {
-    /// false = one enemy type, true = a story preset
+    /// settings saved when Battle mode had story presets: true = `preset` was chosen (moved to its enemy on load)
     pub preset_mode: bool,
     pub fighter: String,
     /// None = the fighter's default form
@@ -225,7 +238,7 @@ pub struct BattlePrefs {
     pub level_auto: bool,
     pub enemy: String,
     pub count: u32,
-    /// "" = automatic (the preset's / the enemy's usual arena)
+    /// one of the Battle mode arenas ([`BATTLE_ARENAS`])
     pub arena: String,
     pub preset: String,
     pub players: usize,
@@ -241,7 +254,7 @@ impl Default for BattlePrefs {
             level_auto: true,
             enemy: "t60".into(),
             count: 1,
-            arena: String::new(),
+            arena: DEFAULT_ARENA.into(),
             preset: "kid_buu".into(),
             players: 1,
         }
@@ -389,8 +402,6 @@ enum Row {
     Outfit,
     Level,
     Enemy,
-    Count,
-    Preset,
     Arena,
     Players,
     Fight,
@@ -466,39 +477,22 @@ fn cap(s: &str) -> String {
     }
 }
 
-/// The skills a battle gives a fighter at `level` in form `form`: the character's new-game list plus what the story
-/// teaches by then. The game gates Super Saiyan 3 by the skill (22) being learned - `learn_skill(0, 22)` after Goku's
-/// fight with Majin Buu (event #27; Majin Buu's level 100), `learn_skill(5, 22)` in Gotenks' fights with Super Buu
-/// (#228 / #233; level 125) - and uses it from Super Saiyan (`can_use_skill`: an SS form with a form above); the
-/// same skill turns it back. A start form that is already SS3 gets it whatever the level (its way back). The Great
-/// Saiyaman has the story's Saiyaman-era list: the Saiyaman skill (18: Great Saiyaman <-> Teen Gohan) in Super
-/// Saiyan's place (the story swaps it back at the World Tournament, #184) - the form has no Super Saiyan above it, so
-/// the SS skill would be lit (`0x0801A4C4` greys only a form with up == down) yet do nothing. Teen Gohan keeps the
-/// new-game list (Super Saiyan). Fusion Dance (12) does nothing in a battle: left out.
+/// The skills a battle gives a fighter in form `form`: the full moveset - the character's skills plus every
+/// transformation the fighter has, whatever the level (Battle mode is an arena, not the story: no story-era lists).
+/// Goku and Gotenks always have Super Saiyan 3 (22; the story teaches it at Majin Buu / Super Buu). The Great Saiyaman
+/// is a form of its own: no Super Saiyan above it (the SS skill would do nothing) and no Saiyaman skill (18, the
+/// story's suit toggle). Fusion Dance (12) does nothing in a battle: left out.
 /// None = the fighter's own list as it is (mods, extra characters).
-fn story_skills(d: &GameData, fighter: &str, form: i32, level: i32) -> Option<Vec<i32>> {
+fn arena_skills(d: &GameData, fighter: &str, form: i32) -> Option<Vec<i32>> {
     let fd = d.fighter(fighter)?;
     if fd.skills.is_some() {
         return None;
     }
     let ch = d.chars.iter().find(|c| c.index == fd.character)?;
-    let mut v: Vec<i32> = ch.skills.iter().copied().filter(|&s| s != 12).collect();
-    let ss3 = d.form(form).is_some_and(|f| f.ss3);
-    let add = |v: &mut Vec<i32>, s: i32| {
-        if !v.contains(&s) {
-            v.push(s);
-        }
-    };
+    let mut v: Vec<i32> = ch.skills.iter().copied().filter(|&s| s != 12 && s != 18).collect();
     match fighter {
-        "goku" if level >= 100 || ss3 => add(&mut v, 22),
-        "gotenks" if level >= 125 || ss3 => add(&mut v, 22),
-        "gohan" if form == 14 => {
-            if let Some(k) = v.iter().position(|&s| s == 20) {
-                v[k] = 18;
-            } else {
-                add(&mut v, 18);
-            }
-        }
+        "goku" | "gotenks" if !v.contains(&22) => v.push(22),
+        "gohan" if form == 14 => v.retain(|&s| s != 20),
         _ => {}
     }
     Some(v)
@@ -551,17 +545,21 @@ impl Launcher {
                 .enemies
                 .iter()
                 .filter(|e| (e.hp > 0 || e.ai != 0) && !e.name.is_empty())
-                .filter(|e| e.ty > LAST_GAME_ENEMY || !NOT_OPPONENTS.contains(&e.ty))
+                .filter(|e| e.ty > LAST_GAME_ENEMY || !(NOT_OPPONENTS.contains(&e.ty) || ARENA_UNFIT.contains(&e.ty)))
                 .map(|e| {
                     let name = OPPONENT_NAMES.iter().find(|n| n.0 == e.ty && e.ty <= LAST_GAME_ENEMY).map(|n| n.1.to_string()).unwrap_or_else(|| e.name.clone());
                     (!BOSS_TYPES.contains(&e.ty), name, format!("t{}", e.ty))
                 })
                 .collect();
             es.sort();
-            // an enemy that is also a one-fighter story fight is listed once: the story fight (its arena, its level)
-            let story_one = |id: &str| PRESETS.iter().any(|p| matches!(p.2, [(e, 1)] if *e == id));
-            enemies = es.into_iter().filter(|(_, _, id)| !story_one(id)).map(|(_, n, id)| (id, n)).collect();
-            arenas = d.arenas.iter().map(|a| (a.id.clone(), a.name.clone())).collect();
+            enemies = es.into_iter().map(|(_, n, id)| (id, n)).collect();
+            // the open arenas, then a mod's own
+            arenas = BATTLE_ARENAS
+                .iter()
+                .filter_map(|id| d.arenas.iter().find(|a| a.id == *id))
+                .chain(d.arenas.iter().filter(|a| !wf_core::battle::ARENAS.iter().any(|g| g.0 == a.id)))
+                .map(|a| (a.id.clone(), a.name.clone()))
+                .collect();
         }
         let bg = packs.read("ui/images/screen_title.png").and_then(|b| decode_rgba(&b).ok());
         let enemy_levels = packs
@@ -571,13 +569,22 @@ impl Launcher {
             .filter_map(|p| packs.read(&p).and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok()))
             .filter_map(|v| Some((v["type"].as_i64()? as i32, v["level_byte"].as_i64()? as i32)))
             .collect();
-        // an opponent listed only as its story fight (above): saved settings naming the enemy pick the story fight
-        // (the same battle - one enemy, the story's arena and level)
-        if !settings.battle.preset_mode {
-            if let Some(p) = PRESETS.iter().find(|p| matches!(p.2, [(e, 1)] if *e == settings.battle.enemy)) {
-                settings.battle.preset_mode = true;
-                settings.battle.preset = p.0.into();
+        // Battle mode is one opponent in an open arena: settings saved with a story preset keep its opponent when it
+        // was one enemy, an arena no longer offered (or the old "automatic" one) moves to the default, one enemy
+        {
+            let b = &mut settings.battle;
+            if b.preset_mode {
+                b.preset_mode = false;
+                if let Some(&[(e, 1)]) = PRESETS.iter().find(|p| p.0 == b.preset).map(|p| p.2) {
+                    if !e.contains('+') {
+                        b.enemy = e.into();
+                    }
+                }
             }
+            if !arenas.iter().any(|a| a.0 == b.arena) {
+                b.arena = DEFAULT_ARENA.into();
+            }
+            b.count = 1;
         }
         Launcher {
             screen: Screen::Main,
@@ -635,20 +642,13 @@ impl Launcher {
                 v
             }
             Screen::Battle => {
-                // the character select (`battle_page`), in its reading order: the fighter, the opponent (any enemy or
-                // a story fight in one list), the fight; A on any row starts it, B goes back
-                let b = &self.settings.battle;
+                // the character select (`battle_page`), in its reading order: the fighter, the opponent (one fighter),
+                // the arena, the players; A on any row starts it, B goes back
                 let mut v = vec![Row::Fighter, Row::Form];
                 if self.outfits().len() > 1 {
                     v.push(Row::Outfit);
                 }
-                v.push(Row::Level);
-                if b.preset_mode {
-                    v.push(Row::Preset);
-                } else {
-                    v.extend([Row::Enemy, Row::Count]);
-                }
-                v.extend([Row::Arena, Row::Players]);
+                v.extend([Row::Level, Row::Enemy, Row::Arena, Row::Players]);
                 v
             }
             Screen::Mods => {
@@ -758,36 +758,26 @@ impl Launcher {
         &self.enemies
     }
 
-    fn preset_idx(&self) -> usize {
-        PRESETS.iter().position(|p| p.0 == self.settings.battle.preset).unwrap_or(0)
-    }
-
-    fn auto_arena(&self) -> String {
+    /// the arena the battle uses (a saved one no longer offered: the default)
+    fn arena_id(&self) -> String {
         let b = &self.settings.battle;
-        if b.preset_mode {
-            return PRESETS[self.preset_idx()].3.to_string();
+        if self.arenas.iter().any(|a| a.0 == b.arena) {
+            b.arena.clone()
+        } else {
+            DEFAULT_ARENA.into()
         }
-        PRESETS
-            .iter()
-            .find(|p| p.2.len() == 1 && p.2[0].0.split('+').next() == Some(b.enemy.as_str()))
-            .map(|p| p.3.to_string())
-            .or_else(|| crate::netmenu::ENEMIES.iter().find(|e| e.0 == b.enemy).map(|e| e.2.to_string()))
-            .unwrap_or_else(|| DEFAULT_ARENA.into())
     }
 
     /// The battle the Battle page describes.
-    /// The Level row's automatic level: the highest level byte among the fight's enemies (helpers `~tN` aside) -
-    /// the ROM's level for them, which follows the story (Majin Buu 100-110, Super Buu 125-147, Kid Buu 150)
+    /// The Level row's default, an even match: the opponent's level (its ROM definition's level byte - Majin Buu
+    /// 100-110, Super Buu 125-147, Kid Buu 150), 50 .. 200
     pub fn auto_level(&self) -> i32 {
         let b = &self.settings.battle;
-        let groups: Vec<&str> = if b.preset_mode { PRESETS[self.preset_idx()].2.iter().map(|(e, _)| *e).collect() } else { vec![b.enemy.as_str()] };
-        groups
-            .iter()
-            .flat_map(|g| g.split('+'))
-            .filter(|p| !p.starts_with('~'))
-            .filter_map(|p| p.trim_start_matches('t').parse::<i32>().ok())
-            .filter_map(|t| self.enemy_levels.get(&t).copied())
-            .max()
+        b.enemy
+            .trim_start_matches('t')
+            .parse::<i32>()
+            .ok()
+            .and_then(|t| self.enemy_levels.get(&t).copied())
             .unwrap_or(60)
             .max(self.picks.get(self.pick_idx()).and_then(|p| FUSION_LEVELS.iter().find(|f| f.0 == p.fighter)).map(|f| f.1).unwrap_or(50))
             .clamp(50, 200)
@@ -808,21 +798,11 @@ impl Launcher {
         // the picker's row: the exact form record (its transformations follow the game's chain from it)
         let (fid, form) = self.picks.get(self.pick_idx()).map(|p| (p.fighter.clone(), p.form_id)).unwrap_or(("goku".into(), 2));
         let level = self.battle_level();
-        // the skill level the story has reached at this level: the level-up hook (event #3) raises the five main
-        // characters' two upgradable skills at 75 / 100 / 125 / 150 - the later of each pair to index 1 at 100, both
-        // to index 2 by 150 (Goku: Instant Transmission 75 / 125, Kamehameha 100 / 150). The battle keeps one level
-        // for every skill: the lower one. Fusions and the extra characters get no upgrades (run 1's Kid Buu records:
-        // all 0)
-        let ch = self.data.as_ref().and_then(|d| d.fighter(&fid)).filter(|fd| fd.fusion.is_none()).map(|fd| fd.character);
-        let skill_level = match ch {
-            Some(0..=4) if level >= 150 => 2,
-            Some(0..=4) if level >= 100 => 1,
-            _ => 0,
-        };
-        // a quick battle as a story player would have it: the level's stat points spent (evenly), full EP, and an
-        // SS / SS3 form with its gauge full (a form reached by transforming always is)
-        let skills = self.data.as_ref().and_then(|d| story_skills(d, &fid, form, level));
-        let mut f = FighterSetup { fighter: fid, form, level, auto_spend: "even".into(), skill_level, full_gauge: true, skills, engage: true, ..Default::default() };
+        // the full moveset at full strength: every skill at its top level (only the five main characters' two
+        // upgradable skills have levels), the level's stat points spent evenly, full EP, and an SS / SS3 form with its
+        // gauge full (a form reached by transforming always is)
+        let skills = self.data.as_ref().and_then(|d| arena_skills(d, &fid, form));
+        let mut f = FighterSetup { fighter: fid, form, level, auto_spend: "even".into(), skill_level: 2, full_gauge: true, skills, engage: true, ..Default::default() };
         // Hercule, Videl, Pikkon (record slot 8): the slot never grows in the game (50 HP, STR 17 at every level), so
         // the battle takes Goku's record at this level - HP, EP, stats with the points spent evenly - and keeps their
         // own skill list (Energy Blast)
@@ -830,14 +810,11 @@ impl Launcher {
             let (r, _, _) = wf_core::battle::build_record(d, &FighterSetup { fighter: "goku".into(), level, auto_spend: "even".into(), ..Default::default() });
             f.fixed = Some(wf_core::battle::FixedRecord { hp: r.max_hp, ep: r.max_ep, stats: [r.str_, r.pow, r.end, r.spd], skills: None });
         }
-        let phases = if b.preset_mode {
-            PRESETS[self.preset_idx()].2.iter().map(|(e, n)| Phase { enemy: e.to_string(), count: *n }).collect()
-        } else {
-            vec![Phase { enemy: b.enemy.clone(), count: b.count.clamp(1, 8) as i32 }]
-        };
-        let arena = if b.arena.is_empty() { self.auto_arena() } else { b.arena.clone() };
-        // (the opponents start in view: 80 px in front of the player - a story spawn point only when that close)
-        BattleConfig { arena, players: vec![f; b.players.clamp(1, 4)], phases, rng: RngInit::Seed(1), xp: true, spawn_near: Some(80) }
+        // one opponent, ended by a KO; the arena rules (`Options::arena`) over the game's
+        let phases = vec![Phase { enemy: b.enemy.clone(), count: 1 }];
+        let arena = self.arena_id();
+        // (the opponent starts in view: 80 px in front of the player)
+        BattleConfig { arena, players: vec![f; b.players.clamp(1, 4)], phases, rng: RngInit::Seed(1), xp: true, spawn_near: Some(80), arena_rules: true, even_level: Some(self.auto_level()) }
     }
 
     fn change(&mut self, row: Row, d: i32) -> Choice {
@@ -866,28 +843,18 @@ impl Launcher {
         match row {
             // (the picker's rows and the level: above)
             Row::Fighter | Row::Form | Row::Outfit | Row::Level => {}
-            // the opponent: the story fights, then every enemy, in one list
-            Row::Enemy | Row::Preset => {
-                let n = PRESETS.len() + self.enemies.len();
-                let k = if b.preset_mode {
-                    PRESETS.iter().position(|p| p.0 == b.preset).unwrap_or(0)
-                } else {
-                    PRESETS.len() + self.enemies.iter().position(|e| e.0 == b.enemy).unwrap_or(0)
-                };
-                let k = wrap(k as i32 + d, n);
-                b.preset_mode = k < PRESETS.len();
-                if b.preset_mode {
-                    b.preset = PRESETS[k].0.into();
-                } else if let Some(e) = self.enemies.get(k - PRESETS.len()) {
+            // the opponent: one fighter
+            Row::Enemy => {
+                let k = self.enemies.iter().position(|e| e.0 == b.enemy).unwrap_or(0);
+                if let Some(e) = self.enemies.get(wrap(k as i32 + d, self.enemies.len())) {
                     b.enemy = e.0.clone();
                 }
             }
-            Row::Count => b.count = (b.count as i32 + d).clamp(1, 8) as u32,
             Row::Arena => {
-                // "" (auto) then every arena
-                let k = if b.arena.is_empty() { 0 } else { self.arenas.iter().position(|a| a.0 == b.arena).map(|i| i as i32 + 1).unwrap_or(0) };
-                let n = wrap(k + d.signum(), self.arenas.len() + 1);
-                b.arena = if n == 0 { String::new() } else { self.arenas[n - 1].0.clone() };
+                let k = self.arenas.iter().position(|a| a.0 == b.arena).unwrap_or(0);
+                if let Some(a) = self.arenas.get(wrap(k as i32 + d.signum(), self.arenas.len())) {
+                    b.arena = a.0.clone();
+                }
             }
             Row::Players => b.players = (b.players as i32 + d.signum()).clamp(1, 4) as usize,
             Row::Mod(i) => {
@@ -970,7 +937,7 @@ impl Launcher {
             }
             Row::Fight => return Choice::Battle(self.battle_config()),
             // the character select: A on any of its rows starts the fight
-            Row::Fighter | Row::Form | Row::Outfit | Row::Level | Row::Enemy | Row::Preset | Row::Count | Row::Arena | Row::Players
+            Row::Fighter | Row::Form | Row::Outfit | Row::Level | Row::Enemy | Row::Arena | Row::Players
                 if self.screen == Screen::Battle =>
             {
                 return Choice::Battle(self.battle_config())
@@ -1012,15 +979,13 @@ impl Launcher {
             Row::Fighter => (t("Character"), format!("< {} >", self.picks.get(self.pick_idx()).map(|p| p.character.as_str()).unwrap_or("?"))),
             Row::Form => (t("Form"), format!("< {} >", self.picks.get(self.pick_idx()).map(|p| p.form.as_str()).unwrap_or("?"))),
             Row::Outfit => (t("Outfit"), format!("< {} >", self.picks.get(self.pick_idx()).map(|p| p.outfit.as_str()).unwrap_or("?"))),
-            Row::Level if b.level_auto => (t("Level"), format!("< Auto: {} >", self.auto_level())),
+            Row::Level if b.level_auto => (t("Level"), format!("< Even: {} >", self.auto_level())),
             Row::Level => (t("Level"), format!("< {} >", b.level.clamp(50, 200))),
             Row::Enemy => (t("Enemy"), format!("< {} >", self.enemies.iter().find(|e| e.0 == b.enemy).map(|e| e.1.as_str()).unwrap_or(b.enemy.as_str()))),
-            Row::Count => (t("How many"), format!("< {} >", b.count)),
-            Row::Preset => (t("Preset"), format!("< {} >", PRESETS[self.preset_idx()].1)),
             Row::Arena => {
-                let id = if b.arena.is_empty() { self.auto_arena() } else { b.arena.clone() };
+                let id = self.arena_id();
                 let name = self.arenas.iter().find(|a| a.0 == id).map(|a| a.1.clone()).unwrap_or(id);
-                (t("Arena"), if b.arena.is_empty() { format!("< Auto: {name} >") } else { format!("< {name} >") })
+                (t("Arena"), format!("< {name} >"))
             }
             Row::Players => (t("Players"), format!("< {} >", b.players)),
             Row::Fight => (t("START"), String::new()),

@@ -168,6 +168,8 @@ fn modded_netplay_peers_stay_in_sync() {
         rng: wf_core::battle::RngInit::Seed(21),
         xp: false,
         spawn_near: None,
+        arena_rules: false,
+        even_level: None,
     };
     let m = MatchConfig::coop(battle);
     let frames = 2400;

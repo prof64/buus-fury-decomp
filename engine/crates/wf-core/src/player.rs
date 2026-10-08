@@ -1602,7 +1602,8 @@ pub fn update(w: &mut World, i: usize) {
         // the death script's loop runs from here on (the original's one player): no other object is updated any
         // more, and every actor gets message 0xF (0x0800F44A: the walk state's vfunc +0x10 SetAnim(0)s)
         // (field: before the object pass, `ko_freeze`)
-        if w.players.len() == 1 && w.field.is_none() {
+        // (Battle mode's arena rules: no death script - the arena carries on, the fight is lost by the KO alone)
+        if w.players.len() == 1 && w.field.is_none() && !w.opts.arena {
             w.modal = Some(vec![w.ents[i].id]);
             for id in w.enemies.clone() {
                 if let Some(k) = w.find(id).filter(|&k| !w.ents[k].removed) {
@@ -1690,7 +1691,8 @@ pub fn update(w: &mut World, i: usize) {
     let ko = pr(w, i).ko_at;
     // (battle; in the field the death script plays it - s000 node 7's `play_music(8)` - and not on its other branches:
     // run 3 row 1,796,302, 0-15, flag 282 set by s020 - a scripted loss, s000 jumps to s021 with no song)
-    if ko >= 0 && w.frame as i64 - ko == 200 && w.field.is_none() {
+    // (Battle mode's arena rules: at the loss, `battle::outcome`)
+    if ko >= 0 && w.frame as i64 - ko == if w.opts.arena { crate::battle::ARENA_KO } else { 200 } && w.field.is_none() {
         w.events.push(Event::Song { id: 8 });
     }
     // (the task list - screen shakes - runs after the whole object pass: `battle::post_step`, the field's step_post)
@@ -4321,6 +4323,8 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
         blocking,
         &mut w.rng,
     );
+    // (Battle mode's arena rules: the even match and the per-hit cap - not on another player's hit)
+    let res = if msg.team != 1 { crate::battle::arena_damage(w, res, true, pr(w, i).rec.max_hp as i64 * 1024) } else { res };
     let dmg = res.dmg;
     msg.crit = res.crit;
     msg.raw = res.raw;

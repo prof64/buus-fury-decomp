@@ -7160,3 +7160,69 @@ native app headless (`--dump`, launcher-started fights; frames under `work/ub/pt
 * *#17 Dragon Fist tap spends 300 EP:* faithful. The emulator lockstep traces `f41_skill5` / `f44_skill5`
   (`data/battle/buu_lockstep`): a 1-frame B tap at frame 5 takes EP 900 -> 600 and goes back to idle; holding then
   spends 300 more at the start and 5 per frame. Not changed.
+
+### (11) Battle mode is a plain arena (user redirect, 2026-10-08) - launcher and even match
+
+Story mode stays faithful; Battle mode runs the faithful core with an arena-rules layer, `BattleConfig::arena_rules`
+-> `Options::arena` (off in the field, replays, the reference, cross_ts and lockstep - hashes unchanged when off; not
+mirrored in TS: not the game). Launcher (`launcher.rs`, `battle_page.rs`):
+* one opponent per fight (no story presets, no "How many"): the list of single fighters; settings saved with a
+  one-enemy preset keep that enemy, other presets fall back to the saved enemy.
+* arenas picked on their own from open floors (`BATTLE_ARENAS`: Giant Crater (default), Rocky Canyon, World Tournament
+  Stadium, Hyperbolic Time Chamber, Volcano Summit, Dojo; then mods' arenas) - no "Auto: story arena". Left out:
+  forest / villages / Kame House (cover over the fighters), plateau cliffs, wasteland pillars, HFIL / Demon World /
+  Yakon's planet obstacles, the blasted crater's pit, the Stomach corridor (`work/ub/arena/sheet1.png`, `sheet2.png`).
+* full moveset (`arena_skills`): the character's skills + SS3 for Goku / Gotenks at any level, every skill at its top
+  level (skill_level 2); the Great Saiyaman is a form without SS / the suit toggle (18); Unstable Trunks (random story
+  transformations) dropped from the picker (saved 24 / 25 -> Trunks SS 22).
+* level: "Even" = the opponent's level byte (fusions keep their minimum, so their skills are payable), or 50 .. 200.
+* even match (`battle::arena_scale` / `arena_damage`): at the even level the fighter's standard hit (stronger of a STR
+  punch / POW ki hit, x1) takes 1/16 of the opponent's HP and the opponent's (stronger of STR / POW) 1/16 of the
+  fighter's; the scales stay fixed when the level is set off "Even" (the difference counts). No single hit takes more
+  than 1/10 of a fighter's max HP (no one-hit KO either way; player-vs-player hits untouched); an opponent's guard lets 1/4 of a hit through (Yakon guarded nearly every hit). Before it, at the
+  opponent's level bosses took 100+ punches and KO'd in 6 - 10 hits (Super Buu with Gohan: one); after it the audit's
+  punching bot wins most fights in 500 - 1200 frames and an idle fighter lasts 900 - 3000 (`work/ub/arena/
+  fair_all.tsv` before, `fair_scaled.tsv` after; `examples/arena_audit.rs`).
+* 2 players: both fighters, shared screen, 1P / 2P tags (`work/ub/arena/twop.png`).
+
+### (12) Battle mode's arena rules - the core half (`Options::arena`, set by `BattleConfig::arena_rules`)
+
+Battle mode is a plain arena fighter; the story stays the game. Every rule below runs only under `w.opts.arena`
+(the launcher's battles) - the field, replays, the TS reference, cross_ts, lockstep and the whole-run check never set
+it (not mirrored in TS: they are not the game). Audit: `engine/crates/wf-app/examples/arena_audit.rs` (every offered
+opponent: an idle player, then a bot that walks up beside it and punches / fires; `--tsv` per-type fairness),
+outputs in `work/ub/arena/`.
+
+* *KO:* no death script - nothing freezes over the KO'd player (#30); the fight is Lost at KO + 120
+  (`battle::ARENA_KO`, game-over song then); from the loss the opponents stand down (beam stopped, idle animation,
+  no AI) behind the end screen.
+* *Janemba:* a hit on an arm / the upper body (his part objects) goes to Janemba himself (a hit that reaches his own
+  body box is left to it). His Mini-Janembas are summoned around him on walkable ground (`enemy::mini_spots`) - the
+  story's fixed HFIL spots were off the ground of other arenas and he waited for them for ever.
+* *Story-room coordinates:* `MoveToPoint` (Yakon's corner (216, 96), state 123's (192, 80)) goes to this arena's corner
+  (`nodes::arena_corner`: free ground 80 px right of / 40 px above the players' start); `WanderToRandomPoint` picks in
+  the arena's bounds; Yakon summons no Mini-Yakons (they only hop in place - a row of them read as a bug).
+* *Worm Head:* every 40 frames, more than 72 px from its player, the head turns toward him (never straight back into
+  its body) - in the open its random turns took it away for good.
+* *Kid Buu:* the split stays (it reads clearly - two Buus, merging back); the copy counts as the opponent too, so the
+  fight is won when both halves (or the merged Buu) are down, never with a Buu standing.
+* *Engaged start:* `battle::arena_engaged_state` follows the initial `GotoState` hops and takes the
+  `IfPlayerWithin` branch beside any fallback (Annihilator, Death Machine, Destroyer, Goon, Knight Destroyer,
+  Hooligan, ...): they come for the player from the start.
+* *Not fighters for an arena (dropped from the list by the launcher):* Super Buu (Gohan absorbed) t119 / t120 (no
+  on-hit tree applies damage - invulnerable by design, glides between story waypoints), Enzyme t24, Blood Cell t7,
+  Blister t6 (spawner, never hits), Mini-Yakon t146 (hops in place).
+
+### (13) Battle mode: a character's own mechanics stay (user correction, 2026-10-08)
+
+"No story rules" means no story scripting (planned deaths, scripted waves, survive timers, cutscene events, story
+flags, story-level skill gating), not a character's own mechanics. Kept as the game has them: Janemba's arms and upper
+body as separate hit targets (the (12) pass-through to his body is removed), Kid Buu's split / merge, the Ghosts'
+invisible chase, Yakon's guard (a guarded hit lets 1/4 through - frontal only, hits from his side / back are whole)
+and his Mini-Yakon summon (restored; under the arena rules the row is made at Yakon instead of the story map's fixed
+(192.., 96)). Adapted only where a story map's coordinates broke a mechanic in another arena: Mini-Janembas around
+Janemba, Yakon's corner, wander points in the arena, the Worm Head turning toward the player in open ground. Dropped
+as story beats / not fighters: Super Buu with Gohan absorbed (scripted glide between story waypoints, no state takes
+damage), Enzyme, Blood Cell, Mini-Yakon on their own; Blister stays (his Enzymes are his attack; beatable, KO-only).
+Enemy share of the even match and the per-hit cap retuned after the app runs (Janemba hit the cap every second):
+1/16 each way, cap 1/10 of max HP (`work/ub/arena/fair_final.tsv`).

@@ -143,7 +143,7 @@ fn setup(data: &GameData, fighter: &str, form: i32, level: i32) -> FighterSetup 
 
 fn battle_session(data: &Arc<GameData>, s: &Scn) -> Session {
     let f = setup(data, &s.fighter, s.form, s.level);
-    let cfg = BattleConfig { arena: "forest".into(), players: vec![f], phases: vec![], rng: RngInit::Seed(7), xp: false, spawn_near: None };
+    let cfg = BattleConfig { arena: "forest".into(), players: vec![f], phases: vec![], rng: RngInit::Seed(7), xp: false, spawn_near: None, arena_rules: false, even_level: None };
     Session::new(Arc::clone(data), cfg)
 }
 

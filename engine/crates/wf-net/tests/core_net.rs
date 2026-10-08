@@ -28,6 +28,8 @@ fn battle(n: usize, enemy: &str, count: i32, arena: &str, seed: u32) -> BattleCo
         rng: RngInit::Seed(seed),
         xp: false,
         spawn_near: None,
+        arena_rules: false,
+        even_level: None,
     }
 }
 

@@ -159,6 +159,8 @@ fn cross_check_vs_typescript_sim() {
             rng: RngInit::State(seed, seed.wrapping_mul(3).wrapping_add(1)),
             xp: false,
             spawn_near: None,
+            arena_rules: false,
+            even_level: None,
         };
         let mut s = Session::new(data(), cfg);
         // (`ehp`: the starting enemies' whole HP - a fight that reaches the deaths)

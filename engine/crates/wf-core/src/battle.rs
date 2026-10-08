@@ -284,6 +284,14 @@ pub struct BattleConfig {
     /// the enemy's own spawn point in its arena, else 120 px in front - TS mirrors that)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub spawn_near: Option<i32>,
+    /// Battle mode's arena rules (`Options::arena`): a plain arena fighter, not the story (the launcher's battles).
+    /// Off: the game's own rules (the reference, the lockstep and cross-check scenarios).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub arena_rules: bool,
+    /// the arena rules' even match is set for the players at this level (the launcher: the opponent's level - a
+    /// fighter set higher or lower than it is that much stronger or weaker); None = the players' own level
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub even_level: Option<i32>,
 }
 impl Default for BattleConfig {
     fn default() -> Self {
@@ -297,6 +305,8 @@ impl Default for BattleConfig {
             rng: RngInit::Seed(1),
             xp: false,
             spawn_near: None,
+            arena_rules: false,
+            even_level: None,
         }
     }
 }
@@ -547,6 +557,7 @@ pub fn create(data: Arc<GameData>, cfg: &BattleConfig) -> World {
     let mut w = World::new(Arc::clone(&data), rng, arena);
     w.opts.xp = cfg.xp;
     w.opts.spawn_near = cfg.spawn_near;
+    w.opts.arena = cfg.arena_rules;
     w.opts.engaged = cfg.players.iter().any(|f| f.engage);
     if let Some(m) = data.maps.get(&w.arena.map) {
         w.col = Some(Collision::new(Arc::clone(m)));
@@ -629,7 +640,78 @@ pub fn create(data: Arc<GameData>, cfg: &BattleConfig) -> World {
         camera(&mut w, s);
         w.cameras[s].init = false;
     }
+    if cfg.arena_rules {
+        w.opts.arena_scale = arena_scale(&w, cfg);
+    }
     w
+}
+
+/// Battle mode's even match (arena rules): the story's opponents were made for a player with the story's equipment,
+/// items and skills - at the same level a boss took 100+ punches and KO'd the fighter in 6 - 10 hits (Super Buu with
+/// Gohan absorbed: in one). Every hit is scaled so a standard hit of each side takes a fixed share of the other's HP:
+/// the fighter's standard hit (its stronger of a STR punch or a POW ki hit, x1) 1/16 of the opponent's, the opponent's standard hit (its stronger of a STR or
+/// a POW hit, x1) 1/16 of the fighter's - measured with the fighter at `even_level` (the opponent's level), so a
+/// fighter set above or below it keeps the difference. Its special attacks keep their weight over that hit, up to
+/// [`ARENA_HIT_CAP`]. [damage to the enemies, to the players] in 1/256.
+pub fn arena_scale(w: &World, cfg: &BattleConfig) -> [i32; 2] {
+    use crate::damage::{compute_damage_raw, Draw};
+    let Some((ei, e)) = live_primary(w).first().and_then(|&id| w.enemy_by_id(id)) else {
+        return [256, 256];
+    };
+    let _ = ei;
+    let (es, ehp) = (e.a.stats, e.max_hp1024.max(1024));
+    let Some(f0) = cfg.players.first() else { return [256, 256] };
+    let mut f = f0.clone();
+    if let Some(lv) = cfg.even_level {
+        f.level = lv;
+        f.fixed = None;
+    }
+    let (rec, skills, forms) = build_record(&w.data, &f);
+    let php = (rec.max_hp as i64 * 1024).max(1024);
+    let fd = w.data.fighter(&f.fighter).unwrap_or(&w.data.fighters[0]);
+    let form = if forms.contains(&f.form) { f.form } else { fd.default_form };
+    let pl = Player::new(
+        w,
+        PlayerInit { slot: 0, form, rec, equip: f.equip, skills, skill_level: f.skill_level, sel: 0, holy_water: f.holy_water, forms_allowed: forms },
+    );
+    let ps = pl.a.stats;
+    // the mean hit: no crit, the middle of rand(26)
+    let hit = |kind: u8, sub: u8, s: i32, cb: i32, d: i32, res: i32| {
+        compute_damage_raw(kind, sub, 1024, 0x400, s as i64, cb as i64, d as i64, res as i64, false, 0, &mut |dr| match dr {
+            Draw::Chance(_) => 0,
+            Draw::Rand(_) => 13,
+        })
+        .dmg
+        .max(1)
+    };
+    // (the fighter's stronger of a punch and a ki hit: some opponents take nothing from punches - armour, resist 0)
+    let to_enemy = hit(0, 0, ps.str_, ps.crit_bonus, es.end, es.res_m).max(hit(1, 1, ps.pow, 0, es.end2, es.res_e));
+    let to_player = hit(0, 0, es.str_, es.crit_bonus, ps.end, ps.res_m).max(hit(1, 1, es.pow, 0, ps.end2, ps.res_e));
+    let scale = |hp: i64, share: i64, d: i64| ((hp / share) * 256 / d).clamp(8, 256 * 64) as i32;
+    [scale(ehp, 16, to_enemy), scale(php, 16, to_player)]
+}
+
+/// arena rules: no single hit takes more than a tenth of a fighter's max HP (no one-hit KO, either way); an
+/// opponent's guard lets a quarter of the hit through
+pub const ARENA_HIT_CAP: i64 = 10;
+
+/// A hit's damage under the arena rules ([`arena_scale`], [`ARENA_HIT_CAP`]); the game's damage otherwise.
+/// `to_player`: the target is a player hit by an enemy (else an enemy hit by a player); `max_hp1024` the target's.
+pub fn arena_damage(w: &World, mut r: crate::damage::DamageResult, to_player: bool, max_hp1024: i64) -> crate::damage::DamageResult {
+    if !w.opts.arena {
+        return r;
+    }
+    let s = w.opts.arena_scale[to_player as usize] as i64;
+    let cap = (max_hp1024 / ARENA_HIT_CAP).max(1024);
+    // an opponent's guard takes at most three quarters of a hit (Yakon guards most hits: 1/16 of each got through -
+    // ~1.3% of his HP per hit, a fight with no end); the fighter's own guard is the game's
+    if !to_player && r.dmg < r.unblocked / 4 {
+        r.dmg = r.unblocked / 4;
+    }
+    let f = |d: i64| if d <= 0 { d } else { ((d * s) >> 8).clamp(1, cap) };
+    r.dmg = f(r.dmg);
+    r.unblocked = f(r.unblocked);
+    r
 }
 
 /// The state an opponent's AI starts in when the battle is engaged ([`FighterSetup::engage`]): the state its "wait
@@ -651,6 +733,35 @@ pub fn engaged_state(d: &GameData, init: u16) -> Option<u16> {
     }
     let go = t.nodes.get(near.kids[0] as usize)?;
     (go.k == K::GotoState).then(|| go.p.g(P::State) as u16)
+}
+
+/// Battle mode's arena rules: [`engaged_state`] for every opponent that waits for the player - through the initial
+/// `GotoState` hops (Annihilator, Assassin, Goon ... start in a state that only jumps to the waiting one) and with any
+/// fallback beside the `IfPlayerWithin` branch (Destroyer's `FacePlayer`, Hooligan's `StandStill`, Knight Destroyer's
+/// sub-state): they come for the player from the start instead of standing until he walks up
+pub fn arena_engaged_state(d: &GameData, init: u16) -> Option<u16> {
+    use crate::ai::{K, P};
+    let mut st = init;
+    for _ in 0..4 {
+        let t = d.states.get(&st)?;
+        let root = t.nodes.first()?;
+        if root.k == K::GotoState {
+            st = root.p.g(P::State) as u16;
+            continue;
+        }
+        if root.k != K::Selector {
+            return None;
+        }
+        for &k in &root.kids {
+            let near = t.nodes.get(k as usize)?;
+            if matches!(near.k, K::IfPlayerWithin | K::IfPlayerWithin2) && near.kids.len() == 1 {
+                let go = t.nodes.get(near.kids[0] as usize)?;
+                return (go.k == K::GotoState).then(|| go.p.g(P::State) as u16);
+            }
+        }
+        return None;
+    }
+    None
 }
 
 fn spawn_phase(w: &mut World, ph: usize) {
@@ -702,7 +813,13 @@ fn spawn_phase(w: &mut World, ph: usize) {
                     (x, y)
                 }
             };
-            let start = if w.opts.engaged { engaged_state(&w.data, t.ai).map(|s| s as i32) } else { None };
+            let start = if w.opts.engaged && w.opts.arena {
+                arena_engaged_state(&w.data, t.ai).map(|s| s as i32)
+            } else if w.opts.engaged {
+                engaged_state(&w.data, t.ai).map(|s| s as i32)
+            } else {
+                None
+            };
             if let Some(ei) = spawn_enemy(w, ty, x, y, 0, start) {
                 let e = w.en(ei);
                 e.primary = primary && t.hp > 0;
@@ -871,6 +988,8 @@ pub fn pvp_winner(w: &World) -> Option<usize> {
 }
 
 const INVULNERABLE: [i32; 2] = [0x1a, 0x1b];
+/// Battle mode's arena rules: frames from the last player's KO to the loss (the KO animation, then the end screen)
+pub const ARENA_KO: i64 = 120;
 const SURVIVE: u32 = 3600;
 
 /// A survive fight's frames left: every live opponent invulnerable (Majin Buu under Babidi's spell, 0x1A / 0x1B -
@@ -897,7 +1016,10 @@ pub fn outcome(w: &World) -> Outcome {
             .map(|&i| w.pl_ref(i).ko_at)
             .max()
             .unwrap_or(-1);
-        return if ko < 0 || w.frame as i64 - ko >= 200 {
+        // (the game's death script takes over at KO + 199; Battle mode's arena rules: lost once the KO pose has
+        // played, 120 frames - the end screen follows)
+        let after = if w.opts.arena { ARENA_KO } else { 200 };
+        return if ko < 0 || w.frame as i64 - ko >= after {
             Outcome::Lost
         } else {
             Outcome::Running

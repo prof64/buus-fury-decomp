@@ -19,7 +19,7 @@ use wf_core::menu::text::{units, Canvas, Pen, TextData};
 use wf_render::menu::MenuRenderer;
 use wf_view::MenuFont;
 
-use super::{Launcher, Row, PRESETS};
+use super::{Launcher, Row};
 
 /// UI palette indices (`ui/palette.json`)
 const WHITE: u8 = 2;
@@ -201,16 +201,10 @@ pub fn draw(l: &mut Launcher, packs: &Packs, fb: &mut [u32], w: usize, h: usize)
     let fi = l.page.fighter.as_ref().map(|f| f.1.clone()).unwrap_or_default();
     let pick = l.picks.get(l.pick_idx()).cloned();
     let b = l.settings.battle.clone();
-    let preset = PRESETS[l.preset_idx()];
-    // the opponent on show: the chosen type, or the story fight's last enemy (its boss)
-    let ety: i32 = if b.preset_mode {
-        preset.2.last().and_then(|(e, _)| e.split('+').find(|p| !p.starts_with('~'))).and_then(|p| p.trim_start_matches('t').parse().ok()).unwrap_or(-1)
-    } else {
-        b.enemy.trim_start_matches('t').parse().unwrap_or(-1)
-    };
+    // the opponent on show, by the list's name
+    let ety: i32 = b.enemy.trim_start_matches('t').parse().unwrap_or(-1);
     let enemy = d.enemy(ety);
-    let ename = enemy.map(|e| e.name.clone()).unwrap_or_default();
-    let opp = if b.preset_mode { preset.1.to_string() } else { ename.clone() };
+    let opp = l.enemies.iter().find(|e| e.0 == b.enemy).map(|e| e.1.clone()).or_else(|| enemy.map(|e| e.name.clone())).unwrap_or_default();
     let elevel = l.enemy_levels.get(&ety).copied();
 
     let mut cv = Canvas::new();
@@ -235,7 +229,7 @@ pub fn draw(l: &mut Launcher, packs: &Packs, fb: &mut [u32], w: usize, h: usize)
     let level = if b.level_auto { l.auto_level() } else { b.level.clamp(50, 200) };
     item(&mut cv, t, MenuFont::Small, &format!("LV {level}"), 14 + nw + if on(Row::Fighter) { 11 } else { 6 }, 17, 0, WHITE, false, 60);
     let oname = opp.to_uppercase();
-    let focus_opp = on(Row::Enemy) || on(Row::Preset);
+    let focus_opp = on(Row::Enemy);
     // a long name (story fights, notes in brackets) on two lines in the menu font - no name is cut (playtest #10)
     let room = 104;
     let fits = |f: MenuFont, s: &str| t.font(f).measure(&units(s)) <= room;
@@ -259,13 +253,7 @@ pub fn draw(l: &mut Launcher, packs: &Packs, fb: &mut [u32], w: usize, h: usize)
         item(&mut cv, t, MenuFont::Menu, &b2, 224, 22, 2, YELLOW, false, room + 6);
         sub_y = 31;
     }
-    // (a story fight: its last enemy's level; how many fights is on the setup panel)
-    let osub = match (b.preset_mode, elevel) {
-        (true, Some(lv)) => format!("STORY  LV {lv}"),
-        (true, None) => "STORY".to_string(),
-        (false, Some(lv)) => format!("LV {lv}"),
-        (false, None) => String::new(),
-    };
+    let osub = elevel.map(|lv| format!("LV {lv}")).unwrap_or_default();
     item(&mut cv, t, MenuFont::Small, &osub, 230, sub_y, 2, WHITE, false, 80);
     let mut vs = Pen::new(MenuFont::Bold, 158, 52, 1, RED, Some(SHADOW));
     cv.text(t, &mut vs, &units("VS"));
@@ -282,15 +270,10 @@ pub fn draw(l: &mut Launcher, packs: &Packs, fb: &mut [u32], w: usize, h: usize)
         let single = l.outfits().len() <= 1;
         line(&mut cv, t, "Outfit", &p.outfit, lx, vx, 119, if single { GREY } else { WHITE }, on(Row::Outfit), 176);
     }
-    let level = if b.level_auto { format!("Auto {}", l.auto_level()) } else { format!("{}", b.level.clamp(50, 200)) };
-    line(&mut cv, t, "Level", &level, lx, vx, 129, WHITE, on(Row::Level), 50);
-    if b.preset_mode {
-        line(&mut cv, t, "Fights", &preset.2.len().to_string(), 106, 142, 129, GREY, false, 20);
-    } else {
-        line(&mut cv, t, "Enemies", &b.count.clamp(1, 8).to_string(), 106, 147, 129, WHITE, on(Row::Count), 20);
-    }
+    // (the default: an even match - the opponent's level)
+    let level = if b.level_auto { format!("Even {}", l.auto_level()) } else { format!("{}", b.level.clamp(50, 200)) };
+    line(&mut cv, t, "Level", &level, lx, vx, 129, WHITE, on(Row::Level), 60);
     line(&mut cv, t, "Players", &b.players.clamp(1, 4).to_string(), 170, 207, 129, WHITE, on(Row::Players), 20);
-    // ("Auto: <arena>" while the arena follows the opponent - it read as a chosen arena without it, playtest #18)
     let arena = l.label(Row::Arena).1.trim_start_matches("< ").trim_end_matches(" >").to_string();
     line(&mut cv, t, "Arena", &arena, lx, vx, 139, WHITE, on(Row::Arena), 176);
     // the fighter's numbers at that level (the Status page's colours: labels yellow, values white), spread over the

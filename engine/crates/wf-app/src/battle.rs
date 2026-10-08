@@ -143,5 +143,7 @@ pub fn config(arena: &str, enemy: &str, count: u32, fighter: &str, form: Option<
         rng: RngInit::Seed(seed),
         xp: true,
         spawn_near: None,
+        arena_rules: false,
+        even_level: None,
     }
 }

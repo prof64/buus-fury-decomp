@@ -275,7 +275,7 @@ pub fn fighter_setup(c: &DojoChar, mode: DojoMode, rules: &DojoRules, d: &GameDa
 /// fight zeroes it (`seed` is kept for the lobby's API and ignored).
 pub fn match_config(p1: FighterSetup, p2: FighterSetup, _seed: u32) -> MatchConfig {
     MatchConfig::pvp(
-        BattleConfig { arena: ARENA.into(), players: vec![p1, p2], phases: Vec::new(), rng: RngInit::State(0, 0), xp: false, spawn_near: None },
+        BattleConfig { arena: ARENA.into(), players: vec![p1, p2], phases: Vec::new(), rng: RngInit::State(0, 0), xp: false, spawn_near: None, arena_rules: false, even_level: None },
         false,
     )
 }

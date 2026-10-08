@@ -218,7 +218,7 @@ pub fn battle_config(d: &GameData, a: &Value) -> Result<(BattleConfig, String), 
         arena = Some(x.to_string());
     }
     let seed = i(a, "seed").unwrap_or(1) as u32;
-    let cfg = BattleConfig { arena: arena.unwrap_or_else(|| "crater".into()), players, phases, rng: RngInit::Seed(seed), xp: b(a, "xp").unwrap_or(false), spawn_near: None };
+    let cfg = BattleConfig { arena: arena.unwrap_or_else(|| "crater".into()), players, phases, rng: RngInit::Seed(seed), xp: b(a, "xp").unwrap_or(false), spawn_near: None, arena_rules: false, even_level: None };
     let foe: Vec<String> = cfg
         .phases
         .iter()
