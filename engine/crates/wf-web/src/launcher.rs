@@ -15,6 +15,8 @@ struct State {
     l: Launcher,
     packs: Packs,
     rgba: Vec<u8>,
+    /// the host clock at the last drawn frame (the Battle page's animations run on elapsed time, like native)
+    last_ms: f64,
 }
 
 thread_local! {
@@ -69,7 +71,7 @@ pub unsafe extern "C" fn wf_launcher_init(ptr: *const u8, len: usize) -> u32 {
         .map(|m| ModEntry { name: m["name"].as_str().unwrap_or("?").into(), enabled: m["enabled"].as_bool().unwrap_or(true) })
         .collect();
     l.bindings = serde_json::from_value(cfg["bindings"].clone()).unwrap_or_default();
-    L.with(|s| *s.borrow_mut() = Some(State { l, packs, rgba: vec![0; 240 * 160 * 4] }));
+    L.with(|s| *s.borrow_mut() = Some(State { l, packs, rgba: vec![0; 240 * 160 * 4], last_ms: unsafe { crate::now_ms() } }));
     0
 }
 
@@ -105,8 +107,10 @@ pub extern "C" fn wf_launcher_frame(win_w: u32, win_h: u32) -> u32 {
         let mut s = s.borrow_mut();
         let Some(st) = s.as_mut() else { return 1 };
         let mut fb = vec![0u32; 240 * 160];
-        // (one animation frame: the Battle page's idle animations)
-        st.l.advance(1.0 / 60.0);
+        // the Battle page's idle animations: the time since the last frame (any display rate)
+        let now = unsafe { crate::now_ms() };
+        st.l.advance((now - st.last_ms) / 1000.0);
+        st.last_ms = now;
         st.l.draw(&st.packs, &mut fb, 240, 160);
         for (o, &p) in st.rgba.chunks_exact_mut(4).zip(fb.iter()) {
             o[0] = (p >> 16) as u8;

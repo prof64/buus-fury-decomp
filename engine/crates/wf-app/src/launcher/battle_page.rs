@@ -230,9 +230,10 @@ pub fn draw(l: &mut Launcher, packs: &Packs, fb: &mut [u32], w: usize, h: usize)
         }
     }
     let fname = pick.as_ref().map(|p| p.character.to_uppercase()).unwrap_or_default();
-    item(&mut cv, t, MenuFont::Bold, &fname, 14, 17, 0, YELLOW, on(Row::Fighter), 96);
+    let nw = item(&mut cv, t, MenuFont::Bold, &fname, 14, 17, 0, YELLOW, on(Row::Fighter), 96);
+    // the level on the name's line, like the Status page's "GOKU LVL 60" (clear of the portrait's frame)
     let level = if b.level_auto { l.auto_level() } else { b.level.clamp(50, 200) };
-    item(&mut cv, t, MenuFont::Small, &format!("LV {level}"), 36, 27, 0, WHITE, false, 104);
+    item(&mut cv, t, MenuFont::Small, &format!("LV {level}"), 14 + nw + if on(Row::Fighter) { 11 } else { 6 }, 17, 0, WHITE, false, 60);
     let oname = opp.to_uppercase();
     let font = if t.font(MenuFont::Bold).measure(&units(&oname)) <= 104 { MenuFont::Bold } else { MenuFont::Menu };
     item(&mut cv, t, font, &oname, 224, 17, 2, YELLOW, on(Row::Enemy) || on(Row::Preset), 104);

@@ -7037,6 +7037,6 @@ idle animation facing left (2x when it fits) with its name and level byte. Setup
 has one look), Level, Enemies (or the story fight's count), Players, Arena, and the fighter's HP / EP / STR / POW / END
 / SPD as the battle builds them (a battle world made once per choice, ~3-6 ms). Rows (UP / DOWN): Character, Form,
 [Outfit], Level, Opponent (story fights then every enemy in one list - the old Fight-kind row is gone), [Count], Arena,
-Players; LEFT / RIGHT change, A / Enter on any row starts, B / Esc back. Animation clock: `Launcher::advance(seconds)`,
-called by the native shell per drawn frame (wall clock) and by the web shell per animation frame (1/60 s). Without the
+Players; LEFT / RIGHT change, A / Enter on any row starts, B / Esc back. Animation clock: `Launcher::advance(seconds)` -
+elapsed time from both shells (native: the wall clock per drawn frame; web: the host's `now_ms`). Without the
 game's menu data the plain list is drawn. Screenshots: `work/ub/battle_select_{1..4}.png`.
