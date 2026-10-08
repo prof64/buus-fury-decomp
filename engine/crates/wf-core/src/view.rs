@@ -16,6 +16,9 @@ use wf_view::{
     SpriteEffect,
 };
 
+/// the volleyball an Ultra Volleyball Attack makes of an enemy: sprite 281 (the golden orb, 0x0803C830)
+const VOLLEYBALL_SPRITE: i32 = 281;
+
 fn draw_key(w: &World, i: usize) -> (i32, i32, u32) {
     let e = &w.ents[i];
     let (layer, depth) = match &e.body {
@@ -496,6 +499,32 @@ pub fn render_view(w: &World, out: &mut RenderView) {
         colour: v.vid as u8,
         jitter: w.scene.sphere_jitter.clone(),
     });
+    // Dabura's dark sphere (0x0803AEA8): the same BG0 disc, all colour 2 (0x7FFF), BG0 at priority 1 (BG0CNT
+    // 0x1C81, over the sprites) blended (BLDCNT 0x1E41: BG0 first target, BG1-3 + OBJ second) - BLDALPHA 8/8 while
+    // it grows, fading EVA = (((128 - r) * 50) >> 6) * 656 >> 12, EVB 16 (re/buu/fxC_sphere.py, fxC_dabura.py)
+    if out.sphere.is_none() {
+        let dark = w.ents.iter().filter(|e| !e.removed).find_map(|e| match &e.body {
+            Body::Shot(s) => match s.kind {
+                ShotKind::DarkSphere { r256 } => Some((s.px(), s.py(), r256 >> 8)),
+                _ => None,
+            },
+            _ => None,
+        });
+        if let Some((x, y, r)) = dark {
+            let (eva, evb) = if w.g.sphere_state == 2 {
+                (((((128 - r).max(0) * 50) >> 6) * 656) >> 12, 16)
+            } else {
+                (8, 8)
+            };
+            out.sphere = Some(wf_view::SphereView { x, y, radius: r, colour: 2, jitter: Vec::new() });
+            if let Some(m) = out.map.as_mut() {
+                let l = m.layers.get_or_insert_with(|| wf_view::BgLayers { visible: [true; 4], ..Default::default() });
+                l.priority[0] = Some(1);
+                l.blend = [Some(1), Some(2), Some(2), Some(2)];
+                l.alpha = Some((eva as u8, evb));
+            }
+        }
+    }
     // the countdown / stopwatch display (`show_timer_hud` 0xB0 / 0xBC: object 0x0802FCA0)
     // a script's title text (`show_title_text` 0xB2)
     if let Some(d) = w.data.menu.as_ref() {
@@ -518,6 +547,10 @@ pub fn render_view(w: &World, out: &mut RenderView) {
         crate::scene::TimerHud::Countdown => w.scene.timers.countdown,
         crate::scene::TimerHud::Stopwatch => w.scene.timers.stopwatch,
     });
+    // a battle's survive fight: the time left on the same countdown display
+    if out.timer.is_none() {
+        out.timer = crate::battle::survive_left(w).map(|f| f as i32);
+    }
     // boss HP bars (the shown one, one sliding out)
     if let Some(b) = &w.scene.boss_bar {
         out.boss_bars.push(wf_view::BossBarView {
@@ -580,8 +613,28 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                 }
                 let step = actor_cel(w, i);
                 if p.a.alpha > 0 && !p.gone {
+                    // the energy shield (block + B: object 0x0801DFE0, made after the player - in front of it): record
+                    // power >> 3 of run 0x087202E8 (0 .. 2 fading in, 3 .. 6 the loop) on the body box centre (base
+                    // draw 0x08019C44; reference player.ts SHIELD_FX)
+                    if let Some((pow, _)) = p.shield {
+                        let (cx, cy) = p.a.center();
+                        effect(w, id, 0x0872_02e8, pow >> 3, cx, cy, out);
+                    }
                     actor_draw(w, id, &a, step, out);
                 }
+            }
+            // a volleyball (Ultra Volleyball Attack's state 0x10): 0x0803C830 draws the struck enemy as sprite 281 (the
+            // golden orb), raw animation 1, frame 0, facing right (reference enemy.ts)
+            Body::Enemy(n) if n.volleyball && n.a.alpha > 0 => {
+                let mut a = n.a.clone();
+                a.sprite = Some(VOLLEYBALL_SPRITE);
+                a.facing = 3;
+                let step = w
+                    .data
+                    .sprite(VOLLEYBALL_SPRITE)
+                    .and_then(|sp| sp.anim_raw(1))
+                    .and_then(|an| an.steps(3).first().map(|s| (s.frame, s.flip, s.attach)));
+                actor_draw(w, id, &a, step, out);
             }
             Body::Enemy(n) => {
                 let step = actor_cel(w, i);
@@ -904,6 +957,30 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                             record_add(w, id, a, px, py, out);
                         }
                     }
+                    // Buu's stretch arm (records 0x0874EFEC + 24 * dir) and the Bio Mech grapple arm (0x0876DFF8 +
+                    // 48 * dir): the arm piece every 8 px while < len - 1, the fist / claw at dir * len on top (the
+                    // claw closed on the player while reeling: records 2 (back) and 3 (front)); reference
+                    // projectiles.ts StretchArm / GrappleArm `draw`
+                    ShotKind::StretchArm { len, .. } | ShotKind::GrappleArm { len, .. } => {
+                        let (base, heads) = match &s.kind {
+                            ShotKind::GrappleArm { phase: 2, .. } => (0x0876_dff8 + 48 * d as u32, &[24u32, 36][..]),
+                            ShotKind::GrappleArm { .. } => (0x0876_dff8 + 48 * d as u32, &[12u32][..]),
+                            _ => (0x0874_efec + 24 * d as u32, &[12u32][..]),
+                        };
+                        let (dx, dy) = crate::geom::DIR_VEC[(d & 3) as usize];
+                        let mut ps = vec![];
+                        let mut o = 0;
+                        while o < len - 1 {
+                            ps.push((base, x + dx * o, y + dy * o));
+                            o += 8;
+                        }
+                        for h in heads {
+                            ps.push((base + h, x + dx * len, y + dy * len));
+                        }
+                        for (a, px, py) in ps.into_iter().rev() {
+                            record_add(w, id, a, px, py, out);
+                        }
+                    }
                     ShotKind::Kame(k) if !k.charging => beam(w, id, &k.set, d, x, y, k.len, k.vt, !k.done, k.stopped, out),
                     // the Final Flash (class 0x08036FA2; tables 0x0875FE2C / 0x08760A8C / 0x087616EC): start record
                     // 2 * dir at the visible origin, body 2 * dir + 1 every 32 px from 16 while < len - 1; growing /
@@ -996,6 +1073,28 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                             }
                         };
                         record(w, id, r, x, y, out);
+                    }
+                    // Super Buu's lobbed ball (0x08021280): the spark run 0x08721164 - charging, record 12 + k (k = (t >> 3)
+                    // & 3, 3 -> 1); thrown, record 13 + ((tick >> 3) & 1), the object's tick running on from the charge's
+                    // 61; drawn where the game's object draws it (`shots::superball_draw`)
+                    ShotKind::SuperBall { phase, draw, .. } => {
+                        if *phase == 0 {
+                            let k = match (t >> 3) & 3 {
+                                3 => 1,
+                                k => k,
+                            };
+                            let f = w.actor_by_id(s.owner).map(|a| a.facing).unwrap_or(s.dir);
+                            let (dx, dy) = crate::shots::superball_draw(f, None);
+                            effect(w, id, 0x0872_1164, 12 + k, x + dx, y + dy, out);
+                        } else {
+                            let (bx, by) = if *draw != [0; 4] {
+                                crate::shots::superball_path(*draw, s.t)
+                            } else {
+                                let (dx, dy) = crate::shots::superball_draw(s.dir, Some(s.t));
+                                (x + dx, y + dy)
+                            };
+                            effect(w, id, 0x0872_1164, 13 + (((t + 61) >> 3) & 1), bx, by, out);
+                        }
                     }
                     // a Kamikaze ghost: the ghost sprite (148) in its own animation state, like an actor
                     ShotKind::Ghost(g) => {
@@ -1103,6 +1202,12 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                     || crate::vram::owner_suspended(w, crate::vram::Owner::Hud),
                 stat_mark: stat_mark_frame(w),
                 y_off: w.scene.hud_y - 8,
+                // local co-op: the tag over the head (the body box's top) that tells the players apart
+                slot: s as u8,
+                tag: (w.players.len() > 1 && !p.gone).then(|| {
+                    let b = p.a.body_box();
+                    ((b.x0 + b.x1) >> 1, b.y0 + p.a.z - 4)
+                }),
             });
         }
     }

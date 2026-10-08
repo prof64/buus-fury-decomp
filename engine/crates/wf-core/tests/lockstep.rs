@@ -231,6 +231,7 @@ fn setup(t: &Value) -> Setup {
         }],
         rng: RngInit::State(0, 0),
         xp: false,
+        spawn_near: None,
     };
     let mut s = Session::new(d, cfg);
     let w = &mut s.world;

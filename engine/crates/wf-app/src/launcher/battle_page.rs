@@ -268,19 +268,25 @@ pub fn draw(l: &mut Launcher, packs: &Packs, fb: &mut [u32], w: usize, h: usize)
         line(&mut cv, t, "Enemies", &b.count.clamp(1, 8).to_string(), 106, 147, 129, WHITE, on(Row::Count), 20);
     }
     line(&mut cv, t, "Players", &b.players.clamp(1, 4).to_string(), 170, 207, 129, WHITE, on(Row::Players), 20);
-    let arena = l.label(Row::Arena).1.trim_start_matches("< ").trim_end_matches(" >").replace("Auto: ", "");
+    // ("Auto: <arena>" while the arena follows the opponent - it read as a chosen arena without it, playtest #18)
+    let arena = l.label(Row::Arena).1.trim_start_matches("< ").trim_end_matches(" >").to_string();
     line(&mut cv, t, "Arena", &arena, lx, vx, 139, WHITE, on(Row::Arena), 176);
     // the fighter's numbers at that level (the Status page's colours: labels yellow, values white), spread over the
     // panel's width
     let stats = [("HP", fi.hp), ("EP", fi.ep), ("STR", fi.stats[0]), ("POW", fi.stats[1]), ("END", fi.stats[2]), ("SPD", fi.stats[3])];
     let sf = t.font(MenuFont::Small);
-    let widths: Vec<i32> = stats.iter().map(|(n, v)| sf.measure(&units(n)) + 3 + sf.measure(&units(&v.to_string()))).collect();
-    let gap = ((222 - widths.iter().sum::<i32>()) / 5).max(2);
+    // (inside the panel's border: x 9 .. 225; at high levels three-digit values left no room - "SPD 121" ran over the
+    // border, playtest #18 - so the label / value space and the gaps shrink first)
+    const ROOM: i32 = 216;
+    let width = |sp: i32| -> Vec<i32> { stats.iter().map(|(n, v)| sf.measure(&units(n)) + sp + sf.measure(&units(&v.to_string()))).collect() };
+    let sp = if width(3).iter().sum::<i32>() + 5 * 3 <= ROOM { 3 } else { 1 };
+    let widths = width(sp);
+    let gap = ((ROOM - widths.iter().sum::<i32>()) / 5).max(1);
     let mut x = lx;
     for ((n, v), wd) in stats.iter().zip(&widths) {
         let mut p = Pen::new(MenuFont::Small, x, 150, 0, YELLOW, Some(SHADOW));
         cv.text(t, &mut p, &units(n));
-        let mut p = Pen::new(MenuFont::Small, p.x + 3, 150, 0, WHITE, Some(SHADOW));
+        let mut p = Pen::new(MenuFont::Small, p.x + sp, 150, 0, WHITE, Some(SHADOW));
         cv.text(t, &mut p, &units(&v.to_string()));
         x += wd + gap;
     }
@@ -304,6 +310,70 @@ pub fn draw(l: &mut Launcher, packs: &Packs, fb: &mut [u32], w: usize, h: usize)
     }
     if let Some(s) = enemy.and_then(|e| e.sprite) {
         stage_actor(&mut l.page, packs, &d, fb, w, h, s, 2, tick, ox + 200, oy + 89, (62, 68), clip);
+    }
+    true
+}
+
+/// One row of a list page: label, value ("< x >" = changeable with LEFT / RIGHT; empty = an action), highlighted
+/// (the START row)
+pub(super) struct ListRow {
+    pub label: String,
+    pub value: String,
+    pub accent: bool,
+}
+
+/// The Story / Settings / Mods pages in the game's menu style, like the Battle page (playtest #21: they were a plain
+/// dark text panel): the striped background, a title panel and a bevelled list panel, yellow labels, white values,
+/// the focused row green between yellow arrows. False = the content has no menu data (the plain list is drawn).
+#[allow(clippy::too_many_arguments)]
+pub(super) fn list_page(l: &mut Launcher, packs: &Packs, fb: &mut [u32], w: usize, h: usize, title: &str, note: &str, rows: &[ListRow], cursor: usize, message: &str) -> bool {
+    let Some(d) = l.data.clone() else { return false };
+    let Some(md) = d.menu.clone() else { return false };
+    let t = &md.text;
+    let mut cv = Canvas::new();
+    cv.background(0, 0, 240, 160);
+    cv.panel(3, 1, 233, 21);
+    item(&mut cv, t, MenuFont::Bold, &title.to_uppercase(), 12, 16, 0, YELLOW, false, 120);
+    if !note.is_empty() {
+        item(&mut cv, t, MenuFont::Small, note, 228, 15, 2, WHITE, false, 150);
+    }
+    cv.panel(3, 23, 233, 145);
+    // the value column after the widest label; long lists scroll
+    let fm = t.font(MenuFont::Menu);
+    let lw = rows.iter().filter(|r| !r.value.is_empty()).map(|r| fm.measure(&units(&r.label))).max().unwrap_or(0);
+    let vx = (14 + lw + 12).max(74);
+    let room = (226 - vx).max(40);
+    let visible = 10usize;
+    let first = cursor.saturating_sub(visible - 1);
+    for (k, r) in rows.iter().enumerate().skip(first).take(visible) {
+        let y = 38 + (k - first) as i32 * 11;
+        let focus = k == cursor;
+        let changeable = r.value.starts_with("< ") && r.value.ends_with(" >");
+        let label_col = if r.accent { RED } else { YELLOW };
+        if r.value.is_empty() {
+            // an action: the label is the focus
+            item(&mut cv, t, MenuFont::Menu, &r.label, 14, y, 0, label_col, focus, 208);
+            continue;
+        }
+        let mut p = Pen::new(MenuFont::Menu, 14, y, 0, if focus && !changeable { GREEN } else { label_col }, Some(SHADOW));
+        cv.text(t, &mut p, &units(&r.label));
+        let v = if changeable { &r.value[2..r.value.len() - 2] } else { r.value.as_str() };
+        let grey = v.starts_with("- ") || v == "-";
+        item(&mut cv, t, MenuFont::Menu, v, vx, y, 0, if grey { GREY } else { WHITE }, focus && changeable, room);
+    }
+    let hint = if message.is_empty() { "A OK   LEFT / RIGHT CHANGE   B BACK" } else { message };
+    item(&mut cv, t, MenuFont::Small, hint, 12, 157, 0, if message.is_empty() { GREY } else { RED }, false, 216);
+    let mv = wf_core::menu::surface_view(cv);
+    let mr = l.page.menu.get_or_insert_with(|| MenuRenderer::load(packs));
+    let pic = mr.render(packs, &mv, None, 0);
+    let (ox, oy) = ((w as i32 - 240) / 2, (h as i32 - 160) / 2);
+    for yy in 0..160 {
+        for xx in 0..240 {
+            let (px, py) = (ox + xx, oy + yy);
+            if px >= 0 && py >= 0 && (px as usize) < w && (py as usize) < h {
+                fb[py as usize * w + px as usize] = pic[(yy * 240 + xx) as usize];
+            }
+        }
     }
     true
 }

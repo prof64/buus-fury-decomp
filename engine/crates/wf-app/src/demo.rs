@@ -360,9 +360,24 @@ impl Sim for DemoWorld {
                 });
             }
         }
-        for w in &self.walkers {
+        let co_op = self.walkers.len() > 1;
+        for (k, w) in self.walkers.iter().enumerate() {
             out.cameras.push(CameraView { x: w.shown.0, y: w.shown.1 });
-            out.hud.push(HudView { name: self.name.clone(), level: self.level, hp: self.hp, hp_max: self.hp, ep: self.ep, ep_max: self.ep, xp72: 0, skill: self.skill, ..Default::default() });
+            // local co-op as in the battle view (wf-core view.rs): each player's slot and its "1P" / "2P" tag over
+            // the head (about 32 px above the anchor), so each viewport shows its own player's HUD in place
+            out.hud.push(HudView {
+                name: self.name.clone(),
+                level: self.level,
+                hp: self.hp,
+                hp_max: self.hp,
+                ep: self.ep,
+                ep_max: self.ep,
+                xp72: 0,
+                skill: self.skill,
+                slot: k as u8,
+                tag: co_op.then(|| ((w.x >> 8) + 8, (w.y >> 8) - 32)),
+                ..Default::default()
+            });
         }
         let _ = GBA_W;
     }

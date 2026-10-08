@@ -67,9 +67,25 @@ SimEvent::Audio(PlaySong | StopSong | PlaySfx{id, volume, pan} | StopSfx | StopA
 
 ## 3. Views and pacing
 
-* `ViewMode::Pc{zoom}` (default, auto zoom = smallest >= 2 leaving <= 8 % black, max 6): view = window / zoom,
-  centred on the player's GBA camera — more of the arena at the same pixel size. `ViewMode::Gba{scale}` = classic
-  240x160. Game logic only ever sees the 240x160 camera.
+* `ViewMode::Pc{zoom}`: view = window / zoom — more of the arena at the same pixel size. `ViewMode::Gba{scale}` =
+  classic 240x160. Game logic only ever sees the 240x160 camera.
+  * Where the PC view looks (`Renderer::view_origin_in`): around the player's GBA camera, **clamped to the map**; on
+    an axis where the map is smaller than the view the map is centred (black both sides); the camera's 240x160
+    picture always stays whole inside the view (a script may pan the camera off the map), so a 240x160 view is the
+    camera's exactly. The world map (mode 7) wraps and is not clamped. The GBA screen's own items (script markers,
+    title text, a middle text box) follow the camera's picture; the HUD, boss bars, banner and top / bottom text
+    boxes anchor to the view's edges. Tool overlays draw with the picture's origin (`Renderer::origin`). (Playtest
+    8: centring alone showed black void beside the map at most arena starts and cut off Yemma and the door in
+    Yemma's Office while the bottom third was black.)
+  * Auto zoom (`zoom` 0, "Steady", the default; `wf_render::steady_zoom`): one zoom per window size, the smallest
+    >= 2 whose view is at most 320 px tall (960x640 2x 480x320, 1280x720 3x, 1080p 4x 480x270, 1440p 5x, 4K 6x
+    640x360) — it no longer follows the map (playtest 20: 2x / 3x jumps from area to area); maps smaller than the
+    view show with black around them. "Auto zoom: max" keeps the per-map rule (the map filling the window, up to 6x,
+    held through menus and black loads: `AutoZoom`).
+  * Menu screens (title, Select Game, the pause menu) are scaled by the largest integer that fits the view (centred,
+    black around); a 240x160 view shows the picture itself.
+  * Known: a parallax BG (another scroll rate than the camera's) only has tiles where the GBA screen can see it, so a
+    wide view near a map edge can show its empty part as black (Snake Way 1-1's sky at the far right end).
 * The sim steps at the GBA's 59.7275 Hz (fixed step, max 4 catch-up steps per host frame).
 * Keys (W3C `code` names, same on both shells): arrows, X = A, Z = B, A = L, S = R, Enter = Start, Backspace =
   Select. Rebinding: web settings panel (localStorage), native `<data>/bindings.json`. Gamepads: standard mapping

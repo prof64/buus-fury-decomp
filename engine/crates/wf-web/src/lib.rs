@@ -243,6 +243,7 @@ pub unsafe extern "C" fn wf_app_init(cfg_ptr: *const u8, cfg_len: usize) -> u32 
     let mut ctl = Control::new(&mut app, hotkeys, cfg["now"].as_f64().unwrap_or(0.0) as u64);
     // a battle ends on the game's "You Win!!" / "You Lose!!" with Retry / Change fighter
     ctl.end_screen = true;
+    ctl.link_configured = cfg["link"].is_object();
     let n = dc.players;
     GAME.with(|g| {
         *g.borrow_mut() = Some(Game {

@@ -2640,7 +2640,12 @@ pub fn kid_buu_merge(w: &mut World, i: usize) {
     w.ents[o].removed = true;
     let oe = w.en(o);
     oe.defeated = true;
-    oe.primary = false;
+    // (a battle: the survivor carries on the fight - the absorbed half was the primary opponent, the copy it merged
+    // into was not, and the fight counted as won with the merged Buu still on his feet)
+    let was_primary = std::mem::take(&mut oe.primary);
+    if was_primary {
+        w.en(i).primary = true;
+    }
     // the absorbed half is deleted, not defeated: the area's placed-enemy slot (its on-defeat callback) goes on with
     // the survivor (run 2 row 1,880,459, 19-3: the placed Kid Buu absorbed into its split copy - no s458 cut-in, the
     // merged Buu goes on hitting)
@@ -3526,6 +3531,11 @@ fn on_death(w: &mut World, i: usize) {
             w.en(i).a.hittable = true;
         }
         w.en(i).ko = -1;
+    } else if death == "Idle" && IDLE_DEATH_REMOVED.contains(&ty) {
+        // battle: the boss's story defeat removes it at once - Pui Pui's on-defeat script (8-27, inline 0x0807CDAC:
+        // set_flag(59), remove_actor(234) in the KO frame) deletes the object, no explosion, no knock-down (its sprite
+        // has none: the "hurt" cel left it standing frozen for 150 frames, playtest 29)
+        die(w, i, false);
     } else if death == "Idle" {
         set_anim(
             w,
@@ -3588,6 +3598,9 @@ fn self_destruct_children(w: &mut World, i: usize) {
         cur = kid;
     }
 }
+/// Idle-death bosses whose story defeat script deletes them in the KO frame (`remove_actor` of their own sprite):
+/// Pui Pui (0x60, 8-27's inline 0x0807CDAC). A battle removes them likewise instead of the knock-down + fade.
+pub const IDLE_DEATH_REMOVED: [i32; 1] = [0x60];
 /// the tanks (death node 0x080333C4, param = def +0xC): Battle Tank variant 0x7F (0), Juggernaut 0x3A (1), 0x8C (2)
 pub const TANKS: [i32; 3] = [0x7f, 0x3a, 0x8c];
 /// crew (enemy type, graphics) per rand(2) and tank (tables 0x087592DC / +0x18)

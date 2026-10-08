@@ -42,7 +42,9 @@ fn launcher_menus_and_save_slots() {
     let slots: Vec<Vec<u8>> = (0..launcher::SLOTS).map(|i| saves.slot_bytes(i)).collect();
     assert!(!slots[1].is_empty());
     let d = wf_app::battle::load_data(&p).unwrap();
-    assert!(launcher::slot_summary(&slots[1], &d).is_some_and(|t| t.contains("1-1")), "{:?}", launcher::slot_summary(&slots[1], &d));
+    // (the area by its banner name, as the in-game Select Game shows it)
+    let area = d.field.as_ref().and_then(|f| f.areas.get(&(1, 1))).map(|a| a.banner.trim().to_string()).filter(|b| !b.is_empty()).unwrap_or_else(|| "1-1".into());
+    assert!(launcher::slot_summary(&slots[1], &d).is_some_and(|t| t.contains(&area)), "{:?} {area}", launcher::slot_summary(&slots[1], &d));
     let app = launcher::story_app(packs(&c.files), &slots, Some(1), 1).expect("continue");
     let s2 = app.sim.as_any().unwrap().downcast_ref::<wf_app::story::StorySim>().unwrap();
     assert_eq!(s2.session.world.saves.current, 1);
@@ -82,13 +84,13 @@ fn quick_battle_defaults_follow_the_enemy() {
     }
     // settings saved before the automatic level existed get it
     assert!(Settings::from_json(r#"{"battle":{"level":60}}"#).unwrap().battle.level_auto);
-    // the story's skills at that level: Goku learned Super Saiyan 3 (#27, level 100); Teen Gohan has the Saiyaman
-    // skill; settings saved with the old PC default move to Classic once
+    // the story's skills at that level: Goku learned Super Saiyan 3 (#27, level 100); the Great Saiyaman has the
+    // Saiyaman skill in Super Saiyan's place; settings saved with the old PC default move to Classic once
     assert!(l.battle_config().players[0].skills.as_ref().is_some_and(|s| s.contains(&22)));
     let mut s = Settings::default();
     s.battle.fighter = "gohan".into();
-    s.battle.form = Some(10);
-    assert!(Launcher::new(&p, s, true).battle_config().players[0].skills.as_ref().is_some_and(|s| s.contains(&18)));
+    s.battle.form = Some(14);
+    assert!(Launcher::new(&p, s, true).battle_config().players[0].skills.as_ref().is_some_and(|s| s.contains(&18) && !s.contains(&20)));
     assert_eq!(Settings::from_json(r#"{"view":"pc:0"}"#).unwrap().view, "gba:0");
     assert_eq!(Settings::default().view, "gba:0");
 }
@@ -160,8 +162,9 @@ fn battle_picker_rows_are_distinct_and_playable() {
         }
         assert!(hp(&ses.world) < hp0, "{k:?}: no hit landed");
     }
-    // saved settings: a record the picker does not list, and no form at all
-    for (fighter, form, want) in [("goku", Some(1), 0), ("gohan", Some(11), 10), ("gogeta", Some(44), 41), ("goku", None, 2), ("f48", Some(48), 0)] {
+    // saved settings: a record the picker does not list, and no form at all (the character's first row: Goku's base
+    // look, not his record default - the Other World halo, form 2)
+    for (fighter, form, want) in [("goku", Some(1), 0), ("gohan", Some(11), 10), ("gogeta", Some(44), 41), ("goku", None, 0), ("f48", Some(48), 0)] {
         let mut s = Settings::default();
         s.battle.fighter = fighter.into();
         s.battle.form = form;

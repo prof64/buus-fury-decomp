@@ -32,11 +32,13 @@ pub const ARENAS: &[(&str, &str, &str, (i32, i32), [i32; 4])] = &[
         [40, 96, 440, 376],
     ),
     ("hfil", "18-14", "HFIL", (64, 248), [24, 80, 300, 304]),
+    // (the start right of the rock pillar at (104..152, 104..208): from (88, 232) a wide beam to the right - Final
+    // Flash - met its foot at once and fizzled; the corridor y 216..248 is open from x 160 to 296)
     (
         "wasteland",
         "20-7",
         "Barren Wasteland",
-        (88, 232),
+        (160, 232),
         [40, 72, 440, 420],
     ),
     (
@@ -189,6 +191,10 @@ pub struct FighterSetup {
     /// Gohan); None = the new-game list. A fixed record's own list still wins.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub skills: Option<Vec<i32>>,
+    /// the opponents come for the players from the start (`Options::engaged`, [`engaged_state`]): a story encounter
+    /// already begun. Off (the reference's and the lockstep scenarios' setup): they wait until a player comes near.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub engage: bool,
     /// a record given as is (link play's Dojo): replaces what the level / growth / points give (`FixedRecord`)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed: Option<FixedRecord>,
@@ -233,6 +239,7 @@ impl Default for FighterSetup {
             holy_water: false,
             full_gauge: false,
             skills: None,
+            engage: false,
             fixed: None,
         }
     }
@@ -261,6 +268,11 @@ pub struct BattleConfig {
     pub rng: RngInit,
     #[serde(default)]
     pub xp: bool,
+    /// the opponents start in view: each phase's enemies `gap` px in front of the player (in formation as usual),
+    /// a story spawn point only when it is that close (the launcher's battles; None = the reference's placement:
+    /// the enemy's own spawn point in its arena, else 120 px in front - TS mirrors that)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spawn_near: Option<i32>,
 }
 impl Default for BattleConfig {
     fn default() -> Self {
@@ -273,6 +285,7 @@ impl Default for BattleConfig {
             }],
             rng: RngInit::Seed(1),
             xp: false,
+            spawn_near: None,
         }
     }
 }
@@ -522,6 +535,8 @@ pub fn create(data: Arc<GameData>, cfg: &BattleConfig) -> World {
     let (arena, spawn) = arena_runtime(&data, &cfg.arena);
     let mut w = World::new(Arc::clone(&data), rng, arena);
     w.opts.xp = cfg.xp;
+    w.opts.spawn_near = cfg.spawn_near;
+    w.opts.engaged = cfg.players.iter().any(|f| f.engage);
     if let Some(m) = data.maps.get(&w.arena.map) {
         w.col = Some(Collision::new(Arc::clone(m)));
     }
@@ -548,6 +563,14 @@ pub fn create(data: Arc<GameData>, cfg: &BattleConfig) -> World {
                 forms_allowed: forms,
             },
         );
+        // the story's unstable Trunks (forms 24 / 25): the form object's countdown is set when the object is made
+        // (`player::new_form_object`: 24 -> 120 + rand(180) frames to Super Saiyan, 25 -> 240 + rand(120) back); a
+        // battle that starts in one makes it with the player (it was 0: the transformation came on the first frame)
+        match data.form(form).map(|x| x.controller) {
+            Some(0x3001b88) => pl.story_cnt = 120 + w.rng.rand(180),
+            Some(0x3001b8c) => pl.story_cnt = 240 + w.rng.rand(120),
+            _ => {}
+        }
         if f.full_gauge {
             let (ss, ss3) = data.form(form).map(|x| (x.ss, x.ss3)).unwrap_or((false, false));
             if ss3 {
@@ -598,6 +621,27 @@ pub fn create(data: Arc<GameData>, cfg: &BattleConfig) -> World {
     w
 }
 
+/// The state an opponent's AI starts in when the battle is engaged ([`FighterSetup::engage`]): the state its "wait
+/// for the player" state goes to. Those initial states are `Selector[IfPlayerWithin | IfPlayerWithin2 (r) ->
+/// GotoState(S), RunMotionController]` - the enemy stands still until a player comes within r (Kid Buu, Majin
+/// Fighters 100 px, Super Janemba / Majin Buu 72 px; in the story the player walks up to it); an engaged battle
+/// starts as if that had just happened. Any other initial state (spawning parts, timers) is kept: None.
+pub fn engaged_state(d: &GameData, init: u16) -> Option<u16> {
+    use crate::ai::{K, P};
+    let t = d.states.get(&init)?;
+    let root = t.nodes.first()?;
+    if root.k != K::Selector || root.kids.len() != 2 {
+        return None;
+    }
+    let near = t.nodes.get(root.kids[0] as usize)?;
+    let wait = t.nodes.get(root.kids[1] as usize)?;
+    if !matches!(near.k, K::IfPlayerWithin | K::IfPlayerWithin2) || wait.k != K::RunMotionController || near.kids.len() != 1 {
+        return None;
+    }
+    let go = t.nodes.get(near.kids[0] as usize)?;
+    (go.k == K::GotoState).then(|| go.p.g(P::State) as u16)
+}
+
 fn spawn_phase(w: &mut World, ph: usize) {
     let Some((parts, count)) = w.battle.phases.get(ph).cloned() else {
         return;
@@ -618,6 +662,9 @@ fn spawn_phase(w: &mut World, ph: usize) {
                     && s.2 > 0
                     && s.3 > 0
             });
+            let gap = w.opts.spawn_near;
+            // (spawn_near: a story point only when it is in view of the player's screen)
+            let near = |s: &(i32, i32, i32, i32)| gap.is_none_or(|g| (s.2 - ppx).abs() <= g + 24 && (s.3 - ppy).abs() <= 56);
             let (x, y) = match sp {
                 Some(s)
                     if n == 1
@@ -625,12 +672,13 @@ fn spawn_phase(w: &mut World, ph: usize) {
                         && s.2 < b.x1
                         && s.3 >= b.y0
                         && s.3 < b.y1
-                        && (s.2 - ppx).abs() > 60 =>
+                        && (s.2 - ppx).abs() > 60
+                        && near(s) =>
                 {
                     (s.2, s.3)
                 }
                 _ => {
-                    let x = (b.x1 - 40).min(ppx + 120 + (k / 4) * 30);
+                    let x = (b.x1 - 40).min(ppx + gap.unwrap_or(120) + (k / 4) * 30);
                     let base = if w.col.is_some() {
                         ppy
                     } else {
@@ -643,10 +691,17 @@ fn spawn_phase(w: &mut World, ph: usize) {
                     (x, y)
                 }
             };
-            if let Some(ei) = spawn_enemy(w, ty, x, y, 0, None) {
+            let start = if w.opts.engaged { engaged_state(&w.data, t.ai).map(|s| s as i32) } else { None };
+            if let Some(ei) = spawn_enemy(w, ty, x, y, 0, start) {
                 let e = w.en(ei);
                 e.primary = primary && t.hp > 0;
-                e.a.facing = 2;
+                // facing the player (left) - unless the sprite has no body facing left: Janemba, Blister, Enzymes,
+                // blood cells and Buu fragments have a body box facing down only (the way the game shows them), and
+                // turned left nothing could hit them (playtest: Janemba never took damage). They keep their own facing.
+                let lb = e.a.body[2];
+                if lb[0] < lb[2] && lb[1] < lb[3] {
+                    e.a.facing = 2;
+                }
                 e.target = (k as usize % nplayers) as u8;
             }
             k += 1;
@@ -806,6 +861,22 @@ pub fn pvp_winner(w: &World) -> Option<usize> {
 
 const INVULNERABLE: [i32; 2] = [0x1a, 0x1b];
 const SURVIVE: u32 = 3600;
+
+/// A survive fight's frames left: every live opponent invulnerable (Majin Buu under Babidi's spell, 0x1A / 0x1B -
+/// the story's encounters the player cannot win), [`outcome`]'s win after `SURVIVE` frames of the phase. None in
+/// any other fight (and in the field). The view shows it as the game's countdown display (`RenderView::timer`).
+pub fn survive_left(w: &World) -> Option<u32> {
+    if w.field.is_some() || w.opts.pvp || w.battle.phase + 1 < w.battle.phases.len() {
+        return None;
+    }
+    let live = live_primary(w);
+    let all_inv = !live.is_empty()
+        && live.iter().all(|&id| {
+            w.enemy_by_id(id)
+                .is_some_and(|(_, e)| INVULNERABLE.contains(&e.ty))
+        });
+    all_inv.then(|| SURVIVE.saturating_sub(w.frame.wrapping_sub(w.battle.phase_start)))
+}
 
 pub fn outcome(w: &World) -> Outcome {
     let players: Vec<usize> = w.players.iter().filter_map(|&id| w.find(id)).collect();

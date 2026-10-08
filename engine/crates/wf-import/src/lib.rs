@@ -1937,16 +1937,19 @@ fn import_super_ball(w: &mut World, ei: usize, ram: &GbaRam, o: u32, notes: &mut
             continue;
         }
         let id = wf_core::shots::add(w, wf_core::shots::super_ball(me));
+        let face = w.en_ref(ei).a.facing;
         if let Some(k) = w.find(id) {
             let s = w.shot(k);
             s.x = x;
             s.y = y;
+            // (the thrower's facing: where the ball is drawn, `shots::superball_draw`)
+            s.dir = face;
             if thrown {
                 let (vx, vy) = (ram.s32(b + 0x4C), ram.s32(b + 0x50));
                 let since = t - THROW;
                 let (sx, sy) = (x - vx * since, y - vy * since);
                 let (tx, ty) = (((sx + vx * 43 + 128) >> 8) << 8, ((sy + vy * 43 + 128) >> 8) << 8);
-                s.kind = wf_core::shots::ShotKind::SuperBall { phase: 1, sx, sy, tx, ty };
+                s.kind = wf_core::shots::ShotKind::SuperBall { phase: 1, sx, sy, tx, ty, draw: [0; 4] };
                 s.t = since as i64;
             } else {
                 s.t = t as i64;

@@ -42,6 +42,10 @@ pub struct Story {
 pub struct StoryStart {
     /// RNG seed of the session (the title's boot carries it into the new game)
     pub seed: u32,
+    /// the cartridge's save slots at the start (hex, the app's slot files `slot1.sav` .. and `options.sav` last, as
+    /// the native app's `--data DIR/saves`): the title's Continue loads them; empty = a fresh cartridge
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub slots: Vec<String>,
 }
 const KEYFRAME_EVERY: u32 = 120;
 const MAX_EVENTS: usize = 400;
@@ -170,9 +174,18 @@ impl Agent {
         let cfg = FieldConfig { world: 1, area: 1, rng: wf_core::battle::RngInit::Seed(start.seed), ..Default::default() };
         let mut s = Session::new_field(Arc::clone(data), cfg);
         s.world.opts.no_lag = true;
-        // the three slot files, empty (as the app's title: its hash covers the slot list)
+        // the three slot files (as the app's title: its hash covers the slot list) - empty, or the start's; the
+        // options block after them sets the menu settings (wf-app `launcher::title_sim`)
+        let files: Vec<Vec<u8>> = start
+            .slots
+            .iter()
+            .map(|h| (0..h.len() / 2).filter_map(|i| u8::from_str_radix(&h[2 * i..2 * i + 2], 16).ok()).collect())
+            .collect();
         for i in 0..wf_core::menu::save::SLOTS {
-            s.world.saves.set_slot_bytes(i, &[]);
+            s.world.saves.set_slot_bytes(i, files.get(i).map(|b| b.as_slice()).unwrap_or(&[]));
+        }
+        if let Some(o) = files.get(wf_core::menu::save::SLOTS).and_then(|b| wf_core::menu::options::Settings::from_flash(b)) {
+            s.world.menu.settings = o;
         }
         wf_core::menu::title::open_title(&mut s.world);
         s

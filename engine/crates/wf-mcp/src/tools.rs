@@ -218,7 +218,7 @@ pub fn battle_config(d: &GameData, a: &Value) -> Result<(BattleConfig, String), 
         arena = Some(x.to_string());
     }
     let seed = i(a, "seed").unwrap_or(1) as u32;
-    let cfg = BattleConfig { arena: arena.unwrap_or_else(|| "crater".into()), players, phases, rng: RngInit::Seed(seed), xp: b(a, "xp").unwrap_or(false) };
+    let cfg = BattleConfig { arena: arena.unwrap_or_else(|| "crater".into()), players, phases, rng: RngInit::Seed(seed), xp: b(a, "xp").unwrap_or(false), spawn_near: None };
     let foe: Vec<String> = cfg
         .phases
         .iter()
@@ -266,6 +266,7 @@ pub fn tool_list() -> Value {
         }), &["area"]),
         t("new_game", "Start the story (the whole game with its script host: events, dialogue, NPCs, shops, save points, the title and its New Game / Continue). Default: from the title through New Game into the prologue; title=true stops on the title screen (press START, then A through Single Player / Select Game). Observations gain `story`: the menu screen and its text, the dialogue box, event_running, the save slots. Every action tool, save_state / load_state / rewind and replays work on it; `frame` counts steps (one game logic iteration each).", json!({
             "seed": {"type": "integer"}, "title": {"type": "boolean", "description": "stop on the title screen"}, "mods": mods,
+            "saves": {"type": "string", "description": "a directory of the app's save slot files (slot1.sav .., options.sav - a native app's --data DIR/saves): the cartridge at the start (with title=true: START, A, then the slot on Select Game continues it)"},
         }), &[]),
         t("list_sessions", "Open sessions.", json!({}), &[]),
         t("close_session", "Close a session.", json!({"session": sess}), &["session"]),
@@ -423,7 +424,24 @@ impl Server {
                     files = m.story_files()?;
                 }
                 let id = self.new_id();
-                let start = crate::env::StoryStart { seed: i(a, "seed").unwrap_or(1) as u32 };
+                // saves: a directory with the app's slot files (`slot1.sav` .. `slot3.sav`, `options.sav`), e.g. a native
+                // app's `--data DIR/saves`: the title's Continue loads them
+                let slots = match s(a, "saves") {
+                    Some(dir) => {
+                        let dir = std::path::Path::new(dir);
+                        let mut v: Vec<String> = (1..=wf_core::menu::save::SLOTS)
+                            .map(|k| dir.join(format!("slot{k}.sav")))
+                            .chain([dir.join("options.sav")])
+                            .map(|p| std::fs::read(p).unwrap_or_default().iter().map(|x| format!("{x:02x}")).collect())
+                            .collect();
+                        while v.last().is_some_and(|x| x.is_empty()) {
+                            v.pop();
+                        }
+                        v
+                    }
+                    None => vec![],
+                };
+                let start = crate::env::StoryStart { seed: i(a, "seed").unwrap_or(1) as u32, slots };
                 let mut ag = Agent::new_story(id.clone(), d, files, start)?;
                 ag.content = set.clone();
                 let mut steps = 0;
@@ -777,7 +795,7 @@ impl Server {
         };
         let scale = i(a, "scale").unwrap_or(if view_kind == "gba" { 2 } else { 1 }).clamp(1, 4) as usize;
         renderer.render(packs, &view, slot, vw, vh);
-        let (ox, oy, _, _) = wf_render::Renderer::view_origin(&view, slot, vw, vh);
+        let (ox, oy, _, _) = renderer.origin;
         let mut fb = renderer.fb.clone();
         if labels {
             for id in m::live_enemies(ag) {

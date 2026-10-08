@@ -53,6 +53,11 @@ fn lobby(d: &Arc<GameData>, setup: DojoSetup, seed: u64) -> (StartInfo, StartInf
     let clock: Clock = Rc::new(move || tc.get());
     let host_save = DojoSave::from_save(0, &save(&fd, &[(0, 90)]), &fd).expect("host party");
     let guest_save = DojoSave::from_save(1, &save(&fd, &[(4, 110), (3, 80)]), &fd).expect("guest party");
+    // the In-Game roster shows display names, never the bare fighter id (playtest 26: "goku Lv90")
+    for c in host_save.party.iter().chain(&guest_save.party) {
+        assert_ne!(c.name, c.fighter, "raw fighter id as the shown name");
+        assert!(c.name.chars().next().is_some_and(|ch| ch.is_uppercase()), "shown name {:?}", c.name);
+    }
     let host_hello = DojoHello { save: host_save.clone(), pick: 0, setup: Some(setup) };
     let guest_pick = 0; // Vegeta (the first party member in record order is Trunks 3 - pick by name below)
     let guest_pick = guest_save.party.iter().position(|c| c.fighter == "vegeta").unwrap_or(guest_pick);

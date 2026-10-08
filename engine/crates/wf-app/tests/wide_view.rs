@@ -1,6 +1,8 @@
 //! The zoomed-out PC view against the GBA view (headless, muted; skipped without the ROM). For every pixel-gate
 //! segment (`data/segments/pixels.json`) at its locked frames:
-//! 1. the wide view's centre 240x160 is the GBA view's picture, pixel for pixel. The corner-anchored overlays are
+//! 1. the wide view holds the GBA view's picture, pixel for pixel, whole, where the view's origin puts the camera
+//!    (the view is clamped to the map: `Renderer::view_origin_in` - the centre when the map does not clamp it, and
+//!    always the centre of a mode-7 world map). The corner-anchored overlays are
 //!    placed for the wide screen on purpose and left out of both pictures: the HUD, the boss bars, the timer, the
 //!    area banner, a top / bottom text box.
 //! 2. nothing the world shows is culled or frozen for being off the GBA screen. Every live actor with a sprite is in
@@ -16,7 +18,7 @@ use wf_core::world::Body;
 use wf_render::Renderer;
 use wf_view::{FrameSel, RenderView};
 
-/// the wide view in world pixels: the GBA screen centred with 80 / 64 px around it
+/// the wide view in world pixels: the GBA screen with 160 / 128 px more around it
 const WIDE: (usize, usize) = (400, 288);
 
 fn strip_overlays(v: &RenderView) -> RenderView {
@@ -61,12 +63,17 @@ fn wide_view_centre_is_the_gba_view_and_nothing_is_culled() {
     // one renderer per picture size (each keeps its own caches)
     let mut gba = Renderer::new();
     let mut wide = Renderer::new();
-    let (ox, oy) = ((WIDE.0 - 240) / 2, (WIDE.1 - 160) / 2);
+    let mut clamped = 0usize;
     let mut fails = vec![];
     let (mut frames, mut offscreen) = (0usize, 0usize);
     // actors with no sprite at all (hidden by the scene / the game): [on screen, off screen]
     let mut undrawn = [0usize; 2];
+    // WIDE_ONLY=name: that segment only (a failure's quick re-run)
+    let only_seg = std::env::var("WIDE_ONLY").ok();
     for (name, locked) in lock["segments"].as_object().unwrap() {
+        if only_seg.as_ref().is_some_and(|o| o != name) {
+            continue;
+        }
         let want: BTreeSet<usize> = locked.as_array().unwrap().iter().filter_map(|f| f[0].as_u64().map(|k| k as usize)).collect();
         let p: PathBuf = repo.join(format!("data/segments/{name}.json"));
         let Ok(doc) = wf_import::segment::load(&p) else {
@@ -120,6 +127,17 @@ fn wide_view_centre_is_the_gba_view_and_nothing_is_culled() {
                 let v = strip_overlays(&view);
                 let g = gba.render(&packs, &v, 0, 240, 160).to_vec();
                 let wd = wide.render(&packs, &v, 0, WIDE.0, WIDE.1).to_vec();
+                // the camera's picture in the wide one: whole, at the origin the renderer used
+                let (vx, vy, cx, cy) = wide.origin;
+                let (ox, oy) = (cx - vx, cy - vy);
+                if ox < 0 || oy < 0 || ox as usize + 240 > WIDE.0 || oy as usize + 160 > WIDE.1 {
+                    bad.entry(k).or_insert_with(|| format!("the GBA picture at ({ox}, {oy}) is not whole in the wide view"));
+                    return;
+                }
+                if (ox as usize, oy as usize) != ((WIDE.0 - 240) / 2, (WIDE.1 - 160) / 2) {
+                    clamped += 1;
+                }
+                let (ox, oy) = (ox as usize, oy as usize);
                 let mut first = None;
                 let mut n = 0;
                 for y in 0..160 {
@@ -131,7 +149,7 @@ fn wide_view_centre_is_the_gba_view_and_nothing_is_culled() {
                     }
                 }
                 if n > 0 {
-                    bad.entry(k).or_insert_with(|| format!("centre differs in {n} px, first at {:?}", first.unwrap()));
+                    bad.entry(k).or_insert_with(|| format!("centre differs in {n} px, first at {:?} (GBA picture at ({ox}, {oy}), view origin {:?})", first.unwrap(), wide.origin));
                 }
             }
         });
@@ -139,7 +157,7 @@ fn wide_view_centre_is_the_gba_view_and_nothing_is_culled() {
             fails.push(format!("{name} f{k}: {why}"));
         }
     }
-    eprintln!("wide view: {frames} frames, {offscreen} off-screen actor checks, actors without a sprite on / off screen {undrawn:?}");
+    eprintln!("wide view: {frames} frames ({clamped} with the view clamped to the map), {offscreen} off-screen actor checks, actors without a sprite on / off screen {undrawn:?}");
     assert!(frames > 0);
     assert!(fails.is_empty(), "{}", fails.join("\n"));
 }

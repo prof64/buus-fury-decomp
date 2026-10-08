@@ -146,11 +146,17 @@ Severity: **critical** = blocks play / never ends, **high** = a core feature bro
 13. **Medium-low - Battle: Unstable Super Saiyan Trunks transforms on frame 1, locking the player ~3 s**
     (`bg_t24/crop_6_186.png`). Expected: first transformation 120-300 frames in.
     **R2: still broken** (`r2b_bg_t24`: frames 6-186).
+    **Fixed (in the tree, verified 2026-10-08):** the battle makes the form object's countdown with the player
+    (`battle::create`: 24 -> 120 + rand(180), as `player::new_form_object`); `work/pt/t24`: walks from frame 60,
+    transforms at 158, back at 585.
 
 14. **Low-medium - Battle end screen: holding / mashing A after the last hit retries instantly.**
     `bw_win`: "You Win!!" at f190, a new fight by f230 (`bw_win/s.png`); the input lock is 40 frames.
     **R2: not visible headless on 6a369e5** (see "How to play"); the 40-frame lock is unchanged in the code; the web
     build shows the same instant retry (the recording id changes from -01 to -02 right after the win, `r2w_battle`).
+    **Fixed (in the tree, verified 2026-10-08):** the end screen ignores the buttons for 60 frames and takes a confirm
+    only after 12 frames with no button held (`control.rs` END_LOCK / END_QUIET); `work/pt/win`: A mashed every 10
+    frames for 1,200 frames after the win picks nothing, one A after a pause retries.
 
 15. **Low-medium - Battle: 2 players are indistinguishable and only player 1 has a HUD** (`bw_pl2/s2.png`).
     **R2: still broken** (`r2b_bw_pl2/s.png`).
@@ -158,6 +164,9 @@ Severity: **critical** = blocks play / never ends, **high** = a core feature bro
 16. **Low - Great Saiyaman Gohan: the Super Saiyan icon is lit but B does nothing, no way back to Teen Gohan.**
     **R2: partly fixed** - the Saiyaman toggle works both ways (`r2b_saiyaman/hud.png`, frames 100 / 610); in Great
     Saiyaman the SS icon is still lit and B on it does nothing (frame 310).
+    **Fixed (in the tree, verified 2026-10-08):** the Great Saiyaman gets the story's Saiyaman-era list - the Saiyaman
+    skill in Super Saiyan's place (`launcher::story_skills`; the form has no Super Saiyan above it); `work/pt/gs`:
+    skills 7 / 18 / 6 / 17, no SS icon, Saiyaman -> Teen Gohan at frame 585.
 
 17. **Low - Dragon Fist: tapping B spends 300 EP and does nothing; holding works** (`bf_dfist3/z.png`). Possibly
     faithful. **R2: unchanged** (`r2b_bf_dfist3`).
@@ -195,7 +204,7 @@ above him (`r2b_bg_g0_left/crop_540_620.png`).
     frames (`r2b_jan_below/s.png`, HP 8880 throughout). Only "Janemba" is in the battle's enemy list - possibly the
     arm / upper-body hit parts the story version has are not spawned in battle (not checked).
 
-24. **Medium - Story: the player walks behind the bottom wall of Babidi's Ship save room (8-41) and disappears.**
+24. **Medium - Story: the player walks behind the bottom wall of Babidi's Ship save room (8-41) and disappears.** **Matches the game (not a bug):** the original also lets the player walk there and draws the wall over him; ours matches it pixel for pixel over 910 frames (segments.md entry 20).
     `pt.py r2s_f_walk --view gba:0 --saves seg_f_fat --keys Enter,ArrowDown,Enter --input "N60,R10,D300,N30,D200,N30,R200,N30,L300,N30" --frames 1200 --every 20`.
     Gohan walks to y=351 past the drawn wall and along it (x 40-183), only his hair tips showing
     (`r2s_f_walk/z.png`, `r2s_f_walk/f000740.png`); the walkable area reaches ~2 tiles below the wall
@@ -218,6 +227,10 @@ above him (`r2b_bg_g0_left/crop_540_620.png`).
 
 29. **Low - Battle: Pui Pui stands frozen upright ~150 frames after his defeat, then fades, no knock-down**
     (`r2b_ship_pui.png`, frames 200-360). Possibly faithful.
+    **Fixed 2026-10-08 (soak agent):** not faithful - Pui Pui's story defeat (8-27, inline 0x0807CDAC) is
+    `remove_actor(234)` in the KO frame: he vanishes, no knock-down (his sprite has none; the battle's Idle-death
+    "hurt" cel froze him upright). Battles now remove him at the KO (`enemy::IDLE_DEATH_REMOVED`, TS the same);
+    `work/pt/pui`: gone at the KO punch (frame 70), Yakon next.
 
 30. **Low - Battle: after the KO, Kid Buu keeps beaming the downed Goku** (`r2b_kidbuu_lose/f000400.png`). Possibly
     faithful.
@@ -229,6 +242,42 @@ above him (`r2b_bg_g0_left/crop_540_620.png`).
 Not covered yet: the World Tournament itself - from the Hercule City save it is ~10 story segments away (school,
 Bulma, Great Saiyaman, circus, Goten's training, Vegeta vs Trunks); `--story 7-1` starts a fresh game there, so the
 desk says "Sorry, there's no tournament today" (`r2s_t9/s.png`), which is expected without story progress.
+
+### Round 3 (story): World Tournament chapter -> end of Earth (Earth agent, 2026-10-08)
+
+Played from the `seg_e_tournament` save (Hercule City 3-1, Gohan Lv 64, 31 / 155 HP) to Goku arriving on Papaya
+Island 7-2 after Spopovich and Yamu (the Babidi chapter's start): the Hercule City world-map circle, East District 2-8,
+Goku's House (Chi-Chi, the "Chapter 3 World Tournament" card), the 2-9 .. 2-11 fights (level 65), the level-65 gate in
+2-90, Goten's rock drill (dodged), the fight with Super Saiyan Goten, Trunks vs Vegeta in the gravity chamber 4-25,
+Bulma at Capsule Corp ("ready to go to the World Tournament? Yes"), Papaya Island: the drinks stall bought down to 30
+zenie, registering Trunks and Gohan at the desk, the punching machine (weak / qualify / "the machine is broken" by
+timing), the Junior division in the ring (four fighters, Goten, Hercule's exhibition), the adult division, Videl vs
+Spopovich, the infirmary. 179,326 frames; pause pages (Status, Inventory, Equip, Options, Journal) at the end.
+
+How: closed-loop like a player through the agent interface (`wf-mcp`: new `new_game {title: true, saves: DIR}` loads
+the app's slot files so the title's Continue resumes them, and world-map observations now carry `field.flight`
+heading / altitude to steer by). Its replay converted to an app `--input-file` and played through the **real app**
+(`buus-fury --launcher --launcher-keys Enter,Enter`, same slot files, Classic view): **the same end-state hash
+(2638bd2e5194d548)**; frames every 30 in `work/earth/r3b/` (contact sheets `/tmp/earthkb/sh/c_*.png` while they last).
+
+**Nothing broke**: no softlock, no missing graphics, menus / shop / minigame / dialogue all worked; the chapter can be
+finished. Things a player may report, each checked against the game and left as they are:
+
+32. **Info - 2-10 -> 2-11's left exit leads into a dead-end pocket under the tree canopy** where the player is hidden
+    (2-11 (60 .. 88, 365 .. 454)). Emulator (run 1 at 2-10, row 127,700, up through the same exit): the game has the
+    same pocket and the same canopy over (87, 368) - faithful. (The agent's `take_exit` picks this nearer exit; a
+    player goes up the right one.)
+33. **Info - the punching machine reads "That was weak" when A is mashed**: it is a timing gauge (A stops a sweeping
+    marker; ~8 frames after it opens gives "702 points ... the machine is broken", ~22 "Not bad! You qualify!").
+    Matches the game's minigame model (`menu/minigame.rs`, gated by the recorded runs).
+34. **Info - the HUD is hidden while walking after some scenes** (West City / Capsule Corp after the gravity chamber,
+    Papaya Island) until a later script shows it: the scripts' `hide_hud` / `show_hud` (pixel-gated slide).
+35. **Info - at a stall with too little zenie, A on a row does nothing visible** (30 zenie, milk 50): the refusal at
+    the stalls is a silent no-op in the recorded runs too (run 3's ship part bought every stall row down to a refusal;
+    exact in logic and sound).
+
+Tooling notes (wf-mcp, not the game): `talk` at the 7-2 registration desk walked to the trigger's edge and reported
+"no reaction" (standing in the middle, facing up, A works); `attack` leaves level-up popups open until the next A.
 
 ## Checked and looked right
 
@@ -273,3 +322,22 @@ Round 2 (6a369e5):
   Story title -> New Game -> the prologue (`r2w_story/s.png`), Quick start with the pause menu and the F1 switch
   (`r2w_quick/s.png`), Settings view cycling (`r2w_views/s.png`); pixel-for-pixel like the native app for the same
   scenes (`r2w_battle/cmp.png`), 60 fps.
+
+## Fixed (ship fix agent, 2026-10-08; frames under `work/playtest/fix/`)
+
+* **6 - arenas:** a fight with no story place of its own goes to the Rocky Plateau (`launcher::DEFAULT_ARENA`), the
+  forest presets to open arenas (Ninja Boss / Airship Warlord: plateau, Pilaf's Guardian: canyon, 4 Majin Fighters:
+  crater; online Majin Fighters: crater). The launcher's battles start the opponents in view
+  (`BattleConfig::spawn_near`: 80 px in front of the player, a story spawn point only when that close; None keeps the
+  reference placement the TS mirror checks). Every listed opponent starts on the GBA screen (`examples/opponents.rs`);
+  `f6_sheet.png` (Majin Fighter, Assassin, Kid Buu, 4 Majin Fighters, PC wide), `arenas_gba.png`.
+* **10 - opponents:** only real opponents with game names (`launcher::NOT_OPPONENTS` / `OPPONENT_NAMES`): no dummy,
+  floor trigger, inert helpers, unused fighters, body parts / summons, never-fighting story actors (Babidi, the two
+  Vegetas, tag-game Goten, the Majin Buu survive fights - their presets stay), no duplicate "(variant)" / disguised /
+  tournament-copy records; 150 entries -> 105, each played headless (`work/shipfix/opponents_after.log`). Online list
+  names fixed (it called Totenhotep "Broly", Dabura "Demon World boss").
+* **8 / 20 - PC wide:** the view is clamped to the map (`Renderer::view_origin_in`; a map smaller than the view is
+  centred, the world map is not clamped), "PC wide (auto)" is one zoom per window size (`steady_zoom`), menus scale
+  up by the largest integer: `f8_sheet.png` (Yemma's Office f8,800 / f10,800, Snake Way f6,660, before | after).
+* **18 / 21 - launcher:** "Arena Auto: <name>"; Goku starts in his normal outfit; the stat line fits at any level;
+  Story / Settings / Mods pages in the game's menu style; Continue slots name the area (`lp_sheet.png`, `lp_sheet2.png`).

@@ -167,6 +167,7 @@ fn modded_netplay_peers_stay_in_sync() {
         phases: vec![wf_core::battle::Phase { enemy: "t150".into(), count: 1 }, wf_core::battle::Phase { enemy: "t68".into(), count: 3 }],
         rng: wf_core::battle::RngInit::Seed(21),
         xp: false,
+        spawn_near: None,
     };
     let m = MatchConfig::coop(battle);
     let frames = 2400;

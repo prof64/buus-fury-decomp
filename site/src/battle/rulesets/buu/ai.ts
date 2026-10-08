@@ -2571,14 +2571,21 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         e.volleyball = false
         e.ctx.explosion(e.w, ...e.center(), 0x1000 + e.w.rng.rand(0x1000, 'volleyball explosion rate'))
       })
-    case 'VolleyballLaunch':
-      return new Act(n, c, () => undefined, (f) => {
-        const [dx, dy] = DIR_VEC[e.lastHitDir]
+    case 'VolleyballLaunch': {
+      // the launched ball's object (vtable 0x0804B720, enter 0x0803C678) takes its direction from the player object's
+      // facing (+0x10) when the kick lands; the ball state's on-hit tree stores no hit direction (wf-core nodes.rs)
+      let dir: Dir = 0
+      return new Act(n, c, () => {
+        const p = e.ctx.player
+        if (p) dir = p.facing
+      }, (f) => {
+        const [dx, dy] = DIR_VEC[dir]
         if (!e.moveBy(e.w, dx * 1024, dy * 1024)) return true
         const p = e.ctx.player
         if (p) e.areaHitEnemies(e.bodyBox(), p)
         return f >= 30
       })
+    }
     default:
       return new Never(n, c)
   }

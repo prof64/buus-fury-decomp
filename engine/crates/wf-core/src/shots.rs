@@ -404,6 +404,9 @@ pub enum ShotKind {
         sy: i32,
         tx: i32,
         ty: i32,
+        /// the game object's own drawn line once thrown (24.8): start and end (`superball_draw`; 0 = by offsets)
+        #[serde(default)]
+        draw: [i32; 4],
     },
     /// Super Janemba energy wave 0x080359D4
     SjWave,
@@ -727,6 +730,7 @@ pub fn super_ball(owner: EntityId) -> Shot {
             sy: 0,
             tx: 0,
             ty: 0,
+            draw: [0; 4],
         },
     )
 }
@@ -3139,6 +3143,31 @@ pub fn drop_charging_ball(w: &mut World, owner: EntityId) {
     }
 }
 
+/// where the game draws the ball relative to ours (px): its object keeps its own drawn position - charging, by the
+/// thrower's facing (down / up / left / right) + (0, -32) / (0, -40) / (2, -32) / (-2, -32) from ours; at the throw 8 px
+/// up, then its own straight line (to 9.5 px above ours at the end) less the arc of its height (+0x78: z += 512 - 32 t
+/// a tick, 24.8). Measured on the emulator (RAM and OAM), real route 20-6 r062_001: 76 throws, the drawn ball within a
+/// pixel. `face` = the thrower's facing (the ball's `dir` once thrown); `t` = ticks since the throw, None = charging
+/// the thrown ball's drawn position (px) on the game object's own line `draw` (start, end; 24.8) at tick `t`: x on the
+/// truncated per-tick step, y less the height arc
+pub fn superball_path(draw: [i32; 4], t: i64) -> (i32, i32) {
+    let t = t.clamp(0, 43);
+    let vx = (draw[2] - draw[0]) / 43;
+    let vy = (draw[3] - draw[1]) / 43;
+    let x = draw[0] as i64 + vx as i64 * t;
+    let y = draw[1] as i64 + vy as i64 * t - 512 * t + 16 * t * (t + 1);
+    ((x >> 8) as i32, (y >> 8) as i32)
+}
+pub fn superball_draw(face: Dir, t: Option<i64>) -> (i32, i32) {
+    let f = (face & 3) as usize;
+    let dx = [0, 0, 2, -2][f];
+    let oy = [-32, -40, -32, -32][f];
+    let Some(t) = t else { return (dx, oy) };
+    let t = t.clamp(0, 43);
+    let dy = (oy as i64 - 8) * 256 - 2432 * t / 43 - 512 * t + 16 * t * (t + 1);
+    (dx, ((dy + 128) >> 8) as i32)
+}
+
 fn superball_update(w: &mut World, i: usize) {
     let t = {
         let s = w.shot(i);
@@ -3152,16 +3181,19 @@ fn superball_update(w: &mut World, i: usize) {
         sy,
         tx,
         ty,
+        ..
     } = w.shot_ref(i).kind
     else {
         return;
     };
     if phase == 0 {
         if let Some(a) = w.actor_by_id(owner) {
-            let (x, y) = ((a.px() + 8) << 8, a.py() << 8);
+            let (x, y, f) = ((a.px() + 8) << 8, a.py() << 8, a.facing);
             let s = w.shot(i);
             s.x = x;
             s.y = y;
+            // (the thrower's facing: where the game draws the ball, `superball_draw`)
+            s.dir = f;
         }
         // (the throw comes in the update whose tick count reaches 0x3D: real run 20-6 r062_001 tile +4,000 - made
         // f14, thrown f75)
@@ -3171,6 +3203,16 @@ fn superball_update(w: &mut World, i: usize) {
                 Some(pi) => w.pl_ref(pi).a.foot_center(),
                 None => (px, py),
             };
+            // the game object's drawn line (its own fields, 24.8): from the thrower's position + the facing's offset,
+            // 8 px up, to the player's position + the same offset less 13.5 px (`superball_draw`)
+            let f = w.shot_ref(i).dir;
+            let (dx, oy) = superball_draw(f, None);
+            let from = w.actor_by_id(owner).map(|a| (a.x + ((dx + 8) << 8), a.y + ((oy - 8) << 8)));
+            let to = w.player_idx(0).map(|pi| (w.pl_ref(pi).a.x + ((dx + 8) << 8), w.pl_ref(pi).a.y + (oy << 8) - 3456));
+            let draw = match (from, to) {
+                (Some(a), Some(b)) => [a.0, a.1, b.0, b.1],
+                _ => [0; 4],
+            };
             let s = w.shot(i);
             let (x, y) = (s.x, s.y);
             s.kind = ShotKind::SuperBall {
@@ -3179,6 +3221,7 @@ fn superball_update(w: &mut World, i: usize) {
                 sy: y,
                 tx: tx << 8,
                 ty: ty << 8,
+                draw,
             };
             s.t = 0;
             // the throw (0x080214DA): the charge sound stops, sound 34 (0x0802154E / 0x0802155E; real run 20-6
@@ -3203,10 +3246,18 @@ fn superball_update(w: &mut World, i: usize) {
             // the burst is the ball object's own animation (records 0x0872A648, 6 x 4 ticks) on the ball's tiles,
             // freed when it ends (real run 20-6 r062_001 tile +5,000: impact f64, the block freed at f88)
             let ball = w.ents[i].id;
+            // (drawn where the ball is drawn at the landing)
+            let (bx, by) = match w.shot_ref(i).kind {
+                ShotKind::SuperBall { draw, .. } if draw != [0; 4] => superball_path(draw, 43),
+                _ => {
+                    let (dx, dy) = superball_draw(w.shot_ref(i).dir, Some(43));
+                    (px + dx, py + dy)
+                }
+            };
             let fid = w.add(Body::Fx(Box::new(fx::Fx::Anim {
                 id: 0x0872_a5dc,
-                x: px,
-                y: py,
+                x: bx,
+                y: by,
                 rec: 9,
                 left: 6,
                 rate: 0x4000,

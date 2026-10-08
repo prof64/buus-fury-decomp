@@ -1020,6 +1020,14 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             }
         }
         K::PushState => r.d[0] = 0,
+        // the launched volleyball's object (vtable 0x0804B720, enter 0x0803C678): its direction (+0x10) is the player
+        // object's facing ([0x03001C34] +0x10) when the kick lands - the punch's own direction; the on-hit tree of the
+        // ball state (IfAttack(0) -> GotoState(0x11)) stores no hit direction (the old one sent it down)
+        K::VolleyballLaunch => {
+            if let Some(pi) = en::ctx_player(w, i) {
+                r.d[0] = w.pl_ref(pi).a.facing as i32;
+            }
+        }
         // enter 0x0804E50C: SetAnim(0) (the idle enter draws its start tick)
         K::StandStill => set_anim(w, i, &[nm("idle")], true, Some(true)),
         // no enter: the step (0x08018CE2) sets SetAnimRaw(1) + state 0x03002B9C (the walk cycle played backwards) when
@@ -3728,7 +3736,8 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             true
         }
         K::VolleyballLaunch => {
-            let (dx, dy) = DIR_VEC[w.en_ref(i).last_hit_dir as usize];
+            // the flight direction the enter took from the player (r.d[0], `leaf_enter`)
+            let (dx, dy) = DIR_VEC[(r.d[0] & 3) as usize];
             if !en::move_by(w, i, dx * 1024, dy * 1024) {
                 return true;
             }

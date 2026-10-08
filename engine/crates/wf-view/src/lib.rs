@@ -475,6 +475,10 @@ pub struct HudView {
     /// the HUD object's slide (its y - 8: 0 in place, down to -24 while it slides in after `show_hud` / out after
     /// `hide_hud`); the stat mark rides with it
     pub y_off: i32,
+    /// local co-op (two or more players on one screen; never in the game): the player's slot (0 = 1P) and the world
+    /// point above its head where the renderer puts its "1P" / "2P" tag. `tag` None = one player: the game's picture.
+    pub slot: u8,
+    pub tag: Option<(i32, i32)>,
 }
 
 /// A damage number: its OBJ's top-left in world pixels and what it shows.

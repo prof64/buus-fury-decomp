@@ -10,16 +10,17 @@ use wf_net::netsim::NetStatus;
 use wf_render::font as tiny;
 use wf_render::ui::Font;
 
-/// (enemy id, name, arena) the host can pick
+/// (enemy id, name, arena) the host can pick (the enemies' game names; open arenas - the forest's tree tops hid the
+/// fighters, playtest #6)
 pub const ENEMIES: &[(&str, &str, &str)] = &[
-    ("t68", "Majin Fighters", "forest"),
+    ("t68", "Majin Fighters", "crater"),
     ("t60", "Kid Buu", "wasteland"),
     ("t51", "Janemba", "crater"),
-    ("t26+~t29", "Super Buu", "crater"),
-    ("t129", "Broly", "crater"),
+    ("t26+~t29", "Majin Buu & Babidi", "crater"),
+    ("t129", "Pharoah Totenhotep", "crater"),
     ("t145", "Yakon", "yakon"),
-    ("t10", "Volcano boss", "volcano"),
-    ("t18", "Demon World boss", "demon"),
+    ("t10", "Broly", "volcano"),
+    ("t18", "Dabura", "demon"),
 ];
 const MODES: [&str; 3] = ["Co-op vs enemies", "PvP", "PvP + enemies"];
 
@@ -64,7 +65,7 @@ impl Default for OnlinePrefs {
 
 impl OnlinePrefs {
     pub fn arena(&self) -> &'static str {
-        ENEMIES.iter().find(|e| e.0 == self.enemy).map(|e| e.2).unwrap_or("forest")
+        ENEMIES.iter().find(|e| e.0 == self.enemy).map(|e| e.2).unwrap_or("crater")
     }
     pub fn pvp(&self) -> bool {
         self.mode != 0

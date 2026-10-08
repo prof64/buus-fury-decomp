@@ -1396,6 +1396,8 @@ export class Enemy extends Actor implements EnemyLike {
     other.unmarkSelf()
     other.removed = true
     other.defeated = true
+    // (the survivor carries on the fight when the absorbed half was the primary opponent - wf-core kid_buu_merge)
+    if (other.primary) this.primary = true
     other.primary = false
     this.w.logEvent('info', `Kid Buu merges back: ${this.hp} HP`)
   }
@@ -1821,6 +1823,10 @@ export class Enemy extends Actor implements EnemyLike {
       // AI runs that state (real run 21-6 r064_004 f304: killed while latched, it self-destructs three frames later)
       this.ko = -1
       this.ai.reset(this.type.deathParam)
+    } else if (name === 'Idle' && IDLE_DEATH_REMOVED.includes(this.type.type)) {
+      // the boss's story defeat removes it at once - Pui Pui's on-defeat script (8-27, inline 0x0807CDAC: set_flag(59),
+      // remove_actor(234) in the KO frame) deletes the object, no explosion, no knock-down (playtest 29)
+      this.die(false)
     } else if (name === 'Idle') {
       // bosses: no explosion; the defeat cutscene takes over in the game - the body stays down
       this.setAnim(['knockdown', 'ko', 'hurt'], true, false)
@@ -1916,6 +1922,8 @@ export class Enemy extends Actor implements EnemyLike {
 /** Janemba Hand type 0x36 created under the player by a hand strike: one hit during its frames 16..55
  *  (body box, melee sub 2 x1.0, attacker = the hand, STR 22), gone after 57 frames */
 /** the tanks (death node 0x080333C4, param = def +0xC): Battle Tank variant 0x7F, Juggernaut 0x3A, 0x8C */
+/** Idle-death bosses whose story defeat script deletes them in the KO frame (Pui Pui 0x60) */
+const IDLE_DEATH_REMOVED = [0x60]
 const TANKS = [0x7f, 0x3a, 0x8c]
 /** crew (enemy type, graphics) per rand(2) and tank (tables 0x087592DC / +0x18) */
 const TANK_CREW = [

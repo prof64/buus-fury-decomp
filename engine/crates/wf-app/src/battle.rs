@@ -142,5 +142,6 @@ pub fn config(arena: &str, enemy: &str, count: u32, fighter: &str, form: Option<
         phases: vec![Phase { enemy: enemy.into(), count: count.max(1) as i32 }],
         rng: RngInit::Seed(seed),
         xp: true,
+        spawn_near: None,
     }
 }

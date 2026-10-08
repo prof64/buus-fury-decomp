@@ -897,6 +897,7 @@ impl Shell {
                 let mut ctl = Control::new(&mut app, load_hotkeys(&self.args.data), now_unix());
                 // a battle ends on the game's "You Win!!" / "You Lose!!" with Retry / Change fighter
                 ctl.end_screen = true;
+                ctl.link_configured = self.args.link.is_some();
                 let a = &self.args;
                 let local = wf_app::battle::config(&a.arena, &a.enemy, a.count, &a.fighter, a.form, a.level, a.players, a.seed);
                 let mut online = online::Online::new(a.net.clone(), &a.data, local, a.signal_given);
@@ -1067,6 +1068,7 @@ impl Shell {
                 if dev_poll(&mut r.dev, &self.args, &mut r.app) {
                     r.ctl = Control::new(&mut r.app, load_hotkeys(&self.args.data), now_unix());
                     r.ctl.end_screen = true;
+                    r.ctl.link_configured = self.args.link.is_some();
                     r.dirty = true;
                 }
                 persist_saves(&self.args.data, &r.app, &mut r.saves_gen);
@@ -1537,6 +1539,9 @@ fn headless(a: &mut Args) -> Result<(), String> {
     };
     // replays: record this run, or play (and verify) a recording instead of the input script
     let mut ctl = Control::new(&mut s.app, Hotkeys::default(), now_unix());
+    // (as the window: a battle ends on its end screen; playback never shows it)
+    ctl.end_screen = true;
+    ctl.link_configured = a.link.is_some();
     let mut replay_end = None;
     if let Some(p) = &a.replay {
         let b = std::fs::read(p).map_err(|e| format!("{}: {e}", p.display()))?;
@@ -1590,6 +1595,8 @@ fn headless(a: &mut Args) -> Result<(), String> {
         // (between frames: a safe point for a dev reload; the restarted scene records afresh)
         if dev_poll(&mut dev, a, &mut s.app) {
             ctl = Control::new(&mut s.app, Hotkeys::default(), now_unix());
+            ctl.end_screen = true;
+            ctl.link_configured = a.link.is_some();
         }
         if let Some(sp) = &spect {
             sp.serve_pending(&mut s);

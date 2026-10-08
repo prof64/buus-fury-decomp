@@ -25,6 +25,8 @@ interface Scn {
   level?: number
   /** the starting enemies' HP (whole HP; a fight that reaches the enemies' deaths) */
   ehp?: number
+  /** the launcher's battles: opponents start engaged (fighter option `engage`, wf-core `FighterSetup::engage`) */
+  engage?: boolean
 }
 
 const SCENARIOS: Scn[] = [
@@ -82,6 +84,9 @@ const SCENARIOS: Scn[] = [
   { name: 'tank_kill', enemy: 't127', arena: 'forest', seed: 199, frames: 1500, style: 'melee', level: 99, ehp: 30 },
   { name: 'blister_kill', enemy: 't6', arena: 'crater', seed: 212, frames: 1800, style: 'hunt', level: 99, ehp: 20 },
   { name: 'kid_buu_kill', enemy: 't60', arena: 'wasteland', seed: 224, frames: 1800, style: 'hunt', level: 99, ehp: 60 },
+  { name: 'kid_buu_engaged', enemy: 't60', arena: 'wasteland', seed: 251, frames: 1500, style: 'idle', level: 150, engage: true },
+  { name: 'janemba_engaged', enemy: 't51', arena: 'crater', seed: 253, frames: 1500, style: 'hunt', level: 150, engage: true },
+  { name: 'majin_fighters_engaged', enemy: 't68', count: 3, arena: 'stadium', seed: 257, frames: 1200, style: 'idle', level: 80, engage: true },
   { name: 'worm_mix', enemy: 't142', arena: 'crater', seed: 227, frames: 1500, style: 'mix', level: 99 },
   { name: 'worm_hunt', enemy: 't142', arena: 'crater', seed: 239, frames: 1500, style: 'hunt', level: 99, ehp: 9999 },
   { name: 'janemba_hunt', enemy: 't51', arena: 'crater', seed: 241, frames: 1800, style: 'hunt', level: 99 },
@@ -121,6 +126,7 @@ describe('wf-core cross-check dumps', () => {
   for (const s of SCENARIOS) {
     it(s.name, () => {
       const f = fighter({ fighter: s.fighterId ?? 'goku', form: s.form ?? 2, level: s.level ?? 60 })
+      if (s.engage) f.options = { ...f.options, engage: true }
       const sim = makeBuuSim({ enemy: s.enemy, count: s.count ?? 1, arena: s.arena, seed: s.seed, fighter: f })
       if (s.ehp) for (const e of sim.enemies) e.hp1024 = s.ehp * 1024
       const keys = inputs(s)

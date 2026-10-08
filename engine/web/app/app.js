@@ -445,6 +445,8 @@ async function boot(baseTarBytes) {
     running = true;
     show('');
     $('hudbtn').style.display = 'block';
+    $('topbar').style.display = 'flex';
+    document.body.classList.add('withbar');
     // the game starts when the sound driver is ready (so the music starts on frame 0 like the game), but never
     // waits more than 2 s for it; events emitted before audio is up are queued and flushed on ready
     const ta = performance.now();
@@ -493,7 +495,9 @@ async function boot(baseTarBytes) {
     pollPads();
     const dpr = window.devicePixelRatio || 1;
     const W = Math.floor(innerWidth * dpr);
-    const H = Math.floor(innerHeight * dpr);
+    // (the button bar's height comes off the picture: the game never draws under the buttons)
+    const barH = document.body.classList.contains('withbar') ? 34 : 0; // (= #topbar's CSS height; no layout read per frame)
+    const H = Math.floor((innerHeight - barH) * dpr);
     x.wf_app_set_clock(Date.now() / 1000);
     // bit 30: a new picture was rendered (none when no step ran and nothing changed - a > 60 Hz display)
     const drawn = (x.wf_app_frame(W, H, net ? net.slot() : 0) & (1 << 30)) !== 0;

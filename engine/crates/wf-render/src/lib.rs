@@ -47,9 +47,9 @@ impl std::hash::Hasher for MulHasher {
 pub enum ViewMode {
     /// The original 240x160 screen, scaled by the largest integer that fits (or `scale` when > 0).
     Gba { scale: u32 },
-    /// PC "zoomed out": the view is the window size / an integer zoom (0 = auto: the smallest zoom >= 2 whose
-    /// view the map covers with <= 8 % black margin, max 6 - picked when the map changes, [`AutoZoom`]), centred
-    /// on the game's camera.
+    /// PC "zoomed out": the view is the window size / an integer zoom (0 = auto: one zoom per window size,
+    /// [`steady_zoom`], or with "Auto zoom: max" the map filling the window, [`AutoZoom`]), around the game's camera
+    /// and inside the map ([`Renderer::view_origin_in`]).
     Pc { zoom: u32 },
 }
 
@@ -67,6 +67,18 @@ pub struct Fit {
     pub scale: u32,
 }
 
+/// "PC wide (auto)": one zoom per window size - the smallest zoom >= 2 whose view is at most 320 world pixels tall
+/// (about two GBA screens: 960x640 -> 2x 480x320, 1280x720 -> 3x, 1080p -> 4x 480x270, 1440p -> 5x, 4K -> 6x
+/// 640x360), at most 6. It does not follow the map: the view is clamped to the map instead, and a map smaller than
+/// the view is centred with black around it (playtest 20: the per-map rule jumped between 2x and 3x from area to
+/// area).
+pub fn steady_zoom(win_w: u32, win_h: u32) -> u32 {
+    let _ = win_w;
+    win_h.div_ceil(320).clamp(2, 6)
+}
+
+/// the smallest zoom >= 2 whose view the map covers with <= 8 % black margin, max 6 ("Auto zoom: max": the map
+/// fills the window as far as the zoom allows)
 pub fn auto_zoom(win_w: u32, win_h: u32, world: Option<(i32, i32)>) -> u32 {
     let mut z = 2;
     if let Some((ww, wh)) = world.filter(|(w, h)| *w > 0 && *h > 0) {
@@ -82,15 +94,11 @@ pub fn auto_zoom(win_w: u32, win_h: u32, world: Option<(i32, i32)>) -> u32 {
     z
 }
 
-/// "PC wide (auto)" held between maps: the zoom is picked by [`auto_zoom`] when the shown map changes (an area or a
-/// scene load) or the window does, and kept through frames that show no map (menu screens, black loads, the
-/// prologue). Picking it from every frame's map made it jump between 2x and 4x whenever a menu opened over a small
-/// map or a cutscene left and re-entered one.
-///
-/// "Steady" (the default, `max` false): at most one step above the window's base zoom (`auto_zoom` with no map), so
-/// a tiny cutscene map shows with black margins instead of zooming in to fill the window - the zoom then only moves
-/// between two values (Kid Buu's chapter: 240x160 scene maps between 480x400 ones jumped 3x / 4x / 6x at 1080p).
-/// "Max" (`max` true): the map fills the window as far as the zoom allows (up to 6x).
+/// "PC wide (auto)": "Steady" (the default, `max` false) is [`steady_zoom`] - one zoom per window size, whatever the
+/// map. "Max" (`max` true): the map fills the window as far as the zoom allows (up to 6x) - the zoom is picked by
+/// [`auto_zoom`] when the shown map changes (an area or a scene load) or the window does, and kept through frames
+/// that show no map (menu screens, black loads, the prologue): picking it from every frame's map made it jump
+/// whenever a menu opened over a small map or a cutscene left and re-entered one.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct AutoZoom {
     map: String,
@@ -119,8 +127,7 @@ impl AutoZoom {
         if self.max {
             self.zoom
         } else {
-            let base = auto_zoom(win_w, win_h, None);
-            self.zoom.clamp(base, base + 1)
+            steady_zoom(win_w, win_h)
         }
     }
 }
@@ -133,7 +140,8 @@ pub fn fit(mode: ViewMode, win_w: u32, win_h: u32, world: Option<(i32, i32)>) ->
             Fit { view_w: GBA_W as u32, view_h: GBA_H as u32, scale: if scale > 0 { scale } else { max_z } }
         }
         ViewMode::Pc { zoom } => {
-            let z = if zoom > 0 { zoom } else { auto_zoom(win_w, win_h, world) }.clamp(1, max_z);
+            let _ = world;
+            let z = if zoom > 0 { zoom } else { steady_zoom(win_w, win_h) }.clamp(1, max_z);
             Fit { view_w: (win_w / z).max(1), view_h: (win_h / z).max(1), scale: z }
         }
     }
@@ -172,6 +180,9 @@ pub struct Renderer {
     menu: Option<menu::MenuRenderer>,
     /// the hit flash's colour maps (`ui/hit_flash.json`): colour -> colour per map; `Some(None)` = content missing
     flash: Option<Option<Vec<HashMap<u32, u32>>>>,
+    /// the last picture's world rectangle origin and camera (`view_origin_in`: vx, vy, camera x, y) - for drawing on
+    /// top of it in world coordinates (tool overlays)
+    pub origin: (i32, i32, i32, i32),
 }
 
 impl Default for Renderer {
@@ -307,6 +318,7 @@ impl Renderer {
             mode7: HashMap::new(),
             strings: None,
             menu: None,
+            origin: (0, 0, 0, 0),
         }
     }
 
@@ -372,6 +384,25 @@ impl Renderer {
         (vx, vy, cam.x, cam.y)
     }
 
+    /// The world rectangle a `w` x `h` view shows inside a `world` (map) of that size: around the 240x160 camera
+    /// ([`Self::view_origin`]), clamped to the map; on an axis where the map is smaller than the view the map is
+    /// centred (black on both sides). The camera's 240x160 picture always stays whole inside the view (a script
+    /// may pan the camera off the map) - so a 240x160 view is exactly the camera's (Classic is unchanged).
+    /// Playtest 8: centring alone showed black void beside the map while cutting off what the game frames (Yemma's
+    /// Office: Yemma and the door off the top, the bottom third black).
+    pub fn view_origin_in(view: &RenderView, player: usize, w: usize, h: usize, world: Option<(i32, i32)>) -> (i32, i32, i32, i32) {
+        let (vx, vy, cx, cy) = Self::view_origin(view, player, w, h);
+        let Some((mw, mh)) = world.filter(|&(a, b)| a > 0 && b > 0) else { return (vx, vy, cx, cy) };
+        let axis = |v: i32, c: i32, n: i32, m: i32, g: i32| -> i32 {
+            if n < g {
+                return v;
+            }
+            let v = if m >= n { v.clamp(0, m - n) } else { -((n - m) / 2) };
+            v.clamp(c + g - n, c)
+        };
+        (axis(vx, cx, w as i32, mw, GBA_W), axis(vy, cy, h as i32, mh, GBA_H), cx, cy)
+    }
+
     /// Compose the view for local player `player` into `self.fb` (`w` x `h` world pixels).
     pub fn render(&mut self, packs: &Packs, view: &RenderView, player: usize, w: usize, h: usize) -> &[u32] {
         self.resize(w, h);
@@ -383,7 +414,8 @@ impl Renderer {
             self.render(packs, &v2, player, w, h);
             let mr = self.menu.get_or_insert_with(|| menu::MenuRenderer::load(packs));
             let pic = mr.render(packs, &mv, mv.fade.or(view.palette_fade), if mv.fade_black > 0 { mv.fade_black } else { view.fade_black });
-            let (ox, oy) = ((w as i32 - GBA_W) / 2, (h as i32 - GBA_H) / 2);
+            // over the camera's 240x160 picture, wherever the clamped view put it
+            let (ox, oy) = (self.origin.2 - self.origin.0, self.origin.3 - self.origin.1);
             for y in 0..GBA_H {
                 for x in 0..GBA_W {
                     let (fx, fy) = (ox + x, oy + y);
@@ -396,22 +428,26 @@ impl Renderer {
             return &self.fb;
         }
         if let Some(mv) = view.menu.as_ref() {
-            // a menu screen replaces everything: the 240x160 picture centred in the view, black around it
+            // a menu screen replaces everything: the 240x160 picture centred in the view, black around it - scaled
+            // by the largest integer that fits (playtest 20: the title / Select Game / pause menu were a 240x160
+            // panel in a mostly black PC window; a 240x160 view - Classic - is the picture itself)
             let mr = self.menu.get_or_insert_with(|| menu::MenuRenderer::load(packs));
             let pic = mr.render(packs, mv, mv.fade.or(view.palette_fade), if mv.fade_black > 0 || mv.fade.is_some() { mv.fade_black } else { view.fade_black });
             self.fb.fill(0xFF00_0000);
-            let (ox, oy) = ((w as i32 - GBA_W) / 2, (h as i32 - GBA_H) / 2);
-            for y in 0..GBA_H {
-                for x in 0..GBA_W {
+            let k = ((w as i32 / GBA_W).min(h as i32 / GBA_H)).max(1);
+            let (ox, oy) = ((w as i32 - GBA_W * k) / 2, (h as i32 - GBA_H * k) / 2);
+            for y in 0..GBA_H * k {
+                for x in 0..GBA_W * k {
                     let (fx, fy) = (ox + x, oy + y);
                     if fx >= 0 && fy >= 0 && (fx as usize) < w && (fy as usize) < h {
-                        self.fb[fy as usize * w + fx as usize] = pic[(y * GBA_W + x) as usize];
+                        self.fb[fy as usize * w + fx as usize] = pic[((y / k) * GBA_W + x / k) as usize];
                     }
                 }
             }
+            let (vx, vy, cx, cy) = Self::view_origin(view, player, w, h);
+            self.origin = (vx, vy, cx, cy);
             return &self.fb;
         }
-        let (vx, vy, cx, cy) = Self::view_origin(view, player, w, h);
         let map = view.map.as_ref().and_then(|m| self.map(packs, &m.id).map(|g| (g, (m.anim_frame, m.tile_frame.unwrap_or(m.anim_frame)), m.shake)));
         let shake_sub = view.map.as_ref().map(|m| m.shake_sub).unwrap_or((0, 0));
         // (the top byte is the colour's palette index for the fades (`put`): the backdrop is BG entry 0, which the
@@ -443,6 +479,13 @@ impl Renderer {
         if m7.is_some() {
             objs.clear();
         }
+        // (the world map - mode 7 - wraps: no clamp there)
+        let world = map.as_ref().filter(|_| m7.is_none()).map(|(m, _, _)| (m.world_w, m.world_h));
+        let (vx, vy, cx, cy) = Self::view_origin_in(view, player, w, h, world);
+        self.origin = (vx, vy, cx, cy);
+        // where the camera's 240x160 picture sits in the view (the GBA screen's own items: markers, title text, a
+        // middle text box) - the view's centre unless the map clamp moved the view
+        let (gx, gy) = (cx - vx, cy - vy);
 
         // screen-space OBJs (HUD, dialogue box): (priority, x, y, w, h, ARGB)
         let mut screen: Vec<(u8, i32, i32, usize, usize, Vec<u32>)> = Vec::new();
@@ -470,11 +513,35 @@ impl Renderer {
                         }
                     }
                 }
+                // local co-op (never in the game; one player draws nothing here): every player's HUD - the shown
+                // player's in its place, the others under it - each with its "1P" / "2P" tag, and the same tag over
+                // each player's head in its colour
+                if view.hud.len() > 1 && !u.layout.hud_hidden {
+                    let (hx, hy) = u.layout.hud_at(w as i32, h as i32);
+                    let mut row = 0;
+                    for (k, hv) in view.hud.iter().enumerate() {
+                        if hv.hidden {
+                            continue;
+                        }
+                        let (tag, tw, th) = player_tag(hv.slot);
+                        let y = if k == player {
+                            hy + hv.y_off
+                        } else {
+                            row += 1;
+                            screen.push((u.layout.hud_priority, hx, hy + hv.y_off + 18 * row, 80, 16, u.hud(packs, hv)));
+                            hy + hv.y_off + 18 * row
+                        };
+                        screen.push((u.layout.hud_priority, hx + 82, y + 4, tw, th, tag.clone()));
+                        if let Some((x, y)) = hv.tag {
+                            screen.push((0, x - vx - tw as i32 / 2, y - vy - th as i32, tw, th, tag));
+                        }
+                    }
+                }
             }
             // a script's markers: 8x8 OBJs at screen positions, priority 0 (GBA picture coordinates)
             for &(k, mx, my) in &view.markers {
                 if let Some(px) = u.marker(k) {
-                    screen.push((0, ox + mx, oy + my, 8, 8, px));
+                    screen.push((0, gx + mx, gy + my, 8, 8, px));
                 }
             }
             // boss HP bars: OAM x 160 (two 32x8 OBJs), priority 1; anchored to the view's top-right corner
@@ -498,7 +565,7 @@ impl Renderer {
                 let mr = self.menu.get_or_insert_with(|| menu::MenuRenderer::load(packs));
                 let (tw, px) = mr.title(packs, &tv.text);
                 if tw > 0 {
-                    screen.push((0, ox + tv.x - tw / 2, oy + tv.y - 16, tw as usize, 32, px));
+                    screen.push((0, gx + tv.x - tw / 2, gy + tv.y - 16, tw as usize, 32, px));
                 }
             }
             if let Some(bv) = &view.banner {
@@ -525,10 +592,11 @@ impl Renderer {
                     // horizontally centred; top / bottom anchored to the view edges, middle centred
                     let y = match dv.position {
                         wf_view::DialogPos::Top => ui::Ui::dialog_y(dv.position),
-                        wf_view::DialogPos::Middle => oy + ui::Ui::dialog_y(dv.position),
+                        wf_view::DialogPos::Middle => gy + ui::Ui::dialog_y(dv.position),
                         wf_view::DialogPos::Bottom => h as i32 - (GBA_H - ui::Ui::dialog_y(dv.position)),
                     };
-                    let bx = ox + ui::DIALOG_CX - sw as i32 / 2;
+                    // (a middle box sits on the GBA picture, as the game's; top / bottom ones centre in the view)
+                    let bx = if dv.position == wf_view::DialogPos::Middle { gx } else { ox } + ui::DIALOG_CX - sw as i32 / 2;
                     screen.push((ui::DIALOG_PRIORITY, bx, y, sw, 64, px));
                     // the choice cursor at its option's pen (x - 16, y - 12; OAM 0x0801796A), in front of the box
                     if let (Some(sel), 0 | 8) = (dv.cursor, anim.scale) {
@@ -870,7 +938,9 @@ impl Renderer {
         // the centre on screen: the world point minus the camera (`cx` / `cy` with the shake), placed in this view
         // like the GBA screen (a wider view's centre 240x160 is the GBA screen: the wide view drew the sphere at the
         // GBA screen's coordinates - rkb_168 14-1 f2250, wide_view test)
-        let (ox, oy) = (sp.x - cx + (w as i32 - GBA_W) / 2, sp.y - cy + (h as i32 - GBA_H) / 2);
+        // (where the camera's 240x160 sits in this view: the centre, or where the map clamp put it - `self.origin`)
+        let (gx, gy) = (self.origin.2 - self.origin.0, self.origin.3 - self.origin.1);
+        let (ox, oy) = (sp.x - cx + gx, sp.y - cy + gy);
         let _ = (vx, vy);
         for py in 0..h as i32 {
             let dy = py - oy;
@@ -1002,6 +1072,17 @@ impl Renderer {
     }
 }
 
+/// local co-op's player tag ("1P" red, "2P" blue, "3P" green, "4P" yellow; the small font with its shadow) as a
+/// screen OBJ: (ARGB, width, height)
+fn player_tag(slot: u8) -> (Vec<u32>, usize, usize) {
+    const COLOURS: [u32; 4] = [0xFFFF_5A40, 0xFF40_A8FF, 0xFF50_E050, 0xFFFF_E040];
+    let s = format!("{}P", slot as u32 + 1);
+    let (w, h) = ((font::text_width(&s) + 1) as usize, 8usize);
+    let mut px = vec![0u32; w * h];
+    font::draw_text(&mut px, w, h, 0, 0, &s, COLOURS[slot as usize & 3]);
+    (px, w, h)
+}
+
 /// FNV-1a over the framebuffer (golden-image tests, cross-platform determinism checks).
 pub fn hash_fb(fb: &[u32]) -> u64 {
     let mut h = 0xcbf2_9ce4_8422_2325u64;
@@ -1036,17 +1117,40 @@ mod auto_zoom_tests {
     }
 
     #[test]
-    fn steady_caps_one_step_above_the_base() {
+    fn steady_is_one_zoom_per_window() {
         let mut a = AutoZoom::default();
         assert!(!a.max);
-        let base = auto_zoom(1920, 1080, None);
-        assert_eq!(a.zoom(1920, 1080, Some(("big", (3584, 2560)))), base);
-        // a 240x160 scene map: 6x uncapped at 1080p, base + 1 steady
-        assert_eq!(auto_zoom(1920, 1080, Some((240, 160))), 6);
-        assert_eq!(a.zoom(1920, 1080, Some(("tiny", (240, 160)))), base + 1);
-        assert_eq!(a.zoom(1920, 1080, Some(("mid", (480, 400)))), base + 1);
-        assert_eq!(a.zoom(1920, 1080, Some(("big", (3584, 2560)))), base);
+        for (id, size) in [("big", (3584, 2560)), ("tiny", (240, 160)), ("mid", (480, 400))] {
+            assert_eq!(a.zoom(1920, 1080, Some((id, size))), 4);
+            assert_eq!(a.zoom(960, 640, Some((id, size))), 2);
+        }
+        assert_eq!(a.zoom(3840, 2160, None), 6);
+        assert_eq!(a.zoom(1280, 720, None), 3);
         a.max = true;
         assert_eq!(a.zoom(1920, 1080, Some(("tiny", (240, 160)))), 6);
+    }
+
+    #[test]
+    fn view_clamped_to_the_map() {
+        let mut v = RenderView::default();
+        v.cameras = vec![wf_view::CameraView { x: 120, y: 320 }];
+        // a 480x320 view low on a 480x512 map (the playtest's Yemma's Office: centring showed 160 px below the map)
+        // - the view moves up to the map's bottom
+        let (vx, vy, cx, cy) = Renderer::view_origin_in(&v, 0, 480, 320, Some((480, 512)));
+        assert_eq!((vx, vy, cx, cy), (0, 192, 120, 320));
+        // a map smaller than the view: centred
+        let (vx, vy, _, _) = Renderer::view_origin_in(&v, 0, 960, 640, Some((480, 448)));
+        assert_eq!((vx, vy), (-240, -96));
+        // ... but the camera's picture stays whole (a camera panned off the map)
+        v.cameras[0].y = 600;
+        let (_, vy, _, cy) = Renderer::view_origin_in(&v, 0, 480, 320, Some((480, 448)));
+        assert!(vy <= cy && vy + 320 >= cy + 160);
+        // a 240x160 view is the camera's
+        for (x, y) in [(-50, -30), (0, 0), (300, 500)] {
+            v.cameras[0].x = x;
+            v.cameras[0].y = y;
+            let (vx, vy, cx, cy) = Renderer::view_origin_in(&v, 0, 240, 160, Some((480, 448)));
+            assert_eq!((vx, vy), (cx, cy));
+        }
     }
 }

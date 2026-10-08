@@ -26,7 +26,11 @@
   #start { background: rgba(0,0,0,.55); cursor: pointer; }
   #start .card { text-align: center; }
   kbd { font: 12px ui-monospace, monospace; background: #26252b; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 1px 5px; color: var(--fg); }
-  #hudbtn { position: fixed; top: 10px; right: 10px; z-index: 5; background: rgba(23,23,27,.75); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; font: inherit; cursor: pointer; display: none; }
+  /* the in-game buttons live in a bar above the game picture (playtest 31: they sat over the picture top right in
+     PC wide); the stage starts under the bar while it shows, and the picture is sized to the space left */
+  #topbar { position: fixed; top: 0; left: 0; right: 0; height: 34px; z-index: 5; display: none; align-items: center; justify-content: flex-end; gap: 8px; padding: 0 10px; background: #000; }
+  body.withbar #stage { top: 34px; }
+  #hudbtn, #replaysbtn { background: rgba(23,23,27,.75); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 3px 10px; font: inherit; cursor: pointer; display: none; }
   #stats { position: fixed; left: 10px; bottom: 10px; z-index: 5; font: 12px/1.4 ui-monospace, monospace; background: rgba(0,0,0,.6); padding: 6px 8px; border-radius: 6px; display: none; white-space: pre; }
   #settings { background: rgba(0,0,0,.6); z-index: 10; }
   #settings .card { max-height: calc(100vh - 32px); overflow: auto; }
@@ -42,7 +46,6 @@
   #replays { background: rgba(0,0,0,.6); z-index: 10; }
   #replays .card { width: min(760px, 100%); max-height: calc(100vh - 32px); overflow: auto; }
   .btns { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
-  #replaysbtn { position: fixed; top: 10px; right: 100px; z-index: 5; background: rgba(23,23,27,.75); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; font: inherit; cursor: pointer; display: none; }
   #scrub { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); width: min(720px, calc(100% - 32px)); z-index: 5; display: none; accent-color: var(--accent); }
 </style>
 </head>
@@ -78,8 +81,7 @@
   </div>
 </section>
 
-<button id="hudbtn" title="Settings (Esc)">Settings</button>
-<button id="replaysbtn" title="Replays (F10)">Replays</button>
+<div id="topbar"><button id="replaysbtn" title="Replays (F10)">Replays</button><button id="hudbtn" title="Settings (Esc)">Settings</button></div>
 <input type="range" id="scrub" min="0" max="1" value="0" aria-label="Replay position">
 
 <section class="screen" id="replays">

@@ -649,7 +649,10 @@ pub fn field_json(a: &Agent, slot: usize) -> Value {
         })
         .collect();
     npcs.sort_by_key(|x| x.0);
+    // the world map's flight (0-50): heading in degrees (0 = north, clockwise), altitude px, speed - to steer by
+    let flight = f.flight.as_ref().map(|fl| json!({"heading_deg": ((fl.h >> 10) & 255) * 360 / 256, "altitude": fl.z >> 10, "speed": fl.spd, "reversing": fl.rev}));
     json!({
+        "flight": flight,
         "area": format!("{}-{}", f.area.world, f.area.area), "variant": f.area.variant, "name": name_of(f.area.world, f.area.area), "map": f.map, "mode": mode,
         "npcs": npcs.into_iter().take(10).map(|x| x.1).collect::<Vec<_>>(),
         "busy": f.busy, "exits": exits.into_iter().map(|x| x.1).collect::<Vec<_>>(), "triggers": others.into_iter().take(12).map(|x| x.1).collect::<Vec<_>>(),

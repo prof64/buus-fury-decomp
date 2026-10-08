@@ -47,6 +47,7 @@ fn main() {
             }],
             rng: RngInit::Seed(9),
             xp: false,
+            spawn_near: None,
         };
         let mut s = Session::new(Arc::clone(&data), cfg);
         let n = 3600u32;

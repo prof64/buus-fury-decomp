@@ -7123,3 +7123,27 @@ native app headless (`--dump`, launcher-started fights; frames under `work/ub/pt
 **Earth agent 2026-10-07 (19): playtest findings 1 and 9 (engine/docs/playtest.md).**
 *1 - the Yemma office softlock: our bug, fixed (wf-core fieldnpc.rs `script_move_mark`).* The game re-marks a map NPC's footprint on the walk grid where a script walk stops (0x08017DF4) **only when the leader's footprint (0x03001C34) does not overlap it**. Emulator (run 1 to row 9,560, then Goku to (93, 240) left of the door ogre, talk facing right, s055 node 5 `walk_to(304, 87, 240)`): the ogre stops on Goku, his old mark is lifted and no new one set (grid watch: the tiles at (88 .. 103, 240) stay free), Goku walks out left (95 -> 89, into the ogre) and right; from below (run 1 row 10,000, no overlap) the mark is set. Ours always marked, and Goku inside the marked tiles could not move in any direction. Emulator segment pt_ogre (1,306 frames: approach, talk, walk L / R / U / D) now matches whole (was 587). Real app (native `--dump`, the playtester's st_p18 input, HEAD + fix: `work/earth/pt_p18`): the ogre walks over Goku at (93, 240) at f11,050 .. 11,075 as in the report, then Goku walks away (93, 354) at f11,600.
 *9 - souls blocking Goku and answering A: the game does the same (no change).* Native app (st_q2 / st_p21 inputs): no NPC footprint ever overlaps Goku's - the soul stands just above him (st_q2 1-4: soul (120, 400) 16x8, Goku (120, 409)), blocks the step up and sits in the facing-up talk box ([x, y-16, x+16, y+8]); drawn behind him by depth. In st_p21 Goku is at (112, 272), 32 px below the ogre (112, 240): the talk box cannot reach the ogre at all, the soul beside him (120, 264) answers. Emulator, 1-4 from run 1 (Goku at (120, 409) in the soul's wander rect, A / small steps for 8,000 frames): the game also blocks Goku under a soul at (128, 400) and souls answer the A presses; ours matches that segment whole (9,238 frames, NPC positions / talks / RNG).
+**Earth agent 2026-10-07 (20): playtest 24 (8-41 save room, the player behind the bottom wall) - the original does the same; no change.** Emulator (run 1 to row 487,990: Gohan at the 8-41 save point (61, 310), then D300, R200, L300): the game lets him walk to y 351, x 41 .. 184 along the bottom wall, and draws the wall (BG0, priority 2) over him - only his hair shows, exactly as in the report (walk grid of map area_08_018 free down to y 359; his OBJs are priority 3, under BG0). Ours from the same state: segment pt_wall841 910 / 910 frames matched, and 47 / 47 sampled pictures pixel-exact against the emulator's screen. Real app (native `--dump`, the report's Continue + input, `work/earth/pt_841`): the same stops (y 351, x 40 .. 183) and picture. Not collision, not draw order: the room's data. Changing it would break parity; if wanted as a PC-only option it belongs to the product side, not the core.
+
+**§12 (9), user-bugs agent - playtest round 2, battle (2026-10-08).** In the native app (`--dump`, frames under
+`work/ub/pt/`).
+* *#2 / #3 (Janemba, opponents waiting, survive countdown)* - the work of a helper that stopped early, checked and
+  kept: `FighterSetup::engage` (opponents start in the state their "wait for the player" state goes to,
+  `battle::engaged_state`; TS mirrored, cross_ts scenarios `*_engaged`), `BattleConfig::spawn_near` (the launcher puts
+  the opponents 80 px in front unless their story spot is in view), facing kept for sprites with a down-only body
+  box (Janemba / Blister / Enzymes / fragments: turned left nothing could hit them), the survive fights' time left on
+  the countdown display (`battle::survive_left` -> `RenderView::timer`). App: Kid Buu comes for an idle player
+  (`kb_idle`), the Majin Buu survive fight counts down (`survive`), Janemba -> Super Janemba (`janfull`: phase 2
+  starts, Super Janemba takes damage).
+* *Janemba hurtable from one spot only:* the game's rule, not changed. His arm and upper-body parts are enemy objects
+  in front of him: a hit under one is taken by the part (damage rolled, nothing else; `enemy::on_message`, verified
+  on sc_janemba) - only the gap between the arms reaches the body. The real fight (sc_janemba) has punch-hit sounds
+  only with the player at or below his feet line between the arms ((-8, 21), (3, 21), (9, 27) from his position);
+  the same spots hit in the app, the left / right sides at mid height do not, in both.
+* *Kid Buu won while the merged Buu stood:* when the split copy absorbs the original, the original's "primary" (the
+  fight's victory list) went with it - `kid_buu_merge` hands it to the survivor (TS mirrored). Forced copy-absorbs-
+  original merge: the fight stays Running with the merged Buu primary.
+* *wf-app frontend test (two-player viewports identical):* the PC view is now clamped to the map, so two cameras near
+  the same corner show the same world rectangle; the demo world gave both players' HUDs slot 0 and no tag. The demo
+  now fills each player's slot and head tag like the battle view, so each viewport shows its own player's HUD in
+  place (`demo.rs`).

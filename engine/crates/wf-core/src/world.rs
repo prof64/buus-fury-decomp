@@ -630,6 +630,12 @@ pub struct Options {
     /// beyond their iteration, the boot screens count their logic frames only; one step = one game logic iteration
     #[serde(default)]
     pub no_lag: bool,
+    /// a battle's opponents start engaged (`battle::engaged_state`, `FighterSetup::engage`)
+    #[serde(default)]
+    pub engaged: bool,
+    /// `BattleConfig::spawn_near` (later phases spawn by it too)
+    #[serde(default)]
+    pub spawn_near: Option<i32>,
 }
 impl Hash for Options {
     fn hash<H: Hasher>(&self, h: &mut H) {
@@ -643,6 +649,12 @@ impl Hash for Options {
         }
         if self.no_lag {
             self.no_lag.hash(h);
+        }
+        if self.engaged {
+            self.engaged.hash(h);
+        }
+        if let Some(g) = self.spawn_near {
+            g.hash(h);
         }
     }
 }

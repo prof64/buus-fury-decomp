@@ -27,6 +27,7 @@ fn battle(n: usize, enemy: &str, count: i32, arena: &str, seed: u32) -> BattleCo
         phases: vec![Phase { enemy: enemy.into(), count }],
         rng: RngInit::Seed(seed),
         xp: false,
+        spawn_near: None,
     }
 }
 

@@ -10,7 +10,7 @@ import { GBA_H, GBA_W } from '../../core/renderer'
 import { Actor } from './actor'
 import { BuuCollision, CollisionOverlay, walkRegion } from './collision'
 import { BuuCtx } from './context'
-import { loadBuu, type BuuData, type BuuForm, type EquipDef } from './data'
+import { loadBuu, type AiNodeJ, type BuuData, type BuuForm, type EquipDef } from './data'
 import { Enemy } from './enemy'
 import { drawHud, HUD } from './hud'
 import { Player } from './player'
@@ -27,7 +27,8 @@ const ARENAS: BuuArena[] = [
   { id: 'crater', map: '8-71', name: 'Giant Crater', image: '', size: [0, 0], spawn: [96, 216], bounds: { x0: 56, y0: 72, x1: 424, y1: 360 } },
   { id: 'volcano', map: '15-32', name: 'Volcano Summit', image: '', size: [0, 0], spawn: [80, 216], bounds: { x0: 40, y0: 96, x1: 440, y1: 376 } },
   { id: 'hfil', map: '18-14', name: 'HFIL', image: '', size: [0, 0], spawn: [64, 248], bounds: { x0: 24, y0: 80, x1: 300, y1: 304 } },
-  { id: 'wasteland', map: '20-7', name: 'Barren Wasteland', image: '', size: [0, 0], spawn: [88, 232], bounds: { x0: 40, y0: 72, x1: 440, y1: 420 } },
+  // (the start right of the rock pillar: from (88, 232) Final Flash met its foot at once - wf-core battle::ARENAS)
+  { id: 'wasteland', map: '20-7', name: 'Barren Wasteland', image: '', size: [0, 0], spawn: [160, 232], bounds: { x0: 40, y0: 72, x1: 440, y1: 420 } },
   { id: 'demon', map: '8-68', name: 'Demon World', image: '', size: [0, 0], spawn: [120, 184], bounds: { x0: 96, y0: 76, x1: 400, y1: 330 } },
   { id: 'canyon', map: '8-70', name: 'Rocky Canyon', image: '', size: [0, 0], spawn: [120, 280], bounds: { x0: 88, y0: 168, x1: 470, y1: 400 } },
   { id: 'yakon', map: '8-40', name: "Yakon's Planet", image: '', size: [0, 0], spawn: [112, 200], bounds: { x0: 72, y0: 92, x1: 380, y1: 390 } },
@@ -122,6 +123,21 @@ function formLabel(_d: BuuData, f: BuuForm): string {
 
 function parseEnemyId(id: string): { type: number; primary: boolean }[] {
   return id.split('+').map((p) => ({ type: Number(p.replace(/^~?t/, '')), primary: !p.startsWith('~') }))
+}
+
+/** wf-core `battle::engaged_state`: an opponent's initial state `Selector[IfPlayerWithin | IfPlayerWithin2 (r) ->
+ *  GotoState(S), RunMotionController]` waits until a player comes within r; an engaged battle starts in S. Any other
+ *  initial state: undefined (kept). */
+function engagedState(states: Map<number, AiNodeJ>, init: number): number | undefined {
+  const root = states.get(init)
+  if (!root || root.name !== 'Selector' || root.children?.length !== 2) return undefined
+  const [near, wait] = root.children
+  const nearName = near.dataName ?? near.name
+  const waitName = wait.dataName ?? wait.name
+  if ((nearName !== 'IfPlayerWithin' && nearName !== 'IfPlayerWithin2') || waitName !== 'RunMotionController') return undefined
+  const go = near.children?.length === 1 ? near.children[0] : undefined
+  if (!go || (go.dataName ?? go.name) !== 'GotoState') return undefined
+  return go.params?.state?.raw
 }
 
 export class BuuRuleset implements Ruleset {
@@ -438,6 +454,10 @@ export class BuuRuleset implements Ruleset {
       holyWater: !!cfg.fighter.options.holyWater,
       formsAllowed: fd.forms,
     })
+    // the story's unstable Trunks (forms 24 / 25): the form object's countdown is set when it is made (wf-core
+    // battle::create; it was 0 - the transformation came on the first frame)
+    if (player.form.controller === 0x3001b88) player.storyCnt = 120 + w.rng.rand(180, 'form 24 countdown')
+    else if (player.form.controller === 0x3001b8c) player.storyCnt = 240 + w.rng.rand(120, 'form 25 countdown')
     // an SS / SS3 start form with its gauge full, as the transformation leaves it (wf-core FighterSetup.full_gauge)
     if (cfg.fighter.options.fullGauge) {
       if (player.form.ss3) player.ss3Gauge = player.maxEp * 65536
@@ -527,11 +547,17 @@ export class BuuRuleset implements Ruleset {
             x = Math.min(b.x1 - 40, player.px + 120 + Math.floor(k / 4) * 30)
             y = (ctx.col ? player.py : (b.y0 + b.y1) >> 1) + ((k % 4) - (Math.min(n * parts.length, 4) - 1) / 2) * 34
           }
-          const e = spawnEnemy(w, part.type, x, Math.round(y))
+          // an engaged battle (fighter option `engage`, wf-core `battle::engaged_state`): the opponent starts in the
+          // state its "wait for the player" state goes to
+          const start = cfg.fighter.options.engage ? engagedState(d.states, t.ai) : undefined
+          const e = spawnEnemy(w, part.type, x, Math.round(y), null, start)
           if (e) {
             // 0-HP scripted objects (body parts, triggers) cannot be defeated: not counted for victory
             e.primary = part.primary && t.hp > 0
-            e.facing = 2
+            // facing the player (left) - unless the sprite has no body facing left (Janemba, Blister, Enzymes,
+            // blood cells, Buu fragments: their body exists facing down only; turned left nothing could hit them)
+            const lb = e.body[2]
+            if (lb && lb[0] < lb[2] && lb[1] < lb[3]) e.facing = 2
           }
         }
       }

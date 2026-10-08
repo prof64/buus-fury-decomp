@@ -146,6 +146,7 @@ fn cross_check_vs_typescript_sim() {
             fighter: sc["fighterId"].as_str().unwrap_or("goku").into(),
             form: sc["form"].as_i64().unwrap_or(2) as i32,
             level: sc["level"].as_i64().unwrap_or(60) as i32,
+            engage: sc["engage"].as_bool().unwrap_or(false),
             ..Default::default()
         };
         let cfg = BattleConfig {
@@ -157,6 +158,7 @@ fn cross_check_vs_typescript_sim() {
             }],
             rng: RngInit::State(seed, seed.wrapping_mul(3).wrapping_add(1)),
             xp: false,
+            spawn_near: None,
         };
         let mut s = Session::new(data(), cfg);
         // (`ehp`: the starting enemies' whole HP - a fight that reaches the deaths)

@@ -80,7 +80,7 @@ fn setup(t: &Value) -> Setup {
     };
     let ety = ini.get("enemy").filter(|v| !v.is_null()).map(|e| i(&e["type"])).or_else(|| en.map(|e| i(&e["type"]))).unwrap_or(-1);
     let arena = t["scenario"]["arena"].as_str().unwrap_or(if en.is_some() { "forest" } else { "htc" }).to_string();
-    let cfg = BattleConfig { arena, players: vec![fighter], phases: vec![Phase { enemy: format!("t{ety}"), count: 1 }], rng: RngInit::State(0, 0), xp: false };
+    let cfg = BattleConfig { arena, players: vec![fighter], phases: vec![Phase { enemy: format!("t{ety}"), count: 1 }], rng: RngInit::State(0, 0), xp: false, spawn_near: None };
     let mut s = Session::new(d, cfg);
     let w = &mut s.world;
     let pi = w.player_idx(0).unwrap();

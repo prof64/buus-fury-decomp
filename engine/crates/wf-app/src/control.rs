@@ -23,7 +23,7 @@ use std::collections::VecDeque;
 use wf_core::battle::{BattleConfig, Outcome};
 use wf_core::session::Session;
 use wf_core::world::{Body, Event, World};
-use wf_render::{Fit, Renderer};
+use wf_render::Fit;
 use wf_replay::{Branch, Checker, ContentId, Divergence, Header, Recorder, Replay, SaveState, StateHeader, Timeline, TimelineConfig, VerifyReport};
 use wf_view::{AudioEvent, RenderView, Sim, SpriteEffect, GBA_FPS};
 
@@ -66,12 +66,17 @@ struct EndScreen {
     sel: u8,
     /// player 1's buttons last step (edges)
     prev: u16,
+    /// steps since player 1 last held a button (a confirm needs a pause before it: not the fight's mashing)
+    quiet: u32,
 }
 
 /// frames between the outcome and the end screen (the last enemy's death / the KO's fall play out)
 const END_DELAY: u64 = 90;
 /// frames the end screen ignores the buttons once up (a fight's button mashing does not pick a choice)
-const END_LOCK: u64 = 40;
+const END_LOCK: u64 = 60;
+/// a confirm counts only after this many frames with no button held (mashing A through the end picks nothing; a
+/// deliberate press after a short pause does)
+const END_QUIET: u32 = 12;
 /// the choices of the end screen
 const END_CHOICES: &str = "- Retry\n- Change fighter";
 
@@ -119,6 +124,9 @@ pub struct Control {
     ghost_off: Option<Ghost>,
     pub damage_log: VecDeque<String>,
     toast: Option<(String, u32, f64)>,
+    /// the host started link play (`--link` / `?link=`): the title's "Waiting for a friend..." box is the lobby.
+    /// Without it the box can only wait - the overlay then says how to set link play up (playtest 27)
+    pub link_configured: bool,
     requests: Vec<Request>,
     acc: f64,
     rew_acc: f64,
@@ -206,6 +214,7 @@ impl Control {
             ghost_off: None,
             damage_log: VecDeque::new(),
             toast: None,
+            link_configured: false,
             requests: Vec::new(),
             acc: 0.0,
             rew_acc: 0.0,
@@ -328,6 +337,8 @@ impl Control {
         let held = live.first().copied().unwrap_or(0);
         let pressed = held & !e.prev;
         e.prev = held;
+        let quiet = e.quiet;
+        e.quiet = if held == 0 { e.quiet.saturating_add(1) } else { 0 };
         if !shown {
             return None;
         }
@@ -340,7 +351,7 @@ impl Control {
             e.sel ^= 1;
             app.audio_out.push(AudioEvent::PlaySfx { id: wf_core::menu::SFX_CURSOR as u8, volume: 64, pan: 0 });
         }
-        if pressed & (A | START) != 0 {
+        if pressed & (A | START) != 0 && quiet >= END_QUIET {
             app.audio_out.push(AudioEvent::PlaySfx { id: wf_core::menu::SFX_ACCEPT as u8, volume: 64, pan: 0 });
             return Some(e.sel);
         }
@@ -453,7 +464,7 @@ impl Control {
             if s.outcome == Outcome::Running {
                 self.end = None;
             } else if self.end_screen && self.play.is_none() && self.end.is_none() {
-                self.end = Some(EndScreen { outcome: s.outcome, at: nf, sel: 0, prev: self.last_inputs.first().copied().unwrap_or(0) });
+                self.end = Some(EndScreen { outcome: s.outcome, at: nf, sel: 0, prev: self.last_inputs.first().copied().unwrap_or(0), quiet: 0 });
             }
         }
         if let Some(g) = &mut self.ghost {
@@ -974,11 +985,13 @@ impl Control {
         self.text.ensure(&app.packs);
         let t = &self.text;
         let lh = t.line_h();
+        // (the picture's own origin: the PC view is clamped to the map, `Renderer::view_origin_in`)
+        let (vx, vy, _, _) = app.renderer.origin;
+        let _ = player;
         let fb = &mut app.renderer.fb;
         if fb.len() < w * h {
             return;
         }
-        let (vx, vy, _, _) = Renderer::view_origin(&app.view, player, w, h);
         if self.training {
             if let Some(s) = CoreSim::of(app.sim.as_ref()) {
                 overlay::training(t, s, fb, w, h, vx, vy);
@@ -1020,14 +1033,36 @@ impl Control {
             let tw = t.width(&s);
             t.plate(fb, w, h, w as i32 - tw - 8, 6, &s, overlay::ACCENT);
         }
+        let mut right_y = if parts.is_empty() { 6 } else { 6 + lh + 2 };
         if let Some(d) = self.play.as_ref().and_then(|p| p.checker.divergence) {
             let s = format!("DESYNC {d}");
             let tw = t.width(&s);
             t.plate(fb, w, h, w as i32 - tw - 8, 6 + lh + 2, &s, overlay::BAD);
+            right_y = 6 + 2 * (lh + 2);
         }
+        // the toast goes top right, under the status lines: the bottom centre (where it was) is where the game's
+        // own text boxes / choices are (playtest 31: "Classic 240x160 (F1)" over the end screen's "Retry"); with a
+        // text box at the top it goes to the bottom right instead
         if let Some((m, c, _)) = &self.toast {
             let tw = t.width(m);
-            t.plate(fb, w, h, (w as i32 - tw) / 2, h as i32 - 48, m, *c);
+            let top_box = app.view.dialog.as_ref().is_some_and(|d| matches!(d.position, wf_view::DialogPos::Top));
+            let y = if top_box { h as i32 - lh - 6 } else { right_y };
+            t.plate(fb, w, h, w as i32 - tw - 8, y, m, *c);
+        }
+        // the title's link box open with no link set up: it can only wait (the game's own box, kept as it is) - say
+        // how to connect a second player, under the box
+        if !self.link_configured {
+            let story = app.sim.as_any().and_then(|a| a.downcast_ref::<crate::story::StorySim>());
+            if story.is_some_and(|s| crate::link::title_wait(s.world()).is_some()) {
+                // (short lines under the box: they fit the 240x160 Classic picture; the box's own B Cancel backs out)
+                let lines = ["No friend connected yet.", "Play: --link host:ROOM / join:ROOM", "Web: ?link=host:ROOM / join:ROOM"];
+                let mut y = h as i32 - 2 - lines.len() as i32 * (lh + 1);
+                for (i, l) in lines.iter().enumerate() {
+                    let tw = t.width(l);
+                    t.plate(fb, w, h, ((w as i32 - tw) / 2).max(0), y, l, if i == 0 { overlay::ACCENT } else { overlay::WHITE });
+                    y += lh + 1;
+                }
+            }
         }
     }
 

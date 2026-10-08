@@ -122,8 +122,16 @@ impl DojoSave {
             }
             let Some(f) = d.fighters.iter().find(|f| f.character == ci as i32 && f.fusion.is_none()) else { continue };
             let form = if f.forms.contains(&c.form) { c.form } else { f.default_form };
+            // the shown name: the game's roster string for this fighter + form (strings 116..139: "SS Goku" ..), else
+            // the form's name ("Goku"), else the fighter's - never the bare fighter id (playtest 26: "goku Lv90")
+            let name = BALANCED_ROSTER
+                .iter()
+                .find(|r| r.1 == f.id && r.2 == form)
+                .map(|r| r.0.to_string())
+                .or_else(|| d.form(form).map(|x| x.name.clone()).filter(|n| !n.is_empty()))
+                .unwrap_or_else(|| f.name.clone());
             party.push(DojoChar {
-                name: f.name.clone(),
+                name,
                 character: ci as i32,
                 fighter: f.id.clone(),
                 form,
@@ -267,7 +275,7 @@ pub fn fighter_setup(c: &DojoChar, mode: DojoMode, rules: &DojoRules, d: &GameDa
 /// fight zeroes it (`seed` is kept for the lobby's API and ignored).
 pub fn match_config(p1: FighterSetup, p2: FighterSetup, _seed: u32) -> MatchConfig {
     MatchConfig::pvp(
-        BattleConfig { arena: ARENA.into(), players: vec![p1, p2], phases: Vec::new(), rng: RngInit::State(0, 0), xp: false },
+        BattleConfig { arena: ARENA.into(), players: vec![p1, p2], phases: Vec::new(), rng: RngInit::State(0, 0), xp: false, spawn_near: None },
         false,
     )
 }
