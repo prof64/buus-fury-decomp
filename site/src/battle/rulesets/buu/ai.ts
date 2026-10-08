@@ -77,6 +77,13 @@ export class AiController {
       b.data.gone = 1
       audioEvent('sfx_stop_match', { id: 63 })
     }
+    // a firing Kid Buu beam belongs to the actor state KidBuuKamehameha's enter set (0x0804C690) too: the pushed
+    // state's replaces it and the beam retracts from the next update (run 2 row 1,894,422, 19-3)
+    const bm = this.e.beam
+    if (bm && this.e.w?.entities.includes(bm)) {
+      bm.stop()
+      this.e.beam = null
+    }
     this.gen++
     const rt = this.build(id)
     this.stack.push({ state: id, rt })
@@ -163,6 +170,10 @@ function onHit(n: AiNodeJ, c: AiController, msg: HitMsg): number {
       const a = P(n, 'atk')
       return msg.atk.sub === a || msg.atk.kind === a ? kid() : 0
     }
+    case 'JanembaPartFlash':
+      // on-hit 0x0803999D (sc_janemba): the body parts play the hurt animation from the hit's frame
+      e.janembaPartsHurt()
+      return 1
     case 'ApplyDamage':
       if (msg.mult === 0) return 0
       return e.takeHit(msg) ? 2 : 1
@@ -242,7 +253,11 @@ function onHit(n: AiNodeJ, c: AiController, msg: HitMsg): number {
     case 'AbsorbPose':
     case 'AbsorbPose2':
     case 'FreezeHelperHit':
+      e.freezeHelperHit()
+      return 1
     case 'ShieldHit':
+      // a worm piece hit: it reverses / the chain splits (Enemy.wormShieldHit)
+      e.wormShieldHit()
       return 1
     default:
       return 0
@@ -469,14 +484,18 @@ function playAnim(n: AiNodeJ, c: AiController, anim: number | (string | number)[
 }
 
 /** standard facing + controller action: anim, events at frames, done at `len` */
-function timed(n: AiNodeJ, c: AiController, anim: number | (string | number)[], len: number, events: Record<number, () => void>, face = true, rule?: EAnimRule) {
+function timed(n: AiNodeJ, c: AiController, anim: number | (string | number)[], len: number, events: Record<number, () => void>, face = true, rule?: EAnimRule, ctlGone = false) {
   return new Act(
     n, c,
-    () => {
+    (a) => {
       if (face) c.e.facePlayer()
       c.e.setAnim(anim, true, false, rule)
+      a.data.seq = c.e.animSeq
     },
-    (f) => {
+    (f, a) => {
+      // (`ctlGone`: the shot is the animation state's (controller) work - a state that replaced it meanwhile, a hurt
+      // animation, fires nothing and the node is over: Volcano 15-25, segment sb 6-6 f18914)
+      if (ctlGone && c.e.animSeq !== a.data.seq) return true
       events[f]?.()
       if (f >= len) {
         // one SetAnim(0) at the end: the controller's own end (the recorded sequence, this frame's anim tick) or here
@@ -568,15 +587,13 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       return new Parallel(n, c, true)
     case 'GotoState':
       return new Instant(n, c, () => c.replaceTop(st))
-    case 'PushState': {
-      let pushed = false
-      return new Act(n, c, () => (pushed = false), () => {
-        if (pushed) return true
-        pushed = true
+    case 'PushState':
+      // the update 0x08018860 pushes on every call and returns 0 - a condition holding it pushes again the next time
+      // its tree runs (real run 14-2 r069_059 f334: the beam dodge pushed again after the first was cut short)
+      return new Act(n, c, () => undefined, () => {
         c.push(st)
         return false
       })
-    }
     case 'PopState':
       return new Instant(n, c, () => {
         e.stunned = false
@@ -627,9 +644,16 @@ export function create(n: AiNodeJ, c: AiController): RNode {
     case 'IfPlayerInFront':
       return new Cond(n, c, () => e.playerInFront(48))
     case 'IfPlayerInZone':
-      return new Cond(n, c, () => e.dist2() <= 160 * 160)
+      // the predicate 0x080379C8: the enemy's body box (0x0800FE78) overlaps the camera's rect (the logical view) - an
+      // on-screen test, not the player (run 3 row 2,676,425, 3-17: a gunman above the view keeps to its walk state)
+      return new Cond(n, c, () => overlaps(e.bodyBox(), e.w.camera))
     case 'IfPlayerInRoomZone':
-      return new Cond(n, c, () => e.playerAlive())
+      // cond 0x0804EE04: the enemy's own footprint lies wholly on free enemy-grid tiles - a bat over a wall or another
+      // enemy's mark does not turn back (tour castle_pw_10_9 f151)
+      return new Cond(n, c, () => {
+        const col = e.ctx.col
+        return !col || col.test('enemy', e.px, e.py, e.px + e.footW, e.py + e.footH)
+      })
     case 'IfPlayerBlastIncoming':
       return new Cond(n, c, () => e.blastIncoming())
     case 'IfPlayerInLineOfFire':
@@ -664,7 +688,12 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       return new Cond(n, c, () => {
         const p = e.player
         if (!p || !p.hittable) return false
-        const [dx, dy] = e.toPlayer()
+        // 0x08034574 compares the centres of the current-facing body boxes (0x0800FE78, at the ground position: a
+        // hopping mini's height does not count; sc_janemba)
+        const pb = p.bodyBoxGround()
+        const mb = e.bodyBoxGround()
+        const dx = ((pb.x0 + pb.x1) >> 1) - ((mb.x0 + mb.x1) >> 1)
+        const dy = ((pb.y0 + pb.y1) >> 1) - ((mb.y0 + mb.y1) >> 1)
         return Math.abs(dx) <= 47 && Math.abs(dy) <= 47
       })
     case 'IfLastKidBuu':
@@ -747,6 +776,9 @@ export function create(n: AiNodeJ, c: AiController): RNode {
     case 'IncCounter':
       return new Instant(n, c, () => e.counter++)
     case 'SelfMessage11':
+      // node 0x0874CA2C (Ronin / Samurai / Shogun guard): SetAnim(0x11) - raw 19 under the one-shot state 0x03001B18
+      // (16 ticks, then SetAnim(0)), restarted by every enter (13-51: the Samurai's stance)
+      return new Act(n, c, () => e.setAnim(18, true, false), () => true)
     case 'RunScript':
     case 'InlineScript':
     case 'StaggerMinions':
@@ -793,7 +825,20 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         },
       )
     case 'SelfDestruct':
-      return new Instant(n, c, () => e.die(true))
+      // (a GotoState death's kill XP: the death effect made here gives it)
+      return new Instant(n, c, () => {
+        const exp = e.xpAtDeath
+        e.xpAtDeath = 0
+        if (exp) e.ctx.player?.gainXp(e.w, exp)
+        e.die(true)
+      })
+    case 'ParentCountDown':
+    case 'node_0802f743':
+      // the Enzyme's death state 0x91 (update 0x0802F724): the parent's count +0x204 minus 1, finished at once - the
+      // Blister spawns again once one of its eight has died (MEASURED run 2, inside Buu 21-4)
+      return new Instant(n, c, () => {
+        if (e.parentE) e.parentE.spawned--
+      })
     case 'TriggerSelf':
       return new Instant(n, c, () => e.die(false))
     case 'Block':
@@ -819,6 +864,20 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       // 0x0802A00C / 0x0802A028: goal = the player's position, path-follow it (path.ts); within 2 px of it the
       // enemy stands (idle anim) - the node never finishes by itself
       const path = new PathMover(speed)
+      // the ThroughRocks wrapper (update 0x080369D0) broadcasts message 0x22 before and after its child's update: a
+      // rock answers by freeing its 32 x 32 rect (x + 16, y + 16) in the walk and the enemy grid (the rocks mark
+      // nothing when they appear; the real route, Volcano Summit 15-32)
+      const rocks = n.name === 'ChasePlayerThroughRocks'
+      const rockMsg = () => {
+        const col = e.ctx.col
+        if (!col) return
+        for (const r of e.w.entities) {
+          if (r.removed || r.kind !== 'rock') continue
+          const { x, y } = r as unknown as { x: number; y: number }
+          col.mark('walk', x + 16, y + 16, x + 48, y + 48, 1)
+          col.mark('enemy', x + 16, y + 16, x + 48, y + 48, 1)
+        }
+      }
       return new Act(n, c, () => {
         const p = e.player
         if (!p) return
@@ -828,6 +887,7 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       }, () => {
         const p = e.player
         if (!p) return false
+        if (rocks) rockMsg()
         path.gx = p.x
         path.gy = p.y
         const dx = path.gx - e.x
@@ -836,9 +896,11 @@ export function create(n: AiNodeJ, c: AiController): RNode {
           // 0x0802A086: within range the update calls vfunc +0x28 = SetAnim(0) on EVERY update (the idle enter draws
           // rand(255) each frame; lockstep f02_vs_enemy_t18, Enzyme)
           e.setAnim('idle', true, true)
+          if (rocks) rockMsg()
           return false
         }
         path.update(e)
+        if (rocks) rockMsg()
         return false
       })
     }
@@ -886,7 +948,8 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         for (let i = 0; i < 1000; i++) {
           const gx = (0x60 + e.w.rng.rand(0x126, 'wander point')) << 8
           const gy = (0x70 + e.w.rng.rand(0xf0, 'wander point')) << 8
-          if (!e.passable(e.w, gx >> 8, gy >> 8)) continue
+          // (the object's own grid test vt+0x54: its own mark included - run 3 cut 2,164,950 f91, Vegeta at 20-7)
+          if (!e.gridFree(gx >> 8, gy >> 8)) continue
           const dx = gx - e.x
           const dy = gy - e.y
           if ((Math.imul(dx, dx) >> 8) + (Math.imul(dy, dy) >> 8) < 0x5000) continue
@@ -897,6 +960,17 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       }, () => {
         path.update(e)
         return Math.abs(path.gx - e.x) < 0x800 && Math.abs(path.gy - e.y) < 0x800
+      }, () => {
+        // exit 0x0803BD06: SetAnim(0) (the idle draw), then the actor showing sprite def 0x34 (Super Buu's graphics)
+        // answers message 5 and the wanderer turns toward it (24.8 difference, ties horizontal; real run 20-6)
+        e.setAnim('idle', true, true)
+        const sb = e.ctx.data.sprites.index(0x34 - GFX_OFFSET)
+        const t = e.w.entities.find((x) => !x.removed && x !== e && sb && (x as unknown as { sprite?: unknown }).sprite === sb) as unknown as { x: number; y: number } | undefined
+        if (t) {
+          const dx = t.x - e.x
+          const dy = t.y - e.y
+          e.facing = Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? 3 : 2) : dy > 0 ? 0 : 1
+        }
       })
     }
     case 'CirclePlayer':
@@ -964,6 +1038,9 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       return new Act(n, c, () => {
         e.setAnim(4, true, false, { rule: 'hold' })
       }, () => {
+        // (no player: done; else face the player every update - the 24.8 rule: real route 13-47)
+        if (!e.player) return true
+        e.facePlayer()
         if (e.ea.pos.raw !== 5) return false
         const [dx, dy] = DIR_VEC[e.facing]
         e.moveBy(e.w, dx * 1024, dy * 1024)
@@ -1075,10 +1152,12 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         const dy = (e.w.rng.rand(3, 'rattle y') - 1) << 8
         e.x = a.data.x + dx
         e.y = a.data.y + dy
+        e.jitter = true
         return false
       }, (a) => {
         e.x = a.data.x
         e.y = a.data.y
+        e.jitter = false
       })
 
     // ---- melee --------------------------------------------------------------------------------------------------------
@@ -1086,6 +1165,9 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       // 0x0802A0C4: hit test once on the switch frame (an accepted hit plays its sound), then SetAnim(4 + rand(n)),
       // n = the sprite's punch animations (create fn 0x0802A288); the punch state 0x03001B50 plays the swing sound
       return new Act(n, c, () => {
+        // the enter does nothing at all while the player's +0x1CC is 0: a held or KO'd player (run 3 row 1,949,621)
+        const p = e.player as unknown as { dead: boolean; state?: string } | null
+        if (!p || p.dead || p.state === 'held') return
         if (e.meleeStrike(0x400, true)) e.meleeHitSfx()
         e.setAnim(4 + e.w.rng.rand(e.punchAnims(), 'enemy punch anim'), true, false)
         // update 0x0802A276 = vfunc +0x34(0): done once the actor is back in the idle state (the punch state's end
@@ -1241,21 +1323,21 @@ export function create(n: AiNodeJ, c: AiController): RNode {
           s.o.recBox = true
           e.w.add(s)
         },
-      })
+      }, true, undefined, true)
     case 'GunShot':
       // the node's own state objects: enter (0x080264D4 / 0x08026754 / 0x0802D0B0) SetAnimRaw(0x12) = raw 19, frame =
       // tick >> 2 (gun) / >> 3 (rifle, wrap) - not the type's recorded raw-19 rule (Earth 3-2)
-      return timed(n, c, [18, 3], 16, { 4: () => e.shot('gun') }, true, { rule: 'once_stop', shift: 2, end: 'none' })
+      return timed(n, c, [18, 3], 16, { 4: () => e.shot('gun') }, true, { rule: 'once_stop', shift: 2, end: 'none' }, true)
     case 'RifleShot':
-      return timed(n, c, [18, 3], 32, { 8: () => e.shot('rifle') }, true, { rule: 'once_stop', shift: 3, end: 'none' })
+      return timed(n, c, [18, 3], 32, { 8: () => e.shot('rifle') }, true, { rule: 'once_stop', shift: 3, end: 'none' }, true)
     case 'NinjaStarThrow':
       // controller 0x03003074: anim 0x13 (raw 20; real route db6 13-32 f117)
       // a frame per 8 ticks; the star, its sound and the end are the node's (not the recorded sequence's cue / end)
-      return timed(n, c, [19, 4], 32, { 8: () => e.shot('star') }, true, { rule: 'once_stop', shift: 3, end: 'none' })
+      return timed(n, c, [19, 4], 32, { 8: () => e.shot('star') }, true, { rule: 'once_stop', shift: 3, end: 'none' }, true)
     case 'MummyWrapShot':
-      return timed(n, c, [18, 3], 24, { 8: () => e.shot('wrap') }, true, { rule: 'once_stop', shift: 3, end: 'none' })
+      return timed(n, c, [18, 3], 24, { 8: () => e.shot('wrap') }, true, { rule: 'once_stop', shift: 3, end: 'none' }, true)
     case 'MummyWrapBurst':
-      return timed(n, c, [18, 3], 24, { 8: () => e.shot('burst') }, false, { rule: 'once_stop', shift: 3, end: 'none' })
+      return timed(n, c, [18, 3], 24, { 8: () => e.shot('burst') }, false, { rule: 'once_stop', shift: 3, end: 'none' }, true)
     case 'TankShoot': {
       // controller 0x030030EC (tick 0x0802E278): SetAnimRaw(0x13) once, 8 ticks per frame, then SetAnim(0); the shell
       // when the frame reaches 2 (tick 16); finished once the controller is gone (Earth segment 3-14)
@@ -1331,10 +1413,16 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       // f02_vs_enemy_t40: open entered at 1, the next state at 25; close entered at 26, the next state at 51)
       // TurretOpen draws the gun into the wall: not hittable (obj+0x1CC = 0) until TurretClose (emulator: real route
       // segment 8-36)
+      // (TurretClose makes it hittable only at its end: Flying Mega-Fortress XJ-6 12-20, a punch during the 24 frames of
+      // the gun coming out passes through)
       return new Act(n, c, () => {
         e.setAnim(n.name === 'TurretOpen' ? 19 : 18, true, false, { rule: 'once_stop', shift: 3, end: 'none' })
-        e.hittable = n.name !== 'TurretOpen'
-      }, () => e.ea.pos.frame >= 3)
+        if (n.name === 'TurretOpen') e.hittable = false
+      }, () => {
+        const done = e.ea.pos.frame >= 3
+        if (done && n.name === 'TurretClose') e.hittable = true
+        return done
+      })
     case 'BombThrow': {
       // controller 0x0203DD04 (SetAnimRaw(0x12)): the bomb at tick 16, SetAnim(0) at 24 (lockstep f02_vs_enemy_bomb).
       // Enter 0x08026A26 (after facing the player): d = the player's position - own (top-left px), the component
@@ -1456,6 +1544,8 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       return new Act(n, c, (a) => {
         e.facePlayer()
         e.setAnim(3, true, false)
+        // (the controller sets the cels: the update)
+        e.ea.r = { rule: 'hold' }
         const OFF = [[16, 20], [16, -4], [-12, 2], [44, 2]]
         const [ox, oy] = OFF[e.facing]
         const gfx = new BeamGfx(e.ctx.fx('buu_beam_kamehameha_1'), e.ctx.fx('fx_08721164'))
@@ -1463,7 +1553,17 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         a.data.beam = e.w.add(b).id
         e.beam = b
         audioEvent('sfx', { id: 3, vol: 64 })
-      }, (f) => {
+      }, (f, a) => {
+        // a new animation replaced the actor state while the beam charged (a hit's reaction drops the beam): the
+        // node finds its controller gone and ends (run 2 row 1,926,312, 19-3)
+        if (!e.beam && a.data.beam) return true
+        // the controller's cels: 0 to tick 8, then (tick - 1) >> 3 - 0, 1, 2, then 1 / 2 alternating
+        const cel = f <= 8 ? 0 : (f - 1) >> 3
+        e.ea.pos.frame = cel < 3 ? cel : 1 + ((cel - 1) & 1)
+        e.ea.pos.tick = f
+        e.ea.done = false
+        e.animEnded = false
+        e.frameIdx = e.ea.pos.frame
         if (f === 9) (e.beam as KameBeam | null)?.fire()
         if (f >= 91) {
           e.setAnim('idle', true, true)
@@ -1473,8 +1573,9 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         }
         return false
       }, () => {
-        e.beam?.stop()
-        e.beam = null
+        // the node's own exit is a no-op; the beam belongs to the actor state its enter set, which goes with the next
+        // state's: the beam stays active through the next update and stops in the one after (19-3, f12345 ..)
+        e.beamStopDue = 2
       })
     // ---- Dabura's stone spit (state 0x7C; lockstep f02_vs_hold_stone) ----------------------------------------------
     // AimAtPlayer = node 0x030030D4: enter 0x0804E684 SetAnimRaw(0x14) + controller 0x030030D0 (its tick 0x0802DF44
@@ -1495,25 +1596,61 @@ export function create(n: AiNodeJ, c: AiController): RNode {
     case 'NinjaTeleport':
       return new Instant(n, c, () => e.ninjaTeleport())
     case 'TeleportNearPlayer':
-      return new Act(n, c, (a) => {
-        a.data.side = e.w.rng.rand(4, 'teleport side')
+      // (sc_janemba): the vanish takes hits off until the node ends; the controller's enter (0x08034BC0) is
+      // SetAnimRaw(0x12) - the graphics' own raw 19 - held; the controller (Enemy.teleTick, in the animation tick)
+      // jumps at 36, takes hits again at 54 and SetAnim(0)s the boss at 72 - the node's end (the controller gone)
+      return new Act(n, c, () => {
+        const side = e.w.rng.rand(4, 'teleport side')
         e.setAnim(17, true, false)
-      }, (f, a) => {
-        if (f === 36) e.teleportBeside(a.data.side)
-        return f >= 54
-      })
+        e.hittable = false
+        if (e.sprite?.anim(19)) e.holdPose(19, 0)
+        e.teleCtl = 0
+        e.teleSide = side
+      }, () => e.teleCtl < 0)
     case 'TeleportChain4':
-      return new Act(n, c, () => e.setAnim(17, true, false), (f) => {
-        if (f % 72 === 36) {
-          const side = e.ctx.teleChain & 3
-          e.teleportBeside(side)
-          e.ctx.teleChain = (e.ctx.teleChain + 1) % 12
-          if (e.ctx.teleChain % 4 === 0) return false
+      // (sc_janemba): the vanish (anim 0x11, hits off), the jump 36 frames after it to side = counter & 3, hittable again
+      // 18 later; the landing's end (72) SetAnim(0)s the boss and steps the persistent counter (0x03003228): a round
+      // one ends the chain, else the next vanish. The node's check (0x08034502): out of the vanish / landing
+      // animations (a hurt cut them) -> the counter steps, a round one ends the chain, else the teleport restarts
+      return new Act(n, c, (a) => {
+        e.setAnim(17, true, false)
+        e.hittable = false
+        a.data.r2 = e.ea.pos.raw
+        a.data.r3 = 0
+      }, (f, a) => {
+        if (f % 72 === 54) e.hittable = true
+        const raw = e.ea.pos.raw
+        const vanish = () => {
+          e.setAnim(17, true, false)
+          e.hittable = false
+          a.data.r2 = e.ea.pos.raw
+          a.f = 0
         }
-        return f % 72 === 0 && e.ctx.teleChain % 4 === 0
+        if (f >= 1 && raw !== a.data.r2 && raw !== a.data.r3) {
+          e.ctx.teleChain = (e.ctx.teleChain + 1) % 12
+          if (e.ctx.teleChain % 4 === 0) return true
+          vanish()
+          return false
+        }
+        if (f % 72 === 36) {
+          e.teleportBeside(e.ctx.teleChain & 3)
+          a.data.r3 = e.ea.pos.raw
+        }
+        if (f > 0 && f % 72 === 0) {
+          e.setAnim(0, true, true)
+          e.ctx.teleChain = (e.ctx.teleChain + 1) % 12
+          if (e.ctx.teleChain % 4 === 0) return true
+          vanish()
+        }
+        return false
       })
     case 'NinjaDisguise':
-      return new Instant(n, c, () => e.setAnim(17, true, true))
+      // the enter 0x0802C1B0: SetAnimRaw(0x12) (the raw only: the tick stays), frame = rand(the animation's frame
+      // count) (which prop the ninja poses as), the hold state - when the state is entered (Northern Wilderness 15-7)
+      return new Act(n, c, () => {
+        const cnt = e.sprite?.anim(19)?.steps(e.facing).length ?? 0
+        e.holdPose(19, e.w.rng.rand(cnt, 'ninja disguise'))
+      }, () => true)
     case 'NinjaReveal':
       return new Act(n, c, (a) => {
         a.data.x = e.x
@@ -1523,10 +1660,11 @@ export function create(n: AiNodeJ, c: AiController): RNode {
           e.x = a.data.x + (e.w.rng.rand(3, 'jitter') - 1) * 256
           e.y = a.data.y + (e.w.rng.rand(3, 'jitter') - 1) * 256
         }
+        // the controller 0x03003080 ends at tick 64 with SetAnim(0) - the position stays where the last jitter put
+        // it; the node (0x0802C3D2) then puffs at the box centre with the rate 0x1000 + rand(0x1000) (13-48)
         if (f >= 64) {
-          e.x = a.data.x
-          e.y = a.data.y
-          e.ctx.puff(e.w, ...e.center())
+          e.setAnim(0, true, true)
+          e.ctx.puffRng(e.w, ...e.center())
           return true
         }
         return false
@@ -1800,8 +1938,12 @@ export function create(n: AiNodeJ, c: AiController): RNode {
           e.facePlayer()
           e.setAnim(19, true, true, { rule: 'hold' })
         }
+        a.data.seq = e.animSeq
       }, (t, a) => {
         if (!a.data.ok) return true
+        // the arm is the work of the animation's controller: a hit's hurt state replaced it - the node is over
+        // (segment sb 6-6 f19062)
+        if (t < 72 && e.animSeq !== a.data.seq) return true
         if (t < 72) {
           e.frameIdx = e.ea.pos.frame = t < 8 ? 0 : t < 56 ? 1 + (((t + 8) >> 3) & 1) : 3 + ((t - 56) >> 3)
           if (t === 64) {
@@ -1829,8 +1971,12 @@ export function create(n: AiNodeJ, c: AiController): RNode {
           e.facePlayer()
           e.setAnim(18, true, true, { rule: 'hold' })
         }
+        a.data.seq = e.animSeq
       }, (t, a) => {
         if (!a.data.ok) return true
+        // the beam is the work of the animation's controller (0x0300304C): a hit's hurt state replaced it meanwhile -
+        // the node is over (segment sb 6-6 f18331)
+        if (t < 32 && e.animSeq !== a.data.seq) return true
         if (t < 32) {
           e.frameIdx = e.ea.pos.frame = t >> 3
           if (t === 16) {
@@ -1870,8 +2016,6 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       }, (f) => {
         if (f >= 92) e.setAnim(0, true, true)
         return f >= 92
-      }, () => {
-        for (const x of e.w.entities) if (x instanceof SuperBall && x.owner === e && x.phase === 0 && !x.removed) x.removed = true
       })
     case 'GlideToWaypoint':
       return new Act(n, c, (a) => {
@@ -1884,17 +2028,29 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         e.facing = facingToward(a.data.vx, a.data.vy)
         e.setAnim(14, true, true)
       }, (f, a) => {
+        // after its 60 moves a 61st update ends it - the exit 0x0803C064 puts it on the nearest whole pixel and
+        // SetAnim(0)s it (real run 20-6/20-7 r062_001, Super Buu inside Buu: 303.98 -> 304)
+        if (f > 60) {
+          e.x = (e.x + 128) & ~0xff
+          e.y = (e.y + 128) & ~0xff
+          e.setAnim('idle', true, true)
+          return true
+        }
         e.x += a.data.vx
         e.y += a.data.vy
         e.clampInside(e.w)
-        return f >= 60
+        return false
       })
     case 'SummonMinion':
-      return timed(n, c, [17], 72, {
-        40: () => {
+      // the controller 0x030032A0 (update 0x0803926C) ticks from the update after the enter, tick 0 first: the minion
+      // at tick 40 is the node's 41st update (it takes the summoner's facing, 0x080392FE), the SetAnim(0) at tick 72
+      // its 73rd (run 2 row 1,484,952, 20-5)
+      return timed(n, c, [17], 73, {
+        41: () => {
           const OFF = [[8, 12], [8, -12], [-12, 8], [12, 8]]
           const [ox, oy] = OFF[e.facing]
-          e.ctx.spawnEnemy(e.w, 0x0d, e.px + ox, e.py + oy, e)
+          const k = e.ctx.spawnEnemy(e.w, 0x0d, e.px + ox, e.py + oy, e) as Enemy | null
+          if (k) k.facing = e.facing
         },
       }, false)
     case 'KidBuuSplitAnim':
@@ -1942,36 +2098,67 @@ export function create(n: AiNodeJ, c: AiController): RNode {
     case 'JanembaSpawnParts':
       return new Instant(n, c, () => e.janembaParts())
     case 'JanembaHandStrikeA':
-    case 'JanembaHandStrikeB':
-      // the part's controller is set by the node's first update; the hand (an enemy, type 0x36) on its 16th tick
-      // (lockstep f02_vs_enemy_hand: part controller at 5, hand at 21)
-      return new Act(n, c, () => e.setAnim(17, true, false), (f) => {
-        if (f === 17) e.handStrike(n.name === 'JanembaHandStrikeA')
-        if (f >= 57) {
-          // the part's controller ends (SetAnim(0) on the arm part: its idle enter draws rand(255)); the node is done
-          e.w.rng.rand(255, 'janemba arm idle tick')
-          return true
+    case 'JanembaHandStrikeB': {
+      // (sc_janemba): the body keeps its idle; the node's first update gives the arm part the strike controller
+      // (SetAnimRaw(0x12), 8 frames a cel - it makes the hand and ends itself: Enemy.janembaPartField); the node waits
+      // it out - done also when Janemba's hurt flash cut it (not once Janemba is down: no next strike)
+      const aSide = n.name === 'JanembaHandStrikeA'
+      return new Act(n, c, () => undefined, (f) => {
+        const arm = e.janembaArm(aSide)
+        if (f === 1 && e.hp1024 > 0 && arm) {
+          arm.setAnim(18, true, false, { rule: 'once_stop', shift: 3, end: 'none' })
+          arm.strike = [1, aSide]
         }
-        return false
+        return f >= 57 || (f > 1 && (!arm || arm.strike[0] === 0))
       })
+    }
     case 'JanembaAscend':
-      return new Act(n, c, () => e.setAnim(18, true, true), (f) => {
-        if (f >= 8) e.z = Math.max(24 - 3 * f, -200)
+      // (sc_janemba): anim 0x13 = raw 20, one pass at 8 frames a cel (its controller counts from its first update: cel 0
+      // shows 9 frames), held on its last cel through the rise and the descent; the rise from the 9th update
+      return new Act(n, c, () => {
+        e.setAnim(19, true, false, { rule: 'once_stop', shift: 3, end: 'none' })
+        e.ea.pos.tick = 0xffff
+      }, (f) => {
+        if (f >= 9) e.z = Math.max(27 - 3 * f, -200)
         return f > 128
       })
     case 'JanembaDescendSummon':
+      // (sc_janemba): the same animation goes on; its controller descends from its second frame; landed, the
+      // animation plays back (cel 1 for 8 frames, then cel 0); 16 frames later the shake (0x0800797C(0x46, 0x1E)) and
+      // a puff at each missing mini's spot; 16 more: the minis come out and the body goes back to idle - the end
       return new Act(n, c, (a) => {
         e.z = -200
-        a.data.cd = -1
-        e.setAnim(18, true, true)
-      }, (f, a) => {
-        if (e.z < 0) {
-          e.z = Math.min(0, e.z + 3)
-          if (e.z === 0) a.data.cd = 16
+        a.data.d0 = -1
+        a.data.d1 = 1
+      }, (_f, a) => {
+        if (a.data.d1 === 1) {
+          a.data.d1 = 0
           return false
         }
-        if (a.data.cd > 0 && --a.data.cd === 0) e.topUpMinis()
-        return a.data.cd === 0 && f > 70
+        if (e.z < 0) {
+          e.z = Math.min(0, e.z + 3)
+          if (e.z === 0) {
+            a.data.d0 = 32
+            e.ea.pos.frame = 1
+            e.frameIdx = 1
+          }
+          return false
+        }
+        if (a.data.d0 > 0) {
+          a.data.d0--
+          e.ea.pos.frame = 32 - a.data.d0 < 8 ? 1 : 0
+          e.frameIdx = e.ea.pos.frame
+          if (a.data.d0 === 16) {
+            e.ctx.shake(70, 30)
+            a.data.d2 = e.miniPuffs()
+          }
+          if (a.data.d0 === 0) {
+            e.miniCreate(a.data.d2)
+            e.setAnim(0, true, true)
+            return true
+          }
+        }
+        return false
       })
     case 'WaitMinisDefeated':
       return new Act(n, c, () => undefined, () => !e.ctx.liveEnemies().some((o) => o.type.type === 0x38))
@@ -1981,7 +2168,15 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       // 0x087593F8[dir] * 0x80 >> 8 (+-0.5 px per axis), no sliding). Aim: the diagonal toward the player from the
       // footprint centres (dx > 0: dy > 0 -> 0, dy < 0 -> 3; dx < 0: dy > 0 -> 2, dy < 0 -> 1; a zero keeps the facing)
       const aim = () => {
-        const [dx, dy] = e.toPlayer()
+        // (0x080346FC aims with the whole-pixel footprint centres, 0x0800FDFA + 0x0804F900)
+        const p = e.player
+        let [dx, dy] = e.toPlayer()
+        if (p) {
+          const [px, py] = p.footCenter()
+          const [mx, my] = e.footCenter()
+          dx = px - mx
+          dy = py - my
+        }
         if (dx > 0 && dy > 0) e.facing = 0
         else if (dx > 0 && dy < 0) e.facing = 3
         else if (dx < 0 && dy > 0) e.facing = 2
@@ -2033,35 +2228,60 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         const V = [[384, 384], [-384, -384], [-384, 384], [384, -384]]
         a.data.vx = V[e.facing][0]
         a.data.vy = V[e.facing][1]
-      }, (f, a) => {
-        // update 0x08034DE8: the controller's tick +8 per frame; 0x81..0xFF try-move, 0x100 one hit (body box, sub 0)
-        if (f > 16 && f < 32) e.moveBy(e.w, a.data.vx, a.data.vy)
+      }, (f0, a) => {
+        // update 0x08034DE8: the node reads the roll controller's counter (+8 a tick from the enter): 0x81..0xFF a
+        // collision-checked step without sliding (sc_janemba: a mini blocked by another stays put), at 0x100 one hit
+        // (the body box at the ground position, sub 0)
+        const f = e.rollCtl >= 0 ? e.rollCtl >> 3 : f0
+        if (f > 16 && f < 32) e.tryMove(a.data.vx, a.data.vy, 0, 0)
         if (f === 32) {
-          e.areaHit(e.bodyBox(), ATK[0], 0x400)
+          e.areaHit(e.bodyBoxGround(), ATK[0], 0x400)
           return true
         }
         return false
       })
     case 'HandAmbush':
-      return new Act(n, c, (a) => {
-        const p = e.player
-        if (p) {
-          const left = e.w.rng.rand(2, 'hand side')
-          e.x = (p.px + (left ? 4 : -20)) << 8
-          e.y = p.y
-          e.facing = left ? 2 : 3
+      // (HFIL's Janemba Hands, sc_hfil): the node's first update does the enter's work - the side draw, the jump to
+      // the player's 24.8 position of that frame, anim 0x12 (raw 19) under the controller 0x0804D714 whose cels are 8
+      // ticks each up to the last; one hit in ticks 80..103 (its sound 48 + rand(2), 0x0803B3D8); done at tick 0x68
+      return new Act(n, c, (a) => (a.data.hit = 0), (f1, a) => {
+        if (f1 === 1) {
+          const p = e.player
+          if (p) {
+            const left = e.w.rng.rand(2, 'hand side')
+            e.x = p.x + ((left ? 4 : -20) << 8)
+            e.y = p.y
+            e.facing = left ? 2 : 3
+          }
+          e.setAnim([18, 17], true, false, { rule: 'hold' })
+          e.alpha = 1
         }
-        e.setAnim(17, true, false)
-        a.data.hit = 0
-        e.alpha = 1
-      }, (f, a) => {
-        if (f >= 80 && f <= 103 && !a.data.hit && e.areaHit(e.bodyBox(), ATK[2], 0x400)) a.data.hit = 1
-        return f >= 106
+        const f = f1 - 1
+        if (f >= 0) {
+          const nn = e.ea.host.nframes(e.ea.pos.raw) || 1
+          e.ea.pos.frame = Math.max(0, Math.min(f >> 3, 12, nn - 1))
+          e.frameIdx = e.ea.pos.frame
+        }
+        if (f >= 80 && f <= 103 && !a.data.hit && e.areaHit(e.bodyBox(), ATK[2], 0x400)) {
+          a.data.hit = 1
+          audioEvent('sfx', { id: 48 + e.w.rng.rand(2, 'hand hit sfx'), vol: 64 })
+        }
+        return f >= 104
       })
     case 'HandSink':
+      // update 0x0803B30E: unless the hand still shows its ambush strike (the one-shot) the node is done at once; the
+      // sink's controller plays the strike backwards (tick from 104 down from the node's second update, cel = tick >>
+      // 3); its end leaves the hand in the walk state (0x0800EE78) - real route 18-1 / 18-12
       return new Act(n, c, () => undefined, (f) => {
-        e.alpha = Math.max(0.2, 1 - f / 107)
-        return f >= 107
+        if (f === 1 && e.animLoop !== false) return true
+        e.alpha = Math.max(51, 256 - Math.trunc((f * 256) / 107)) / 256
+        if (f >= 2) {
+          const nn = e.ea.host.nframes(e.ea.pos.raw) || 1
+          e.ea.pos.frame = Math.min(Math.max(0, Math.min(104, 105 - f)) >> 3, nn - 1)
+          e.frameIdx = e.ea.pos.frame
+        }
+        if (f >= 106) e.setAnim(1, true, true)
+        return f >= 106
       })
 
     // ---- Super Janemba --------------------------------------------------------------------------------------------
@@ -2076,8 +2296,10 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       })
 
     // ---- Broly / Dabura / Yakon / others --------------------------------------------------------------------------
-    case 'BrolySpawnRocks':
-      return new Instant(n, c, () => {
+    case 'BrolySpawnRocks': {
+      // the rocks are made with Broly - on the node's enter (his initial state 0x33; the real route, 15-32); the update
+      // finds them there
+      const rocks = () => {
         if (e.w.entities.some((x) => x.kind === 'rock')) return
         for (const [x, y] of [[200, 136], [112, 272], [296, 240]]) {
           const b = e.w.arena.bounds
@@ -2087,7 +2309,12 @@ export function create(n: AiNodeJ, c: AiController): RNode {
             e.w.add(rock)
           }
         }
+      }
+      return new Act(n, c, rocks, () => {
+        rocks()
+        return true
       })
+    }
     case 'JumpSmash':
       // the jump is SetAnim id 0x13 = raw 20 under its own controller (the type's recorded sequence, 249 ticks:
       // Volcano Summit 15-32); the three dust clouds draw their rate on tick 248 and the controller's next two ticks
@@ -2149,8 +2376,15 @@ export function create(n: AiNodeJ, c: AiController): RNode {
     case 'PlayAnim12Yakon2':
       return playAnim(n, c, 17, false, 16)
     case 'PlayAnim13':
-    case 'PlayAnim13Yakon':
       return playAnim(n, c, 18, false, 16)
+    case 'PlayAnim13Yakon':
+      // 0x0803A556: the first update SetAnim(0x13)s (raw 20) and enters controller 0x030032CC (tick + 1, cel = tick >>
+      // 3, at tick 32 the walk state without an animation change); the node finishes in the update after its 32nd
+      // tick (real route 8-38: the pose after the combo, then Wait 60)
+      return new Act(n, c, () => undefined, (f) => {
+        if (f === 1) e.setAnim(19, true, false)
+        return f >= 33
+      })
     case 'PlayAnimOnce': {
       // the Skeleton's state 0x213: the collapse (def 0x08759370, singleton 0x0300320C): enter 0x0804EAA0 = not
       // hittable (obj+0x1CC = 0) + SetAnimRaw(0x11) under the one-shot state 0x03001B38 ({vtable 0x0804E0AC, shift
@@ -2183,7 +2417,19 @@ export function create(n: AiNodeJ, c: AiController): RNode {
           e.ea.pos.frame = (f & 0x1f) >> 3
           return false
         })
-      return wait(n, c, 32, 19)
+      // (sc_janemba, Super Janemba's state 0x2DD: a hit cuts the teleport): the landing animation (0x13) held, at 36
+      // the vanish (0x11) held, at 71 SetAnim(0) - no hits until its end
+      return new Act(n, c, () => {
+        e.setAnim(19, true, false, { rule: 'hold' })
+        e.hittable = false
+      }, (f) => {
+        if (f === 36) e.setAnim(17, true, false, { rule: 'hold' })
+        if (f === 71) {
+          e.setAnim(0, true, true)
+          e.hittable = true
+        }
+        return f >= 71
+      })
     case 'DarkSphere':
       return new Act(n, c, () => {
         const [cx, cy] = e.center()
@@ -2210,7 +2456,12 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         a.data.t = 120
         a.data.n = e.spawned
       }, () => {
-        if (e.spawned >= 8) return false
+        if (e.spawned >= 8) {
+          // at eight the timer is held at 480 (0x0802F590): the next spawn comes 480 frames after a death brings the
+          // count down (run 2 21-4)
+          e.enzTimer = 480
+          return false
+        }
         if (--e.enzTimer <= 0) {
           const off = e.w.rng.rand(2, 'enzyme spot') ? [16, -8] : [0, 0]
           const [x, y] = [e.px + off[0], e.py + off[1]]
@@ -2223,10 +2474,11 @@ export function create(n: AiNodeJ, c: AiController): RNode {
             const sh = (sp.json as unknown as { header?: { shadow?: number[] } } | undefined)?.header?.shadow
             const [fw, fh] = [sh?.[0] || 16, sh?.[1] || 8]
             const m = e.marked
-            const saved = m ? c.save('enemy', ...m) : null
             if (m) c.mark('enemy', ...m, 1)
             free = c.test('enemy', x, y, x + fw, y + fh)
-            if (m && saved) c.load('enemy', ...m, saved)
+            // freed, tested, marked again (+0x48(1), the test, +0x48(0)): the Blister's whole footprint is blocked after
+            // any try (MEASURED run 2 21-6, cut 1,605,500: a hole another enemy's leaving had made there is filled)
+            if (m) c.mark('enemy', ...m, 0)
           }
           if (free && e.ctx.spawnEnemy(e.w, 0x18, x, y, e)) {
             e.spawned++
@@ -2306,7 +2558,8 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       return new Act(n, c, () => {
         e.stunned = true
         e.setAnim(9, true, true)
-      }, (f) => f >= 48, () => (e.stunned = false))
+        // (sc_janemba): the stun lasts the hurt animation (0x08039BFD: done when the state's animation ended)
+      }, (f) => f > 1 && e.ea.pos.raw !== 10, () => (e.stunned = false))
     case 'VolleyballTransform':
       return new Instant(n, c, () => {
         e.volleyball = true

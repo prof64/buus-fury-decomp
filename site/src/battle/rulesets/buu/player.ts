@@ -910,6 +910,9 @@ export class Player extends Actor implements PlayerLike {
 
   /** the state's control (vtable +8) */
   private control(w: World) {
+    // L cycles the skill in the HUD object's update (0x0800B970), whatever the player's state - the idle / walk
+    // controls keep their own (run 3 rows 1,905,806 .. 1,905,833: L presses during the Super Saiyan transformation)
+    if (this.gs !== 'idle' && this.gs !== 'idle2' && this.gs !== 'walk' && w.input.pressed & BTN.L) this.cycleSkill()
     if (this.gs === STONE) return this.ctlStone(w)
     if (this.state === 'held') return this.updHeld(w)
     switch (this.gs) {
@@ -980,16 +983,6 @@ export class Player extends Actor implements PlayerLike {
     }
   }
 
-  fits(w: World, x: number, y: number): boolean {
-    if (!super.fits(w, x, y)) return false
-    for (const e of w.entities) {
-      if (e.kind === 'rock' && !e.removed) {
-        const r = (e as unknown as { rect(): Rect }).rect()
-        if (x < r.x1 && r.x0 < x + this.footW && y < r.y1 && r.y0 < y + this.footH) return false
-      }
-    }
-    return true
-  }
 
   cycleSkill() {
     if (this.skills.length) this.slot = (this.slot + 1) % this.skills.length
@@ -2015,6 +2008,9 @@ export class Player extends Actor implements PlayerLike {
         this.setAnimId(w, 0)
         return this.itMarkersEnd()
       }
+      // with picks the markers go when the selection closes too (MEASURED real run 20-6 r062_001 f3,010; wf-core
+      // it_select)
+      this.itMarkersEnd()
       this.it = { dir: this.facing, idx: 0, targets: s.picks, origin: [this.px, this.py], t: -24 }
       this.hittable = false
       this.ap.raw = 20

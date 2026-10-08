@@ -131,10 +131,13 @@ describe('enemy AI vs emulator', () => {
     for (const h of hits) expect(h).toBeGreaterThanOrEqual(17)
     for (const h of hits) expect(h).toBeLessThanOrEqual(29) // crit x1.5
   })
-  it("Pilaf's Guardian HeavyStrike reaches 60 px (centre to centre) but not 65; the strike lands 60 ticks into its state", () => {
+  // (the strike 0x0802F77C is the standard strike with the turn - `strikeRect`, 8 px past the body box's near edge -
+  // as the field segments have it (Northern Wilderness 15-12, engine/docs/segments.md); the earlier 57-px box from
+  // the centre, fitted to a 60 / 65 px probe, is gone: a 64-px-wide Guardian reaches 40 px foot centre to centre)
+  it("Pilaf's Guardian HeavyStrike reaches 40 px (foot centre to centre) but not 45; the strike lands 60 ticks into its state", () => {
     for (const [d, expectHit] of [
-      [60, true],
-      [65, false],
+      [40, true],
+      [45, false],
     ] as [number, boolean][]) {
       const s = sim('t63')
       god(s)

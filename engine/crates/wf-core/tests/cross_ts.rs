@@ -33,6 +33,7 @@ fn frame_state(w: &World) -> Value {
         0
     };
     let mut e = vec![];
+    let mut ea = vec![];
     let mut s = vec![];
     let mut k = vec![];
     for (i, x) in w.ents.iter().enumerate() {
@@ -41,7 +42,9 @@ fn frame_state(w: &World) -> Value {
         }
         k.push(format!("{}:{}", x.id + ID_OFF, x.kind()));
         match &x.body {
-            Body::Enemy(n) => e.push(json!([
+            Body::Enemy(n) => {
+                ea.push(json!([x.id + ID_OFF, n.ea.pos.raw, n.ea.pos.frame]));
+                e.push(json!([
                 x.id + ID_OFF,
                 n.ty,
                 n.a.x,
@@ -56,7 +59,8 @@ fn frame_state(w: &World) -> Value {
                     .map(|s| format!("{s:x}"))
                     .collect::<Vec<_>>()
                     .join(">")
-            ])),
+                ]))
+            }
             Body::Shot(sh) => s.push(json!([x.id + ID_OFF, sh.kind_name(), sh.x, sh.y])),
             Body::Hand(_) => {}
             _ => {}
@@ -71,6 +75,7 @@ fn frame_state(w: &World) -> Value {
         "e": e,
         "s": s,
         "k": k.join(" "),
+        "ea": ea,
     })
 }
 
@@ -101,7 +106,11 @@ fn norm_ts(f: &Value) -> Value {
 
 fn first_diff(a: &Value, b: &Value) -> Vec<String> {
     let mut out = vec![];
-    for k in ["rng", "cam", "p", "e", "s", "k"] {
+    for k in ["rng", "cam", "p", "e", "s", "k", "ea"] {
+        // (each enemy's animation position: dumps written before it have none)
+        if k == "ea" && a[k].is_null() {
+            continue;
+        }
         if a[k] != b[k] {
             out.push(k.to_string());
         }
@@ -150,6 +159,15 @@ fn cross_check_vs_typescript_sim() {
             xp: false,
         };
         let mut s = Session::new(data(), cfg);
+        // (`ehp`: the starting enemies' whole HP - a fight that reaches the deaths)
+        if let Some(hp) = sc["ehp"].as_i64() {
+            let ids = s.world.enemies.clone();
+            for id in ids {
+                if let Some((k, _)) = s.world.enemy_by_id(id) {
+                    s.world.en(k).hp1024 = hp << 10;
+                }
+            }
+        }
         let inputs: Vec<u16> = d["inputs"]
             .as_array()
             .unwrap()

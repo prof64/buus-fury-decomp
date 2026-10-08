@@ -21,8 +21,10 @@ interface Scn {
   form?: number
   fighterId?: string
   /** input style: 'idle' (stand still: the AI acts alone), 'mix' (random walk / punch / skills) */
-  style: 'idle' | 'mix' | 'melee'
+  style: 'idle' | 'mix' | 'melee' | 'hunt'
   level?: number
+  /** the starting enemies' HP (whole HP; a fight that reaches the enemies' deaths) */
+  ehp?: number
 }
 
 const SCENARIOS: Scn[] = [
@@ -62,6 +64,32 @@ const SCENARIOS: Scn[] = [
   { name: 'gunmen', enemy: 't44+t8', arena: 'forest', seed: 137, frames: 1200, style: 'idle' },
   { name: 'mechanoid', enemy: 't72', arena: 'forest', seed: 139, frames: 1200, style: 'mix' },
   { name: 'gotenks_ghosts', enemy: 't68', count: 2, arena: 'forest', seed: 149, frames: 1500, style: 'mix', fighterId: 'gotenks', form: 31 },
+  // the field rules battles share (Battle mode draws as the field: Janemba's parts / arm strikes / summon, Super
+  // Janemba's teleports, the HFIL hand, the samurai guard, the ninja disguise, Super Buu's ball and minions, the
+  // knight's heavy strike, Broly's jump smash)
+  { name: 'janemba_mix', enemy: 't51', arena: 'crater', seed: 151, frames: 1500, style: 'mix', level: 99 },
+  { name: 'super_janemba', enemy: 't122', arena: 'crater', seed: 157, frames: 1500, style: 'mix', level: 99 },
+  { name: 'hfil_hand', enemy: 't57', count: 2, arena: 'forest', seed: 163, frames: 1200, style: 'mix' },
+  { name: 'samurai', enemy: 't99', arena: 'forest', seed: 167, frames: 1500, style: 'mix' },
+  { name: 'ninja', enemy: 't79', count: 2, arena: 'forest', seed: 173, frames: 1200, style: 'mix' },
+  { name: 'super_buu_gohan', enemy: 't119', arena: 'crater2', seed: 179, frames: 1500, style: 'mix', level: 99 },
+  { name: 'super_buu_minions', enemy: 't118', arena: 'crater2', seed: 181, frames: 1500, style: 'mix', level: 99 },
+  { name: 'knight', enemy: 't62', arena: 'forest', seed: 191, frames: 1500, style: 'mix', level: 80 },
+  { name: 'broly_melee', enemy: 't11', arena: 'volcano', seed: 193, frames: 1500, style: 'melee', level: 99 },
+  { name: 'vegeta_wander', enemy: 't137', arena: 'wasteland', seed: 197, frames: 1500, style: 'mix', level: 99 },
+  // deaths as the field has them (a tank's crew, SelfDestruct's children, the Enzyme's death state, Kid Buu's copies),
+  // worm hits (reverse / split), the on-screen and footprint conditions
+  { name: 'tank_kill', enemy: 't127', arena: 'forest', seed: 199, frames: 1500, style: 'melee', level: 99, ehp: 30 },
+  { name: 'blister_kill', enemy: 't6', arena: 'crater', seed: 212, frames: 1800, style: 'hunt', level: 99, ehp: 20 },
+  { name: 'kid_buu_kill', enemy: 't60', arena: 'wasteland', seed: 224, frames: 1800, style: 'hunt', level: 99, ehp: 60 },
+  { name: 'worm_mix', enemy: 't142', arena: 'crater', seed: 227, frames: 1500, style: 'mix', level: 99 },
+  { name: 'worm_hunt', enemy: 't142', arena: 'crater', seed: 239, frames: 1500, style: 'hunt', level: 99, ehp: 9999 },
+  { name: 'janemba_hunt', enemy: 't51', arena: 'crater', seed: 241, frames: 1800, style: 'hunt', level: 99 },
+  { name: 'super_janemba_hunt', enemy: 't122', arena: 'crater', seed: 251, frames: 1800, style: 'hunt', level: 99 },
+  { name: 'gunmen_mix', enemy: 't44+t8', arena: 'forest', seed: 229, frames: 1200, style: 'mix' },
+  { name: 'vampire_mix', enemy: 't134', count: 2, arena: 'forest', seed: 233, frames: 1500, style: 'mix' },
+  { name: 'bombers', enemy: 't43', count: 3, arena: 'forest', seed: 257, frames: 1500, style: 'hunt' },
+  { name: 'gunmen_hunt', enemy: 't44+t8', arena: 'forest', seed: 263, frames: 1500, style: 'hunt' },
 ]
 
 const KEYS = [0, BTN.LEFT, BTN.RIGHT, BTN.UP, BTN.DOWN, BTN.A, BTN.A, BTN.B, BTN.B, BTN.R, BTN.LEFT | BTN.A, BTN.RIGHT | BTN.B, BTN.L, BTN.UP | BTN.A, BTN.R | BTN.B, BTN.DOWN | BTN.A]
@@ -94,10 +122,31 @@ describe('wf-core cross-check dumps', () => {
     it(s.name, () => {
       const f = fighter({ fighter: s.fighterId ?? 'goku', form: s.form ?? 2, level: s.level ?? 60 })
       const sim = makeBuuSim({ enemy: s.enemy, count: s.count ?? 1, arena: s.arena, seed: s.seed, fighter: f })
+      if (s.ehp) for (const e of sim.enemies) e.hp1024 = s.ehp * 1024
       const keys = inputs(s)
       const frames: unknown[] = []
       let prev = 0
       for (let i = 0; i < s.frames; i++) {
+        // 'hunt': walk at the nearest living enemy on the dominant axis, punch when near (the keys are recorded:
+        // the Rust side replays them)
+        if (s.style === 'hunt') {
+          const p = sim.player as Player
+          const near = sim.w.entities
+            .filter((e) => e.kind === 'enemy' && !e.removed && !(e as Enemy).defeated && !(e as Enemy).part)
+            .map((e) => e as Enemy)
+            .sort((a, b) => Math.hypot(a.px - p.px, a.py - p.py) - Math.hypot(b.px - p.px, b.py - p.py))[0]
+          let k = 0
+          if (near) {
+            const [ex, ey] = near.footCenter()
+            const [px, py] = p.footCenter()
+            const dx = ex - px
+            const dy = ey - py
+            if (Math.abs(dx) <= 28 && Math.abs(dy) <= 20) k = i % 12 < 2 ? BTN.A : 0
+            else if (Math.abs(dx) > Math.abs(dy)) k = dx > 0 ? BTN.RIGHT : BTN.LEFT
+            else k = dy > 0 ? BTN.DOWN : BTN.UP
+          }
+          keys[i] = k
+        }
         const held = keys[i]
         const inp = { held, pressed: held & ~prev, released: prev & ~held }
         sim.battle.preStep?.(sim.w, inp)
@@ -120,6 +169,11 @@ describe('wf-core cross-check dumps', () => {
             return [q.id, q.kind, q.x, q.y]
           }),
           k: ents.map((e) => `${e.id}:${e.kind}`).join(' '),
+          // each enemy's animation controller position (raw, cel): what the picture shows
+          ea: ents.filter((e) => e.kind === 'enemy').map((e) => {
+            const n = e as Enemy
+            return [n.id, n.ea.pos.raw, n.ea.pos.frame]
+          }),
         })
       }
       writeFileSync(join(dir, `${s.name}.json`), JSON.stringify({ scenario: s, inputs: keys, frames }))

@@ -2085,11 +2085,10 @@ fn swap_to_partner(w: &mut World, i: usize) {
 
 /// the state's control (vtable +8)
 fn control(w: &mut World, i: usize) {
-    // field: L cycles the skill in the HUD object's update (0x0800B970: pressed L and 0x08013B34 on the leader's
-    // record), whatever the player's state - the idle / walk controls below keep their own (same frame, same order).
-    // Run 3 rows 1,905,806 .. 1,905,833: three L presses during the Super Saiyan transformation (vt 0x0804E2B0)
-    if w.field.is_some()
-        && !matches!(pr(w, i).gs, Gs::Idle | Gs::Walk)
+    // L cycles the skill in the HUD object's update (0x0800B970: pressed L and 0x08013B34 on the leader's record),
+    // whatever the player's state - the idle / walk controls below keep their own (same frame, same order). Run 3
+    // rows 1,905,806 .. 1,905,833: three L presses during the Super Saiyan transformation (vt 0x0804E2B0) - battles too
+    if !matches!(pr(w, i).gs, Gs::Idle | Gs::Walk)
         && inp(w, i).pressed & btn::L != 0
     {
         cycle_skill(w, i);
@@ -2141,17 +2140,7 @@ pub fn fits(w: &World, i: usize, x: i32, y: i32) -> bool {
             return false;
         }
     }
-    // (the field's rocks are no obstacle of their own: Broly's summit 15-32, see nodes.rs `rock_msg`)
-    for e in w.ents.iter().filter(|_| w.field.is_none()) {
-        if let Body::Rock { x: rx, y: ry, .. } = e.body {
-            if !e.removed {
-                let r = Rect::new(rx + 16, ry + 16, rx + 48, ry + 48);
-                if x < r.x1 && r.x0 < x + a.foot_w && y < r.y1 && r.y0 < y + a.foot_h {
-                    return false;
-                }
-            }
-        }
-    }
+    // (Broly's rocks are no obstacle of their own: the summit 15-32, see nodes.rs `rock_msg` - battles too)
     true
 }
 fn move_by(w: &mut World, i: usize, vx: i32, vy: i32) {

@@ -258,17 +258,10 @@ export class StraightShot extends Shot {
     // sound and explosion; the shuriken is just removed) and is accepted, whatever the sender's team or attack kind
     // (the real route, Diablo Desert Express 11-21: Trunks' ki blast meets a gunman's bullet - the bullet bursts,
     // the blast counts the hit, the player is not hit)
-    // The bullet tests the message in its own update, after it moved (Earth 3-3 #4 f1495: a ki blast created later
-    // in the list - updated earlier in the frame - meets the bullet's box of this frame): a bullet that has not had
-    // its update this frame is tested where this frame's move puts it.
-    const ents = _w.entities
-    const ahead = ents.indexOf(msg.source as never) > ents.indexOf(this as never) && !(this.o.delay && this.t < this.o.delay)
-    let r = this.rect()
-    if (ahead) {
-      const dx = ((this.x + this.o.vx) >> 8) - this.px
-      const dy = ((this.y + this.o.vy) >> 8) - this.py
-      r = { x0: r.x0 + dx, y0: r.y0 + dy, x1: r.x1 + dx, y1: r.y1 + dy }
-    }
+    // The test is on the box the bullet's last update stored (+0x28): a ki blast later in the list (updated first)
+    // misses the bullet still short of it, and the bullet, after its move, bursts the blast with its own message (3-3
+    // #4 f1495; run 3 fat Buu 1,286,553: emulator write order)
+    const r = this.rect()
     if (this.o.fragile && this.dead < 0 && !msg.foot && msg.source !== this && !this.removed && overlaps(msg.rect, r)) {
       this.removed = true
       if (this.o.sfxEnd != null) audioEvent('sfx', { id: this.o.sfxEnd, vol: 64 })
@@ -1501,7 +1494,9 @@ export class Bomb extends Shot {
     }
     if (this.t >= 71) {
       this.removed = true
-      this.hit(w, this.rect(), ATK[1], 1024)
+      // the blast's message is of sender class 2 to every object (the enemies' handler takes it as well as the
+      // player's: a Mad Bomber's bomb hurts another bandit, Diablo Desert 11-14), then the chips
+      this.hit(w, this.rect(), ATK[1], 1024, false, 2)
       for (let i = 0; i < 4; i++) w.add(new Debris(this.ctx.fx('buu_debris'), this.px, this.py, i))
       this.ctx.explosion(w, this.px, this.py, 0x1000 + w.rng.rand(0x1000, 'bomb explosion rate'))
       audioEvent('sfx', { id: 24, vol: 64 })

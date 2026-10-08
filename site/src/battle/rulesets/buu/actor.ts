@@ -41,7 +41,9 @@ export function isReceiver(e: unknown): e is Receiver {
 /** 0x08011C70: send to every object; `first` stops at the first receiver that accepts */
 export function broadcast(w: World, msg: HitMsg, first = false): boolean {
   let any = false
-  for (const e of w.entities.slice()) {
+  // the game delivers newest object first (0x08011C70; story playthrough: Goku's punch on two fighters - the newer
+  // one is hit first; wf-core world.rs broadcast)
+  for (const e of w.entities.slice().reverse()) {
     if (e.removed || !isReceiver(e)) continue
     if (e.onMessage(w, msg)) {
       any = true

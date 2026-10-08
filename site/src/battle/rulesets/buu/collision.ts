@@ -67,7 +67,9 @@ export type Layer = 'walk' | 'shot' | 'enemy'
 export class BuuCollision {
   readonly w: number
   readonly h: number
-  readonly walk: Uint8Array
+  /** the map's walk grid until something marks it (then a private copy: Broly's rocks) */
+  walk: Uint8Array
+  private walkOwn = false
   readonly shot: Uint8Array
   readonly enemy: Uint8Array
   constructor(g: CollisionGrid) {
@@ -105,6 +107,10 @@ export class BuuCollision {
 
   /** 0x08009930(box, grid, value): set (1) / clear (0) every tile under the box (clipped to the grid) */
   mark(l: Layer, x0: number, y0: number, x1: number, y1: number, value: 0 | 1) {
+    if (l === 'walk' && !this.walkOwn) {
+      this.walk = this.walk.slice()
+      this.walkOwn = true
+    }
     const g = this.grid(l)
     const tx0 = Math.max(0, x0 >> 3)
     const ty0 = Math.max(0, y0 >> 3)

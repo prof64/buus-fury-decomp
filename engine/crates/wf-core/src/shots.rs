@@ -3056,19 +3056,13 @@ fn bomb_update(w: &mut World, i: usize) {
         // field: the blast's hit comes first (its damage number takes its 0x100 block while the bomb's own is still
         // held), then the bomb's block is freed, the chips' shared graphic takes the last unit of it and the explosion
         // allocates (MEASURED r002_006 7,192 / 17,816: alloc 0x100 from 0x0800ABFB, free (151, 4) from 0x08051193,
-        // alloc 0x40 from 0x0804E4AD, alloc 0x400 from 0x0802A84B). Battles: chips first, then the hit (no allocator)
+        // alloc 0x40 from 0x0804E4AD, alloc 0x400 from 0x0802A84B) - battles too
         let id = w.ents[i].id;
         let r = rect(w, i);
-        let field = w.field.is_some();
-        if !field {
-            crate::vram::release(w, crate::vram::Owner::Ent(id));
-            let (px, py) = (w.shot_ref(i).px(), w.shot_ref(i).py());
-            bomb_chips(w, px, py);
-        }
-        if field {
-            // field: the blast's message is of sender class 2, which the enemies' handler (0x0800FBE6: class 1 or 2)
-            // takes as well as the player's - a Mad Bomber's bomb hurts another bandit (Diablo Desert 11-14: 49 HP and
-            // the knockback). Battles keep the reference (the player only)
+        {
+            // the blast's message is of sender class 2, which the enemies' handler (0x0800FBE6: class 1 or 2) takes as
+            // well as the player's - a Mad Bomber's bomb hurts another bandit (Diablo Desert 11-14: 49 HP and the
+            // knockback) - battles too
             let s = w.shot_ref(i);
             let (owner, dir) = (s.owner, s.dir);
             let stats = w
@@ -3104,8 +3098,6 @@ fn bomb_update(w: &mut World, i: usize) {
             crate::vram::release(w, crate::vram::Owner::Ent(id));
             let (px, py) = (w.shot_ref(i).px(), w.shot_ref(i).py());
             bomb_chips(w, px, py);
-        } else {
-            hit(w, i, r, atk(1), 1024, true);
         }
         let (px, py) = (w.shot_ref(i).px(), w.shot_ref(i).py());
         let rate = 0x1000 + w.rng.rand(0x1000);
@@ -3362,27 +3354,12 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
         // end's sound and explosion; the shuriken is just removed) and is accepted, whatever the sender's team or
         // attack kind (the real route, Diablo Desert Express 11-21: Trunks' ki blast meets a gunman's bullet - the
         // bullet bursts, the blast counts the hit, the player is not hit)
-        // Battles: a bullet that has not had its update this frame is tested where this frame's move puts it (the TS
-        // sim's model). The field tests the box the bullet's last update stored (+0x28): a ki blast later in the list
-        // (updated first) misses the bullet still short of it, and the bullet, after its move, bursts the blast with
-        // its own message - no hit draw of the blast's (3-3 #4 f1495, game broadcast 0x080199B6 -> 0; run 3 fat Buu
-        // 1,286,553: Goku's blast and a gunman's bullet, emulator write order)
+        // The test is on the box the bullet's last update stored (+0x28): a ki blast later in the list (updated first)
+        // misses the bullet still short of it, and the bullet, after its move, bursts the blast with its own message -
+        // no hit draw of the blast's (3-3 #4 f1495, game broadcast 0x080199B6 -> 0; run 3 fat Buu 1,286,553: Goku's
+        // blast and a gunman's bullet, emulator write order) - battles too
         ShotKind::Straight(o) => {
-            let ahead = w.field.is_none() && w.find(msg.source).is_some_and(|j| j > i)
-                && !(o.delay > 0 && w.shot_ref(i).t < o.delay);
-            let r = if ahead {
-                let s = w.shot_ref(i);
-                let (px, py) = ((s.x + o.vx) >> 8, (s.y + o.vy) >> 8);
-                let b = rect(w, i);
-                Rect::new(
-                    b.x0 + px - s.px(),
-                    b.y0 + py - s.py(),
-                    b.x1 + px - s.px(),
-                    b.y1 + py - s.py(),
-                )
-            } else {
-                rect(w, i)
-            };
+            let r = rect(w, i);
             if o.fragile
                 && o.dead < 0
                 && !msg.foot

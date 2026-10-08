@@ -140,10 +140,10 @@ pub fn push(w: &mut World, i: usize, id: u16) {
             }
         }
     }
-    // field: a firing Kid Buu beam belongs to the actor state KidBuuKamehameha's enter set (0x0804C690) too: the
-    // pushed state's actor state replaces it and the beam retracts from the next update (run 2 row 1,894,422, 19-3:
-    // hit at len 11, then 8, 5, 2, gone - play 33 / stop 32 on time; a charging one: enemy::set_anim_rule)
-    if w.field.is_some() && w.en_ref(i).beam != 0 && w.find(w.en_ref(i).beam).is_some() {
+    // a firing Kid Buu beam belongs to the actor state KidBuuKamehameha's enter set (0x0804C690) too: the pushed
+    // state's actor state replaces it and the beam retracts from the next update (run 2 row 1,894,422, 19-3: hit at
+    // len 11, then 8, 5, 2, gone - play 33 / stop 32 on time; a charging one: enemy::set_anim_rule) - battles too
+    if w.en_ref(i).beam != 0 && w.find(w.en_ref(i).beam).is_some() {
         stop_enemy_beam(w, i);
     }
     w.en(i).ai.gen += 1;
@@ -597,11 +597,7 @@ pub fn busy_controller(w: &mut World, i: usize) {
 /// the game's face-the-player routine 0x0801599C: exact in the field (24.8 difference, ties horizontal); battles keep
 /// the footprint-pixel rule the TypeScript cross-check pins (tests/cross_ts.rs) until it is re-verified there
 fn face_player_routine(w: &mut World, i: usize) {
-    if w.field.is_some() {
-        en::face_player_exact(w, i);
-    } else {
-        en::face_player(w, i);
-    }
+    en::face_player_exact(w, i);
 }
 
 /// the ThroughRocks wrapper (update 0x080369D0) broadcasts message 0x22 before and after its child's update; a
@@ -669,22 +665,21 @@ fn cond(w: &mut World, c: &C, n: u16) -> bool {
         K::IfPlayerInFront => en::player_in_front(w, i, 48),
         // field: the predicate 0x080379C8 (vt 0x08049E08) - the enemy's body box (0x0800FE78) overlaps the camera's
         // rect (0x030019A4 +0x18, the logical view) - an on-screen test, not the player (run 3 row 2,676,425, 3-17:
-        // a gunman above the view keeps to its walk state, ours took the 160 px distance and went to the aim state);
-        // battles keep the reference's distance
-        K::IfPlayerInZone if w.field.is_some() && !w.cameras.is_empty() => {
+        // a gunman above the view keeps to its walk state, ours took the 160 px distance and went to the aim state) -
+        // battles too
+        K::IfPlayerInZone if !w.cameras.is_empty() => {
             crate::geom::overlaps(&w.en_ref(i).a.body_box(), &w.cameras[0].rect)
         }
         K::IfPlayerInZone => en::dist2(w, i) <= 160 * 160,
         // cond 0x0804EE04 (named for the vampire lair, INFERRED before): the enemy's own footprint (0x0800FDFA) lies
         // wholly on free enemy-grid tiles (map object +0xB0, the test 0x08009324) - a bat over a wall or another
-        // enemy's mark does not turn back (tour castle_pw_10_9 f151); battles keep the player check
-        K::IfPlayerInRoomZone if w.field.is_some() => {
+        // enemy's mark does not turn back (tour castle_pw_10_9 f151) - battles too
+        K::IfPlayerInRoomZone => {
             let a = &w.en_ref(i).a;
             let (x0, y0) = (a.px(), a.py());
             let (x1, y1) = (x0 + a.foot_w, y0 + a.foot_h);
             w.col.as_ref().is_none_or(|c| c.test(crate::world::Layer::Enemy, x0, y0, x1, y1))
         }
-        K::IfPlayerInRoomZone => en::player(w, i).is_some(),
         K::IfPlayerBlastIncoming => en::blast_incoming(w, i),
         // 0x080331EC: only while IsAnim(0) (3-2: a tank that just started driving does not roll its Chance); the
         // footprint centres more than 16 px apart along the facing, less than 16 across
@@ -717,16 +712,12 @@ fn cond(w: &mut World, c: &C, n: u16) -> bool {
             if !w.pl_ref(pi).a.hittable {
                 return false;
             }
-            let (mut dx, mut dy) = en::to_player(w, i);
-            // field (sc_janemba): 0x08034574 compares the centres of the current-facing body boxes (0x0800FE78, at the
-            // ground position: a hopping mini's height does not count);
-            // battle keeps the reference's
-            if w.field.is_some() {
-                let c = |b: crate::geom::Rect| ((b.x0 + b.x1) >> 1, (b.y0 + b.y1) >> 1);
-                let (px, py) = c(w.pl_ref(pi).a.body_box_ground());
-                let (mx, my) = c(w.en_ref(i).a.body_box_ground());
-                (dx, dy) = (px - mx, py - my);
-            }
+            // (sc_janemba): 0x08034574 compares the centres of the current-facing body boxes (0x0800FE78, at the
+            // ground position: a hopping mini's height does not count) - battles too
+            let c = |b: crate::geom::Rect| ((b.x0 + b.x1) >> 1, (b.y0 + b.y1) >> 1);
+            let (px, py) = c(w.pl_ref(pi).a.body_box_ground());
+            let (mx, my) = c(w.en_ref(i).a.body_box_ground());
+            let (dx, dy) = (px - mx, py - my);
             dx.abs() <= 47 && dy.abs() <= 47
         }
         K::IfLastKidBuu => {
@@ -993,7 +984,8 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         // and the HUD's; spawned later, the portrait text box that follows purges differently and Broly's place
         // in the update list changes - app soak of the real route, 15-32). Field only: the battle keeps the
         // update-time spawn the TypeScript reference has.
-        K::BrolySpawnRocks if w.field.is_some() => spawn_rocks(w),
+        // (battles too)
+        K::BrolySpawnRocks => spawn_rocks(w),
         // shield soldiers: the graphics swap runs on enter (seen on the GotoState frame)
         K::RaiseShield => {
             w.en(i).shield = 1;
@@ -1059,13 +1051,8 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             for _ in 0..1000 {
                 let gx = (0x60 + w.rng.rand(0x126)) << 8;
                 let gy = (0x70 + w.rng.rand(0xf0)) << 8;
-                // field: the game's own-mark-included test (`grid_free`); battles keep the reference's
-                let free = if w.field.is_some() {
-                    en::grid_free(w, i, gx >> 8, gy >> 8)
-                } else {
-                    en::passable(w, i, gx >> 8, gy >> 8)
-                };
-                if !free {
+                // the game's own-mark-included test (`grid_free`) - battles too
+                if !en::grid_free(w, i, gx >> 8, gy >> 8) {
                     continue;
                 }
                 let dx = gx - w.en_ref(i).a.x;
@@ -1124,8 +1111,8 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             // field: the enter (0x0802A0C4) does nothing at all - no hit test, no rand, no punch - while the player's
             // +0x1CC is 0: a held or KO'd player (run 3 row 1,949,621, 18-14: King Yemma's teleport lands next to the
             // player he knocked out at 1,949,444 - the Sequence goes on in the idle; ours' `hittable` is off in more
-            // states than the game's flag - run 3 ship 276,926). Battle keeps the reference's
-            if w.field.is_some() && en::player(w, i).is_none_or(|pi| w.pl_ref(pi).dead || w.pl_ref(pi).state == crate::player::PState::Held) {
+            // states than the game's flag - run 3 ship 276,926) - battles too
+            if en::player(w, i).is_none_or(|pi| w.pl_ref(pi).dead || w.pl_ref(pi).state == crate::player::PState::Held) {
                 return;
             }
             // hit test (an accepted hit plays its sound), then SetAnim(4 + rand(punch animations))
@@ -1278,10 +1265,10 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             let r0 = w.data.anim.once_stop3;
             let open = kind(c, n) == K::TurretOpen;
             set_anim_r(w, i, &[an(if open { 19 } else { 18 })], false, r0);
-            // field: TurretClose makes it hittable only at its end (Flying Mega-Fortress XJ-6 12-20: a punch during
-            // the 24 frames of the gun coming out passes through; obj+0x1CC set at the node's finish)
-            if open || w.field.is_none() {
-                w.en(i).a.hittable = !open;
+            // TurretClose makes it hittable only at its end (Flying Mega-Fortress XJ-6 12-20: a punch during the 24
+            // frames of the gun coming out passes through; obj+0x1CC set at the node's finish) - battles too
+            if open {
+                w.en(i).a.hittable = false;
             }
         }
         // the shell controller 0x030030EC: SetAnimRaw(0x13) played once (8 ticks per frame), then SetAnim(0)
@@ -1337,10 +1324,9 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         K::KidBuuKamehameha => {
             en::face_player(w, i);
             set_anim(w, i, &[an(3)], true, Some(false));
-            if w.field.is_some() {
-                let h = w.data.anim.hold;
-                w.en(i).ea.rule = h;
-            }
+            // (the controller sets the cels: the update)
+            let h = w.data.anim.hold;
+            w.en(i).ea.rule = h;
             const OFF: [(i32, i32); 4] = [(16, 20), (16, -4), (-12, 2), (44, 2)];
             let a = &w.en_ref(i).a;
             let (ox, oy) = OFF[a.facing as usize];
@@ -1376,9 +1362,9 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         K::TeleportNearPlayer => {
             r.d[0] = w.rng.rand(4);
             set_anim(w, i, &[an(17)], true, Some(false));
-            // field (sc_janemba): the vanish takes hits off until the node ends (a punch at it computes nothing);
-            // battle keeps the reference's
-            if w.field.is_some() {
+            // (sc_janemba): the vanish takes hits off until the node ends (a punch at it computes nothing) - battles
+            // too
+            {
                 w.en(i).a.hittable = false;
                 // the controller's enter (0x08034BC0) is SetAnimRaw(0x12) - the graphics' own animation 0x12 (raw
                 // 19), not the type's SetAnim table: King Yemma's vanish (run 3 row 1,949,548, 18-14 post-game) is
@@ -1394,17 +1380,14 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         }
         K::TeleportChain4 => {
             set_anim(w, i, &[an(17)], true, Some(false));
-            // field: the vanish takes hits off (as TeleportNearPlayer's); its raw is what the node's check knows
-            if w.field.is_some() {
-                w.en(i).a.hittable = false;
-                r.d[2] = w.en_ref(i).ea.pos.raw;
-            }
+            // the vanish takes hits off (as TeleportNearPlayer's); its raw is what the node's check knows
+            w.en(i).a.hittable = false;
+            r.d[2] = w.en_ref(i).ea.pos.raw;
         }
         // field: the enter 0x0802C1B0 - SetAnimRaw(0x12) (the raw only: the tick stays), frame = rand(the animation's
         // frame count) (which prop the ninja poses as), SetState(0x03001B00: a state that holds); it runs when the
-        // state is entered (Northern Wilderness 15-7: in the frame of the GotoState). Battles keep the reference's
-        // rule (no draw, the animation set by the update)
-        K::NinjaDisguise if w.field.is_some() => {
+        // state is entered (Northern Wilderness 15-7: in the frame of the GotoState); battles too
+        K::NinjaDisguise => {
             let d = Arc::clone(&w.data);
             let cnt = {
                 let e = w.en_ref(i);
@@ -1580,33 +1563,23 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
                 set_anim_r(w, i, &[an(19)], true, h);
             }
         }
-        // field (sc_janemba): the arm part plays the strike (raw 19), the body keeps its idle; battle keeps the
-        // reference's body animation (cross_ts)
+        // (sc_janemba): the arm part plays the strike (raw 19), the body keeps its idle - battles too
         // (the arm's animation starts with its controller, on the node's first update)
-        K::JanembaHandStrikeA | K::JanembaHandStrikeB if w.field.is_some() => {}
-        K::JanembaHandStrikeA | K::JanembaHandStrikeB => {
-            set_anim(w, i, &[an(17)], true, Some(false))
-        }
-        // field (sc_janemba): anim 0x13 = raw 20, one pass at 8 frames a cel, held on its last cel through the rise and
-        // the descent; battle keeps the reference's
-        K::JanembaAscend if w.field.is_some() => {
+        K::JanembaHandStrikeA | K::JanembaHandStrikeB => {}
+        // (sc_janemba): anim 0x13 = raw 20, one pass at 8 frames a cel, held on its last cel through the rise and the
+        // descent - battles too
+        K::JanembaAscend => {
             let rule = w.data.anim.fallback_once;
             en::set_anim_rule(w, i, &[an(19)], true, Some(false), Some(rule));
             // the controller (0x030032B8) counts from its first update: cel 0 shows 9 frames
             w.en(i).ea.pos.tick = 0xffff;
         }
-        K::JanembaAscend => set_anim(w, i, &[an(18)], true, Some(true)),
-        // field: the same animation goes on (no restart)
-        K::JanembaDescendSummon if w.field.is_some() => {
+        // the same animation goes on (no restart)
+        K::JanembaDescendSummon => {
             w.en(i).a.z = -200;
             r.d[0] = -1;
             // its controller (0x0804D3C8) rises from its second frame (minis 229 frames after the ascent began)
             r.d[1] = 1;
-        }
-        K::JanembaDescendSummon => {
-            w.en(i).a.z = -200;
-            r.d[0] = -1;
-            set_anim(w, i, &[an(18)], true, Some(true));
         }
         // node 0x03003230 (enter 0x0803467A: SetAnimRaw(0x12), the hop controller, aim)
         K::MiniHopToward => {
@@ -1640,23 +1613,10 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             r.d[0] = V[f as usize].0;
             r.d[1] = V[f as usize].1;
         }
-        // field (HFIL's Janemba Hands, segments sc_hfil): the node's first update does the enter's work (the side
-        // draw, the jump to the player's position of that frame, the controller 0x0804D714)
-        K::HandAmbush if w.field.is_some() => {
-            r.d[0] = 0;
-        }
+        // (HFIL's Janemba Hands, segments sc_hfil): the node's first update does the enter's work (the side draw,
+        // the jump to the player's position of that frame, the controller 0x0804D714) - battles too
         K::HandAmbush => {
-            if let Some(pi) = en::player(w, i) {
-                let left = w.rng.rand(2) != 0;
-                let (ppx, py) = (w.pl_ref(pi).a.px(), w.pl_ref(pi).a.y);
-                let e = w.en(i);
-                e.a.x = (ppx + if left { 4 } else { -20 }) << 8;
-                e.a.y = py;
-                e.a.facing = if left { 2 } else { 3 };
-            }
-            set_anim(w, i, &[an(17)], true, Some(false));
             r.d[0] = 0;
-            w.en(i).a.alpha = 256;
         }
         K::SuperJanembaWave => timed_enter(w, i, &[an(19), an(3)], true),
         // field: the jump is SetAnim id 0x13 = raw 20 under its own controller 0x0804D310@0x0300325C (the type's
@@ -1668,8 +1628,8 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         // node 0x0874CA2C (Ronin / Samurai / Shogun guard): the enemy's SetAnim(0x11) (vfunc +0x28 -> 0x0800FAB6):
         // raw 19 under the one-shot state 0x03001B18 (16 ticks, then SetAnim(0)); restarted by every enter
         // (13-51: the Samurai's stance restarts every 3 frames while its state loops, and runs out when it does not).
-        // Field only: battles keep the rule the TypeScript cross-check pins
-        K::SelfMessage11 if w.field.is_some() => set_anim(w, i, &[an(18)], true, Some(false)),
+        // (battles too)
+        K::SelfMessage11 => set_anim(w, i, &[an(18)], true, Some(false)),
         // Babidi's state 0xCA, enter 0x0802ADF0: SetAnimRaw(0x15) under the controller 0x0300301C
         K::PlayAnimHold if w.en_ref(i).ty == 0x1d => {
             let h = w.data.anim.hold;
@@ -1706,14 +1666,14 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             let rule = w.data.anim.once_stop2;
             set_anim_r(w, i, &[an(if collapse { 17 } else { 18 })], false, rule);
         }
-        // field: the Yakon pose's SetAnim runs in the node's first update (below)
-        K::PlayAnim13Yakon if w.field.is_some() => {}
-        K::PlayAnim13 | K::PlayAnim13Yakon | K::GhostAnimA | K::GhostAnimB => {
+        // the Yakon pose's SetAnim runs in the node's first update (below)
+        K::PlayAnim13Yakon => {}
+        K::PlayAnim13 | K::GhostAnimA | K::GhostAnimB => {
             set_anim(w, i, &[an(18)], true, Some(false))
         }
-        // field (sc_janemba, Super Janemba's state 0x2DD: a hit cuts the teleport): the landing animation (0x13)
-        // played backwards from its end, then the vanish (0x11) backwards - 71 frames, then a SetAnim(0)
-        K::PlayAnimTimed if w.field.is_some() && w.en_ref(i).ty != 0x1d => {
+        // (sc_janemba, Super Janemba's state 0x2DD: a hit cuts the teleport): the landing animation (0x13) played
+        // backwards from its end, then the vanish (0x11) backwards - 71 frames, then a SetAnim(0) - battles too
+        K::PlayAnimTimed if w.en_ref(i).ty != 0x1d => {
             let hold = w.data.anim.hold;
             en::set_anim_rule(w, i, &[an(19)], true, Some(false), Some(hold));
             // no hits until its end
@@ -1728,7 +1688,6 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             set_anim_r(w, i, &[an(20)], true, h);
             w.g.buu_pacified = 1;
         }
-        K::PlayAnimTimed => set_anim(w, i, &[an(19)], true, Some(true)),
         K::DarkSphere => {
             let (cx, cy) = w.en_ref(i).a.center();
             let id = w.ents[i].id;
@@ -1761,8 +1720,8 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
 /// MiniHopToward's aim: the diagonal toward the player from the footprint centres (a zero keeps the facing)
 fn mini_aim(w: &mut World, i: usize) {
     let (mut dx, mut dy) = en::to_player(w, i);
-    // 0x080346FC aims with the whole-pixel footprint centres (0x0800FDFA + 0x0804F900)
-    if w.field.is_some() {
+    // 0x080346FC aims with the whole-pixel footprint centres (0x0800FDFA + 0x0804F900) - battles too
+    {
         if let Some(pi) = en::player(w, i) {
             let (px, py) = w.pl_ref(pi).a.fc();
             let (mx, my) = w.en_ref(i).a.fc();
@@ -1822,9 +1781,8 @@ fn leaf_exit(w: &mut World, c: &C, n: u16, _r: &mut NodeRt) {
         // its enter set (0x0804C690), which goes when the next state sets the actor's - a hit's GotoState into the
         // teleport: the beam stays active (and hits) through Kid Buu's next update and stops in the one after, its
         // retraction starting the frame after that - the real route, 19-3: hit f12345, beam hits f12346 / f12347,
-        // retracts from f12348)
-        K::KidBuuKamehameha if w.field.is_some() => w.en(i).beam_stop_due = 2,
-        K::KidBuuKamehameha => stop_enemy_beam(w, i),
+        // retracts from f12348) - battles too
+        K::KidBuuKamehameha => w.en(i).beam_stop_due = 2,
         // exit 0x08033AF6: crit = 0, hit dir = facing ^ 1 (the KnockbackSlide that follows slides it backwards), SetAnim(9)
         K::VampireGrab => {
             release_if_held(w);
@@ -1847,22 +1805,13 @@ fn leaf_exit(w: &mut World, c: &C, n: u16, _r: &mut NodeRt) {
         K::ShockStun => w.en(i).stunned = false,
         // the throw interrupted while the ball charges (a hit's state change): the ball goes, its destructor stops
         // the charge sound (real run 20-6 r062_001 tile +21,000 f418: stop 3 with the punch's sounds)
-        // (battles; the field drops the ball with its controller: shots::drop_charging_ball)
-        K::ThrowBigBall if w.field.is_none() => {
-            let me = w.ents[i].id;
-            let balls: Vec<usize> = (0..w.ents.len()).filter(|&k| !w.ents[k].removed && matches!(&w.ents[k].body, Body::Shot(s) if s.owner == me && matches!(s.kind, shots::ShotKind::SuperBall { phase: 0, .. }))).collect();
-            for k in balls {
-                w.ents[k].removed = true;
-                crate::vram::entity_gone(w, k);
-                w.sfx_stop(3);
-            }
-        }
+        // (the ball goes with its controller - the next animation: shots::drop_charging_ball)
         // exit 0x0803BD06 (vt 0x0804ADC0 +8): SetAnim(0) - the idle enter's rand(255) (real run 20-6 r062_001 tile
         // +5,000 f45: Vegeta reaches his waypoint)
         // then the actor showing sprite def 0x34 (`0x08000158(0x34)`: Super Buu's graphics) answers message 5 and the
         // wanderer turns toward it (0x0801599C: 24.8 difference, ties horizontal; real run 20-6 tiles: Vegeta faces
-        // Super Buu at each waypoint)
-        K::WanderToRandomPoint if w.field.is_some() => {
+        // Super Buu at each waypoint) - battles too
+        K::WanderToRandomPoint => {
             set_anim(w, i, &[nm("idle")], true, Some(true));
             let me = w.ents[i].id;
             let target = (0..w.ents.len()).find(|&k| {
@@ -1923,12 +1872,9 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             true
         }
         K::PushState => {
-            // field: the update 0x08018860 pushes on every call and returns 0 - a condition holding it pushes again
-            // the next time its tree runs (real run 14-2 r069_059 f334: the beam dodge pushed again after the
-            // first was cut short and popped); battles keep the reference's once-per-entry push
-            if r.d[0] != 0 && w.field.is_none() {
-                return true;
-            }
+            // the update 0x08018860 pushes on every call and returns 0 - a condition holding it pushes again the next
+            // time its tree runs (real run 14-2 r069_059 f334: the beam dodge pushed again after the first was cut
+            // short and popped) - battles too
             r.d[0] = 1;
             let st = par(c, n, P::State, 0) as u16;
             push(w, i, st);
@@ -2052,11 +1998,13 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         K::SelfDestruct => {
             // (a GotoState death's kill XP: the death effect made here gives it on its first update, `field::xp_due`)
             let exp = std::mem::take(&mut w.en(i).xp_at_death);
-            if exp != 0 && w.field.is_some() {
+            if exp != 0 {
                 if let Some(pi) = en::ctx_player(w, i) {
                     let pid = w.ents[pi].id;
                     if let Some(f) = w.field.as_mut() {
                         f.xp_due.push((pid, exp));
+                    } else {
+                        player::gain_xp(w, pi, exp);
                     }
                 }
             }
@@ -2067,12 +2015,10 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         // minus 1, finished at once. Field: the Blister spawns again once one of its eight has died (MEASURED run 2,
         // inside Buu 21-4: +0x204 8 -> 7 .. 4 at the deaths (write 0x0802F73C), the next Enzyme at row 1,599,304)
         K::LatchRelease => {
-            if w.field.is_some() {
-                let p = w.en_ref(i).parent;
-                if let Some(pi) = (p != 0).then(|| w.find(p)).flatten() {
-                    if let Body::Enemy(e) = &mut w.ents[pi].body {
-                        e.spawned -= 1;
-                    }
+            let p = w.en_ref(i).parent;
+            if let Some(pi) = (p != 0).then(|| w.find(p)).flatten() {
+                if let Body::Enemy(e) = &mut w.ents[pi].body {
+                    e.spawned -= 1;
                 }
             }
             true
@@ -2101,7 +2047,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             let Some(pi) = en::player(w, i) else {
                 return false;
             };
-            let rocks = kind(c, n) == K::ChasePlayerThroughRocks && w.field.is_some();
+            let rocks = kind(c, n) == K::ChasePlayerThroughRocks;
             if rocks {
                 rock_msg(w);
             }
@@ -2223,9 +2169,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             if en::player(w, i).is_none() {
                 return true;
             }
-            if w.field.is_some() {
-                en::face_player_exact(w, i);
-            }
+            en::face_player_exact(w, i);
             if w.en_ref(i).ea.pos.raw != 5 {
                 return false;
             }
@@ -2433,7 +2377,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         // the player's spawner 0x08019858: origin 0x0800FF44 on the body box; the blast tests its record's box (shots::ki_blast_box)
         // (the ki blast is its controller's work too: a hit's hurt state replaced it - after the pop the node is over;
         // segment sb 6-6 f18914)
-        K::KiBlast if w.field.is_some() && r.d[6] != w.en_ref(i).anim_seq as i32 => true,
+        K::KiBlast if r.d[6] != w.en_ref(i).anim_seq as i32 => true,
         K::KiBlast => {
             if f == 16 {
                 let (mx, my) = en::hand_point(w, i);
@@ -2448,10 +2392,10 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             }
             timed_end(w, i, f, 32)
         }
-        // field: the shot is the actor's animation state's (controller) work - a state that was replaced meanwhile
-        // (a hurt animation: Volcano 15-25, a Cursed One punched mid-throw) fires nothing and the node is over
+        // the shot is the actor's animation state's (controller) work - a state that was replaced meanwhile (a hurt
+        // animation: Volcano 15-25, a Cursed One punched mid-throw) fires nothing and the node is over (battles too)
         K::GunShot | K::RifleShot | K::NinjaStarThrow | K::MummyWrapShot | K::MummyWrapBurst
-            if w.field.is_some() && r.d[6] != w.en_ref(i).anim_seq as i32 =>
+            if r.d[6] != w.en_ref(i).anim_seq as i32 =>
         {
             true
         }
@@ -2557,7 +2501,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         // finished on the update that sees the anim frame at 3
         K::TurretOpen | K::TurretClose => {
             let done = w.en_ref(i).ea.pos.frame >= 3;
-            if done && w.field.is_some() && kind(c, n) == K::TurretClose {
+            if done && kind(c, n) == K::TurretClose {
                 w.en(i).a.hittable = true;
             }
             done
@@ -2690,13 +2634,13 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         // the beam fires at tick 8 (stop 3, sound 32); the state ends once tick > 90 (SetAnim(0); the exit stops the
         // beam: it retracts)
         K::KidBuuKamehameha => {
-            // (field: a new animation replaced the actor state 0x0804C690 while the beam charged - a hit's reaction,
+            // (a new animation replaced the actor state 0x0804C690 while the beam charged - a hit's reaction,
             // `enemy::set_anim_rule` dropped the beam: the node finds its controller gone and ends, the tree goes on
             // (run 2 row 1,926,312, 19-3: after the knockback Kid Buu walks, no second charge))
-            if w.field.is_some() && w.en_ref(i).beam == 0 && r.d[0] != 0 {
+            if w.en_ref(i).beam == 0 && r.d[0] != 0 {
                 return true;
             }
-            if w.field.is_some() {
+            {
                 let c = if f <= 8 { 0 } else { (f - 1) >> 3 };
                 let e = w.en(i);
                 e.ea.pos.frame = if c < 3 { c } else { 1 + ((c - 1) & 1) };
@@ -2725,23 +2669,16 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             true
         }
         K::TeleportNearPlayer => {
-            // field (sc_janemba): the controller (`enemy::tele_tick`) jumps at 36, takes hits again at 54 and SetAnim(0)s
-            // the boss at 72 - the node's end (the controller gone), MeleeAttack follows
-            if w.field.is_some() {
-                return w.en_ref(i).tele_ctl < 0;
-            }
-            if f == 36 {
-                en::teleport_beside(w, i, r.d[0]);
-            }
-            f >= 54
+            // (sc_janemba): the controller (`enemy::tele_tick`) jumps at 36, takes hits again at 54 and SetAnim(0)s the
+            // boss at 72 - the node's end (the controller gone), MeleeAttack follows
+            w.en_ref(i).tele_ctl < 0
         }
         K::TeleportChain4 => {
-            // field (sc_janemba): the jump 36 frames after the vanish shows, to side = counter & 3, hittable again 18
-            // later. Battle keeps the reference's
-            if w.field.is_some() && f % 72 == 54 {
+            // (sc_janemba): the jump 36 frames after the vanish shows, to side = counter & 3, hittable again 18 later
+            if f % 72 == 54 {
                 w.en(i).a.hittable = true;
             }
-            if w.field.is_some() {
+            {
                 // the node's check (0x08034502): out of the vanish / landing animations (a hurt that cut the
                 // vanish, state 0x2DD's reverse, the landing's end below) -> the persistent side counter
                 // (0x03003228) steps, a round one ends the chain, else the teleport restarts from this frame
@@ -2775,26 +2712,11 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                     r.d[2] = w.en_ref(i).ea.pos.raw;
                     r.f = 0;
                 }
-                return false;
+                false
             }
-            if f % 72 == 36 {
-                let side = w.g.tele_chain & 3;
-                en::teleport_beside(w, i, side);
-                w.g.tele_chain = (w.g.tele_chain + 1) % 12;
-                if w.g.tele_chain % 4 == 0 {
-                    return false;
-                }
-            }
-            f % 72 == 0 && w.g.tele_chain % 4 == 0
         }
-        K::NinjaDisguise => {
-            // field: the node's enter did it (leaf_enter)
-            if w.field.is_some() {
-                return true;
-            }
-            set_anim(w, i, &[an(17)], true, Some(true));
-            true
-        }
+        // (the node's enter did it: leaf_enter)
+        K::NinjaDisguise => true,
         K::NinjaReveal => {
             if f % 2 == 0 {
                 let jx = w.rng.rand(3) - 1;
@@ -2806,20 +2728,10 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             if f >= 64 {
                 // field (13-48): the controller 0x03003080 (update 0x0802C36A) ends at tick 64 with SetAnim(0) - the
                 // position stays where the last jitter put it; the node (0x0802C3D2) then puffs at the box centre
-                // with the rate 0x1000 + rand(0x1000). Battles keep the rule the TypeScript cross-check pins
-                if w.field.is_some() {
-                    set_anim(w, i, &[an(0)], true, Some(true));
-                    let (cx, cy) = w.en_ref(i).a.center();
-                    crate::fx::puff_rng(w, cx, cy);
-                    return true;
-                }
-                {
-                    let e = w.en(i);
-                    e.a.x = r.d[0];
-                    e.a.y = r.d[1];
-                }
+                // with the rate 0x1000 + rand(0x1000) - battles too
+                set_anim(w, i, &[an(0)], true, Some(true));
                 let (cx, cy) = w.en_ref(i).a.center();
-                crate::fx::puff(w, cx, cy, 0x1800);
+                crate::fx::puff_rng(w, cx, cy);
                 return true;
             }
             false
@@ -3118,7 +3030,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             }
             // field: the arm is the work of the animation's controller; a hit's hurt state replaced it - the node is
             // over after the pop (segment sb 6-6 f19062, as CandyBeam / KiBlast)
-            if w.field.is_some() && f < 72 && r.d[6] != w.en_ref(i).anim_seq as i32 {
+            if f < 72 && r.d[6] != w.en_ref(i).anim_seq as i32 {
                 return true;
             }
             if f < 72 {
@@ -3158,7 +3070,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             }
             // field: the beam is the work of the animation's controller (0x0300304C); a hit's hurt state replaced it
             // meanwhile - the node is over (segment sb 6-6 f18331, like the shot nodes)
-            if w.field.is_some() && f < 32 && r.d[6] != w.en_ref(i).anim_seq as i32 {
+            if f < 32 && r.d[6] != w.en_ref(i).anim_seq as i32 {
                 return true;
             }
             if f < 32 {
@@ -3202,10 +3114,10 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             f >= 92
         }
         K::GlideToWaypoint => {
-            // (field: after its 60 moves a 61st update ends it - the exit 0x0803C064 puts it on the nearest whole
-            // pixel and SetAnim(0)s it (an idle draw); the state change after it comes the next frame (real run
-            // 20-6/20-7 r062_001, Super Buu inside Buu: 303.98 -> 304, 127.91 -> 128, 112.03 -> 112)
-            if w.field.is_some() && f > 60 {
+            // (after its 60 moves a 61st update ends it - the exit 0x0803C064 puts it on the nearest whole pixel
+            // and SetAnim(0)s it (an idle draw); the state change after it comes the next frame (real run 20-6/20-7
+            // r062_001, Super Buu inside Buu: 303.98 -> 304, 127.91 -> 128, 112.03 -> 112) - battles too
+            if f > 60 {
                 {
                     let e = w.en(i);
                     e.a.x = (e.a.x + 128) & !0xFF;
@@ -3220,12 +3132,12 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 e.a.y += r.d[1];
             }
             en::clamp_inside(w, i);
-            w.field.is_none() && f >= 60
+            false
         }
         // field: the controller 0x030032A0 (update 0x0803926C) ticks from the update after the enter, tick 0 first: the
         // minion at tick 40 is the node's 41st update, the SetAnim(0) at tick 72 its 73rd (run 2 row 1,484,952, 20-5:
-        // the minion a frame after ours); battles keep the reference's 40 / 72
-        K::SummonMinion if w.field.is_some() => {
+        // the minion a frame after ours) - battles too
+        K::SummonMinion => {
             if f == 41 {
                 const OFF: [(i32, i32); 4] = [(8, 12), (8, -12), (-12, 8), (12, 8)];
                 let a = &w.en_ref(i).a;
@@ -3238,16 +3150,6 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 }
             }
             timed_end(w, i, f, 73)
-        }
-        K::SummonMinion => {
-            if f == 40 {
-                const OFF: [(i32, i32); 4] = [(8, 12), (8, -12), (-12, 8), (12, 8)];
-                let a = &w.en_ref(i).a;
-                let (ox, oy) = OFF[a.facing as usize];
-                let (x, y) = (a.px() + ox, a.py() + oy);
-                crate::battle::spawn_enemy(w, 0x0d, x, y, me, None);
-            }
-            timed_end(w, i, f, 72)
         }
         // SetAnimRaw(0xC) under 0x03001B30; finishes on the 56th update
         K::KidBuuSplitAnim => f >= 56,
@@ -3286,8 +3188,8 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         }
         // the part's controller is set by the node's first update; the hand on its 16th tick; its end SetAnim(0)s the
         // arm part (rand(255))
-        K::JanembaHandStrikeA | K::JanembaHandStrikeB if w.field.is_some() => {
-            // field: the node's first update gives the arm part the strike controller (it makes the hand and ends
+        K::JanembaHandStrikeA | K::JanembaHandStrikeB => {
+            // the node's first update gives the arm part the strike controller (it makes the hand and ends
             // the arm's animation itself: enemy.rs janemba_part_field); the node waits it out
             let arm = en::janemba_arm(w, i, kind(c, n) == K::JanembaHandStrikeA);
             // (not once Janemba is down: the killing punch that cut a strike starts no next one - the real route's
@@ -3304,21 +3206,10 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             // strikes of state 0xff, then the ascent)
             f >= 57 || (f > 1 && arm.is_none_or(|k| w.en_ref(k).strike.0 == 0))
         }
-        K::JanembaHandStrikeA | K::JanembaHandStrikeB => {
-            if f == 17 {
-                let _ = en::hand_strike(w, i, kind(c, n) == K::JanembaHandStrikeA);
-            }
-            if f >= 57 {
-                // the arm's SetAnim(0) (its idle start draw)
-                w.rng.rand(255);
-                return true;
-            }
-            false
-        }
         K::JanembaAscend => {
-            // field: the rise starts a frame later (sc_janemba f1065 / f2335: the arms, which copy the body's height,
+            // the rise starts at the 9th update (sc_janemba f1065 / f2335: the arms, which copy the body's height,
             // first move in the game's picture of f1068 / f2338)
-            let s = if w.field.is_some() { 9 } else { 8 };
+            let s = 9;
             if f >= s {
                 w.en(i).a.z = (3 * s - 3 * f).max(-200);
             }
@@ -3327,7 +3218,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         // field (sc_janemba): landed (67 frames), the animation plays back (cel 1 for 8 frames, then cel 0); 16 frames
         // later the screen shake (0x0800797C(0x46, 0x1E)); 16 more: the minis are topped up to 5 and the body goes back
         // to idle (SetAnim(0)) - the node's end (minis 229 frames after the ascent began)
-        K::JanembaDescendSummon if w.field.is_some() => {
+        K::JanembaDescendSummon => {
             if r.d[1] == 1 {
                 r.d[1] = 0;
                 return false;
@@ -3358,23 +3249,6 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                 }
             }
             false
-        }
-        K::JanembaDescendSummon => {
-            if w.en_ref(i).a.z < 0 {
-                let z = (w.en_ref(i).a.z + 3).min(0);
-                w.en(i).a.z = z;
-                if z == 0 {
-                    r.d[0] = 16;
-                }
-                return false;
-            }
-            if r.d[0] > 0 {
-                r.d[0] -= 1;
-                if r.d[0] == 0 {
-                    en::top_up_minis(w, i);
-                }
-            }
-            r.d[0] == 0 && f > 70
         }
         K::WaitMinisDefeated => !w.live_enemies().iter().any(|&o| w.en_ref(o).ty == 0x38),
         // update 0x080346FC: tick + 8 (wraps at 0x100); at 0 re-aim with chance(0x4000); > 0x80: the whole step
@@ -3458,35 +3332,25 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             // the node reads the roll controller's counter (0x03003248, +8 a tick from the enter), not a frame count
             // of its own: dash while it is 0x81 .. 0xFF, the hit and the end at exactly 0x100. A counter already past
             // 0x100 (a roll whose end was missed - run 2 rows 1,318,750 .. 1,319,519, Janemba's mini at 18-14 rolling
-            // for 600+ frames: its counter 4,968 at the cut) never ends the node until it wraps. Field only (battle
-            // never imports a running roll: there the counter is 8 x f)
+            // for 600+ frames: its counter 4,968 at the cut) never ends the node until it wraps
             let f = match w.en_ref(i).roll_ctl {
-                c if w.field.is_some() && c >= 0 => c >> 3,
+                c if c >= 0 => c >> 3,
                 _ => f,
             };
             if f > 16 && f < 32 {
-                // field (sc_janemba): the dash is a collision-checked step without sliding (a mini blocked by
-                // another stays put); battle keeps the reference's free move
-                if w.field.is_some() {
-                    en::try_move(w, i, r.d[0], r.d[1], 0, 0);
-                } else {
-                    en::move_by(w, i, r.d[0], r.d[1]);
-                }
+                // (sc_janemba): the dash is a collision-checked step without sliding (a mini blocked by another stays
+                // put) - battles too
+                en::try_move(w, i, r.d[0], r.d[1], 0, 0);
             }
             if f == 32 {
-                // field: the hit box is 0x0800FE78's, at the ground position (sc_janemba: a mini mid-hop hits)
-                let a = &w.en_ref(i).a;
-                let bb = if w.field.is_some() {
-                    a.body_box_ground()
-                } else {
-                    a.body_box()
-                };
+                // the hit box is 0x0800FE78's, at the ground position (sc_janemba: a mini mid-hop hits)
+                let bb = w.en_ref(i).a.body_box_ground();
                 en::area_hit(w, i, bb, atk(0), 0x400);
                 return true;
             }
             false
         }
-        K::HandAmbush if w.field.is_some() => {
+        K::HandAmbush => {
             if f == 1 {
                 if let Some(pi) = en::player(w, i) {
                     let left = w.rng.rand(2) != 0;
@@ -3530,21 +3394,12 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             // frame meets the sinking hand, not a still-striking one; HandSink runs one frame longer to keep the total)
             f >= 104
         }
-        K::HandAmbush => {
-            if (80..=103).contains(&f) && r.d[0] == 0 {
-                let bb = w.en_ref(i).a.body_box();
-                if en::area_hit(w, i, bb, atk(2), 0x400) {
-                    r.d[0] = 1;
-                }
-            }
-            f >= 106
-        }
         K::HandSink => {
             // update 0x0803B30E: unless the hand still shows its ambush strike (the object's current animation =
             // its def's animation table entry 0x54 / 4) the node is done at once - no sink. Real route 18-1
             // (r037_084): a hand hit by a ki blast while it rose stays in the hit's hold state (looping, stunned);
             // its state 0x117 lasts the Wait alone (182 frames, not 287). Ours: the strike is the one-shot
-            if w.field.is_some() && f == 1 && w.en_ref(i).a.anim_loop != Some(false) {
+            if f == 1 && w.en_ref(i).a.anim_loop != Some(false) {
                 return true;
             }
             w.en(i).a.alpha = (256 - f * 256 / 107).max(51);
@@ -3552,7 +3407,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             // second update, the cel its tick >> 3 (real route 18-1 rj03 f249 .. f355)
             // (its first update keeps the tick at 104 and does not rewrite the frame: the strike's last cel 12 stays,
             // not tick >> 3 = 13 - rj03_045 f251)
-            if w.field.is_some() && f >= 2 {
+            if f >= 2 {
                 let n = w
                     .en_ref(i)
                     .a
@@ -3565,13 +3420,10 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             }
             // field: the one-shot controller's end (0x0800EE78) leaves the hand in the walk state - an event that
             // starts during the Wait after it idles it (message 0xF: SetAnim(0), one draw; HFIL 18-12, sc_hfil)
-            if w.field.is_some() {
-                if f >= 106 {
-                    en::set_walk_state(w, i);
-                }
-                return f >= 106;
+            if f >= 106 {
+                en::set_walk_state(w, i);
             }
-            f >= 107
+            f >= 106
         }
         K::SuperJanembaWave => {
             if f == 24 {
@@ -3668,8 +3520,8 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         // 0x0803A556 (field): the first update SetAnim(0x13)s and enters controller 0x030032CC (0x0803A538: tick + 1,
         // cel = tick >> 3, at tick 32 the walk state 0x0800EE78 without an animation change - the last cel stays);
         // the node finishes when the enemy is no longer in that state: the controller ticks before the AI, so in
-        // the update after its 32nd tick (real route 8-38: the pose after the combo, then Wait 60)
-        K::PlayAnim13Yakon if w.field.is_some() => {
+        // the update after its 32nd tick (real route 8-38: the pose after the combo, then Wait 60) - battles too
+        K::PlayAnim13Yakon => {
             if f == 1 {
                 // (anim 0x13 = raw 20: real route 8-38, shipr_266 f6,062 - the pose showed raw 19)
                 set_anim(w, i, &[an(19)], true, Some(false));
@@ -3682,7 +3534,6 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         | K::PlayAnim12Yakon
         | K::PlayAnim12Yakon2
         | K::PlayAnim13
-        | K::PlayAnim13Yakon
         | K::PlayAnimOnce => {
             let d = Arc::clone(&w.data);
             // (field: the swarm minion's one-shot 0x03001B38 is shorter than 16 updates - it ends when the animation
@@ -3699,7 +3550,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             }
             done
         }
-        K::PlayAnimTimed if w.field.is_some() && w.en_ref(i).ty != 0x1d => {
+        K::PlayAnimTimed if w.en_ref(i).ty != 0x1d => {
             if f == 36 {
                 let hold = w.data.anim.hold;
                 en::set_anim_rule(w, i, &[an(17)], true, Some(false), Some(hold));
@@ -3741,13 +3592,12 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             false
         }
         // Babidi's controller tick 0x0802AEC0: the tick wraps at 0x20, cel = tick >> 3; the node never finishes
-        K::PlayAnimTimed if w.en_ref(i).ty == 0x1d => {
+        K::PlayAnimTimed => {
             let e = w.en(i);
             e.ea.pos.tick = f & 0x1f;
             e.ea.pos.frame = (f & 0x1f) >> 3;
             false
         }
-        K::PlayAnimTimed => f >= 32,
         K::DarkSphere => w.g.sphere_state == 1 || w.g.sphere_state == 3,
         // controller 0x0804E030 (update 0x08033D9A): tick 8 throws a rock at the player's footprint centre
         // + (rand(64) - 32, rand(64) - 32) from the facing offset 0x0875939C (rock object 0x08033F28)
@@ -3786,11 +3636,9 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         K::WaitSummonsDead => !w.live_enemies().iter().any(|&o| w.en_ref(o).ty == 0x92),
         K::SpawnEnzymes => {
             if w.en_ref(i).spawned >= 8 {
-                // field: at eight the timer is held at 480 (0x0802F590): the next spawn comes 480 frames after a
-                // death brings the count down (run 2 21-4: the count 7 at f7,090 of cut 1,591,712, Enzyme f7,592)
-                if w.field.is_some() {
-                    w.en(i).enz_timer = 480;
-                }
+                // at eight the timer is held at 480 (0x0802F590): the next spawn comes 480 frames after a death
+                // brings the count down (run 2 21-4: the count 7 at f7,090 of cut 1,591,712, Enzyme f7,592)
+                w.en(i).enz_timer = 480;
                 return false;
             }
             w.en(i).enz_timer -= 1;
@@ -3804,26 +3652,20 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                     .data
                     .sprite(0x57 - crate::content::GFX_OFFSET)
                     .map(|s| s.foot);
-                let field = w.field.is_some();
                 let free = match (foot, w.col.is_some()) {
                     (Some((fw, fh)), true) => {
                         let marked = w.en_ref(i).marked;
                         let c = w.col.as_mut().unwrap();
-                        let saved = marked.map(|m| (m, c.save_enemy(m)));
-                        if let Some((m, _)) = saved {
+                        if let Some(m) = marked {
                             c.mark_enemy(m, 1);
                         }
                         let ok = c.test(crate::world::Layer::Enemy, x, y, x + fw, y + fh);
-                        if let Some((m, sv)) = saved {
-                            // field: freed, tested, marked again (+0x48(1), the test, +0x48(0)): the Blister's whole
-                            // footprint is blocked after any try, a hole another enemy's leaving had made there is
-                            // filled (MEASURED run 2 21-6, cut 1,605,500: tile (21, 35) blocked again at the try in
-                            // f100, two frames before the spawn - an Enzyme below re-plans around the Blister)
-                            if field {
-                                c.mark_enemy(m, 0);
-                            } else {
-                                c.load_enemy(m, &sv);
-                            }
+                        if let Some(m) = marked {
+                            // freed, tested, marked again (+0x48(1), the test, +0x48(0)): the Blister's whole footprint
+                            // is blocked after any try, a hole another enemy's leaving had made there is filled
+                            // (MEASURED run 2 21-6, cut 1,605,500: tile (21, 35) blocked again at the try in f100, two
+                            // frames before the spawn - an Enzyme below re-plans around the Blister) - battles too
+                            c.mark_enemy(m, 0);
                         }
                         ok
                     }
@@ -3875,10 +3717,9 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             w.en(i).a.alpha = if f & 2 != 0 { 77 } else { 256 };
             f as i64 >= par(c, n, P::Frames, 32)
         }
-        // field (sc_janemba): the stun lasts the hurt animation (0x08039BFD: done when the state's animation ended);
-        // battle keeps the reference's 48 frames
-        K::ShockStun if w.field.is_some() => f > 1 && w.en_ref(i).ea.pos.raw != 10,
-        K::ShockStun => f >= 48,
+        // (sc_janemba): the stun lasts the hurt animation (0x08039BFD: done when the state's animation ended) -
+        // battles too
+        K::ShockStun => f > 1 && w.en_ref(i).ea.pos.raw != 10,
         K::VolleyballTransform | K::VolleyballRestore => {
             w.en(i).volleyball = kind(c, n) == K::VolleyballTransform;
             let (cx, cy) = w.en_ref(i).a.center();
@@ -3985,12 +3826,9 @@ fn hit_node(w: &mut World, i: usize, t: &Arc<BehTree>, n: u16, msg: &HitMsg) -> 
                 1
             }
         }
-        // on-hit 0x0803999D (field, sc_janemba): the body parts play the hurt animation from the hit's frame; battle
-        // keeps the reference (no part flash)
+        // on-hit 0x0803999D (sc_janemba): the body parts play the hurt animation from the hit's frame (battles too)
         K::JanembaPartFlash => {
-            if w.field.is_some() {
-                en::janemba_parts_hurt(w, i);
-            }
+            en::janemba_parts_hurt(w, i);
             1
         }
         K::GotoState => {
@@ -4115,7 +3953,7 @@ fn hit_node(w: &mut World, i: usize, t: &Arc<BehTree>, n: u16, msg: &HitMsg) -> 
         // a fragment's footprint 64 px below is on walkable tiles (0x08009904), the enemy ctor 0x0800F68C builds a
         // fragment (type 14 "freezes the player", def 0x087113FC, sprite 45) at this enemy's pixel position (real
         // run 20-5 r061_004 f6,130: Super Buu, Gotenks absorbed, hit by a punch)
-        K::FreezeHelperHit if w.field.is_some() => {
+        K::FreezeHelperHit => {
             if w.live_enemies().into_iter().any(|o| w.en_ref(o).ty == 14) {
                 return 1;
             }
@@ -4130,6 +3968,11 @@ fn hit_node(w: &mut World, i: usize, t: &Arc<BehTree>, n: u16, msg: &HitMsg) -> 
                 .as_ref()
                 .is_some_and(|c| !c.test(crate::world::Layer::Walk, px, py, px + fw, py + fh))
             {
+                return 1;
+            }
+            // (battles: the field object's constructor sequence, not counted for the fight's end)
+            if w.field.is_none() {
+                en::battle_crew(w, 14, 45, x >> 8, y >> 8, false);
                 return 1;
             }
             // (a run-time placed enemy like a tank's crew: its death runs the type's drop script, 0x08710F99)
@@ -4151,11 +3994,11 @@ fn hit_node(w: &mut World, i: usize, t: &Arc<BehTree>, n: u16, msg: &HitMsg) -> 
             1
         }
         // a worm piece hit (0x0802D328): it reverses / the chain splits (`enemy::worm_shield_hit`)
-        K::ShieldHit if w.field.is_some() => {
+        K::ShieldHit => {
             en::worm_shield_hit(w, i);
             1
         }
-        K::AbsorbPose | K::AbsorbPose2 | K::FreezeHelperHit | K::ShieldHit => 1,
+        K::AbsorbPose | K::AbsorbPose2 => 1,
         _ => 0,
     }
 }

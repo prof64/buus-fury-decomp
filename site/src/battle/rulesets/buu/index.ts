@@ -460,7 +460,7 @@ export class BuuRuleset implements Ruleset {
     w.add(player)
     if (w.arena.image && typeof Image !== 'undefined') void loadAll([w.arena.image])
 
-    const spawnEnemy = (ww: World, type: number, x: number, y: number, parent?: Enemy | null, start?: number): Enemy | null => {
+    const spawnEnemy = (ww: World, type: number, x: number, y: number, parent?: Enemy | null, start?: number, exact = false): Enemy | null => {
       const t = d.enemies[type]
       if (!t) return null
       const e = new Enemy(ctx, t)
@@ -469,7 +469,7 @@ export class BuuRuleset implements Ruleset {
       e.y = y << 8
       e.clampInside(ww)
       // on walkable ground, clear of the other enemies' marked footprints (nearest free spot)
-      if (ctx.col && !parent) {
+      if (ctx.col && !parent && !exact) {
         const [fx, fy] = ctx.col.freeSpot('enemy', e.px, e.py, e.footW, e.footH, ww.arena.bounds, region)
         e.x = fx << 8
         e.y = fy << 8
@@ -500,7 +500,7 @@ export class BuuRuleset implements Ruleset {
       }
       return e
     }
-    ctx.spawnEnemy = (ww, type, x, y, parent, start) => spawnEnemy(ww, type, x, y, parent as Enemy | null, start)
+    ctx.spawnEnemy = (ww, type, x, y, parent, start, exact) => spawnEnemy(ww, type, x, y, parent as Enemy | null, start, exact)
 
     let phase = 0
     let nextPhaseAt = 0

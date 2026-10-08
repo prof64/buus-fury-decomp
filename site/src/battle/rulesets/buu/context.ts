@@ -98,7 +98,8 @@ export class BuuCtx {
   /** 0x030032E5: re-plan phase handed to the next path follower (path.ts), +1 & 7 each time */
   pathStagger = 0
   /** spawn an enemy of `type` at integer px (set by index.ts) */
-  spawnEnemy: (w: World, type: number, x: number, y: number, parent?: EnemyLike | null, startState?: number) => EnemyLike | null = () => null
+  /** `exact`: at (x, y) as given, no free-spot search (a field object's constructor: a tank's crew) */
+  spawnEnemy: (w: World, type: number, x: number, y: number, parent?: EnemyLike | null, startState?: number, exact?: boolean) => EnemyLike | null = () => null
   private lastPopup = new Map<Actor, { frame: number; p: Popup; value: number }>()
 
   /** map collision of the arena (null = open arena, bounds only) */

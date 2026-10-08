@@ -117,7 +117,10 @@ fn norm(w: &World, v: &RenderView) -> Vec<String> {
         v.obj_shake,
         v.hud.first().map(|h| (h.hidden, h.y_off, h.hp, h.ep, h.ss, h.skill, h.skill_alt)),
     ));
-    let _ = cam;
+    // BF_CAM: where the screen frames the player (the camera's offset from the player's position)
+    if std::env::var_os("BF_CAM").is_some() {
+        out.push(format!("cam ({},{})", cam.x - px, cam.y - py));
+    }
     out
 }
 
@@ -249,8 +252,19 @@ fn run(data: &Arc<GameData>, s: &Scn, verbose: bool) -> (usize, usize, Vec<Strin
     }
     fs.world.rng = bs.world.rng;
     for (k, &keys) in s.keys.iter().enumerate() {
+        // BF_TRACE=<frame>: every generator call of that frame with its caller, both sessions
+        let tr = std::env::var("BF_TRACE").ok().and_then(|v| v.parse::<usize>().ok()) == Some(k);
+        let set = |on: bool| wf_core::rng::TRACE.store(on, std::sync::atomic::Ordering::Relaxed);
+        if tr {
+            eprintln!("== battle f{k}");
+            set(true);
+        }
         Sim::step(&mut bs, &[keys], &mut ev);
+        if tr {
+            eprintln!("== field f{k}");
+        }
         Sim::step(&mut fs, &[keys], &mut ev);
+        set(false);
         if !s.enemies.iter().any(|e| e.0 < 0) {
             inert(&mut bs.world);
             inert(&mut fs.world);
@@ -265,6 +279,13 @@ fn run(data: &Arc<GameData>, s: &Scn, verbose: bool) -> (usize, usize, Vec<Strin
                 let p = w.pl_ref(pi);
                 let sp: Vec<String> = v.sprites.iter().filter(|s| s.entity == w.ents[pi].id).map(|s| format!("{} ({},{})", s.sheet, s.x, s.y)).collect();
                 eprintln!("{tag} f{k} p ({},{}) sprites {:?} cam {:?}", p.a.x, p.a.y, sp, v.cameras.first());
+            }
+        }
+        if std::env::var("BF_GRID").ok().and_then(|v| v.parse::<usize>().ok()) == Some(k) {
+            if let (Some(cb), Some(cf)) = (bs.world.col.as_ref(), fs.world.col.as_ref()) {
+                let diff: Vec<(usize, usize, u8, u8)> = (0..cb.enemy.len()).filter(|&j| cb.enemy[j] != cf.enemy[j]).map(|j| (j % 256 * 8, j / 256 * 8, cb.enemy[j], cf.enemy[j])).collect();
+                let wd = cb.walk.as_ref().map(|v| v.len()).unwrap_or(0) != cf.walk.as_ref().map(|v| v.len()).unwrap_or(0) || cb.walk != cf.walk;
+                eprintln!("f{k} enemy grid: {} tiles differ (x, y, battle, field) {:?} | walk grids differ {wd}", diff.len(), &diff[..diff.len().min(40)]);
             }
         }
         if std::env::var_os("BF_RNG").is_some() && (bs.world.rng.calls, bs.world.rng.a) != (fs.world.rng.calls, fs.world.rng.a) {
@@ -306,6 +327,16 @@ fn run(data: &Arc<GameData>, s: &Scn, verbose: bool) -> (usize, usize, Vec<Strin
                     }
                 }
             }
+        }
+        // the player's KO + 199: the battle ends there (everything holds for the result), the field's death script
+        // takes over - not a drawing difference; the comparison stops
+        let ko_end = |w: &World| {
+            let pi = w.player_idx(0).unwrap();
+            let p = w.pl_ref(pi);
+            p.ko_at >= 0 && w.frame as i64 - p.ko_at >= 199
+        };
+        if ko_end(&bs.world) && ko_end(&fs.world) {
+            break;
         }
         if nb != nf {
             nd += 1;

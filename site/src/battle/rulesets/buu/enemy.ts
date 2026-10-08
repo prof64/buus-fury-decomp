@@ -12,7 +12,7 @@ import { AiController } from './ai'
 import type { BuuCtx, EnemyLike, PlayerLike } from './context'
 import { ATK, computeDamage, type AttackType } from './damage'
 import { GFX_OFFSET, type EnemyType } from './data'
-import { MummyWrap, StraightShot, type GrowBeam, type KameBeam } from './projectiles'
+import { KameBeam, MummyWrap, StraightShot, SuperBall, type GrowBeam } from './projectiles'
 import { audioEvent } from '../../audio/bus'
 import { ENEMY_SETANIM, EnemyAnim, setAnimRule, type EAnimRule } from './eanim'
 
@@ -147,12 +147,37 @@ export class Enemy extends Actor implements EnemyLike {
   hoverCtl = false
   /** the jump smash's landing dust: clouds still to make on the controller's next ticks */
   smashPuffs = 0
+  /** the beam of a left KidBuuKamehameha stops at this enemy's second update after (ai.ts) */
+  beamStopDue = 0
+  /** the state tick's end callback is running (its SetAnim(0) drops no charge) */
+  private inTick = false
+  /** the charging Super Buu ball (shots::drop_charging_ball: removed, stop 3) and the charging Kamehameha
+   *  (enemy::drop_charging_kame: its stop - removed, stop 3) */
+  private dropCharging() {
+    const w = this.w
+    if (!w) return
+    for (const x of w.entities) {
+      if (x instanceof SuperBall && x.owner === this && x.phase === 0 && !x.removed) {
+        x.removed = true
+        audioEvent('sfx_stop', { id: 3 })
+      }
+    }
+    const b = this.beam
+    if (b instanceof KameBeam && b.charging && b.owner === this && w.entities.includes(b)) {
+      b.stop()
+      this.beam = null
+    }
+  }
   /** the landing's three dust clouds (0x08035D04 ..: each rate 0x1000 + rand(0x1000)) */
   smashDust() {
     for (let k = -1; k <= 1; k++) this.ctx.puffRng(this.w, this.center()[0] + k * 12, this.py + 4)
   }
   update(w: World) {
     this.w = w
+    if (this.beamStopDue > 0 && --this.beamStopDue === 0) {
+      this.beam?.stop()
+      this.beam = null
+    }
     // the player's death script (0x08799D0C) blocks every object update at KO + 199; from KO + 200 an enemy only
     // runs its state tick (caller 0x0800F5E0: no AI) (lockstep f02_vs_enemy_t0c frames 540+)
     const koAt = this.ctx.player?.koAt ?? -1
@@ -167,12 +192,14 @@ export class Enemy extends Actor implements EnemyLike {
       this.smashDust()
     }
     if (this.contactCd > 0) this.contactCd--
-    if (this.defeated) {
+    // (a defeated enemy whose death node is a GotoState - ko -1 - stays the object it was: its AI runs the death state)
+    if (this.defeated && this.ko >= 0) {
       this.ko++
       if (this.ko > 150) this.alpha = Math.max(0, 1 - (this.ko - 150) / 30)
       if (this.ko > 180) this.removed = true
       return
     }
+    if (this.part && (this.type.type === 0x34 || this.type.type === 0x35 || this.type.type === 0x37)) return this.janembaPartField()
     if (this.part) {
       const par = this.parentE
       if (!par || par.removed || par.defeated) {
@@ -203,8 +230,13 @@ export class Enemy extends Actor implements EnemyLike {
    *  (buu_enemy_anim_sim.json), else the enemy SetAnim table (0x080726B8); `rule` forces one (e.g. the back-off's
    *  reversed walk). Re-entering restarts the state (idle draws a new start tick). */
   setAnim(ref: number | string | (number | string)[], restart = true, loop?: boolean, rule?: EAnimRule) {
+    // a charging Super Buu ball / Kamehameha belongs to the actor state its node set: a new animation (not SetAnim
+    // 15, the throw's own) replaces it and the charge goes (wf-core enemy::set_anim_rule; the state tick's own end
+    // SetAnim(0) is not this path)
+    if (!this.inTick && (Array.isArray(ref) ? ref[0] : ref) !== 15) this.dropCharging()
     this.spitCtl = -1
     this.rollCtl = -1
+    this.teleCtl = -1
     this.hoverCtl = false
     this.stateHook = null
     const prev = this.anim
@@ -258,6 +290,12 @@ export class Enemy extends Actor implements EnemyLike {
       if (t === 0xc0 && this.sprite?.anim(20)) this.setRaw(20)
       this.ea.pos.frame = t < 0x80 ? 0 : t - 0x80 < 0x40 ? 1 : ((t - 0x80) >> 5) & 1
       this.rollCtl = (t + 8) & 0xffff
+      // the height: from t = 0x80 -(sin table [t - 0x80] >> 11), a 32 px leap over the dash, 0 from t = 0x100
+      // (sc_janemba 18-14 f5,150: the body 0, 7, 13 .. 32 px over its shadow)
+      if (t >= 0x80) {
+        const u = t - 0x80
+        this.z = u >= 0x80 ? 0 : -ROLL_ARC[(u >> 3) & 15]
+      }
     }
     if (this.hoverCtl) {
       this.z = Math.max(-50, this.z - 1)
@@ -268,13 +306,41 @@ export class Enemy extends Actor implements EnemyLike {
     }
     // the state's tick (vtable +4) runs before the AI; a one-shot's end callback is SetAnim(0)
     if (this.ea.tick() === 'idle') {
+      this.inTick = true
       this.setAnim('idle', true, true)
+      this.inTick = false
       this.animEnded = true
     } else if (this.ea.pos.raw !== this.anim.raw) {
       const a = this.sprite?.anim(this.ea.pos.raw)
       if (a) this.anim = a
     }
     this.frameIdx = this.ea.pos.frame
+    // (after the state tick: its SetAnim(0) draws)
+    if (this.teleCtl >= 0) this.teleTick()
+  }
+  /** TeleportNearPlayer's controller (0x08034BDE), -1 = not running; its side */
+  teleCtl = -1
+  teleSide = 0
+  /** the controller's update: tick + 1; at 36 the jump beside the player and SetAnimRaw(0x14) (raw 21), frame 0;
+   *  frame = tick >> 2, from the landing (tick - 36) >> 2; hittable again from 54; at 72 SetAnim(0) - the node's end
+   *  (sc_janemba) */
+  private teleTick() {
+    const t = this.teleCtl + 1
+    this.teleCtl = t
+    if (t === 36) {
+      this.teleportBeside(this.teleSide)
+      this.teleCtl = t
+      if (this.sprite?.anim(21)) this.holdPose(21, 0)
+    }
+    if (t >= 72) {
+      this.setAnim(0, true, true)
+      return
+    }
+    if (this.ownState && (this.ea.pos.raw === 19 || this.ea.pos.raw === 21)) {
+      this.ea.pos.frame = t < 36 ? t >> 2 : (t - 36) >> 2
+      this.frameIdx = this.ea.pos.frame
+    }
+    if (t >= 54) this.hittable = true
   }
   animDone(): boolean {
     if (!this.anim) return true
@@ -472,10 +538,17 @@ export class Enemy extends Actor implements EnemyLike {
     const [dx, dy] = this.toPlayer()
     return dx * dx + dy * dy
   }
+  /** the game's face-the-player routine 0x0801599C: the 24.8 position difference, the dominant axis with ties
+   *  horizontal, no turn when equal (wf-core enemy::face_player_exact; story playthrough) */
   facePlayer() {
-    if (!this.player) return
-    const [dx, dy] = this.toPlayer()
-    this.facing = facingToward(dx, dy)
+    const p = this.player
+    if (!p) return
+    const dx = p.x - this.x
+    const dy = p.y - this.y
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      if (dx === 0) return
+      this.facing = dx > 0 ? 3 : 2
+    } else this.facing = dy > 0 ? 0 : 1
   }
   /** 0x0800FF44: the shot origin on the body box (0x0800FE78), centre c: down (cx, position y), up (cx, cy), left
    *  (x0, cy), right (x1, cy) */
@@ -547,7 +620,8 @@ export class Enemy extends Actor implements EnemyLike {
    *  controller (0x0804E938, rise / vanish); Attach 0x0800F954 when those end. Modelled: body parts, worm segments,
    *  the enemy holding the player, airborne (height offset), defeated (INFERRED mapping of the controllers) */
   attached(): boolean {
-    return !this.part && !this.prev && !this.defeated && !this.detached && !this.removed && this.z === 0 && this.ctx.player?.heldBy !== this
+    // (the height does not detach: sc_janemba, a hopping Mini-Janemba keeps marking the enemy grid)
+    return !this.part && !this.prev && !(this.defeated && this.ko >= 0) && !this.detached && !this.wormRemark && !this.removed && this.ctx.player?.heldBy !== this
   }
   /** obj+0x291 set by the Detach node (enemy_ai.json "SpawnPuff", enter 0x0804E53C -> 0x0800F924): off the enemy grid
    *  for good (the Ghost's first state) */
@@ -569,10 +643,21 @@ export class Enemy extends Actor implements EnemyLike {
   }
   /** keep the marks on the current footprint (positions set directly: spawns, teleports, followers) */
   syncMark() {
+    // RandomStep writes the position only: the grid keeps the mark of the kept position while the bones rattle (the
+    // real route, Volcano 15-14)
+    if (this.jitter && this.marked) return
     const m = this.marked
     if (m && this.attached() && m[0] === this.px && m[1] === this.py) return
     this.unmarkSelf()
     this.markSelf()
+  }
+  /** a RandomStep is moving the actor around its kept position (the grid mark stays at that position) */
+  jitter = false
+  /** a detached enemy (obj+0x291: a Ghost) fits anywhere - the game's test is the enemy grid alone, which it is off for
+   *  good (Pilaf's Castle 10-27: a Ghost chases a player outside the walk bounds) */
+  fits(w: World, x: number, y: number): boolean {
+    if (this.detached) return true
+    return super.fits(w, x, y)
   }
   /** vfunc +0x54 = 0x0800F9EE(enemy, pos): footprint on the enemy grid; a detached enemy (obj+0x291 != 0) always fits */
   passable(_w: World, x: number, y: number): boolean {
@@ -586,6 +671,13 @@ export class Enemy extends Actor implements EnemyLike {
     const ok = c.test('enemy', x, y, x + this.footW, y + this.footH)
     c.load('enemy', ...m, saved)
     return ok
+  }
+  /** the object's own grid test (vt+0x54, 0x0800F9EE): the footprint at (x, y) against the enemy grid as it is - its
+   *  own mark included (wf-core enemy::grid_free) */
+  gridFree(x: number, y: number): boolean {
+    const c = this.ctx.col
+    if (!c || !this.attached()) return true
+    return c.test('enemy', x, y, x + this.footW, y + this.footH)
   }
   /** enemy step (ChasePlayer's step 0x0803B9xx, the back-off / step-away steps 0x08018C3A / 0x0801CBA1): unmark, try the full move, else only
    *  the x part (fx), else only the y part (fy), re-mark. true = the full move was taken */
@@ -888,7 +980,8 @@ export class Enemy extends Actor implements EnemyLike {
    *  after its step, AlignWithPlayer 0x0801CEEC before its move); gfx 0xA4 / 0x44 / 0xBF on ticks 8 / 24 (path
    *  follower only) */
   footstep(path: boolean) {
-    const g = this.type.gfx
+    // (the object's own graphics: a placement's sprite, a swapped set - Pilaf's Castle 10-14)
+    const g = this.gfxNow ?? this.type.gfx
     // the game's step SetAnim(1)s (0x0803B9DA) before this test: a first walking step counts as walk tick 0 (the
     // simulator switches to the walk animation after the AI; lockstep f02_vs_enemy_t14)
     const t = this.moving && this.anim?.name !== 'walk' ? 0 : this.ea.pos.tick
@@ -1080,7 +1173,10 @@ export class Enemy extends Actor implements EnemyLike {
   contactExplode(): boolean {
     const p = this.player
     if (!p || !overlaps(this.bodyBox(), p.bodyBox())) return false
-    return p.onMessage(this.w, { team: 0, rect: this.bodyBox(), dir: this.facing, mult: 0x1000, atk: ATK[1], attacker: this, source: this })
+    const hit = p.onMessage(this.w, { team: 0, rect: this.bodyBox(), dir: this.facing, mult: 0x1000, atk: ATK[1], attacker: this, source: this })
+    // an accepted hit plays sound 48 + rand(2) (0x080390D8; run 2 row 1,485,000, 20-5)
+    if (hit) audioEvent('sfx', { id: 48 + this.w.rng.rand(2, 'enemy melee hit sfx'), vol: 64 })
+    return hit
   }
   areaHit(rect: Rect, atk: AttackType, mult: number): boolean {
     const p = this.player
@@ -1172,6 +1268,13 @@ export class Enemy extends Actor implements EnemyLike {
 
   // ---- teleports / special -----------------------------------------------------------------------------------------
   ninjaTeleport() {
+    // the update (0x0802C1DC) takes the enemy off the enemy grid first and puts it back at the end - at the new spot
+    // after a jump, in the same update (run 2 row 1,891,199, 0-50's Ninjas)
+    this.unmarkSelf()
+    this.ninjaTeleportTries()
+    this.markSelf()
+  }
+  private ninjaTeleportTries() {
     const w = this.w
     for (let i = 0; i < 16; i++) {
       const dx = w.rng.rand(201, 'teleport dx') - 100
@@ -1191,13 +1294,52 @@ export class Enemy extends Actor implements EnemyLike {
     const OFF = [[0, 32], [0, -32], [-32, 0], [32, 0]]
     const [ox, oy] = OFF[side & 3]
     this.ctx.puff(this.w, ...this.center())
-    const [pfx, pfy] = p.footCenter()
-    this.x = (pfx + ox - (this.footW >> 1)) << 8
-    this.y = (pfy + oy - (this.footH >> 1)) << 8
-    this.clampInside(this.w)
-    this.facePlayer()
+    // (sc_janemba): the player's whole-pixel position + the side offset, moved to a free spot of the walk layer
+    this.x = (p.px + ox) << 8
+    this.y = (p.py + oy) << 8
+    this.freeSpot()
+    // the landing keeps the facing (the sequence's FacePlayer turns it); the grid is not touched: the old footprint
+    // stays marked for good and the enemy takes the new spot as its own (Super Janemba's teleports leave holes)
+    this.marked = [this.px, this.py, this.px + this.footW, this.py + this.footH]
     this.setAnim(19, true, false)
     this.ctx.puff(this.w, ...this.center())
+  }
+  /** 0x08009816: a footprint that does not fit the walk layer moves to the first free tile-aligned spot of a square
+   *  spiral around its tile (wf-core enemy::free_rect) */
+  freeSpot() {
+    const c = this.ctx.col
+    if (!c) return
+    const [x, y, rw, rh] = [this.px, this.py, this.footW, this.footH]
+    if (c.test('walk', x, y, x + rw, y + rh)) return
+    const bx = x & ~7
+    const by = y & ~7
+    for (let k = 0; k < 4096; k++) {
+      const s = Math.floor(Math.sqrt(k))
+      let dx: number
+      let dy: number
+      if (s & 1) {
+        if (s * s + s >= k) {
+          dx = (s + 1) >> 1
+          dy = k - s * s - ((s + 1) >> 1) + 1
+        } else {
+          dx = ((s + 1) >> 1) - k + s * s + s
+          dy = (s + 1) >> 1
+        }
+      } else if (s * s + s >= k) {
+        dx = -s >> 1
+        dy = (-s >> 1) - k + s * s + s
+      } else {
+        dx = k - s * s - s + (-s >> 1)
+        dy = -s >> 1
+      }
+      const nx = bx + dx * 8
+      const ny = by + dy * 8
+      if (c.test('walk', nx, ny, nx + rw, ny + rh)) {
+        this.x = nx << 8
+        this.y = ny << 8
+        return
+      }
+    }
   }
   kidBuuSplit() {
     const w = this.w
@@ -1257,26 +1399,130 @@ export class Enemy extends Actor implements EnemyLike {
     other.primary = false
     this.w.logEvent('info', `Kid Buu merges back: ${this.hp} HP`)
   }
+  /** Janemba's body parts (sc_janemba, emulator 0x0803D0C4 / 0x0803CE94): created at (-16, -16) / (48, -16) /
+   *  (16, -40); the enemy constructor marks each footprint on the enemy grid where it is made, and nothing unmarks it
+   *  (the mirror node moves the parts without marks: the minis hop around it) */
   janembaParts() {
-    const defs: [number, number, number][] = [[0x34, -12, -22], [0x35, 44, -22], [0x37, 16, -41]]
-    for (const [t, ox, oy] of defs) {
-      const p = this.ctx.spawnEnemy(this.w, t, this.px + ox, this.py + oy, this, -1) as Enemy | null
+    const defs: [number, number, number, number, number][] = [[0x34, -12, -22, -16, -16], [0x35, 44, -22, 48, -16], [0x37, 16, -41, 16, -40]]
+    for (const [t, ox, oy, sx, sy] of defs) {
+      const p = this.ctx.spawnEnemy(this.w, t, this.px + sx, this.py + sy, this, -1) as Enemy | null
       if (p) {
         p.part = true
         p.partOffset = [ox, oy]
         p.hittable = false
         p.layer = 0
+        this.ctx.col?.mark('enemy', p.px, p.py, p.px + p.footW, p.py + p.footH, 0)
+        p.marked = null
       }
     }
   }
-  handStrike(a: boolean) {
+  /** an arm part (0x34 / 0x35) in a hand strike: its strike controller's ticks (0 = none) and side (A = 0x34) */
+  strike: [number, boolean] = [0, false]
+  strikeHand: HandRise | null = null
+  /** part 0x37's mirror node: the body's raw and cel seen on its previous update */
+  mirrorRaw = 0
+  mirrorCel = 0
+  /** Janemba's arm part for a hand strike: A = 0x34 (screen left), B = 0x35 */
+  janembaArm(a: boolean): Enemy | null {
+    const t = a ? 0x34 : 0x35
+    return (this.w.entities.find((k) => !k.removed && k instanceof Enemy && k.part && k.parentE === this && k.type.type === t) as Enemy | undefined) ?? null
+  }
+  /** a Janemba part's hurt animation ends with SetAnim(0) (the idle's rand(255)) */
+  private partHurtEnd() {
+    if (this.ea.pos.raw === 10 && this.ea.done) this.setAnim(0, true, true)
+  }
+  /** a Janemba part's update (sc_janemba): the body's height and facing; the arm's hand strike controller (the hand
+   *  on its 16th tick, on its 56th the hand idles - rand(255) - and goes, its marked tiles freed, and the arm
+   *  SetAnim(0)s); part 0x37's AI node places the chain at the body + (16, -40) / (-12, -21) / (44, -21) plus a y
+   *  delta by the body's cel read before the body's own tick: hurt (raw 10) [-1, -2, -1], raw 20 [15, -3, -5], else
+   *  [0, 1, 0, -1] (wf-core enemy::janemba_part_field) */
+  private janembaPartField() {
+    const par = this.parentE
+    if (!par || par.removed || par.defeated) {
+      this.removed = true
+      return
+    }
+    const raw0 = par.ea.pos.raw
+    const cel0 = par.ea.pos.frame
+    const [x, y] = [par.x, par.y]
+    this.z = par.z
+    this.facing = par.facing
+    this.partHurtEnd()
+    const [st0, aSide] = this.strike
+    if (st0 > 0) {
+      const st = st0 + 1
+      this.strike = [st >= 57 ? 0 : st, aSide]
+      if (st === 17) this.strikeHand = par.handStrike(aSide)
+      if (st >= 57) {
+        const h = this.strikeHand
+        this.strikeHand = null
+        if (h && this.w.entities.includes(h)) {
+          this.w.rng.rand(255, 'hand idle tick')
+          h.unmark()
+          h.removed = true
+        }
+        this.setAnim(0, true, true)
+      }
+    }
+    if (this.type.type !== 0x37) return
+    const seen = this.mirrorRaw
+    this.mirrorRaw = raw0
+    const lastCel = this.mirrorCel
+    this.mirrorCel = cel0
+    // (a switch into the ascent's controller animation (raw 20) shows in the table a frame late; under it the frame
+    // byte lags a frame more)
+    const raw = raw0 === 20 && seen !== 0 ? seen : raw0
+    const cel = (raw === 20 && seen === raw) || (raw0 === 20 && seen !== 20 && seen !== 0) ? lastCel : cel0
+    const table = raw === 10 ? [-1, -2, -1] : raw === 20 ? [15, -3, -5] : [0, 1, 0, -1]
+    const dy = table[cel] ?? 0
+    for (const k of this.w.entities) {
+      if (k.removed || !(k instanceof Enemy) || !k.part || k.parentE !== par) continue
+      const t = k.type.type
+      const off = t === 0x37 ? [16, -40] : t === 0x34 ? [-12, -21] : t === 0x35 ? [44, -21] : null
+      if (!off) continue
+      k.x = x + (off[0] << 8)
+      k.y = y + ((off[1] + dy) << 8)
+    }
+  }
+  /** JanembaPartFlash (on hit): every body part plays the hurt animation (raw 10); an arm in a hand strike ends it
+   *  first - the hand idles (rand(255)) and goes (sc_janemba: Janemba punched in the frame the hand appears) */
+  janembaPartsHurt() {
+    const parts = this.w.entities.filter((k) => !k.removed && k instanceof Enemy && k.part && k.parentE === this) as Enemy[]
+    for (const k of parts) {
+      if (k.strike[0] > 0) {
+        const h = k.strikeHand
+        k.strikeHand = null
+        k.strike = [0, k.strike[1]]
+        if (h && this.w.entities.includes(h)) {
+          this.w.rng.rand(255, 'hand idle tick')
+          h.unmark()
+          h.removed = true
+        }
+      }
+      k.setAnim(9, true, false)
+    }
+  }
+  handStrike(a: boolean): HandRise | null {
     const p = this.player
-    if (!p) return
+    if (!p) return null
     const t = this.ctx.data.enemies[0x36]
     // an enemy object: its constructor's SetAnim(0) draws the idle start tick
     this.w.rng.rand(255, 'hand idle tick')
-    const h = new HandRise(this.ctx, t, p.px + (a ? 4 : -20), p.py, a ? 2 : 3)
+    const h = new HandRise(this.ctx, t, p.px + (a ? 4 : -20), p.py, a ? 2 : 3, a)
     this.w.add(h)
+    return h
+  }
+  /** the puffs announcing the minis the next top-up creates (one per missing mini, at its spot); the missing count */
+  miniPuffs(): number {
+    const live = this.ctx.liveEnemies().filter((o) => o.type.type === 0x38).length
+    const n = Math.max(0, 5 - live)
+    for (const [x, y] of MINI_PTS.slice(0, n)) this.ctx.puffRng(this.w, x, y)
+    return n
+  }
+  /** the top-up of `miniPuffs`'s count (at the fixed spots, in order) */
+  miniCreate(n: number) {
+    const b = this.w.arena.bounds
+    for (const [x, y] of MINI_PTS.slice(0, n)) this.ctx.spawnEnemy(this.w, 0x38, Math.max(b.x0, Math.min(b.x1 - 16, x)), Math.max(b.y0, Math.min(b.y1 - 16, y)), this)
   }
   topUpMinis() {
     const pts = [[104, 112], [120, 136], [152, 144], [184, 136], [200, 112]]
@@ -1316,8 +1562,27 @@ export class Enemy extends Actor implements EnemyLike {
       chain[i].prev = chain[i - 1]
     }
   }
+  /** a worm piece hit (ShieldHit's) guard: the count down, or hittable again at 0 (head 0x0802D4CC, body 0x0802D656) */
+  wormGuard = 0
+  /** a body piece split off into a head: off the enemy grid until its first update marks it */
+  wormRemark = false
+  private wormGuardTick() {
+    if (this.wormGuard !== 0) this.wormGuard--
+    else this.hittable = true
+  }
   wormHeadStep() {
     const w = this.w
+    this.wormGuardTick()
+    // a split piece clears its flag and marks the footprint where it stands (vt+0x54) - blocked (the old head still on
+    // those cells): set again and nothing more this update (0x0802D4EA; run 2 cut 1,689,300 f206)
+    if (this.wormRemark) {
+      this.wormRemark = false
+      if (!this.passable(w, this.px, this.py)) {
+        this.wormRemark = true
+        return
+      }
+      this.markSelf()
+    }
     if (w.rng.rand(200, 'worm turn') === 0) {
       let d = this.wormDir ^ 2
       // 0x0802D546: the extra quarter turn when rand(2) == 0 (bne skips the eor)
@@ -1334,11 +1599,84 @@ export class Enemy extends Actor implements EnemyLike {
       this.wormDir = ((this.wormDir + 1) & 3) as Dir
     }
     this.facing = this.wormDir
+    // the head's enemy-grid mark follows its step inside its update (run 2 cut 1,689,300 f164)
+    this.syncMark()
     this.next?.cmds.push(this.wormDir)
     this.contactHit(true)
   }
+  /** ShieldHit (a worm piece's on-hit node, 0x0802D328; run 2 cut 1,689,300 f28): a head reverses, it and every piece
+   *  after it not hittable, guard 15; a body piece: the whole chain from its head not hittable, the hit piece's guard 15,
+   *  and the chain splits there - the hit piece becomes a head (its sprite 0x128, type 0x8E, SetAnim(1); its state
+   *  stays) (wf-core enemy::worm_shield_hit) */
+  wormShieldHit() {
+    const w = this.w
+    const live = (e: Enemy | null) => !!e && w.entities.includes(e)
+    const chainFrom = (start: Enemy) => {
+      const out: Enemy[] = []
+      let cur: Enemy | null = start
+      while (cur && live(cur) && !out.includes(cur)) {
+        out.push(cur)
+        cur = cur.next
+      }
+      return out
+    }
+    const prev = this.prev
+    if (!prev || !live(prev)) {
+      const d = (this.wormDir ^ 1) as Dir
+      this.wormDir = d
+      this.facing = d
+      for (const k of chainFrom(this)) {
+        k.hittable = false
+        k.wormGuard = 15
+      }
+      return
+    }
+    let head = prev
+    while (head.prev && live(head.prev)) head = head.prev
+    for (const k of chainFrom(head)) k.hittable = false
+    this.wormGuard = 15
+    prev.next = null
+    this.prev = null
+    const sp = this.ctx.data.sprites.index(0x128 - GFX_OFFSET)
+    if (sp) {
+      this.gfxNow = 0x128
+      this.setSprite(sp)
+    }
+    this.type = this.ctx.data.enemies[0x8e]
+    this.wormRemark = true
+    this.detached = false
+    this.wormDir = this.facing
+    this.contactCd = 0
+    this.setAnim(1, true, true)
+  }
+  /** the freeze helper's hit (FreezeHelperHit, field object 0x0875819C): unless a type 0x0E lives, a new one (sprite 45)
+   *  at the 24.8 position if its footprint (y + 0x40) is walkable - not counted for the fight's end */
+  freezeHelperHit() {
+    if (this.ctx.liveEnemies().some((o) => o.type.type === 14)) return
+    const sp = this.ctx.data.sprites.index(45 - GFX_OFFSET)
+    const sh = (sp?.json as unknown as { header?: { shadow?: number[] } } | undefined)?.header?.shadow
+    const [fw, fh] = [sh?.[0] || 16, sh?.[1] || 8]
+    const [px, py] = [this.x >> 8, (this.y + 0x4000) >> 8]
+    const c = this.ctx.col
+    if (c && !c.test('walk', px, py, px + fw, py + fh)) return
+    this.placed(14, 45, this.x >> 8, this.y >> 8, false)
+  }
+  /** a run-time placed enemy (a tank's crew, the freeze helper): the field object's constructor sequence - the enemy
+   *  at its def position as given, the placement's graphics, then its first state */
+  private placed(ty: number, gfx: number, x: number, y: number, primary: boolean) {
+    const e = this.ctx.spawnEnemy(this.w, ty, x, y, null, -1, true) as Enemy | null
+    if (!e) return
+    const sp = this.ctx.data.sprites.index(gfx - GFX_OFFSET)
+    if (sp && e.sprite !== sp) {
+      e.setSprite(sp)
+      e.gfxNow = gfx
+    }
+    e.primary = primary
+    e.start(this.w, this.ctx.data.enemies[ty].ai)
+  }
   /** the head and the segments stay in the idle state while they move (no SetAnim(1): VERIFIED segment sb 21-11) */
   wormBodyStep() {
+    this.wormGuardTick()
     // the last segment (no next, 0x0802D674): sprite def 0x12A (Worm Tail) set again every frame (0x0800EDF8: the
     // animation restarts) + SetAnim(1)
     if (!this.next || this.next.removed) {
@@ -1364,7 +1702,15 @@ export class Enemy extends Actor implements EnemyLike {
   /** enemy message handler (0x0800FAFA kind 0): ComputeDamage on every accepted hit first (0x0800FC2C), script #2
    *  (melee EP / HP hooks) when it did damage, then the top state's on-hit tree, whose ApplyDamage node takes the HP */
   onMessage(w: World, msg: HitMsg): boolean {
-    if (msg.team === 0 || this.part || this.defeated || this.removed || !this.hittable) return false
+    // Janemba's parts are enemy objects too - a hit under one computes its damage (crit chance + roll) and nothing
+    // else (sc_janemba: a punch under the lowered arm in the ascent)
+    if (msg.team !== 0 && !this.removed && this.part && (this.type.type === 0x34 || this.type.type === 0x35 || this.type.type === 0x37)) {
+      if (msg.foot || !overlaps(msg.rect, this.bodyBoxGround())) return false
+      const res = computeDamage(msg.atk, msg.mult, msg.attacker.stats, this.stats, false, w.rng)
+      msg.crit = res.crit
+      return true
+    }
+    if (msg.team === 0 || this.part || (this.defeated && this.ko !== -1) || this.removed || !this.hittable) return false
     // the body box (0x0800FE78) is at the ground position - the height does not lift it (wf-core enemy.rs
     // on_message; sc_janemba: a punch lands on Janemba 66 px up in its ascent)
     if (!overlaps(msg.rect, msg.foot ? this.footBox() : this.bodyBoxGround())) return false
@@ -1445,15 +1791,18 @@ export class Enemy extends Actor implements EnemyLike {
     // owner died: its projectiles fly on harmlessly (messages 0x11/0x12) - Shot.ownerDead reads `defeated`
     const name = this.type.deathName
     if (name === 'special' && (this.type.type === 0x3c || this.type.type === 0x3d)) {
-      // Kid Buu: the surviving body returns to phase 1
+      // Kid Buu with copies left: the death node 0x08032D44 takes the object out of the world list without its defeat
+      // handler (its grid cells freed, the puff at rate 0x1000 + rand(0x1000)); the survivor keeps its AI state (the
+      // real route, 19-3: the same punch then hits it through its own on-hit tree)
       const other = this.ctx.liveEnemies().find((o) => o !== this && (o.type.type === 0x3c || o.type.type === 0x3d)) as Enemy | undefined
       if (other) {
         this.defeated = true
         this.removed = true
         this.primary = false
-        this.ctx.puff(w, ...this.center())
+        const [cx, cy] = this.center()
         other.primary = true
-        other.ai.reset(this.ctx.data.enemies[0x3c].ai)
+        this.unmarkSelf()
+        this.ctx.puffRng(w, cx, cy)
         return
       }
     }
@@ -1461,14 +1810,60 @@ export class Enemy extends Actor implements EnemyLike {
     this.hittable = false
     this.blocking = false
     w.stats.kills++
-    this.ctx.player?.gainXp(w, this.type.exp)
+    // the death node GotoState: the death effect (its kill XP) is made at the death state's SelfDestruct (MEASURED run
+    // 2 21-4, cut 1,599,700)
+    if (name === 'GotoState') this.xpAtDeath = this.type.exp
+    else this.ctx.player?.gainXp(w, this.type.exp)
     w.logEvent('info', `${this.label} defeated`)
     for (const s of w.entities) if (s.kind === 'beam' && (s as unknown as { owner: unknown }).owner === this) (s as unknown as GrowBeam).stop()
-    if (name === 'Idle') {
+    if (name === 'GotoState') {
+      // (the Enzyme: def 0x08710EF4 -> state 0x91, ParentCountDown + SelfDestruct): the defeated object stays and its
+      // AI runs that state (real run 21-6 r064_004 f304: killed while latched, it self-destructs three frames later)
+      this.ko = -1
+      this.ai.reset(this.type.deathParam)
+    } else if (name === 'Idle') {
       // bosses: no explosion; the defeat cutscene takes over in the game - the body stays down
       this.setAnim(['knockdown', 'ko', 'hurt'], true, false)
       this.ko = 0
-    } else this.die(true)
+    } else {
+      this.die(true)
+      if (name === 'special') {
+        const k = TANKS.indexOf(this.type.type)
+        if (k >= 0) this.tankCrew(k)
+      }
+      if (name === 'SelfDestruct') this.selfDestructChildren()
+    }
+  }
+  /** the kill XP a GotoState death gives at its SelfDestruct */
+  xpAtDeath = 0
+  /** A destroyed tank's crew (0x080333C4): after the defeat handler, the removal and the explosion, four enemies from
+   *  the template 0x087592BC (no callback, standing) at the tank's position + (0, 0), (24, 0), (24, 24), (0, 24), each
+   *  a rand(2) pick of the tank's two crew types (the field object's constructor order: the enemy at its def position
+   *  as given, the placement's graphics, its first state); counted for the fight's end */
+  private tankCrew(tank: number) {
+    const [x, y] = [this.px, this.py]
+    for (const [dx, dy] of [[0, 0], [24, 0], [24, 24], [0, 24]]) {
+      const [ty, gfx] = TANK_CREW[this.w.rng.rand(2, 'tank crew') & 1][tank]
+      this.placed(ty, gfx, x + dx, y + dy, true)
+    }
+  }
+  /** SelfDestruct's death (0x08018950) loops down the first-child links: the dying object, then its oldest living child,
+   *  that one's oldest child ... each with its kill XP, removal and explosion (MEASURED run 2 21-4, cut 1,602,800 f259:
+   *  the Blister's KO punch also blows up its oldest Enzyme); a worm piece's link is its live next segment */
+  private selfDestructChildren() {
+    let cur: Enemy = this
+    for (;;) {
+      const worm = cur.type.type === 0x8e || cur.type.type === 0x8f
+      const c0 = cur
+      const kid = worm
+        ? (c0.next && !c0.next.removed && !c0.next.defeated && c0.next.prev === c0 ? c0.next : null)
+        : ((c0.children.find((k) => !k.removed && !(k as Enemy).defeated && (k as Enemy).parentE === c0) as Enemy | undefined) ?? null)
+      if (!kid) return
+      this.ctx.player?.gainXp(this.w, kid.type.exp)
+      kid.hittable = false
+      kid.die(true)
+      cur = kid
+    }
   }
   die(explode: boolean) {
     if (!this.defeated) {
@@ -1520,28 +1915,56 @@ export class Enemy extends Actor implements EnemyLike {
 
 /** Janemba Hand type 0x36 created under the player by a hand strike: one hit during its frames 16..55
  *  (body box, melee sub 2 x1.0, attacker = the hand, STR 22), gone after 57 frames */
+/** the tanks (death node 0x080333C4, param = def +0xC): Battle Tank variant 0x7F, Juggernaut 0x3A, 0x8C */
+const TANKS = [0x7f, 0x3a, 0x8c]
+/** crew (enemy type, graphics) per rand(2) and tank (tables 0x087592DC / +0x18) */
+const TANK_CREW = [
+  [[8, 0x22], [0x43, 0xab], [0x2b, 0x88]],
+  [[0x0f, 0x46], [0x2f, 0x8d], [0x61, 0xeb]],
+]
+
+/** the minis' spots (Janemba's summon) */
+const MINI_PTS = [[104, 112], [120, 136], [152, 144], [184, 136], [200, 112]]
+
+/** Mini Janemba's roll height by its counter's step (0x087B6EEC sin >> 11) */
+const ROLL_ARC = [0, 7, 13, 18, 23, 27, 30, 32, 32, 32, 30, 27, 23, 18, 13, 7]
+
 export class HandRise extends Actor {
   kind = 'hand'
   ctx: BuuCtx
   t = 0
   hit = false
-  constructor(ctx: BuuCtx, type: EnemyType, x: number, y: number, facing: Dir) {
+  /** the footprint its constructor marked on the enemy grid (null once the arm's controller freed it) */
+  marked: [number, number, number, number] | null = null
+  constructor(ctx: BuuCtx, type: EnemyType, x: number, y: number, facing: Dir, aSide = false) {
     super()
     this.ctx = ctx
     this.x = x << 8
     this.y = y << 8
     this.facing = facing
     this.stats = { STR: type.STR, POW: type.POW, END: type.END, END2: type.END, resM: 128, resE: 128, critBonus: 0, blockFactor: 0x1000 }
-    this.setSprite(type.sprite)
-    this.setAnim(18, true, false)
+    // the strike's spawn record 0x0877B050 gives the hand gfx 0x96 (the type table's 0x97 is the HFIL field hand's;
+    // sc_janemba: the strike hand is sprite 150)
+    this.setSprite(ctx.data.sprites.index(0x96 - GFX_OFFSET) ?? type.sprite)
+    // (the portal hand of the A side (facing 2) rises with anim 0x13 - raw 20 of sprite 150, the B side's with 0x12;
+    // real route 18-14 rj_049 f515 / f572)
+    this.setAnim(aSide && this.sprite?.anim(20) ? 19 : 18, true, false)
     this.hittable = false
+    // an enemy object: its constructor marks its footprint on the enemy grid (sc_janemba)
+    this.marked = [this.px, this.py, this.px + this.footW, this.py + this.footH]
+    ctx.col?.mark('enemy', ...this.marked, 0)
+  }
+  /** the arm's controller end frees the tiles the constructor marked */
+  unmark() {
+    const m = this.marked
+    this.marked = null
+    if (m) this.ctx.col?.mark('enemy', ...m, 1)
   }
   update(w: World) {
     this.tickAnim()
     this.t++
     const p = this.ctx.player
-    // the rising controller (0x0804C338) ends on tick 40 with SetAnim(0) (rand(255)); hits from tick 16
-    if (this.t === 40) w.rng.rand(255, 'hand idle tick')
+    // hits from tick 16 (the arm part's strike controller SetAnim(0)s the hand at its end, its tick 40)
     if (!this.hit && p && !p.dead && this.t >= 16 && this.t < 40) {
       if (p.onMessage(w, { team: 0, rect: this.bodyBox(), dir: this.facing, mult: 0x400, atk: ATK[2], attacker: this, source: this })) {
         this.hit = true
@@ -1552,7 +1975,12 @@ export class HandRise extends Actor {
     this.alpha = this.t < 12 ? this.t / 12 : this.t > 50 ? Math.max(0, (57 - this.t) / 7) : 1
     if (this.t >= 57) this.removed = true
   }
-  onMessage(): boolean {
-    return false
+  /** a strike hand is an enemy object (type 0x36): the player's hits reach it while its tiles are marked - a punch
+   *  computes its damage (crit chance + roll), nothing else (sc_janemba) */
+  onMessage(w: World, msg: HitMsg): boolean {
+    if (msg.team === 0 || !this.marked || !overlaps(msg.rect, this.bodyBox())) return false
+    const res = computeDamage(msg.atk, msg.mult, msg.attacker.stats, this.stats, false, w.rng)
+    msg.crit = res.crit
+    return true
   }
 }

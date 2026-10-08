@@ -1227,12 +1227,10 @@ impl World {
 pub fn broadcast(w: &mut World, msg: &mut HitMsg, first: bool) -> bool {
     let n = w.ents.len();
     let mut any = false;
-    // the field game delivers newest object first (story playthrough: Goku's punch on two fighters, game list
-    // [player, hud, 209, 211] -> 211 hit first); battles keep the order the TS-sim cross-check pins
-    // (TODO(core): verify the battle order against the game itself)
-    let field = w.field.is_some();
+    // the game delivers newest object first (story playthrough: Goku's punch on two fighters, game list [player,
+    // hud, 209, 211] -> 211 hit first) - battles too
     for j in 0..n {
-        let k = if field { n - 1 - j } else { j };
+        let k = n - 1 - j;
         if k >= w.ents.len() || w.ents[k].removed {
             continue;
         }
@@ -1253,7 +1251,7 @@ pub fn deliver(w: &mut World, k: usize, msg: &mut HitMsg) -> bool {
         Body::Enemy(_) => crate::enemy::on_message(w, k, msg),
         Body::Shot(_) => crate::shots::on_message(w, k, msg),
         Body::Breakable(_) => crate::fieldobj::breakable_message(w, k, msg),
-        Body::Hand(_) if w.field.is_some() => crate::enemy::hand_message(w, k, msg),
+        Body::Hand(_) => crate::enemy::hand_message(w, k, msg),
         _ => false,
     }
 }

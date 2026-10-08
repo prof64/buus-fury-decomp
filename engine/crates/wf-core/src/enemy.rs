@@ -554,7 +554,7 @@ pub fn set_anim_rule(
     looped: Option<bool>,
     rule: Option<u32>,
 ) {
-    if w.field.is_some() && !matches!(refs.first(), Some(AnimRef::N(15))) {
+    if !matches!(refs.first(), Some(AnimRef::N(15))) {
         let id = w.ents[i].id;
         crate::shots::drop_charging_ball(w, id);
         drop_charging_kame(w, i);
@@ -574,8 +574,8 @@ pub fn tick_anim(w: &mut World, i: usize) {
     // the roll controller's height (its update 0x08034D86, t = the counter before the +8): from t = 0x80 the object's
     // +0x176 = -(sin table 0x087B6EEC[t - 0x80] >> 11) - a 32 px leap over the dash - and 0 from t = 0x100. Field
     // only (the battle reference draws the roll on the ground). sc_janemba 18-14 f5,150 .. (emulator OAM: the
-    // body 24 + 0, 7, 13 .. 32 px over its shadow)
-    let roll = (w.field.is_some() && w.en_ref(i).a.anim.is_some()).then_some(w.en_ref(i).roll_ctl).filter(|&t| t >= 0x80);
+    // body 24 + 0, 7, 13 .. 32 px over its shadow) - battles too
+    let roll = w.en_ref(i).a.anim.is_some().then_some(w.en_ref(i).roll_ctl).filter(|&t| t >= 0x80);
     w.en(i).tick_anim(&d, &mut rng, &mut ev);
     if let Some(t) = roll {
         const ROLL_ARC: [i32; 16] = [0, 7, 13, 18, 23, 27, 30, 32, 32, 32, 30, 27, 23, 18, 13, 7];
@@ -585,7 +585,7 @@ pub fn tick_anim(w: &mut World, i: usize) {
     w.rng = rng;
     w.events = ev;
     // (after the copies are back: its SetAnim(0) draws)
-    if w.field.is_some() && w.en_ref(i).tele_ctl >= 0 {
+    if w.en_ref(i).tele_ctl >= 0 {
         tele_tick(w, i);
     }
 }
@@ -843,7 +843,7 @@ fn update_rest(w: &mut World, i: usize) {
             return;
         }
     }
-    if w.en_ref(i).part && w.field.is_some() && matches!(w.en_ref(i).ty, 0x34 | 0x35 | 0x37) {
+    if w.en_ref(i).part && matches!(w.en_ref(i).ty, 0x34 | 0x35 | 0x37) {
         return janemba_part_field(w, i);
     }
     if w.en_ref(i).part {
@@ -1116,13 +1116,9 @@ pub fn face_player(w: &mut World, i: usize) {
     if player(w, i).is_none() {
         return;
     }
-    // the field: the game's routine 0x0801599C (the nodes' enters: FlameBreath 0x08023FA8, TurretFire, SoldierThrow,
-    // CyborgShot ...; Babidi's ship Destroyers / turrets); battles keep the footprint rule cross_ts pins
-    if w.field.is_some() {
-        return face_player_exact(w, i);
-    }
-    let (dx, dy) = to_player(w, i);
-    w.en(i).a.facing = facing_toward(dx, dy);
+    // the game's routine 0x0801599C (the nodes' enters: FlameBreath 0x08023FA8, TurretFire, SoldierThrow, CyborgShot
+    // ...; Babidi's ship Destroyers / turrets) - battles too
+    face_player_exact(w, i)
 }
 /// FacePlayer node 0x0801D047 -> 0x0801599C (the cutscene face_actor routine): the 24.8 position difference, the
 /// dominant axis with ties horizontal, no turn when equal (story playthrough: a fighter turns 2 frames later than the
@@ -1267,18 +1263,17 @@ pub fn attached(w: &World, i: usize) -> bool {
     let e = w.en_ref(i);
     let held = ctx_player(w, i)
         .is_some_and(|pi| w.pl_ref(pi).held_by == w.ents[i].id && w.ents[i].id != 0);
-    // field: the height does not detach (sc_janemba: a hopping Mini-Janemba keeps marking the enemy grid)
+    // the height does not detach (sc_janemba: a hopping Mini-Janemba keeps marking the enemy grid) - battles too
     // a field enemy whose death node is Idle stays the object it was (`ko < 0`): still on the enemy grid, so the
     // step it takes in the pass of the killing hit is collision-checked like the ones before (0-21: Majin Buu's
     // slide, blocked at the wall, stays blocked on the killing frame; 8-71: a free slide moves once more)
-    let gone = e.defeated && !(w.field.is_some() && e.ko < 0);
+    let gone = e.defeated && e.ko >= 0;
     !e.part
         && e.prev == 0
         && !gone
         && !e.detached
         && !e.worm_remark
         && !w.ents[i].removed
-        && (e.a.z == 0 || w.field.is_some())
         && !held
 }
 pub fn mark_self(w: &mut World, i: usize) {
@@ -1315,7 +1310,7 @@ pub fn sync_mark(w: &mut World, i: usize) {
     // RandomStep (0x0804B1C0) writes the position only: the game's enemy grid keeps the mark of the kept position
     // while the bones rattle (the real route, Volcano 15-14: a Skeleton's pile next to a wall - a mark following the
     // jitter would free the wall's tile when it moves back)
-    if w.field.is_some() && w.en_ref(i).jitter && w.en_ref(i).marked.is_some() {
+    if w.en_ref(i).jitter && w.en_ref(i).marked.is_some() {
         return;
     }
     // a defeated enemy (its own update no longer runs) keeps the mark it had while a script walks / glides it (the
@@ -1377,10 +1372,10 @@ pub fn grid_free(w: &World, i: usize, x: i32, y: i32) -> bool {
 }
 /// footprint inside the arena bounds and passable
 pub fn fits(w: &mut World, i: usize, x: i32, y: i32) -> bool {
-    // field: a detached enemy (obj+0x291: a Ghost) fits anywhere - the game's test is the enemy grid alone, which
-    // it is off for good (Pilaf's Castle 10-27: a Ghost chases straight at a player standing in the doorway
-    // outside the walk bounds); battles keep the arena bounds the TypeScript reference tests
-    if w.field.is_some() && w.en_ref(i).detached {
+    // a detached enemy (obj+0x291: a Ghost) fits anywhere - the game's test is the enemy grid alone, which it is off
+    // for good (Pilaf's Castle 10-27: a Ghost chases straight at a player standing in the doorway outside the walk
+    // bounds) - battles too
+    if w.en_ref(i).detached {
         return true;
     }
     let b = w.arena.bounds;
@@ -1853,12 +1848,10 @@ pub fn footstep(w: &mut World, i: usize, path: bool) {
     let d = Arc::clone(&w.data);
     let mut g = d.enemy(w.en_ref(i).ty).and_then(|t| t.gfx).unwrap_or(-1);
     let e = w.en_ref(i);
-    // field: the object's own graphics (a placement's sprite: Pilaf's Castle 10-14 has a Destroyer drawn with 0x4F,
-    // which makes no step sound, beside one with the type's 0x4E)
-    if w.field.is_some() {
-        if let Some(s) = e.a.sprite {
-            g = s + crate::content::GFX_OFFSET;
-        }
+    // the object's own graphics (a placement's sprite: Pilaf's Castle 10-14 has a Destroyer drawn with 0x4F, which
+    // makes no step sound, beside one with the type's 0x4E) - battles too
+    if let Some(s) = e.a.sprite {
+        g = s + crate::content::GFX_OFFSET;
     }
     // the game's step SetAnim(1)s before this test: a first walking step counts as walk tick 0
     let t = if e.moving && e.a.anim_name(&d) != Some("walk") {
@@ -2173,9 +2166,9 @@ pub fn contact_explode(w: &mut World, i: usize) -> bool {
     }
     let mut m = msg_from(w, i, 0, bb, w.en_ref(i).a.facing, 0x1000, atk(1));
     let hit = player::on_message(w, pi, &mut m);
-    // field: an accepted hit plays sound 48 + rand(2) (0x080390D8; run 2 row 1,485,000, 20-5: a swarm minion's
-    // explosion on the player); battles keep the reference
-    if hit && w.field.is_some() {
+    // an accepted hit plays sound 48 + rand(2) (0x080390D8; run 2 row 1,485,000, 20-5: a swarm minion's explosion on
+    // the player) - battles too
+    if hit {
         let s = 48 + w.rng.rand(2);
         w.sfx(s, 64);
     }
@@ -2468,15 +2461,10 @@ pub fn shot(w: &mut World, i: usize, kind: ShotType) {
 pub fn ninja_teleport(w: &mut World, i: usize) {
     // field: the update (0x0802C1DC) takes the enemy off the enemy grid first (vfunc +0x48(1)) and puts it back at
     // the end (vfunc +0x48(0)) - at the new spot after a jump, in the same update (run 2 row 1,891,199, 0-50's
-    // Ninjas: the one chasing behind it re-plans through the old spot in the same frame)
-    let grid = w.field.is_some();
-    if grid {
-        unmark_self(w, i);
-    }
+    // Ninjas: the one chasing behind it re-plans through the old spot in the same frame) - battles too
+    unmark_self(w, i);
     ninja_teleport_tries(w, i);
-    if grid {
-        mark_self(w, i);
-    }
+    mark_self(w, i);
 }
 fn ninja_teleport_tries(w: &mut World, i: usize) {
     for _ in 0..16 {
@@ -2505,37 +2493,19 @@ pub fn teleport_beside(w: &mut World, i: usize, side: i32) {
     let (ox, oy) = OFF[(side & 3) as usize];
     let (cx, cy) = w.en_ref(i).a.center();
     crate::fx::puff(w, cx, cy, 0x1800);
-    let (pfx, pfy) = w.pl_ref(pi).a.foot_center();
-    // field (sc_janemba): the player's whole-pixel position + the side offset; battle keeps the reference's
-    // footprint-centred placement
-    let at = w
-        .field
-        .is_some()
-        .then(|| (w.pl_ref(pi).a.px(), w.pl_ref(pi).a.py()));
+    // (sc_janemba): the player's whole-pixel position + the side offset, moved to a free spot of the walk layer -
+    // battles too
+    let (px, py) = (w.pl_ref(pi).a.px(), w.pl_ref(pi).a.py());
     {
         let a = &mut w.en(i).a;
-        match at {
-            Some((px, py)) => {
-                a.x = (px + ox) << 8;
-                a.y = (py + oy) << 8;
-            }
-            None => {
-                a.x = (pfx + ox - (a.foot_w >> 1)) << 8;
-                a.y = (pfy + oy - (a.foot_h >> 1)) << 8;
-            }
-        }
+        a.x = (px + ox) << 8;
+        a.y = (py + oy) << 8;
     }
-    if at.is_some() {
-        free_spot(w, i);
-    } else {
-        clamp_inside(w, i);
-    }
-    // field: the landing keeps the facing (the sequence's FacePlayer turns it). The grid is not touched: the old
-    // footprint stays marked for good and the enemy takes the new spot as its own (its next move unmarks tiles it
-    // never marked; sc_janemba: Super Janemba's teleports leave holes)
-    if at.is_none() {
-        face_player(w, i);
-    } else {
+    free_spot(w, i);
+    // the landing keeps the facing (the sequence's FacePlayer turns it). The grid is not touched: the old footprint
+    // stays marked for good and the enemy takes the new spot as its own (its next move unmarks tiles it never marked;
+    // sc_janemba: Super Janemba's teleports leave holes)
+    {
         let a = &w.en_ref(i).a;
         let m = [a.px(), a.py(), a.px() + a.foot_w, a.py() + a.foot_h];
         w.en(i).marked = Some(m);
@@ -2801,9 +2771,9 @@ pub fn janemba_parts_hurt(w: &mut World, i: usize) {
         })
         .collect();
     for k in parts {
-        // field: an arm part in a hand strike - the strike controller's exit puts its hand into the idle controller
+        // an arm part in a hand strike - the strike controller's exit puts its hand into the idle controller
         // (SetAnim(0): rand(255)) and destroys it (sc_janemba: Janemba punched in the frame the hand appears)
-        if w.field.is_some() && w.en_ref(k).strike.0 > 0 {
+        if w.en_ref(k).strike.0 > 0 {
             let h = std::mem::take(&mut w.en(k).strike_hand);
             w.en(k).strike.0 = 0;
             if let Some(hk) = (h != 0).then(|| w.find(h)).flatten() {
@@ -2834,28 +2804,23 @@ pub fn janemba_arm(w: &World, i: usize, a: bool) -> Option<usize> {
 }
 pub fn janemba_parts(w: &mut World, i: usize) {
     let me = w.ents[i].id;
-    let field = w.field.is_some();
     for (t, ox, oy) in [(0x34, -12, -22), (0x35, 44, -22), (0x37, 16, -41)] {
         let (px, py) = (w.en_ref(i).a.px(), w.en_ref(i).a.py());
-        // field: the parts appear at their spawn offsets; 0x37's node places them from the next frame
-        let (sx, sy) = if field {
-            match t {
-                0x34 => (-16, -16),
-                0x35 => (48, -16),
-                _ => (16, -40),
-            }
-        } else {
-            (ox, oy)
+        // the parts appear at their spawn offsets; 0x37's node places them from the next frame (battles too)
+        let (sx, sy) = match t {
+            0x34 => (-16, -16),
+            0x35 => (48, -16),
+            _ => (16, -40),
         };
-        if let Some(pi) = crate::battle::spawn_enemy_at(w, t, px + sx, py + sy, me, Some(-1), field)
+        if let Some(pi) = crate::battle::spawn_enemy_at(w, t, px + sx, py + sy, me, Some(-1), true)
         {
             let p = w.en(pi);
             p.part = true;
             p.part_offset = (ox, oy);
             p.a.hittable = false;
-            // field: the enemy constructor marks the footprint on the enemy grid where the part is created; the
-            // mirror node moves the parts without marks, so that mark stays (sc_janemba: minis hop around it)
-            if field {
+            // the enemy constructor marks the footprint on the enemy grid where the part is created; the mirror node
+            // moves the parts without marks, so that mark stays (sc_janemba: minis hop around it)
+            {
                 let a = &w.en_ref(pi).a;
                 let m = [a.px(), a.py(), a.px() + a.foot_w, a.py() + a.foot_h];
                 if let Some(c) = w.col.as_mut() {
@@ -2901,29 +2866,27 @@ pub fn hand_strike(w: &mut World, i: usize, a_side: bool) -> Option<EntityId> {
     let gfx = 0x96 - crate::content::GFX_OFFSET;
     a.set_sprite(
         &d,
-        if w.field.is_some() && d.sprite(gfx).is_some() {
+        if d.sprite(gfx).is_some() {
             Some(gfx)
         } else {
             t.sprite
         },
     );
-    // (field: the portal hand of the A side (facing 2) rises with anim 0x13 - raw 20 of sprite 150, the B side's
-    // with 0x12; real route 18-14 rj_049 f515 / f572)
-    if w.field.is_some() && a_side && a.sprite.and_then(|s| d.sprite(s)).is_some_and(|s| s.anim_raw(20).is_some()) {
+    // (the portal hand of the A side (facing 2) rises with anim 0x13 - raw 20 of sprite 150, the B side's with 0x12;
+    // real route 18-14 rj_049 f515 / f572)
+    if a_side && a.sprite.and_then(|s| d.sprite(s)).is_some_and(|s| s.anim_raw(20).is_some()) {
         a.set_anim(&d, &[n(19)], true, Some(false));
     } else {
         a.set_anim(&d, &[n(18)], true, Some(false));
     }
     a.hittable = false;
-    // field: an enemy object - its constructor marks its footprint on the enemy grid (sc_janemba)
-    let marked = if w.field.is_some() {
+    // an enemy object - its constructor marks its footprint on the enemy grid (sc_janemba)
+    let marked = {
         let m = [a.px(), a.py(), a.px() + a.foot_w, a.py() + a.foot_h];
         if let Some(c) = w.col.as_mut() {
             c.mark_enemy(m, 0);
         }
         Some(m)
-    } else {
-        None
     };
     let id = w.add(Body::Hand(Box::new(Hand {
         a,
@@ -2965,11 +2928,7 @@ pub fn hand_update(w: &mut World, i: usize) {
         h.t += 1;
         (h.t, h.hit)
     };
-    // the rising controller (0x0804C338) ends on tick 40 with SetAnim(0) (rand(255)); hits from tick 16
-    // battle: tick 40 SetAnim(0)s it (field: the arm part's strike controller does, at its end)
-    if t == 40 && w.field.is_none() {
-        w.rng.rand(255);
-    }
+    // hits from tick 16 (the arm part's strike controller SetAnim(0)s the hand at its end, its tick 40)
     let pi = w.player_idx(0);
     if let Some(pi) = pi {
         if !hit && !w.pl_ref(pi).dead && (16..40).contains(&t) {
@@ -3169,10 +3128,8 @@ pub fn worm_head_step(w: &mut World, i: usize) {
     w.en(i).a.facing = wd;
     // the head's enemy-grid mark follows its step inside its update (free 0x0802D522, mark 0x0802D5AA): a split
     // head updated after it tests against the new cells (run 2 cut 1,689,300 f164: the head ahead moved off row 12
-    // first, the split piece's own step went through)
-    if w.field.is_some() {
-        sync_mark(w, i);
-    }
+    // first, the split piece's own step went through) - battles too
+    sync_mark(w, i);
     let next = w.en_ref(i).next;
     if let Some((ni, _)) = w.enemy_by_id(next) {
         w.en(ni).cmds.push(wd);
@@ -3308,10 +3265,9 @@ pub fn worm_body_step(w: &mut World, i: usize) {
 /// enemy message handler (0x0800FAFA kind 0): ComputeDamage on every accepted hit, the player's melee hooks, then
 /// the top state's on-hit tree (whose ApplyDamage takes the HP)
 pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
-    // field: Janemba's parts are enemy objects too - a hit under one computes its damage (crit chance + roll) and
-    // nothing else (sc_janemba: a punch under the lowered arm in the ascent)
-    if w.field.is_some()
-        && msg.team != 0
+    // Janemba's parts are enemy objects too - a hit under one computes its damage (crit chance + roll) and nothing
+    // else (sc_janemba: a punch under the lowered arm in the ascent)
+    if msg.team != 0
         && !w.ents[i].removed
         && matches!(w.en_ref(i).ty, 0x34 | 0x35 | 0x37)
         && w.en_ref(i).part
@@ -3328,7 +3284,7 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
     {
         let e = w.en_ref(i);
         // (the handler `0x0800FBE6` takes sender classes 1 and 2)
-        let idle_dead = w.field.is_some() && e.ko == -1;
+        let idle_dead = e.ko == -1;
         if !matches!(msg.team, 1 | 2)
             || e.part
             || (e.defeated && !idle_dead)
@@ -3480,7 +3436,7 @@ fn on_death(w: &mut World, i: usize) {
             // copies, the first one's death draws its rate after its on-hit tree)
             let (cx, cy) = w.en_ref(i).a.center();
             w.en(o).primary = true;
-            if w.field.is_some() {
+            {
                 // (the death node 0x08032D44 with copies left - count by message 5 > 1 - takes the object out of the
                 // world list without its defeat handler: no defeat, no on-defeat callback; a placed copy hands its
                 // placement (callback, drops) to the survivor - the real route 19-3 f13415: the punched copy was the
@@ -3500,12 +3456,8 @@ fn on_death(w: &mut World, i: usize) {
                     }
                 }
                 crate::fx::puff_rng(w, cx, cy);
-                // (field: the survivor keeps its AI state - the real route, 19-3: the same punch then hits it through
-                // its own on-hit tree, three chances, no idle draw; battles keep the reference's phase-1 reset)
-            } else {
-                crate::fx::puff(w, cx, cy, 0x1800);
-                let st = w.data.enemy(0x3c).map(|t| t.ai).unwrap_or(0);
-                crate::nodes::reset(w, o, st);
+                // (the survivor keeps its AI state - the real route, 19-3: the same punch then hits it through its own
+                // on-hit tree, three chances, no idle draw; battles too)
             }
             return;
         }
@@ -3532,9 +3484,9 @@ fn on_death(w: &mut World, i: usize) {
         }
     }
     let exp = w.data.enemy(ty).map(|t| t.exp).unwrap_or(0);
-    if death == "GotoState" && w.field.is_some() {
+    if death == "GotoState" {
         // the death node GotoState: the defeat's death effect (its first update gives the XP) is made at the state's
-        // SelfDestruct, not at the hit (MEASURED run 2 21-4, cut 1,599,700: the KO punch f220, ParentCountDown f221,
+        // SelfDestruct, not at the hit (battles too) (MEASURED run 2 21-4, cut 1,599,700: the KO punch f220, ParentCountDown f221,
         // SelfDestruct's explosion rand f222, the level-up rolls f223)
         w.en(i).xp_at_death = exp;
     } else if let (Some(f), Some(pi)) = (w.field.is_some().then_some(()), ctx_player(w, i)) {
@@ -3558,10 +3510,10 @@ fn on_death(w: &mut World, i: usize) {
     // Kid Buu's death node (`0x08032D44`): the last copy is not destroyed - its defeat handler (vfunc +0x74) runs
     // and it stays as it is (segment sb 19-3 f21479: no explosion, the object lives on into event 458)
     let last_copy = death == "special" && (ty == 0x3c || ty == 0x3d);
-    if death == "GotoState" && w.field.is_some() {
+    if death == "GotoState" {
         // the death node GotoState (the Enzyme: def 0x08710EF4 -> state 0x91 = node 0x0802F743, SelfDestruct): the
         // defeated object stays and its AI runs that state (real run 21-6 r064_004 f304: killed while latched, it
-        // self-destructs three frames later)
+        // self-destructs three frames later) - battles too
         let st = w.data.enemy(ty).map(|t| t.death_param as u16).unwrap_or(0);
         w.en(i).ko = -1;
         crate::nodes::reset(w, i, st);
@@ -3585,12 +3537,13 @@ fn on_death(w: &mut World, i: usize) {
         w.en(i).ko = 0;
     } else {
         die(w, i, true);
-        if death == "special" && w.field.is_some() {
+        // (battles too: the crew bails out, the children go with their parent)
+        if death == "special" {
             if let Some(k) = TANKS.iter().position(|&t| t == ty) {
                 tank_crew(w, i, k);
             }
         }
-        if death == "SelfDestruct" && w.field.is_some() {
+        if death == "SelfDestruct" {
             self_destruct_children(w, i);
         }
     }
@@ -3626,6 +3579,8 @@ fn self_destruct_children(w: &mut World, i: usize) {
             let pid = w.ents[pi].id;
             if let Some(f) = w.field.as_mut() {
                 f.xp_due.push((pid, exp));
+            } else {
+                player::gain_xp(w, pi, exp);
             }
         }
         w.en(ki).a.hittable = false;
@@ -3642,12 +3597,17 @@ const TANK_CREW: [[(i32, i32); 3]; 2] = [
 ];
 /// A destroyed tank's crew (0x080333C4, field): after the defeat handler, the removal and the puff, four enemies
 /// from the template 0x087592BC (ctor 0x0800FD55, no callback, standing) at the tank's position + (0, 0), (24, 0),
-/// (24, 24), (0, 24), each a rand(2) pick of the tank's two crew types; battles keep the reference (no crew)
+/// (24, 24), (0, 24), each a rand(2) pick of the tank's two crew types. Battles too: the same constructor order
+/// (`battle_crew`), the crew counted for the fight's end
 fn tank_crew(w: &mut World, i: usize, tank: usize) {
     use crate::fieldcontent::{Cond, ObjDef, ObjKind, ObjRef};
     let (x, y) = (w.en_ref(i).a.px(), w.en_ref(i).a.py());
     for (dx, dy) in [(0, 0), (24, 0), (24, 24), (0, 24)] {
         let (ty, gfx) = TANK_CREW[w.rng.rand(2) as usize & 1][tank];
+        if w.field.is_none() {
+            battle_crew(w, ty, gfx, x + dx, y + dy, true);
+            continue;
+        }
         let o = ObjDef {
             at: ObjRef::List(0xff, ty as u16),
             cond: Cond::Always,
@@ -3662,6 +3622,25 @@ fn tank_crew(w: &mut World, i: usize, tank: usize) {
             rom: 0x0875_92bc,
         };
         crate::field::spawn_object(w, &o);
+    }
+}
+/// a run-time placed enemy in a battle (a tank's crew, the freeze helper): the field object's constructor sequence
+/// (`field::spawn_object`): the enemy at its def position as given (its idle start draw, its grid mark), the
+/// placement's graphics, then its first state; `primary`: counted for the fight's end
+pub fn battle_crew(w: &mut World, ty: i32, gfx: i32, x: i32, y: i32, primary: bool) {
+    let Some(i) = crate::battle::spawn_enemy_at(w, ty, x, y, 0, Some(-1), true) else { return };
+    let content = gfx - crate::scene::SPRITE_BASE;
+    if w.data.sprite(content).is_some() && w.en_ref(i).a.sprite != Some(content) {
+        let d = w.data.clone();
+        w.en(i).a.set_sprite(&d, Some(content));
+    }
+    w.en(i).primary = primary;
+    if let Some(st) = w.data.enemy(ty).map(|t| t.ai) {
+        let f = w.g.clock(w.frame);
+        let e = w.en(i);
+        e.mark1 = f;
+        e.mark2 = f;
+        crate::battle::push_initial(w, i, st);
     }
 }
 pub fn die(w: &mut World, i: usize, explode: bool) {

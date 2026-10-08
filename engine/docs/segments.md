@@ -6950,6 +6950,45 @@ in your half.*
   them as scene visuals but never drew them. Now `ui/hud/markers.png` (wf-ui), `RenderView::markers`, drawn by the
   renderer; and they are objects of their area: gone with a load (rclose_002 f1,820, the landing). Board 18,758 ->
   18,848 exact, none lost (rclose_002 153 -> 286 of its samples); pixel gate re-locked.
+* **Update 25 (Super Buu agent, 2026-10-07): Battle mode draws as the field.** `wf-app/examples/battle_field.rs`
+  (`work/superbuu/bf.sh`) plays the same inputs in a Battle-mode session and in the field (Southwest Forest 8-3; the
+  battle's player copied in, the same RNG and camera) and diffs the picture frame by frame (sprites relative to the
+  player, damage numbers, the screen line): 657 player scenarios (every launcher pick: walk, punch, each skill held /
+  tapped / aimed, Instant Transmission, block-dash, transformations, Saiyaman, fusion) and 150 opponents (live AI,
+  idle then punched; `BF_TOUGH=1` keeps them alive; `BF_RNG`, `BF_TRACE=<frame>`, `BF_GRID=<frame>`, `BF_AI` /
+  `BF_SHOTS` / `BF_STATE` for the first difference). Battles now run the field's rules - each one the game's, from the
+  real routes; the TS reference mirrors every one (cross_ts compares each enemy's animation cel now too, and has 21
+  more scenarios: Janemba / Super Janemba / HFIL hands / samurai / ninjas / Super Buu / knights / Broly / Vegeta /
+  tank crew / worm hits / bombers / gunmen / vampires, a `hunt` input style and an `ehp` start HP; 57 scenarios,
+  78,600 frames, 0 failures; lockstep 709):
+  - player side: the presenter's one-frame lag, damage numbers, the aura's place and end, the ki blast's burst
+    frame, the object list's compaction, shakes (stacked, the camera held), the camera clamp, IT's return sound and
+    markers, L cycling the skill in any state, Broly's rocks no obstacle;
+  - enemies: HeavyStrike (pose, standard strike rect - the old 57-px box goes; buu_sim's Guardian reach test now 40 /
+    45 px); JumpSmash (raw 20, landing dust, FinishLandingAnim's cels), ChargedPunch's first cel unhittable, hits on the
+    ground-height body box; IfContactHit / IfMeleeHit (standard strike, hit sound, x2 landing); the swarm minion's
+    appear and explosion sound; Wander's walk SetAnim; ninja disguise / reveal / teleport marks; the samurai stance;
+    SummonMinion (tick 41, facing), GlideToWaypoint (rounding, idle), the Yakon pose; Kid Buu's beam (controller
+    cels, stop two updates after the exit, dropped by a hurt) and copy death (the survivor keeps its AI); Super Buu's
+    ball dropped with its controller; Vegeta's wander (own-mark goal test, exit idle + turn to Super Buu); the
+    Blister's spawn test and 480 hold, the Enzyme's death state, SelfDestruct's children, a tank's crew (counted for
+    the fight's end); Janemba (parts' spawn / marks / mirror table, the arm's strike controller and its hand object -
+    sprite 150, marks, takes hits, gone at the arm's end - the parts' hurt flash, the ascent and the descent's cels,
+    shake, puffs and minis, the body's drawn height / cel lag); Mini-Janemba (marks while hopping, aim and near test by
+    centres, the roll's leap, collision and ground hit box); the HFIL hand (ambush / sink cels, hit sound); Super
+    Janemba (the teleport controller, landing on the player's pixel + free spot, the chain counter, the timed reverse,
+    the stun to the hurt's end); MeleeAttack skipped on a held / KO'd player; face-the-player by the 24.8 rule; shot
+    / arm / beam nodes end when their controller is replaced; PushState every call; LungeStep turns; IfPlayerInZone =
+    on screen, IfPlayerInRoomZone = footprint on free tiles; the turret hittable at its close's end; Broly's rocks on
+    the node's enter and freeing their grid; worm hits (reverse / split, guard) and the head's marks; the freeze
+    helper; RandomStep's kept mark; detached ghosts fit anywhere; footsteps by sprite; bombs (a class-2 blast to every
+    object); bullets tested on their last box; hit messages newest object first.
+  Left by design: bosses whose death node is Idle (Goten, Hercule, Olibu, PuiPui, Spopovich, Uub ...) - the field
+  leaves them standing for the story's defeat scene, Battle mode knocks them down and fades them out; the player's KO
+  + 199 ends a battle (the field runs its death script). Arenas are the bare maps: the field's NPCs, breakables and
+  map objects (and the tiles they block) are not there (the harness's Worm Head turns at one in 8-3). Not modelled in
+  battles: sprite memory (a vampire's puff needs 0x400 free bytes), Majin Buu's candy camera follow, event holds.
+  The default dumps the workspace's cross_ts reads (`engine/target/wf-core-ts-dumps`, from Oct 6) were regenerated.
 *Earth agent (by the claim above): run 3 2,606,136 fixed - the whole Kid Buu part (030_k3_kidbuu) is now exact in state and sound.* A script command on an enemy (s460 at 19-3, from the command-list tick 0x0801943D) replaces its animation; the charging Kamehameha belongs to the state that set it (0x0804C690), so it goes with the destructor (stop 3, beam object 0x2031A5C, from 0x080207AD) and its tiles are freed at once. Ours dropped only Super Buu's charging ball there. `enemy::drop_charging_kame` (the old set_anim_rule block, now shared) is called from `scene::anim_mut` too (field only) and frees the beam's VRAM block in that frame (a script runs after the frame's reap). Cut wr_2605900 400 / 400 (was 236). Gates / wf-core / wf-app tests green; check.sh EXACT: runs 1 / 2 exact, run 3 first difference now **2,682,904 in 031_p3_post** (sound 40 ours only; rng stop 2,683,006) - the side-content agent's half of the Kid Buu part has no stops left, so the next items are post-game ones.
 *Real-route agent (2026-10-06): run 3's post-game + credits (2,652,034 .. 2,712,165) - all three stops fixed; run 3
 exact end to end (state + sound) outside the Vegeta range.* (wf-core nodes.rs, field.rs, menu/mod.rs, menu/title.rs)

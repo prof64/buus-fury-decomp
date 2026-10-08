@@ -94,8 +94,8 @@ pub fn actor_cel(w: &World, i: usize) -> Option<(u16, bool, Option<(i32, i32)>)>
         Body::Enemy(n) => {
             let (raw, frame) = crate::scene::scene_anim(w, i)
                 .map(|a| (a.raw, a.frame))
-                .unwrap_or(if w.field.is_some() && n.ty == 0x33 && !n.part && n.ea.pos.raw == 20 {
-                    // field Janemba's body under the ascent's controller: the frame byte lags a frame
+                .unwrap_or(if n.ty == 0x33 && !n.part && n.ea.pos.raw == 20 {
+                    // Janemba's body under the ascent's controller: the frame byte lags a frame (battles too)
                     (n.shown_prev.0, n.shown_prev.1)
                 } else {
                     (n.ea.pos.raw, n.ea.pos.frame)
@@ -579,9 +579,9 @@ pub fn render_view(w: &World, out: &mut RenderView) {
             Body::Enemy(n) => {
                 let step = actor_cel(w, i);
                 if n.a.alpha > 0 {
-                    // field Janemba's body: the height before this frame's AI step (`Enemy::z_prev`)
+                    // Janemba's body: the height before this frame's AI step (`Enemy::z_prev`; battles too)
                     let mut a = std::borrow::Cow::Borrowed(&n.a);
-                    if w.field.is_some() && n.ty == 0x33 && !n.part {
+                    if n.ty == 0x33 && !n.part {
                         a.to_mut().z = n.z_prev;
                     }
                     actor_draw(w, id, &a, step, out);
