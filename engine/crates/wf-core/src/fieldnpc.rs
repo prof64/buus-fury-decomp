@@ -593,6 +593,18 @@ pub fn script_move_mark(w: &mut World, i: usize, set: bool) {
         return;
     }
     let f = foot(npc_ref(w, i));
+    // the mark at the stop (0x08017DF4) is skipped where the leader's footprint (0x03001C34) overlaps the NPC's: the
+    // walk ended on the player, who must still walk away (emulator, Yemma's office s055 talked to from the ogre's left:
+    // his walk_to (87, 240) ends on Goku at (95, 240) - the grid stays free there, Goku walks out either way; marked,
+    // ours held him in place for good - playtest finding 1)
+    if set {
+        if let Some(pi) = w.player_idx(0) {
+            let p = w.pl_ref(pi).a.foot_box();
+            if ov(f, [p.x0, p.y0, p.x1, p.y1]) {
+                return;
+            }
+        }
+    }
     mark(w, f, if set { 0 } else { 1 });
 }
 

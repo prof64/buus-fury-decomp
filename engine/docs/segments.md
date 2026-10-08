@@ -7099,3 +7099,27 @@ game's menu data the plain list is drawn. Screenshots: `work/ub/battle_select_{1
 * *View:* Classic 240x160 is the default (`Settings::classic_default`: settings saved before move to Classic once);
   F1 switches Classic / PC wide in a game (native: saved as the launcher's View; web: the same, `wf.prefs` /
   `wf.launcher`), with a toast.
+
+**§12 (8), user-bugs agent - playtest findings (engine/docs/playtest.md) #11-#16, battle (2026-10-07).** In the
+native app headless (`--dump`, launcher-started fights; frames under `work/ub/pt/`).
+* *#14 mashing A through the win retried at once:* the end screen's confirm now needs a 12-frame pause with no
+  button held before the press, and the lock is 60 frames (`control.rs` `END_QUIET`, `END_LOCK`); the headless shell
+  shows the end screen too (as the window). `mash`: A mashed for 1,300 frames - the box stays up; a press after a
+  pause retries.
+* *#16 Great Saiyaman's SS icon lit, does nothing:* the game greys Super Saiyan only on a form with up == down
+  (`0x0801A4C4`); the Great Saiyaman (14) has none above. The story's Saiyaman-era list has the Saiyaman skill in Super
+  Saiyan's place (#184 swaps it back): `story_skills` gives form 14 [7, 18, 6, 17]; Teen Gohan keeps the new-game list.
+  `gs14`: 14 -> 10 -> 14 by the Saiyaman skill.
+* *#13 Unstable Trunks transformed on frame 1:* the form object's countdown (`new_form_object`: 24 -> 120 + rand(180),
+  25 -> 240 + rand(120)) is now set when a battle starts in the form (`battle::create`; TS mirrored). `t24`: walks
+  from frame 1, Super Saiyan from ~150.
+* *#11 fusions' moves unaffordable at the automatic level:* the automatic level no longer goes below the fusion's
+  first story fight (enemy level bytes: Gogeta vs Janemba 105, Gotenks vs Super Buu 125, Vegito vs Super Buu with
+  Gohan 142; `launcher::FUSION_LEVELS`). `vegito_auto` (vs a Majin Fighter): Lv 142, EP 1167, Banshee Blast fires.
+* *#12 Final Flash fizzled at the Wasteland start:* the start (88, 232) sat right of a rock pillar's foot; a wide beam
+  met it at once. Start moved to (160, 232) (open corridor to x 296; TS mirrored). Every arena's start checked for a
+  clear wide beam to the right (`work/ub/clear.py`): all clear except Southwest Forest (the ship-fixes agent's arena
+  work) and the Dojo (a wall 176 px away, past the opponent). `ff_waste3`: the beam fires and kills.
+**Earth agent 2026-10-07 (19): playtest findings 1 and 9 (engine/docs/playtest.md).**
+*1 - the Yemma office softlock: our bug, fixed (wf-core fieldnpc.rs `script_move_mark`).* The game re-marks a map NPC's footprint on the walk grid where a script walk stops (0x08017DF4) **only when the leader's footprint (0x03001C34) does not overlap it**. Emulator (run 1 to row 9,560, then Goku to (93, 240) left of the door ogre, talk facing right, s055 node 5 `walk_to(304, 87, 240)`): the ogre stops on Goku, his old mark is lifted and no new one set (grid watch: the tiles at (88 .. 103, 240) stay free), Goku walks out left (95 -> 89, into the ogre) and right; from below (run 1 row 10,000, no overlap) the mark is set. Ours always marked, and Goku inside the marked tiles could not move in any direction. Emulator segment pt_ogre (1,306 frames: approach, talk, walk L / R / U / D) now matches whole (was 587). Real app (native `--dump`, the playtester's st_p18 input, HEAD + fix: `work/earth/pt_p18`): the ogre walks over Goku at (93, 240) at f11,050 .. 11,075 as in the report, then Goku walks away (93, 354) at f11,600.
+*9 - souls blocking Goku and answering A: the game does the same (no change).* Native app (st_q2 / st_p21 inputs): no NPC footprint ever overlaps Goku's - the soul stands just above him (st_q2 1-4: soul (120, 400) 16x8, Goku (120, 409)), blocks the step up and sits in the facing-up talk box ([x, y-16, x+16, y+8]); drawn behind him by depth. In st_p21 Goku is at (112, 272), 32 px below the ogre (112, 240): the talk box cannot reach the ogre at all, the soul beside him (120, 264) answers. Emulator, 1-4 from run 1 (Goku at (120, 409) in the soul's wander rect, A / small steps for 8,000 frames): the game also blocks Goku under a soul at (128, 400) and souls answer the A presses; ours matches that segment whole (9,238 frames, NPC positions / talks / RNG).
