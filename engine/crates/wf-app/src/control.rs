@@ -964,12 +964,18 @@ impl Control {
         let Some(e) = &self.end else { return };
         let Some(md) = CoreSim::of(app.sim.as_ref()).and_then(|s| s.data.menu.clone()) else { return };
         let won = e.outcome == Outcome::Won;
-        app.view.title = vec![wf_view::TitleView { text: md.text.s(if won { 111 } else { 112 }).to_vec(), x: 120, y: 44 }];
+        // (clear of player 1: the title and the choice box go to the screen half the player is not in - at the
+        // bottom of the screen the box covered Goku, playtest 40)
+        let low = CoreSim::of(app.sim.as_ref())
+            .and_then(|s| s.world.player_idx(0).map(|i| s.world.pl_ref(i).a.py()))
+            .zip(app.view.cameras.first().map(|c| c.y))
+            .is_some_and(|(py, cy)| py - cy > 88);
+        app.view.title = vec![wf_view::TitleView { text: md.text.s(if won { 111 } else { 112 }).to_vec(), x: 120, y: if low { 88 } else { 44 } }];
         app.view.dialog = Some(wf_view::DialogView {
             text: END_CHOICES.into(),
             style: 1,
             page: 0,
-            position: wf_view::DialogPos::Bottom,
+            position: if low { wf_view::DialogPos::Top } else { wf_view::DialogPos::Bottom },
             portrait: None,
             portrait_left: false,
             cursor: Some(e.sel),
@@ -1050,13 +1056,13 @@ impl Control {
             t.plate(fb, w, h, w as i32 - tw - 8, y, m, *c);
         }
         // the title's link box open with no link set up: it can only wait (the game's own box, kept as it is) - say
-        // how to connect a second player, under the box
+        // how to play with a friend, in player terms (playtest 27: command-line flags a player cannot use, over the
+        // title's menu item and the copyright line) - at the top of the picture, clear of both
         if !self.link_configured {
             let story = app.sim.as_any().and_then(|a| a.downcast_ref::<crate::story::StorySim>());
             if story.is_some_and(|s| crate::link::title_wait(s.world()).is_some()) {
-                // (short lines under the box: they fit the 240x160 Classic picture; the box's own B Cancel backs out)
-                let lines = ["No friend connected yet.", "Play: --link host:ROOM / join:ROOM", "Web: ?link=host:ROOM / join:ROOM"];
-                let mut y = h as i32 - 2 - lines.len() as i32 * (lh + 1);
+                let lines = ["No friend connected.", "To play together: Launcher > Story > Link play,", "both players on the same room number."];
+                let mut y = 4;
                 for (i, l) in lines.iter().enumerate() {
                     let tw = t.width(l);
                     t.plate(fb, w, h, ((w as i32 - tw) / 2).max(0), y, l, if i == 0 { overlay::ACCENT } else { overlay::WHITE });

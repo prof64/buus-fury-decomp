@@ -41,7 +41,7 @@ pub const PRESETS: &[Preset] = &[
     preset!("guardian", "Pilaf's Guardian", "", [("t63", 1)], "forest"),
     preset!("warlord", "Airship Warlord", "", [("t0", 1)], "forest"),
     preset!("blister", "Blister (spawns Enzymes)", "", [("t6", 1)], "crater"),
-    preset!("worm", "Worm Head (+ 5 Worm Body segments)", "", [("t142", 1)], "crater"),
+    preset!("worm", "Worm Head (+ 5 Worm Body segments)", "", [("t142", 1)], "stomach"),
     preset!("majin_fighters", "Southwest Forest: 4 Majin Fighters", "", [("t68", 4)], "forest"),
 ];
 

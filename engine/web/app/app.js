@@ -333,6 +333,11 @@ async function boot(baseTarBytes) {
   const cfg = { players: Number(qs.get('players') || 1), bindings, hotkeys, now: Date.now() / 1000 };
   // the launcher's pick: story (new game / a save slot) or a battle config; the save slots go along
   if (launch) Object.assign(cfg, { launch, slots: readSlots() });
+  // the launcher's Story > Link play (host / join a room): the title with link play, as ?link=host:ROOM
+  const ls = lsGet('wf.launcher') || {};
+  if (launch && launch.kind === 'title' && !qs.has('link') && (ls.link_mode === 1 || ls.link_mode === 2)) {
+    qs.set('link', `${ls.link_mode === 1 ? 'host' : 'join'}:LINK${String(ls.link_room ?? 1).padStart(4, '0')}`);
+  }
   const linkCfg = linkConfig(qs);
   if (linkCfg) cfg.link = linkCfg;
   // real battle by default (?arena=forest&enemy=t68&count=1&fighter=goku&seed=1); ?demo or ?area=8-3 = demo world

@@ -194,7 +194,8 @@ impl App {
     /// Render local player `player` for a `win_w` x `win_h` (device pixels) window. The framebuffer is
     /// `self.renderer.fb` (`fit.view_w` x `fit.view_h`, ARGB), to be shown scaled by `fit.scale`.
     pub fn render(&mut self, player: usize, win_w: u32, win_h: u32) -> Fit {
-        let world = self.world_size();
+        // (the map's showable area: the painted part the game's camera can show - PC wide clamps and zooms to it)
+        let world = self.renderer.view_area(&self.packs, &self.view).map(|a| (a[2] - a[0], a[3] - a[1])).or_else(|| self.world_size());
         // auto zoom: picked when the shown map changes, kept through frames without one (menu screens, black
         // loads) - see `AutoZoom`
         let mode = match self.mode {
@@ -204,6 +205,13 @@ impl App {
                 ViewMode::Pc { zoom: self.auto_zoom.zoom(win_w.max(1), win_h.max(1), shown) }
             }
             m => m,
+        };
+        // a menu screen (title, Select Game, the pause menu: a 240x160 picture) in PC wide: shown like Classic, the
+        // picture scaled by the largest integer the window takes - in the wide view it was scaled only as far as the
+        // view held it (a 960x518 browser window: a 480x259 view, the menu 1x in black, playtest 42)
+        let mode = match (mode, &self.view.menu) {
+            (ViewMode::Pc { .. }, Some(m)) if !m.overlay => ViewMode::Gba { scale: 0 },
+            (m, _) => m,
         };
         let f = fit(mode, win_w, win_h, world);
         self.renderer.render(&self.packs, &self.view, player, f.view_w as usize, f.view_h as usize);

@@ -77,6 +77,14 @@ pub fn steady_zoom(win_w: u32, win_h: u32) -> u32 {
     win_h.div_ceil(320).clamp(2, 6)
 }
 
+/// The zoom a map's showable area (`Renderer::view_area`, w x h world px) needs to fill the window: the smallest
+/// zoom whose view fits inside it on both axes. [`fit`] caps it where the view would get smaller than the GBA screen.
+/// Playtest 39: the prologue's 240x160 rooms at the steady 2x were a small panel in a black window.
+pub fn fill_zoom(win_w: u32, win_h: u32, area: (i32, i32)) -> u32 {
+    let (aw, ah) = (area.0.max(1) as u32, area.1.max(1) as u32);
+    win_w.div_ceil(aw).max(win_h.div_ceil(ah)).max(1)
+}
+
 /// the smallest zoom >= 2 whose view the map covers with <= 8 % black margin, max 6 ("Auto zoom: max": the map
 /// fills the window as far as the zoom allows)
 pub fn auto_zoom(win_w: u32, win_h: u32, world: Option<(i32, i32)>) -> u32 {
@@ -94,11 +102,12 @@ pub fn auto_zoom(win_w: u32, win_h: u32, world: Option<(i32, i32)>) -> u32 {
     z
 }
 
-/// "PC wide (auto)": "Steady" (the default, `max` false) is [`steady_zoom`] - one zoom per window size, whatever the
-/// map. "Max" (`max` true): the map fills the window as far as the zoom allows (up to 6x) - the zoom is picked by
-/// [`auto_zoom`] when the shown map changes (an area or a scene load) or the window does, and kept through frames
-/// that show no map (menu screens, black loads, the prologue): picking it from every frame's map made it jump
-/// whenever a menu opened over a small map or a cutscene left and re-entered one.
+/// "PC wide (auto)": "Steady" (the default, `max` false) is [`steady_zoom`] - one zoom per window size - raised to
+/// [`fill_zoom`] where the map's showable area is smaller than that view (a small room fills the window instead of
+/// floating in black; a map at least that large keeps the window's zoom). "Max" (`max` true): the map fills the
+/// window as far as the zoom allows (up to 6x, [`auto_zoom`]). Either is picked when the shown map changes (an area or
+/// a scene load) or the window does, and kept through frames that show no map (menu screens, black loads): picking it
+/// from every frame's map made it jump whenever a menu opened over a small map or a cutscene left and re-entered one.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct AutoZoom {
     map: String,
@@ -109,26 +118,29 @@ pub struct AutoZoom {
 }
 
 impl AutoZoom {
-    /// the zoom for this frame: `map` = the shown map's id and world size (None: no map this frame)
+    /// the zoom for this frame: `map` = the shown map's id and showable area size (None: no map this frame)
     pub fn zoom(&mut self, win_w: u32, win_h: u32, map: Option<(&str, (i32, i32))>) -> u32 {
         let win = (win_w, win_h);
+        let pick = |size: Option<(i32, i32)>| -> u32 {
+            match (self.max, size) {
+                (true, s) => auto_zoom(win_w, win_h, s),
+                (false, Some(s)) => steady_zoom(win_w, win_h).max(fill_zoom(win_w, win_h, s)).min(6),
+                (false, None) => steady_zoom(win_w, win_h),
+            }
+        };
         match map {
             Some((id, size)) if id != self.map || win != self.win || self.zoom == 0 => {
-                self.zoom = auto_zoom(win_w, win_h, Some(size));
+                self.zoom = pick(Some(size));
                 self.map = id.to_string();
                 self.win = win;
             }
             None if self.zoom == 0 || win != self.win => {
-                self.zoom = auto_zoom(win_w, win_h, None);
+                self.zoom = pick(None);
                 self.win = win;
             }
             _ => {}
         }
-        if self.max {
-            self.zoom
-        } else {
-            steady_zoom(win_w, win_h)
-        }
+        self.zoom
     }
 }
 
@@ -183,6 +195,11 @@ pub struct Renderer {
     /// the last picture's world rectangle origin and camera (`view_origin_in`: vx, vy, camera x, y) - for drawing on
     /// top of it in world coordinates (tool overlays)
     pub origin: (i32, i32, i32, i32),
+    /// per map: the painted area ([`painted_area`])
+    painted: HashMap<String, Option<[i32; 4]>>,
+    /// `RenderView::see_through` sprites' pixels this frame (0 = none) and whether the OBJ being drawn is one
+    ghost: Vec<u32>,
+    ghost_on: bool,
 }
 
 impl Default for Renderer {
@@ -319,6 +336,9 @@ impl Renderer {
             strings: None,
             menu: None,
             origin: (0, 0, 0, 0),
+            painted: HashMap::new(),
+            ghost: Vec::new(),
+            ghost_on: false,
         }
     }
 
@@ -391,21 +411,50 @@ impl Renderer {
     /// Playtest 8: centring alone showed black void beside the map while cutting off what the game frames (Yemma's
     /// Office: Yemma and the door off the top, the bottom third black).
     pub fn view_origin_in(view: &RenderView, player: usize, w: usize, h: usize, world: Option<(i32, i32)>) -> (i32, i32, i32, i32) {
+        Self::view_origin_area(view, player, w, h, world.map(|(a, b)| [0, 0, a, b]))
+    }
+
+    /// [`Self::view_origin_in`] for an area rectangle (x0, y0, x1, y1) - [`Self::view_area`]: the map's painted part
+    /// the game's camera can show
+    pub fn view_origin_area(view: &RenderView, player: usize, w: usize, h: usize, area: Option<[i32; 4]>) -> (i32, i32, i32, i32) {
         let (vx, vy, cx, cy) = Self::view_origin(view, player, w, h);
-        let Some((mw, mh)) = world.filter(|&(a, b)| a > 0 && b > 0) else { return (vx, vy, cx, cy) };
-        let axis = |v: i32, c: i32, n: i32, m: i32, g: i32| -> i32 {
+        let Some([x0, y0, x1, y1]) = area.filter(|a| a[2] > a[0] && a[3] > a[1]) else { return (vx, vy, cx, cy) };
+        let axis = |v: i32, c: i32, n: i32, a0: i32, a1: i32, g: i32| -> i32 {
             if n < g {
                 return v;
             }
-            let v = if m >= n { v.clamp(0, m - n) } else { -((n - m) / 2) };
+            let m = a1 - a0;
+            let v = if m >= n { v.clamp(a0, a1 - n) } else { a0 - (n - m) / 2 };
             v.clamp(c + g - n, c)
         };
-        (axis(vx, cx, w as i32, mw, GBA_W), axis(vy, cy, h as i32, mh, GBA_H), cx, cy)
+        (axis(vx, cx, w as i32, x0, x1, GBA_W), axis(vy, cy, h as i32, y0, y1, GBA_H), cx, cy)
+    }
+
+    /// The part of the shown map the PC wide view stays inside: the map's painted area (the camera-locked layers'
+    /// tiles that have a pixel - maps leave unpainted black margins the game's camera never reaches: Hercule City's
+    /// top / bottom, Snake Way's top-left; playtest 41) within the rectangle the game's camera can show
+    /// (`MapView::frame`). None: no map, or the world map (mode 7, it wraps).
+    pub fn view_area(&mut self, packs: &Packs, view: &RenderView) -> Option<[i32; 4]> {
+        let mv = view.map.as_ref().filter(|m| m.mode7.is_none())?;
+        let m = self.map(packs, &mv.id)?;
+        let painted = *self.painted.entry(mv.id.clone()).or_insert_with(|| painted_area(&m));
+        let mut a = [0, 0, m.world_w, m.world_h];
+        for r in [painted, mv.frame] .into_iter().flatten() {
+            let b = [a[0].max(r[0]), a[1].max(r[1]), a[2].min(r[2]), a[3].min(r[3])];
+            if b[2] > b[0] && b[3] > b[1] {
+                a = b;
+            }
+        }
+        Some(a)
     }
 
     /// Compose the view for local player `player` into `self.fb` (`w` x `h` world pixels).
     pub fn render(&mut self, packs: &Packs, view: &RenderView, player: usize, w: usize, h: usize) -> &[u32] {
         self.resize(w, h);
+        self.ghost.clear();
+        if !view.see_through.is_empty() {
+            self.ghost.resize(w * h, 0);
+        }
         if let Some(mv) = view.menu.as_ref().filter(|m| m.overlay) {
             // a screen over the field (mini-games): the normal picture, then the screen's pixels on top
             let mv = mv.clone();
@@ -480,8 +529,8 @@ impl Renderer {
             objs.clear();
         }
         // (the world map - mode 7 - wraps: no clamp there)
-        let world = map.as_ref().filter(|_| m7.is_none()).map(|(m, _, _)| (m.world_w, m.world_h));
-        let (vx, vy, cx, cy) = Self::view_origin_in(view, player, w, h, world);
+        let area = if m7.is_none() { self.view_area(packs, view) } else { None };
+        let (vx, vy, cx, cy) = Self::view_origin_area(view, player, w, h, area);
         self.origin = (vx, vy, cx, cy);
         // where the camera's 240x160 picture sits in the view (the GBA screen's own items: markers, title text, a
         // middle text box) - the view's centre unless the map clamp moved the view
@@ -652,7 +701,9 @@ impl Renderer {
                     // on: Gotenks' cut-short crit shake leaves (3, -3); the actors drawn 3 px off without it). The
                     // screen-space OBJs (HUD, boss bar, numbers' screen items) stay put
                     let (shx, shy) = view.obj_shake.or(map.as_ref().map(|m| m.2)).unwrap_or((0, 0));
+                    self.ghost_on = view.see_through.contains(&s.entity);
                     self.draw_obj(sheet, *fi, *flip, s.x - vx - shx, s.y - vy - shy, s.effect);
+                    self.ghost_on = false;
                 }
             }
             if let Some(f) = &m7 {
@@ -766,6 +817,10 @@ impl Renderer {
             if fade != 0 {
                 c = darken(c, fade, bm);
             }
+            // a see-through sprite's pixel under a BG drawn over it: half blended (battle fighters, playtest 40)
+            if let Some(&g) = self.ghost.get(i).filter(|&&g| g != 0 && self.top_l[i] != L_OBJ) {
+                c = (((c & 0xFE_FEFE) >> 1) + ((g & 0xFE_FEFE) >> 1)) & 0xFF_FFFF;
+            }
             self.fb[i] = c | 0xFF00_0000;
         }
 
@@ -779,6 +834,9 @@ impl Renderer {
     /// `c` = RGB in the low 24 bits; the top byte carries the colour's palette index within the layer's half
     /// (BG 0..255 / OBJ 256..511), 0 = unknown — palette fades use it to find the original RGB888 exactly.
     fn put(&mut self, i: usize, c: u32, layer: u8, b: u16) {
+        if self.ghost_on {
+            self.ghost[i] = c | 0xFF00_0000;
+        }
         self.bot[i] = self.top[i];
         self.bot_l[i] = self.top_l[i];
         self.top[i] = c;
@@ -1072,6 +1130,31 @@ impl Renderer {
     }
 }
 
+/// The bounding box (world px) of the map's camera-locked layers' tiles that have a non-transparent pixel (a layer
+/// scrolling at another rate - a sky, a drifting fog - or a wrap layer is not tied to world positions). None: none.
+fn painted_area(m: &Map) -> Option<[i32; 4]> {
+    let ts = &m.tileset;
+    let mut b: Option<[i32; 4]> = None;
+    for l in m.layers.iter().filter(|l| l.kind != LayerKind::Wrap && l.rate_x == 1024 && l.rate_y == 1024) {
+        // (a layer pixel shows at world px - its scroll offset: `Layer::scroll_with` adds it to the camera)
+        let (dx, dy) = (l.offset_x >> 10, l.offset_y >> 10);
+        for ty in 0..l.h_tiles {
+            for tx in 0..l.w_tiles {
+                let Some((t, _, _)) = l.tile(tx, ty) else { continue };
+                let base = t as usize * 64;
+                if ts.tiles.get(base..base + 64).is_some_and(|px| px.iter().any(|&p| p != 0)) {
+                    let (x, y) = (tx as i32 * 8 - dx, ty as i32 * 8 - dy);
+                    b = Some(match b {
+                        None => [x, y, x + 8, y + 8],
+                        Some(o) => [o[0].min(x), o[1].min(y), o[2].max(x + 8), o[3].max(y + 8)],
+                    });
+                }
+            }
+        }
+    }
+    b
+}
+
 /// local co-op's player tag ("1P" red, "2P" blue, "3P" green, "4P" yellow; the small font with its shadow) as a
 /// screen OBJ: (ARGB, width, height)
 fn player_tag(slot: u8) -> (Vec<u32>, usize, usize) {
@@ -1120,9 +1203,11 @@ mod auto_zoom_tests {
     fn steady_is_one_zoom_per_window() {
         let mut a = AutoZoom::default();
         assert!(!a.max);
-        for (id, size) in [("big", (3584, 2560)), ("tiny", (240, 160)), ("mid", (480, 400))] {
-            assert_eq!(a.zoom(1920, 1080, Some((id, size))), 4);
-            assert_eq!(a.zoom(960, 640, Some((id, size))), 2);
+        // the window's zoom for every map at least that view's size; a smaller one zooms in to fill the window
+        // (playtest 39: the prologue's 240x160 rooms were a small panel in black) - as far as `fit` allows
+        for (id, size, z1080, z640) in [("big", (3584, 2560), 4, 2), ("mid", (480, 400), 4, 2), ("tiny", (240, 160), 6, 4), ("short", (1000, 200), 6, 4)] {
+            assert_eq!(a.zoom(1920, 1080, Some((id, size))), z1080, "{id}");
+            assert_eq!(a.zoom(960, 640, Some((id, size))), z640, "{id}");
         }
         assert_eq!(a.zoom(3840, 2160, None), 6);
         assert_eq!(a.zoom(1280, 720, None), 3);

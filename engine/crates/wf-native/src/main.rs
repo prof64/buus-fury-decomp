@@ -133,6 +133,8 @@ struct Args {
     title_launch: bool,
     /// `--link host:ROOM|join:ROOM`: the title with online link play (host?, room)
     link: Option<(bool, String)>,
+    /// `--link` was given on the command line (the launcher's Link play setting does not clear it)
+    link_cli: bool,
     /// `--link-bot dojo|trade`: the scripted link player
     link_bot: Option<wf_app::link::LinkKind>,
     /// `--link-report FILE`
@@ -200,6 +202,7 @@ fn parse_args() -> Args {
         open_replays: false,
         title_launch: false,
         link: None,
+        link_cli: false,
         link_bot: None,
         link_report: None,
         link_quick: false,
@@ -331,6 +334,7 @@ fn parse_args() -> Args {
                 let v = next(&mut i);
                 let (role, room) = v.split_once(':').unwrap_or(("join", v.as_str()));
                 a.link = Some((role == "host", room.trim().to_ascii_uppercase()));
+                a.link_cli = true;
                 a.title_launch = true;
                 a.cli_mode = true;
             }
@@ -701,7 +705,15 @@ fn apply_choice(a: &mut Args, l: &wf_app::launcher::Launcher, c: &wf_app::launch
     a.auto_zoom_max = l.settings.auto_zoom_max;
     match c {
         Choice::Story { slot } => a.story_launch = Some(*slot),
-        Choice::Title => a.title_launch = true,
+        Choice::Title => {
+            a.title_launch = true;
+            // the launcher's Story > Link play (host / join a room): the title with link play, like `--link`
+            match l.settings.link_mode {
+                1 | 2 => a.link = Some((l.settings.link_mode == 1, format!("LINK{:04}", l.settings.link_room))),
+                _ if !a.link_cli => a.link = None,
+                _ => {}
+            }
+        }
         Choice::Battle(cfg) => a.battle_cfg = Some(cfg.clone()),
         Choice::Online => {
             a.battle_cfg = Some(l.battle_config());

@@ -40,6 +40,8 @@ const ARENAS: BuuArena[] = [
   { id: 'plateau', map: '19-3', name: 'Rocky Plateau (720x560)', image: '', size: [0, 0], spawn: [240, 280], bounds: { x0: 40, y0: 200, x1: 660, y1: 432 } },
   { id: 'village', map: '15-1', name: 'Nataday Village (800x720)', image: '', size: [0, 0], spawn: [200, 304], bounds: { x0: 96, y0: 120, x1: 760, y1: 560 } },
   { id: 'kamehouse', map: '5-1', name: 'Kame House island (720x640)', image: '', size: [0, 0], spawn: [160, 472], bounds: { x0: 72, y0: 368, x1: 648, y1: 560 } },
+  // the Worm Head's corridor (Stomach 21-9): in the open crater the wandering worm never met the player (Rust wf_core::battle::ARENAS)
+  { id: 'stomach', map: '21-9', name: "Buu's Stomach", image: '', size: [0, 0], spawn: [88, 296], bounds: { x0: 40, y0: 32, x1: 192, y1: 400 } },
   // the link-play Dojo (area 0-90; Rust wf_core::battle::ARENAS)
   { id: 'dojo', map: '0-90', name: 'Dojo', image: '', size: [0, 0], spawn: [120, 176], bounds: { x0: 24, y0: 80, x1: 296, y1: 304 } },
 ]
@@ -93,7 +95,7 @@ const PRESETS: Preset[] = [
   { id: 'guardian', name: "Pilaf's Guardian", phases: [{ enemy: 't63', count: 1 }], arena: 'forest' },
   { id: 'warlord', name: 'Airship Warlord', phases: [{ enemy: 't0', count: 1 }], arena: 'forest' },
   { id: 'blister', name: 'Blister (spawns Enzymes)', phases: [{ enemy: 't6', count: 1 }], arena: 'crater' },
-  { id: 'worm', name: 'Worm Head (+ 5 Worm Body segments)', phases: [{ enemy: 't142', count: 1 }], arena: 'crater' },
+  { id: 'worm', name: 'Worm Head (+ 5 Worm Body segments)', phases: [{ enemy: 't142', count: 1 }], arena: 'stomach' },
   { id: 'majin_fighters', name: 'Southwest Forest: 4 Majin Fighters', phases: [{ enemy: 't68', count: 4 }], arena: 'forest' },
 ]
 

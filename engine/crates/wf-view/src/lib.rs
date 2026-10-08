@@ -43,6 +43,10 @@ pub const GBA_FPS: f64 = 16_777_216.0 / 280_896.0;
 pub struct RenderView {
     /// Simulation frame number this view was taken at.
     pub frame: u64,
+    /// Entities whose sprites show through the BG drawn over them (half blended): a battle's players, so a fighter
+    /// behind an arena's foreground scenery stays visible (playtest 40: Goku hidden behind HFIL's crystals at "You
+    /// Win!!"). Empty in the story (the game's own picture).
+    pub see_through: Vec<u32>,
     /// The map shown (BG layers) — `None` = backdrop only.
     pub map: Option<MapView>,
     /// OBJ layer: every sprite to draw this frame, in OAM order (index 0 is drawn on top among equal
@@ -323,6 +327,7 @@ pub enum DialogPos {
 impl RenderView {
     pub fn clear(&mut self) {
         self.frame = 0;
+        self.see_through.clear();
         self.map = None;
         self.sprites.clear();
         self.cameras.clear();
@@ -361,6 +366,10 @@ pub struct MapView {
     pub mode7: Option<Mode7View>,
     /// Script BG control over the map's own (DISPCNT / BGxCNT / BLDCNT / BLDALPHA writes); None = the map's.
     pub layers: Option<BgLayers>,
+    /// The world rectangle the game's camera can show (x0, y0, x1, y1): the field's camera limits + the 240x160
+    /// screen, a battle arena's view. The PC wide view stays inside it (and inside the map's painted area); Classic
+    /// does not use it. None = the whole map.
+    pub frame: Option<[i32; 4]>,
 }
 
 /// BG state a script set (wf-core `scene::Layers`): per BG0..3 shown, priority, blend targets (bit 0 first target,

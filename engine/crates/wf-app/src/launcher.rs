@@ -60,7 +60,7 @@ pub const PRESETS: &[(&str, &str, &[(&str, i32)], &str)] = &[
     ("guardian", "Pilaf's Guardian", &[("t63", 1)], "canyon"),
     ("warlord", "Airship Warlord", &[("t0", 1)], "plateau"),
     ("blister", "Blister", &[("t6", 1)], "crater"),
-    ("worm", "Worm Head", &[("t142", 1)], "crater"),
+    ("worm", "Worm Head", &[("t142", 1)], "stomach"),
     ("majin_fighters", "4 Majin Fighters", &[("t68", 4)], "crater"),
 ];
 
@@ -170,7 +170,7 @@ const LAST_GAME_ENEMY: i32 = 149;
 /// (script-created / 0 XP)
 const NOT_OPPONENTS: &[i32] = &[
     84, 141, 34, 114, 126, 30, 135, 144, 52, 53, 55, 54, 143, 13, 14, 61, 4, 25, 29, 136, 137, 38, 26, 27, 28, 11, 31, 42, 73,
-    83, 87, 92, 95, 134, 139, 79, 105, 102, 81, 109, 110, 111, 147, 117, 120,
+    83, 87, 92, 95, 134, 139, 79, 105, 102, 81, 109, 110, 111, 147, 117, 120, 57,
 ];
 
 /// The opponent names the Battle page shows for game types whose catalogue name carries a note
@@ -184,7 +184,6 @@ const OPPONENT_NAMES: &[(i32, &str)] = &[
     (121, "Super Buu (inside Buu)"),
     (39, "Goten (Time Chamber)"),
     (59, "Tournament Fighter"),
-    (57, "Janemba Hand"),
 ];
 
 pub const VIEWS: &[(&str, &str)] = &[
@@ -272,6 +271,12 @@ pub struct Settings {
     /// ([`Settings::migrate`]); F1 in a game switches Classic <-> PC wide
     #[serde(default)]
     pub classic_default: bool,
+    /// link play from the title (Multiplayer -> Dojo / Trading Post with a friend online): 0 off, 1 host a room,
+    /// 2 join one; the room number both players pick (`LINK<number>` on the link server)
+    #[serde(default)]
+    pub link_mode: u8,
+    #[serde(default)]
+    pub link_room: u32,
 }
 
 impl Default for Settings {
@@ -285,6 +290,8 @@ impl Default for Settings {
             original_pacing: false,
             auto_zoom_max: false,
             classic_default: true,
+            link_mode: 0,
+            link_room: 1,
         }
     }
 }
@@ -396,6 +403,9 @@ enum Row {
     Pacing,
     /// "Auto zoom: steady / max" (`Settings::auto_zoom_max`)
     AutoZoom,
+    /// Story: link play off / host / join, and the room
+    LinkMode,
+    LinkRoom,
     Controls,
     Back,
 }
@@ -548,7 +558,9 @@ impl Launcher {
                 })
                 .collect();
             es.sort();
-            enemies = es.into_iter().map(|(_, n, id)| (id, n)).collect();
+            // an enemy that is also a one-fighter story fight is listed once: the story fight (its arena, its level)
+            let story_one = |id: &str| PRESETS.iter().any(|p| matches!(p.2, [(e, 1)] if *e == id));
+            enemies = es.into_iter().filter(|(_, _, id)| !story_one(id)).map(|(_, n, id)| (id, n)).collect();
             arenas = d.arenas.iter().map(|a| (a.id.clone(), a.name.clone())).collect();
         }
         let bg = packs.read("ui/images/screen_title.png").and_then(|b| decode_rgba(&b).ok());
@@ -559,6 +571,14 @@ impl Launcher {
             .filter_map(|p| packs.read(&p).and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok()))
             .filter_map(|v| Some((v["type"].as_i64()? as i32, v["level_byte"].as_i64()? as i32)))
             .collect();
+        // an opponent listed only as its story fight (above): saved settings naming the enemy pick the story fight
+        // (the same battle - one enemy, the story's arena and level)
+        if !settings.battle.preset_mode {
+            if let Some(p) = PRESETS.iter().find(|p| matches!(p.2, [(e, 1)] if *e == settings.battle.enemy)) {
+                settings.battle.preset_mode = true;
+                settings.battle.preset = p.0.into();
+            }
+        }
         Launcher {
             screen: Screen::Main,
             cursor: 0,
@@ -605,7 +625,13 @@ impl Launcher {
             Screen::Story => {
                 let mut v = vec![Row::TitleScreen];
                 v.extend((0..SLOTS).map(Row::Slot));
-                v.extend([Row::NewGame, Row::Back]);
+                v.push(Row::NewGame);
+                // link play: the title's Multiplayer pages with a friend (both pick the same room)
+                v.push(Row::LinkMode);
+                if self.settings.link_mode != 0 {
+                    v.push(Row::LinkRoom);
+                }
+                v.push(Row::Back);
                 v
             }
             Screen::Battle => {
@@ -881,6 +907,8 @@ impl Launcher {
             Row::Fullscreen => self.settings.fullscreen = !self.settings.fullscreen,
             Row::Pacing => self.settings.original_pacing = !self.settings.original_pacing,
             Row::AutoZoom => self.settings.auto_zoom_max = !self.settings.auto_zoom_max,
+            Row::LinkMode => self.settings.link_mode = wrap(self.settings.link_mode as i32 + d.signum(), 3) as u8,
+            Row::LinkRoom => self.settings.link_room = wrap(self.settings.link_room as i32 + d, 10_000) as u32,
             _ => return Choice::None,
         }
         Choice::Settings
@@ -972,7 +1000,13 @@ impl Launcher {
             Row::Mods => (t("Mods"), String::new()),
             Row::Settings => (t("Settings"), String::new()),
             Row::Quit => (t("Quit"), String::new()),
+            Row::TitleScreen if self.settings.link_mode != 0 => (t("Title screen"), t("Multiplayer with a friend")),
             Row::TitleScreen => (t("Title screen"), t("New Game / Continue")),
+            Row::LinkMode => (
+                t("Link play"),
+                format!("< {} >", ["Off", "Host a room", "Join a room"][self.settings.link_mode.min(2) as usize]),
+            ),
+            Row::LinkRoom => (t("Room"), format!("< {:04} >", self.settings.link_room)),
             Row::NewGame => (t("Quick start"), t("Snakeway, no prologue")),
             Row::Slot(i) => (format!("Continue {}", i + 1), self.slots.get(i).cloned().flatten().unwrap_or_else(|| t("- empty -"))),
             Row::Fighter => (t("Character"), format!("< {} >", self.picks.get(self.pick_idx()).map(|p| p.character.as_str()).unwrap_or("?"))),
@@ -1170,7 +1204,8 @@ pub fn slot_summary(bytes: &[u8], d: &GameData) -> Option<String> {
         .and_then(|f| f.areas.get(&(sd.world, sd.area)))
         .and_then(|a| Some(a.banner.trim()).filter(|b| !b.is_empty()).map(str::to_string).or_else(|| a.name.clone()))
         .unwrap_or_else(|| format!("{}-{}", sd.world, sd.area));
-    Some(format!("{name} Lv{lv}  {area}  {}:{:02}", mins / 60, mins % 60))
+    // (the play time before the area: a long area name is what a narrow line cuts - it lost the time, playtest 21)
+    Some(format!("{name} Lv{lv} {}:{:02} {area}", mins / 60, mins % 60))
 }
 
 /// A story app: a new game (`slot` None) or the game saved in `slots[slot]`. `slots` = the slot files (empty = no

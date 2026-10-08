@@ -344,6 +344,10 @@ fn it_ring(w: &World, id: u32, group: u32, t: i32, x: i32, y: i32, out: &mut Ren
 pub fn render_view(w: &World, out: &mut RenderView) {
     out.clear();
     out.frame = w.frame as u64;
+    // (battle mode: the players show through foreground scenery - not the story, which is the game's picture)
+    if w.field.is_none() {
+        out.see_through.extend(w.players.iter().copied());
+    }
     let map_id = match &w.field {
         Some(f) => f.map.clone(),
         None => w
@@ -417,6 +421,12 @@ pub fn render_view(w: &World, out: &mut RenderView) {
         },
         mode7: mode7.clone(),
         layers,
+        // (the field camera's limits 0 ..= camera_max, `scene::cam_clamp`; a battle arena's view rect)
+        frame: match (&w.field, w.arena.view) {
+            (Some(f), _) => Some([0, 0, f.camera_max.0 + crate::world::GBA_W, f.camera_max.1 + crate::world::GBA_H]),
+            (None, Some(v)) => Some([v.x0, v.y0, v.x1, v.y1]),
+            _ => None,
+        },
     });
     // the area transition's palette fade (field FadeOut k -> level 8k, FadeIn k -> 256 - 8k; 0x08006D98 / 0x08006DD6)
     if let Some(f) = w.field.as_ref() {

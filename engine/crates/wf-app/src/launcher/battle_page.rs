@@ -235,8 +235,30 @@ pub fn draw(l: &mut Launcher, packs: &Packs, fb: &mut [u32], w: usize, h: usize)
     let level = if b.level_auto { l.auto_level() } else { b.level.clamp(50, 200) };
     item(&mut cv, t, MenuFont::Small, &format!("LV {level}"), 14 + nw + if on(Row::Fighter) { 11 } else { 6 }, 17, 0, WHITE, false, 60);
     let oname = opp.to_uppercase();
-    let font = if t.font(MenuFont::Bold).measure(&units(&oname)) <= 104 { MenuFont::Bold } else { MenuFont::Menu };
-    item(&mut cv, t, font, &oname, 224, 17, 2, YELLOW, on(Row::Enemy) || on(Row::Preset), 104);
+    let focus_opp = on(Row::Enemy) || on(Row::Preset);
+    // a long name (story fights, notes in brackets) on two lines in the menu font - no name is cut (playtest #10)
+    let room = 104;
+    let fits = |f: MenuFont, s: &str| t.font(f).measure(&units(s)) <= room;
+    let mut sub_y = 27;
+    if fits(MenuFont::Bold, &oname) {
+        item(&mut cv, t, MenuFont::Bold, &oname, 224, 17, 2, YELLOW, focus_opp, room);
+    } else if fits(MenuFont::Menu, &oname) {
+        item(&mut cv, t, MenuFont::Menu, &oname, 224, 17, 2, YELLOW, focus_opp, room);
+    } else {
+        // the first kind of break (in this order) that leaves both lines within the room; the mark stays on line 1
+        // ("JANEMBA >" / "SUPER JANEMBA"), a bracket moves to line 2
+        let split = |sep: &str| {
+            oname.match_indices(sep).map(|(i, _)| i).filter_map(|i| {
+                let (a, b) = if sep == " (" { (&oname[..i], &oname[i + 1..]) } else { (&oname[..i + sep.trim_end().len()], &oname[i + sep.len()..]) };
+                (fits(MenuFont::Menu, a) && t.font(MenuFont::Menu).measure(&units(b)) <= room + 6).then(|| (a.to_string(), b.to_string()))
+            }).last()
+        };
+        let (a, b2) = [" (", " > ", " & ", ": ", ", ", " "].iter().find_map(|sep| split(sep)).unwrap_or((oname.clone(), String::new()));
+        // (raised: the sub line stays above the opponent's sprite)
+        item(&mut cv, t, MenuFont::Menu, &a, 224, 13, 2, YELLOW, focus_opp, room);
+        item(&mut cv, t, MenuFont::Menu, &b2, 224, 22, 2, YELLOW, false, room + 6);
+        sub_y = 31;
+    }
     // (a story fight: its last enemy's level; how many fights is on the setup panel)
     let osub = match (b.preset_mode, elevel) {
         (true, Some(lv)) => format!("STORY  LV {lv}"),
@@ -244,7 +266,7 @@ pub fn draw(l: &mut Launcher, packs: &Packs, fb: &mut [u32], w: usize, h: usize)
         (false, Some(lv)) => format!("LV {lv}"),
         (false, None) => String::new(),
     };
-    item(&mut cv, t, MenuFont::Small, &osub, 230, 27, 2, WHITE, false, 80);
+    item(&mut cv, t, MenuFont::Small, &osub, 230, sub_y, 2, WHITE, false, 80);
     let mut vs = Pen::new(MenuFont::Bold, 158, 52, 1, RED, Some(SHADOW));
     cv.text(t, &mut vs, &units("VS"));
     // A to fight

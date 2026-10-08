@@ -7147,3 +7147,16 @@ native app headless (`--dump`, launcher-started fights; frames under `work/ub/pt
   the same corner show the same world rectangle; the demo world gave both players' HUDs slot 0 and no tag. The demo
   now fills each player's slot and head tag like the battle view, so each viewport shows its own player's HUD in
   place (`demo.rs`).
+
+### (10) Playtest round 3 (build c67e5ec): #10, #17
+
+* *#10 opponent list:* Janemba's summoned hand (type 57: invisible, never acts - a fight that never ends) is no longer
+  offered (`NOT_OPPONENTS`). An enemy that is also a one-enemy story fight (Broly, Yakon, Dabura, Majin Vegeta,
+  Airship Warlord, Kid Buu, Pikkon, ...) is listed once, as the story fight - the same battle (one enemy, the story's
+  arena and level); settings naming the enemy open the story fight. Names wider than the opponent column go on two
+  lines in the menu font, broken at the first of " (" / " > " / " & " / ": " / ", " / space that fits both lines
+  (`battle_page.rs`); nothing is cut. Test `launcher.rs::opponent_list_has_no_hand_and_no_twins`. App: all 140
+  entries stepped on the Battle page, `work/ub/r3_names_0.png` / `_1.png`.
+* *#17 Dragon Fist tap spends 300 EP:* faithful. The emulator lockstep traces `f41_skill5` / `f44_skill5`
+  (`data/battle/buu_lockstep`): a 1-frame B tap at frame 5 takes EP 900 -> 600 and goes back to idle; holding then
+  spends 300 more at the start and 5 per frame. Not changed.

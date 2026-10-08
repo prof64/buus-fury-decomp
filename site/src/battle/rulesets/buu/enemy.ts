@@ -1394,6 +1394,11 @@ export class Enemy extends Actor implements EnemyLike {
     this.ctx.puffRng(this.w, ...other.center())
     // (the absorbed copy leaves the enemy grid: its mark would stand in the path follower's way)
     other.unmarkSelf()
+    // the absorbed half's beam goes with its actor state (wf-core kid_buu_merge): charging -> removed, firing -> retracts
+    const ob = other.beam
+    if (ob && this.w.entities.includes(ob)) ob.stop()
+    other.beam = null
+    other.beamStopDue = 0
     other.removed = true
     other.defeated = true
     // (the survivor carries on the fight when the absorbed half was the primary opponent - wf-core kid_buu_merge)

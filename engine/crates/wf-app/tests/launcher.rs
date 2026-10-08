@@ -172,3 +172,26 @@ fn battle_picker_rows_are_distinct_and_playable() {
         assert_eq!(l.battle_config().players[0].form, want, "{fighter} {form:?}");
     }
 }
+
+/// The Battle page's opponent list (playtest #10): no Janemba's summoned hand (invisible, never acts - a fight with no
+/// end), no name twice (Broly, Yakon, Airship Warlord, Majin Vegeta were both a one-enemy story fight and an enemy);
+/// settings naming such an enemy open its story fight - the same battle
+#[test]
+fn opponent_list_has_no_hand_and_no_twins() {
+    let Some(rom) = wf_rom::testutil::rom() else { return };
+    let (c, _) = wf_extract::extract_rom(&rom, &Default::default(), &mut |_| {});
+    let p = packs(&c.files);
+    let l = Launcher::new(&p, Settings::default(), true);
+    let es = l.enemy_list();
+    assert!(!es.iter().any(|e| e.0 == "t57"), "Janemba's hand offered");
+    let mut names: Vec<String> = launcher::PRESETS.iter().map(|p| p.1.to_uppercase()).collect();
+    names.extend(es.iter().map(|e| e.1.to_uppercase()));
+    let n = names.len();
+    names.sort();
+    names.dedup();
+    assert_eq!(names.len(), n, "a name twice");
+    let mut s = Settings::default();
+    s.battle.enemy = "t10".into();
+    let cfg = Launcher::new(&p, s, true).battle_config();
+    assert_eq!((cfg.phases.len(), cfg.arena.as_str()), (1, "volcano"));
+}

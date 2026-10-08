@@ -2637,6 +2637,10 @@ pub fn kid_buu_merge(w: &mut World, i: usize) {
     crate::fx::puff_rng(w, ox, oy);
     // (the absorbed copy leaves the enemy grid: its mark would stand in the path follower's way)
     unmark_self(w, o);
+    // the absorbed half's beam belongs to its actor state (0x0804C690), which goes with the object: a charging beam
+    // is removed, a firing one retracts (beam_stop) - it does not hang in the arena without its owner
+    crate::nodes::stop_beam_of(w, o);
+    w.en(o).beam_stop_due = 0;
     w.ents[o].removed = true;
     let oe = w.en(o);
     oe.defeated = true;

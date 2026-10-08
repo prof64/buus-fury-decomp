@@ -38,6 +38,7 @@ const SCENARIOS: Scn[] = [
   { name: 'kid_buu', enemy: 't60', arena: 'wasteland', seed: 13, frames: 1500, style: 'mix' },
   { name: 'broly', enemy: 't10', arena: 'volcano', seed: 17, frames: 1500, style: 'mix' },
   { name: 'worm', enemy: 't142', arena: 'crater', seed: 19, frames: 1200, style: 'idle' },
+  { name: 'worm_stomach', enemy: 't142', arena: 'stomach', seed: 19, frames: 1200, style: 'mix' },
   { name: 'yakon', enemy: 't145', arena: 'yakon', seed: 23, frames: 1500, style: 'mix' },
   { name: 'majin_vegeta', enemy: 't70', arena: 'canyon', seed: 29, frames: 1500, style: 'mix' },
   { name: 'totenhotep', enemy: 't129', arena: 'crater', seed: 31, frames: 1200, style: 'mix' },

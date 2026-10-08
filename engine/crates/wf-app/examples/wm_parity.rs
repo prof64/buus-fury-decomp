@@ -140,7 +140,7 @@ pub fn run(packs: &Packs, work: &Path, out: Option<&Path>, only: &[String], mode
         let mut best: Option<(usize, Vec<u32>, (usize, usize, usize))> = None;
         for &(c, f, g) in &combos {
             let mut view = RenderView::default();
-            view.map = Some(MapView { id: "area_00_050".into(), anim_frame: 0, tile_frame: None, shake: (0, 0), shake_sub: (0, 0), mode7: Some(v7(&cams[c], label)), layers: None });
+            view.map = Some(MapView { id: "area_00_050".into(), anim_frame: 0, tile_frame: None, shake: (0, 0), shake_sub: (0, 0), mode7: Some(v7(&cams[c], label)), layers: None, frame: None });
             view.world_map = Some(WorldMapView {
                 bg_camera: Some(v7(&bg_cam, None)),
                 flyer: flyer_view(packs, &fls[f]).map(|mut fv| {
@@ -165,7 +165,7 @@ pub fn run(packs: &Packs, work: &Path, out: Option<&Path>, only: &[String], mode
         if let (Some(o), true) = (out, std::env::var("WM_PC").is_ok()) {
             let (c, f, g) = pick;
             let mut view = RenderView::default();
-            view.map = Some(MapView { id: "area_00_050".into(), anim_frame: 0, tile_frame: None, shake: (0, 0), shake_sub: (0, 0), mode7: Some(v7(&cams[c], label)), layers: None });
+            view.map = Some(MapView { id: "area_00_050".into(), anim_frame: 0, tile_frame: None, shake: (0, 0), shake_sub: (0, 0), mode7: Some(v7(&cams[c], label)), layers: None, frame: None });
             view.world_map = Some(WorldMapView {
                 bg_camera: Some(v7(&bg_cam, None)),
                 flyer: flyer_view(packs, &fls[f]).map(|mut fv| {

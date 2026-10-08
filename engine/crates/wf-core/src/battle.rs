@@ -111,6 +111,17 @@ pub const ARENAS: &[(&str, &str, &str, (i32, i32), [i32; 4])] = &[
         (160, 472),
         [72, 368, 648, 560],
     ),
+    // the Worm Head's own place (Stomach 21-9, a corridor walkable 40..192 x 32..400): the worm only wanders (rand(200)
+    // turns, a wall turns it) and hits by contact - in the game it meets the player because the corridor holds it; in
+    // the open Giant Crater it walked away and never fought (playtest #37). The start is screen-near the story's worm
+    // at (152, 248), which `spawn_phase` then uses.
+    (
+        "stomach",
+        "21-9",
+        "Buu's Stomach",
+        (88, 296),
+        [40, 32, 192, 400],
+    ),
     // the link-play Dojo (title -> Multiplayer -> Dojo; area 0-90, its walled room: walkable 24..296 x 80..304)
     ("dojo", "0-90", "Dojo", (120, 176), [24, 80, 296, 304]),
 ];

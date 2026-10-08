@@ -119,7 +119,7 @@ Severity: **critical** = blocks play / never ends, **high** = a core feature bro
    (`r2s_nv/s.png`), HFIL (`r2s_h1/s.png`), and on the web build. (Classic is now the default view, so fewer players
    meet it.)
 
-9. **Medium - Story: wandering souls walk into Goku, block him and take his A-button talk.**
+9. **Medium - Story: wandering souls walk into Goku, block him and take his A-button talk.** **Matches the game (not a bug):** the soul is never inside Goku - it stands just above him (1-4: soul (120, 400) 16x8, Goku (120, 409)), drawn behind him by depth, blocks the step up and is in the facing-up talk box, so it answers A; under the office ogre Goku was 32 px below him, out of the ogre's talk reach. The original does the same (emulator from run 1 in 1-4: Goku stopped under a soul at (128, 400), souls answering A: `work/earth/pt_soul/emu_soul.png`); ours matches that recording whole (9,238 frames; segments.md entry 19).
    Saw: under the office ogre, a soul hidden behind Goku answers every A with "I'm going to Heaven!" (`st_p21/z.png`);
    at 1-4 a soul inside Goku blocks the open stairs and answers A (`st_q3/s.png`). Walking away frees him. Probably
    the same cause as 1 (NPC movement ignores the player's body).
@@ -276,8 +276,91 @@ finished. Things a player may report, each checked against the game and left as 
     the stalls is a silent no-op in the recorded runs too (run 3's ship part bought every stall row down to a refusal;
     exact in logic and sound).
 
+- **Info - #9 and #24 re-reported, both faithful:** the soul "inside" Goku at the 1-4 stairs (only its outline
+    shows behind his head: `r2s_q3/halo.png`) stands just above him and answers A - the emulator shows the same
+    picture and talk (`work/earth/pt_soul/emu_soul.png`); the 8-41 bottom wall hides the player in the original too
+    (segments.md entries 19 / 20). Both marked in their items above.
+
 Tooling notes (wf-mcp, not the game): `talk` at the 7-2 registration desk walked to the trigger's edge and reported
 "no reaction" (standing in the middle, facing up, A works); `attack` leaves level-up popups open until the next A.
+
+### Round 3 (playtester): re-verify on c67e5ec, broad Battle, story from saves (2026-10-08)
+
+The play build of c67e5ec (`work/playtest/bin/buus-fury-c67`), headless + muted, Classic (default) and PC wide; web
+rebuilt from a clean export of c67e5ec in headless Chrome. Runs `r3b_*` (battle), `r3s_*` (story / launcher / web).
+
+**Verified fixed:** 1 Yemma's Office softlock (Goku walks free right after the ogre, `r3s_p18`); 2 / 23 Janemba
+(dies in < 300 frames, Super Janemba follows, won at f1510: `r3b_bosses1.png`); 3 opponents approach (Kid Buu walks
+in and beats an idle Goku: `r3b_sheet1.png`); the survive countdown (top right, ends "You Win!!" at 00:00); 5
+volleyball (ball drawn, a right punch sends it right: `r3b_vb/z.png`); 6 / 25 arenas and spawns on screen
+(`r3_t1/s.png`, `r3b_sheet4.png`); 7 shield bubble (`r3b_bg_shield/z.png`); 8 PC wide clamped (`r3b_sheet4.png`,
+`r3s_gk/s.png`; maps smaller than the view centred: `r3s_wide.png`); 11 fusion moves usable at the auto level
+(Gotenks vs Majin Fighter now Lv 125, SS3 skill, 924 EP; Vegito 1167, Gogeta 483); 12 Final Flash from the Wasteland
+start (`r3b_sheet2.png`); 13 Unstable Trunks (transforms ~f200); 14 end-screen lock (mashed A picks nothing, one A
+after a pause retries: `r3b_bw_win`); 15 two players (two HUDs, 1P / 2P labels: `r3b_sheet3.png`); 16 Great
+Saiyaman (skills 7 / 18 / 6 / 17, toggles back); 19 "You Lose!!" placement (`r3b_r2b_kidbuu_lose/zoom_100_900.png`);
+20 one zoom per window (all story frames 480x320, Select Game scaled up: `r3s_p18/s0.png`); 22 Kid Buu false win (won
+only when the split copy dies, f~4950: `r3b_kb_win/end.png`); 26 Dojo names ("Goku Lv90" / "Vegeta Lv60",
+`r3s_ldojo2/s.png`); 28 text boxes on the map (`r3s_gk/s.png`); 29 Pui Pui removed at the KO (`r3b_ship`); 31 web
+layout (buttons in a bar above the picture, F1 toast top right clear of Retry, no instant retry: `r3s_web_battle/s.png`).
+
+**Still broken:**
+* 9 (medium) - souls still answer A instead of the ogre (`r3s_p21/s.png`, f011020-f011600) and a soul inside Goku
+  keeps him at (120,409) through 300 frames of Up at the 1-4 stairs (`r3s_q3/s2.png`, f006480 / f006720).
+* 24 (medium) - Babidi's Ship save room: Gohan walks behind the bottom wall at y=351, x 40-183, only hair tips showing
+  (`r3s_f_walk/s.png`, frames 400 / 740 / 1000).
+* 10 (medium, partly fixed) - the list is clean except **Janemba Hand**: still listed, invisible, 50/50 HP, the fight
+  never ends (`r3b_sk_goku2/sk.png`); names cut off ("MAJIN BUU & BABIDI (S..", "TIME CHAMBER > SUPE..", "GOTEN (TIME
+  CHAMBE..", "SUPER BUU (TWO-PHA..", "HUMAN (WORLD TOUR..") and repeated labels (BROLY x2, YAKON x2, AIRSHIP WARLORD x2,
+  MAJIN VEGETA x2) with nothing telling them apart (`r3b_opps/s1.png`).
+* 30 (low) - Kid Buu's beam over the downed Goku stays frozen through "You Lose!!" for 800+ frames
+  (`r3b_r2b_kidbuu_lose/zoom_100_900.png`); see also 36.
+* 17 (low) - Dragon Fist tap still spends 300 EP for nothing (`r3b_sheet2.png` f40).
+* 21 (low, partly fixed) - the Story page is in menu style with area names, but the Continue line is cut off:
+  "Gohan Lv64 Hercule City 0:3.." loses the play time, "Goten Lv110 Nataday Village .." loses it entirely
+  (`r3s_lp/s.png`, `r3_t2/launcher_000.png`).
+* 27 (low, partly fixed) - the waiting box now says "No friend connected yet. Play: --link host:ROOM / join:ROOM, Web:
+  ?link=host:ROOM / join:ROOM": command-line flags a player of the packaged app cannot use, and the text covers the
+  title's menu item and the copyright line (`r3s_dojo/s.png`, f000300).
+
+**New (round 3):**
+
+36. **Medium-high - Battle: a Kid Buu beam hangs in the arena forever.** `chase.py r3b_kb_win --battle
+    goku:5:kid_buu:1::200 --view pc:0 --reach 30 --ytol 8 --frames 5000`: a vertical cyan beam stays at one world spot
+    from ~f2800 (right after the main Kid Buu merges into the split copy) to the end, still there behind "You Win!!"
+    (`r3b_kb_win/zoom_1600_4600.png`, `r3b_kb_win/end.png`). Expected: the beam ends with its attack / owner.
+37. **Medium - Battle: Worm Head never fights.** `r3_opps.py goku:0:t142` (900 frames idle, Lv 145): it wanders
+    off-screen to (392,138), never attacks, the player's HP unchanged (`r3b_op_t142/l.png`). Expected: it engages like
+    the other opponents now do.
+38. **Medium - Battle: the Majin Buu survive fight kills an idle player at its automatic level (100).** Lost at f~600
+    (`r3b_op_majin_buu`): a survive fight a player cannot survive by default. (Round 2 had nothing happening at all.)
+39. **Low-medium - PC wide: the prologue's small maps shrink to a 240x160 panel** in a mostly black window (Goku's
+    house, the Lookout, whose text box floats in the black above the scene): one zoom per window now
+    (`r3s_p18/s0.png`, f001000 / f001500; repro `pt.py r3s_p18 --keys Enter,Enter --input "$(cat st_inputs/st_p18.txt)"
+    --frames 12700 --every 50`).
+40. **Low-medium - Battle: the Janemba arena ends with Goku hidden behind a foreground crystal / jelly bean** - "You
+    Win!!" with no player in sight (`r3b_jan_win/zoom_1450_1650.png`).
+41. **Low - PC wide shows maps' unpainted black margins**: clamped to the whole map, it reaches past where the game's
+    camera goes - Hercule City ~40 px black at the top, ~30 at the bottom (game camera y 75-235, painted ~40-290;
+    `r3s_wm/s.png` f000180, repro `pt.py r3s_wm --saves seg_e_tournament --keys Enter,ArrowDown,Enter --input
+    "N60,U10,L110,N120" --frames 300 --every 20`); Snake Way a black top-left corner and left column, native and web
+    (`r3s_p18/s.png` f006650, `r3s_web_quick/s.png` 01 / 09). Expected: clamp to the area the game can show.
+42. **Low - web: the pause menu is not scaled up in PC wide** (960x640 Chrome: picture 480x259, the menu stays 1x, a
+    quarter-size panel in black: `r3s_web_quick/s.png` 10_pause_menu); native fills the view.
+43. **Low (possibly faithful)** - Super Buu's ki balls burst just in front of a knocked-back player (~115 px) and do no
+    damage, so an idle fight stalls (`r3b_sbw2/z.png`); the Ghost turns invisible (eyes + shadow), sits on Goku and
+    never attacks in 900 frames (`r3b_op_t32/l.png`); Dabura holds Goku in a hit-stun loop 500+ frames (548 -> 236 HP),
+    sprites overlapping (`r3b_ops2.png`, middle row). Not seen: Dabura's sphere attack.
+
+**Looked right:** skill sweeps for 13 fighter / form combos (Goku halo and SS3 no-limit, Mystic Gohan, Great Saiyaman,
+Goten, Trunks, Vegeta halo SS, Gotenks SS3 no-limit, Vegito, Gogeta, Hercule): every skill fires, transformations up
+and down, Energy Sword and Kamikaze Ghosts drawn, both views (`r3b_sk_*/sk.png`); new enemy shots - Super Buu's
+stretch punch / beam / ki ball (`r3b_op_super_buu/sh.png`), Mechanoid arm, Totenhotep's bandage (`r3b_ops2.png`); ten
+varied opponents approach and fight (ninja, Shinobi, Grenadier, Sniper, Tank, Pharoah, Mega Cyborg, Broly, Airship
+Warlord, Totenhotep). Story: the new launcher pages take the same keys; Continue from Grand Kai's Mansion, Hercule City,
+Nataday, HFIL and West City saves; pause menu pages; save point menu; field Instant Transmission; a save at Hercule City
+-> Continue resumes there (`r3s_sv.png`); Grand Kai's Mansion -> Planet with Olibu. Web: launcher, a battle won with SS,
+F1 both ways, Quick start, the pause menu.
 
 ## Checked and looked right
 
@@ -341,3 +424,18 @@ Round 2 (6a369e5):
   up by the largest integer: `f8_sheet.png` (Yemma's Office f8,800 / f10,800, Snake Way f6,660, before | after).
 * **18 / 21 - launcher:** "Arena Auto: <name>"; Goku starts in his normal outfit; the stat line fits at any level;
   Story / Settings / Mods pages in the game's menu style; Continue slots name the area (`lp_sheet.png`, `lp_sheet2.png`).
+
+**Round 3 fixes (ship fix agent, 2026-10-08; frames under `work/playtest/`):**
+* 39 / 41 - PC wide: the view stays inside the map's **showable area** - its painted part (the camera-locked layers' tiles
+  with a pixel) within what the game's camera can show (`MapView::frame`: the field camera limits + 240x160, an arena's
+  view; `Renderer::view_area`), and "PC wide (auto)" zooms in where that area is smaller than the window's view
+  (`fill_zoom`, capped so the view never gets smaller than the GBA screen; big maps keep the window's zoom).
+  `fix3_sheet.png`: Goku's house and the Lookout fill the window, Hercule City and Snake Way without black margins.
+* 40 - battle: the players show through foreground scenery (half blended, `RenderView::see_through`; not in the story)
+  and the end screen goes to the screen half the player is not in: `fix3_jan_sheet.png`.
+* 42 - a menu screen (title, Select Game, pause menu) in PC wide is shown like Classic, scaled by the largest integer
+  the window takes: web 960x518 3x (`fix3_web_pause.png`; `engine/web/tests/pause_probe.mjs`).
+* 21 - the Continue line puts the play time before the area: `fix3_lp_sheet.png`.
+* 27 - the title's waiting box says how to play with a friend in player terms, at the top clear of the menu; the
+  launcher's Story page has **Link play** (Off / Host a room / Join a room) and **Room** (0000-9999) - the title then
+  starts with link play (native and web): `fix3_link_sheet.png`.
