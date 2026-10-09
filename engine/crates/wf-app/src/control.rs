@@ -173,7 +173,25 @@ pub struct Control {
     play_prev: u16,
     /// a replay's menu chose to leave (native shell: [`Control::take_exit_replay`])
     exit_replay: bool,
+    /// the PC system menu (Esc in every mode, [`crate::sysmenu`]) and what the shell has to carry out from it
+    pub sys: crate::sysmenu::SysMenu,
+    sys_actions: VecDeque<crate::sysmenu::SysAction>,
+    sys_was_paused: bool,
+    /// the shell's facts for the menu: can it quit itself, its volume, full screen (None: no switch), a key screen
+    pub sys_quit_game: bool,
+    pub sys_volume: u32,
+    pub sys_fullscreen: Option<bool>,
+    pub sys_rebind: bool,
+    /// "Esc: Menu" shown at a game's start (seconds left)
+    hint_t: f64,
+    /// story: the save generation last seen and the frame it changed (progress since then is unsaved)
+    save_mark: Option<(u32, u64)>,
 }
+
+/// seconds the "Esc: Menu" hint stays (the last one fades)
+const HINT_SECS: f64 = 5.0;
+/// frames of play after the last save that count as progress worth a "quit without saving?" question
+const UNSAVED_FRAMES: u64 = 600;
 
 fn fmt_time(frames: u64) -> String {
     let s = frames as f64 / GBA_FPS;
@@ -220,7 +238,8 @@ fn outcome_name(o: Outcome) -> &'static str {
 }
 
 impl Control {
-    pub fn new(app: &mut App, hotkeys: Hotkeys, now_unix: u64) -> Control {
+    pub fn new(app: &mut App, mut hotkeys: Hotkeys, now_unix: u64) -> Control {
+        hotkeys.migrate();
         let enabled = start_of(app).is_some() && app.sim.snapshot().is_some();
         let mut c = Control {
             enabled,
@@ -258,6 +277,15 @@ impl Control {
             play_menu: None,
             play_prev: 0,
             exit_replay: false,
+            sys: Default::default(),
+            sys_actions: VecDeque::new(),
+            sys_was_paused: false,
+            sys_quit_game: false,
+            sys_volume: 100,
+            sys_fullscreen: None,
+            sys_rebind: false,
+            hint_t: HINT_SECS,
+            save_mark: None,
         };
         if enabled {
             c.timeline.capture(app.sim.as_ref());
@@ -349,6 +377,107 @@ impl Control {
     }
 
     /// The end screen chose "Change fighter" (cleared by the call): the host goes back to the launcher's Battle page.
+    /// Start opens the system menu: a local battle (no Start menu of its own) outside its end screen and replays
+    fn start_opens_menu(&self, app: &App) -> bool {
+        CoreSim::of(app.sim.as_ref()).is_some() && self.play.is_none() && self.end.is_none()
+    }
+
+    /// Open the system menu (Esc): what this game allows; the game pauses under it (an online match cannot)
+    pub fn open_sys(&mut self, app: &mut App) {
+        let story = app.sim.as_any().and_then(|a| a.downcast_ref::<crate::story::StorySim>());
+        let online = wf_net::netsim::current_status().is_some() || app.sim.as_any().is_some_and(|a| a.is::<crate::link::LinkSim>());
+        let unsaved = story.is_some() && self.save_mark.is_some_and(|(_, f)| app.sim.frame().saturating_sub(f) > UNSAVED_FRAMES);
+        let ctx = crate::sysmenu::SysCtx {
+            restart: CoreSim::of(app.sim.as_ref()).is_some() && self.play.is_none() && self.enabled,
+            quit_game: self.sys_quit_game,
+            unsaved,
+            online,
+            classic: matches!(app.mode, wf_render::ViewMode::Gba { .. }),
+            volume: self.sys_volume,
+            fullscreen: self.sys_fullscreen,
+            rebind: self.sys_rebind,
+        };
+        self.sys.hotkeys = self.hotkeys.clone();
+        self.sys.show(ctx);
+        self.sys_was_paused = app.paused;
+        if !online {
+            app.paused = true;
+        }
+        self.acc = 0.0;
+        self.hint_t = 0.0;
+        app.audio_out.push(AudioEvent::PlaySfx { id: wf_core::menu::SFX_ACCEPT as u8, volume: 64, pan: 0 });
+    }
+
+    /// carry out a system menu choice: resume / restart here, the rest is the shell's ([`Control::take_sys_action`])
+    fn sys_act(&mut self, app: &mut App, a: crate::sysmenu::SysAction) {
+        use crate::sysmenu::SysAction as S;
+        app.audio_out.push(AudioEvent::PlaySfx { id: wf_core::menu::SFX_CURSOR as u8, volume: 64, pan: 0 });
+        if !self.sys.open {
+            app.paused = self.sys_was_paused;
+            self.acc = 0.0;
+        }
+        match a {
+            S::Resume => {}
+            S::Restart => {
+                self.retry(app);
+                app.paused = false;
+            }
+            S::ToggleView => {
+                app.mode = match app.mode {
+                    wf_render::ViewMode::Pc { .. } => wf_render::ViewMode::Gba { scale: 0 },
+                    wf_render::ViewMode::Gba { .. } => wf_render::ViewMode::Pc { zoom: 0 },
+                };
+                self.sys_actions.push_back(a);
+            }
+            S::Volume(v) => {
+                self.sys_volume = v;
+                self.sys_actions.push_back(a);
+            }
+            S::ToggleFullscreen => {
+                self.sys_fullscreen = self.sys_fullscreen.map(|f| !f);
+                self.sys_actions.push_back(a);
+            }
+            _ => self.sys_actions.push_back(a),
+        }
+    }
+
+    /// What the system menu left for the shell: quit to the launcher / the game, view, volume, full screen, keys.
+    pub fn take_sys_action(&mut self) -> Option<crate::sysmenu::SysAction> {
+        self.sys_actions.pop_front()
+    }
+
+    /// The mouse in view pixels (`click`: the left button went down) - true while the system menu has it.
+    pub fn sys_pointer(&mut self, app: &mut App, x: i32, y: i32, click: bool) -> bool {
+        if !self.sys.open {
+            return false;
+        }
+        if let Some(a) = self.sys.pointer(x, y, click) {
+            self.sys_act(app, a);
+        }
+        true
+    }
+
+    /// story: the save generation and the frame it changed (the system menu's "progress since the last save")
+    fn mark_saves(&mut self, app: &App) {
+        if let Some(gen) = app.sim.as_any().and_then(|a| a.downcast_ref::<crate::story::StorySim>()).map(|s| s.session.world.saves.generation) {
+            if self.save_mark.is_none_or(|m| m.0 != gen) {
+                self.save_mark = Some((gen, app.sim.frame()));
+            }
+        }
+    }
+
+    /// The hint's clock where no [`Control::advance`] runs (headless stepping).
+    pub fn tick_hint(&mut self, dt: f64) {
+        if !self.sys.open {
+            self.hint_t = (self.hint_t - dt).max(0.0);
+        }
+    }
+
+    /// Show the "Esc: Menu" hint again (a shell starting a game in place).
+    pub fn show_hint(&mut self) {
+        self.hint_t = HINT_SECS;
+    }
+
     /// A replay's menu chose to leave (the shell goes back to the launcher).
     pub fn take_exit_replay(&mut self) -> bool {
         std::mem::take(&mut self.exit_replay)
@@ -428,6 +557,41 @@ impl Control {
             _ => {
                 self.exit_replay = true;
                 self.requests.push(Request::ExitReplay);
+            }
+        }
+    }
+
+    /// the system menu over the picture, or the "Esc: Menu" hint at a game's start (fading out)
+    fn draw_sys(&mut self, app: &mut App, w: usize, h: usize) {
+        if self.sys.open {
+            self.sys.draw(&app.packs, &mut app.renderer.fb, w, h);
+            return;
+        }
+        if self.hint_t <= 0.0 || app.renderer.fb.len() < w * h {
+            return;
+        }
+        self.text.ensure(&app.packs);
+        let t = &self.text;
+        let s = "Esc: Menu";
+        let (tw, lh) = (t.width(s) + 8, t.line_h() + 4);
+        let (x, y) = (4, h as i32 - lh - 4);
+        // the last second fades: the plate drawn on a copy, mixed back by what is left
+        let a = (self.hint_t.min(1.0) * 256.0) as u32;
+        let fb = &mut app.renderer.fb;
+        let rows: Vec<(usize, Vec<u32>)> = (y.max(0)..(y + lh + 2).min(h as i32))
+            .map(|yy| {
+                let i = yy as usize * w + x.max(0) as usize;
+                (i, fb[i..(i + (tw + 2) as usize).min(yy as usize * w + w)].to_vec())
+            })
+            .collect();
+        t.plate(fb, w, h, x, y, s, overlay::WHITE);
+        if a < 256 {
+            for (i, old) in rows {
+                for (k, &o) in old.iter().enumerate() {
+                    let n = fb[i + k];
+                    let mix = |sh: u32| ((((n >> sh) & 255) * a + ((o >> sh) & 255) * (256 - a)) >> 8) << sh;
+                    fb[i + k] = 0xFF00_0000 | mix(16) | mix(8) | mix(0);
+                }
             }
         }
     }
@@ -548,6 +712,7 @@ impl Control {
         for (i, v) in app.inputs.iter_mut().enumerate() {
             *v = inputs.get(i).copied().unwrap_or(0);
         }
+        self.mark_saves(app);
         let a0 = app.audio_out.len();
         app.step();
         if !audio {
@@ -615,6 +780,10 @@ impl Control {
                 self.toast = None;
             }
         }
+        if !self.sys.open {
+            self.hint_t = (self.hint_t - dt).max(0.0);
+        }
+        self.mark_saves(app);
         if !self.enabled {
             return app.advance(dt, &|| 0.0);
         }
@@ -688,6 +857,20 @@ impl Control {
     /// A key event. `game_bound`: the key drives a GBA button. Returns true when it was a hotkey (the host
     /// then does not pass it to the game).
     pub fn key(&mut self, app: &mut App, code: &str, m: Mods, down: bool, repeat: bool, game_bound: bool) -> bool {
+        // the system menu takes every key while open (releases go on to the shell's held keys)
+        if self.sys.open {
+            if down {
+                if let Some(a) = self.sys.key(code) {
+                    self.sys_act(app, a);
+                }
+            }
+            return down;
+        }
+        // Esc opens it in every mode; Enter (Start) where the game has no Start menu of its own (a battle)
+        if down && !repeat && !m.any() && (code == "Escape" || (code == "Enter" && self.start_opens_menu(app))) {
+            self.open_sys(app);
+            return true;
+        }
         if !self.enabled {
             return false;
         }
@@ -839,6 +1022,8 @@ impl Control {
 
     /// Replace the app's sim (new config): stop sounds, re-render, music if not starting at frame 0.
     fn install(&mut self, app: &mut App, sim: Box<dyn Sim>) {
+        self.hint_t = HINT_SECS;
+        self.save_mark = None;
         app.sim = sim;
         app.inputs = vec![0; app.sim.players()];
         self.last_inputs = app.inputs.clone();
@@ -1126,9 +1311,14 @@ impl Control {
     }
 
     fn draw_overlays(&mut self, app: &mut App, player: usize, w: usize, h: usize) {
-        if !self.enabled {
-            return;
+        if self.enabled {
+            self.draw_tools(app, player, w, h);
         }
+        // the system menu over everything (the tools' status lines too)
+        self.draw_sys(app, w, h);
+    }
+
+    fn draw_tools(&mut self, app: &mut App, player: usize, w: usize, h: usize) {
         self.text.ensure(&app.packs);
         let t = &self.text;
         let lh = t.line_h();

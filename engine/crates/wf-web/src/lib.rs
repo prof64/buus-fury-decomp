@@ -238,12 +238,18 @@ pub unsafe extern "C" fn wf_app_init(cfg_ptr: *const u8, cfg_len: usize) -> u32 
             return 1;
         }
     };
-    let bindings = serde_json::from_value(cfg["bindings"].clone()).unwrap_or_default();
+    let bindings: Bindings = serde_json::from_value(cfg["bindings"].clone()).unwrap_or_default();
     let hotkeys: Hotkeys = serde_json::from_value(cfg["hotkeys"].clone()).unwrap_or_default();
     let mut ctl = Control::new(&mut app, hotkeys, cfg["now"].as_f64().unwrap_or(0.0) as u64);
     // a battle ends on the game's "You Win!!" / "You Lose!!" with Retry / Change fighter
     ctl.end_screen = true;
     ctl.link_configured = cfg["link"].is_object();
+    // the system menu (Esc): a page cannot close itself; the browser's full screen; keys on the settings panel
+    ctl.sys_quit_game = false;
+    ctl.sys_rebind = true;
+    ctl.sys_fullscreen = Some(cfg["fullscreen"].as_bool().unwrap_or(false));
+    ctl.sys_volume = cfg["volume"].as_u64().unwrap_or(100).min(100) as u32;
+    ctl.sys.bindings = bindings.clone();
     let n = dc.players;
     GAME.with(|g| {
         *g.borrow_mut() = Some(Game {
@@ -732,6 +738,34 @@ pub extern "C" fn wf_app_current_replay() -> u32 {
         None => 1,
     })
     .unwrap_or(1)
+}
+
+/// What the system menu (Esc) left for the page: 0 none, 1 quit to the launcher, 3 view switched, 4 volume (the
+/// string buffer holds it), 5 full screen, 6 change keys (the settings panel).
+#[no_mangle]
+pub extern "C" fn wf_app_sys_action() -> u32 {
+    use wf_app::sysmenu::SysAction as S;
+    with_game(|g| match g.ctl.take_sys_action() {
+        Some(S::QuitToLauncher | S::QuitGame) => {
+            g.ctl.finalize(&g.app);
+            1
+        }
+        Some(S::ToggleView) => 3,
+        Some(S::Volume(v)) => {
+            set_str(&v.to_string());
+            4
+        }
+        Some(S::ToggleFullscreen) => 5,
+        Some(S::Rebind) => 6,
+        _ => 0,
+    })
+    .unwrap_or(0)
+}
+
+/// The mouse over the picture, in view pixels (`click` 1: the left button went down); 1 = the system menu has it.
+#[no_mangle]
+pub extern "C" fn wf_app_sys_pointer(x: i32, y: i32, click: u32) -> u32 {
+    with_game(|g| g.ctl.sys_pointer(&mut g.app, x, y, click != 0) as u32).unwrap_or(0)
 }
 
 /// Esc during a replay: its menu.

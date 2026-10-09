@@ -78,6 +78,9 @@ struct Args {
     headless: bool,
     size: (u32, u32),
     input: String,
+    /// headless: host keys / mouse at host frames (`120:Escape,150:ArrowDown`, `200:120:80:1` = x, y, click)
+    host_keys: Vec<(u64, String)>,
+    host_mouse: Vec<(u64, i32, i32, bool)>,
     spectate: Option<String>,
     realtime: bool,
     show_controls: bool,
@@ -169,6 +172,8 @@ fn parse_args() -> Args {
         headless: wf_app::session::automation_default(),
         size: (960, 640),
         input: String::new(),
+        host_keys: Vec::new(),
+        host_mouse: Vec::new(),
         spectate: None,
         realtime: false,
         show_controls: false,
@@ -293,6 +298,18 @@ fn parse_args() -> Args {
                 }
             }
             "--input" => a.input = next(&mut i),
+            "--host-keys" => {
+                a.host_keys = next(&mut i).split(',').filter_map(|k| k.split_once(':')).filter_map(|(f, c)| Some((f.parse().ok()?, c.to_string()))).collect();
+            }
+            "--host-mouse" => {
+                a.host_mouse = next(&mut i)
+                    .split(',')
+                    .filter_map(|m| {
+                        let v: Vec<&str> = m.split(':').collect();
+                        Some((v.first()?.parse().ok()?, v.get(1)?.parse().ok()?, v.get(2)?.parse().ok()?, v.get(3).is_some_and(|c| *c == "1")))
+                    })
+                    .collect();
+            }
             "--input-file" => a.input = std::fs::read_to_string(next(&mut i)).unwrap_or_default().trim().to_string(),
             "--window" => a.headless = false,
             "--spectate" => {
@@ -535,7 +552,8 @@ fn start_audio(packs: &Packs, gain: f32) -> Result<(cpal::Stream, mpsc::Sender<A
     let ch = cfg.channels() as usize;
     let (tx, rx) = mpsc::channel::<AudioEvent>();
     let mut eng = AudioEngine::new(bank, rate);
-    eng.gain *= gain;
+    VOLUME.store(gain.to_bits(), std::sync::atomic::Ordering::Relaxed);
+    let base = eng.gain;
     let mut tmp: Vec<f32> = Vec::new();
     let stream = dev
         .build_output_stream(
@@ -544,6 +562,7 @@ fn start_audio(packs: &Packs, gain: f32) -> Result<(cpal::Stream, mpsc::Sender<A
                 while let Ok(e) = rx.try_recv() {
                     eng.push(e);
                 }
+                eng.gain = base * f32::from_bits(VOLUME.load(std::sync::atomic::Ordering::Relaxed));
                 let frames = out.len() / ch.max(1);
                 tmp.resize(frames * 2, 0.0);
                 eng.render(&mut tmp);
@@ -588,11 +607,25 @@ struct Running {
     /// 16.7 ms - three of four wake-ups had rendered and blitted the same picture again)
     shown: (u32, u32),
     dirty: bool,
+    /// the picture's view size and scale last drawn (the mouse's view coordinates)
+    fit: (u32, u32, u32),
     /// `--dev`: the mod file watcher (hot reload between frames)
     dev: Option<wf_app::dev::Dev>,
 }
 
 // ------------------------------------------------------------------ launcher support (settings, save slots)
+
+/// the system menu's facts for the window shell: it can quit, change keys (F5), switch full screen; its volume and keys
+fn sys_setup(ctl: &mut Control, data: &Path, bindings: &Bindings, fullscreen: bool) {
+    ctl.sys_quit_game = true;
+    ctl.sys_rebind = true;
+    ctl.sys_fullscreen = Some(fullscreen);
+    ctl.sys_volume = load_settings(data).volume;
+    ctl.sys.bindings = bindings.clone();
+}
+
+/// the output volume the audio callback applies (f32 bits; the system menu's Volume changes it live)
+static VOLUME: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0x3F80_0000);
 
 fn load_settings(data: &Path) -> wf_app::launcher::Settings {
     std::fs::read_to_string(data.join("settings.json")).ok().and_then(|s| wf_app::launcher::Settings::from_json(&s)).unwrap_or_default()
@@ -800,6 +833,8 @@ struct Shell {
     ui: Vec<u32>,
     /// the launcher's Quit (exits on the next event-loop turn)
     quit: bool,
+    /// the mouse (window px)
+    mouse_at: (f64, f64),
 }
 
 impl Shell {
@@ -828,9 +863,39 @@ impl Shell {
     }
 
     fn launcher_key(&mut self, code: &str) {
-        use wf_app::launcher::Choice;
         let Phase::Launcher(ls) = &mut self.phase else { return };
         let c = ls.l.key(code);
+        self.launcher_choice(c);
+    }
+
+    /// the mouse moved / clicked (window px): the launcher's rows or the system menu
+    fn mouse(&mut self, click: bool) {
+        let Some(win) = self.window.clone() else { return };
+        let size = win.inner_size();
+        let (ww, wh) = (size.width.max(1) as f64, size.height.max(1) as f64);
+        let (mx, my) = self.mouse_at;
+        match &mut self.phase {
+            Phase::Launcher(ls) => {
+                let s = ((ww / 240.0).min(wh / 160.0)).floor().max(1.0);
+                let (ox, oy) = ((ww - 240.0 * s) / 2.0, (wh - 160.0 * s) / 2.0);
+                let (lx, ly) = (((mx - ox) / s).floor() as i32, ((my - oy) / s).floor() as i32);
+                let c = ls.l.pointer(lx, ly, click);
+                self.launcher_choice(c);
+            }
+            Phase::Ready(r) => {
+                let (vw, vh, sc) = r.fit;
+                let s = sc.max(1) as f64;
+                let (ox, oy) = ((ww - vw as f64 * s) / 2.0, (wh - vh as f64 * s) / 2.0);
+                let (vx, vy) = (((mx - ox) / s).floor() as i32, ((my - oy) / s).floor() as i32);
+                r.ctl.sys_pointer(&mut r.app, vx, vy, click);
+            }
+            _ => {}
+        }
+    }
+
+    fn launcher_choice(&mut self, c: wf_app::launcher::Choice) {
+        use wf_app::launcher::Choice;
+        let Phase::Launcher(ls) = &mut self.phase else { return };
         match &c {
             Choice::None => {}
             Choice::Settings => {
@@ -910,6 +975,7 @@ impl Shell {
                 // a battle ends on the game's "You Win!!" / "You Lose!!" with Retry / Change fighter
                 ctl.end_screen = true;
                 ctl.link_configured = self.args.link.is_some();
+                sys_setup(&mut ctl, &self.args.data, &bindings, self.window.as_ref().is_some_and(|w| w.fullscreen().is_some()));
                 let a = &self.args;
                 let local = wf_app::battle::config(&a.arena, &a.enemy, a.count, &a.fighter, a.form, a.level, a.players, a.seed);
                 let mut online = online::Online::new(a.net.clone(), &a.data, local, a.signal_given);
@@ -938,6 +1004,7 @@ impl Shell {
                     saves_gen: 0,
                     shown: (0, 0),
                     dirty: true,
+                    fit: (240, 160, 1),
                 }));
                 if self.args.open_replays {
                     if let Phase::Ready(r) = &mut self.phase {
@@ -989,6 +1056,60 @@ impl Shell {
 
         // phase transitions
         // a battle's end screen chose "Change fighter": its recording saved, back to the launcher's Battle page
+        let mut sys_quit = (false, false);
+        if let Phase::Ready(r) = &mut self.phase {
+            use wf_app::sysmenu::SysAction as S;
+            while let Some(a) = r.ctl.take_sys_action() {
+                match a {
+                    S::QuitToLauncher => sys_quit.0 = true,
+                    S::QuitGame => sys_quit.1 = true,
+                    S::ToggleView => {
+                        let classic = matches!(r.app.mode, ViewMode::Gba { .. });
+                        let mut st = load_settings(&self.args.data);
+                        st.view = if classic { "gba:0" } else { "pc:0" }.into();
+                        save_settings(&self.args.data, &st);
+                    }
+                    S::Volume(v) => {
+                        let mut st = load_settings(&self.args.data);
+                        st.volume = v;
+                        save_settings(&self.args.data, &st);
+                        VOLUME.store(st.gain().to_bits(), std::sync::atomic::Ordering::Relaxed);
+                    }
+                    S::ToggleFullscreen => {
+                        if let Some(w) = &self.window {
+                            let on = w.fullscreen().is_none();
+                            w.set_fullscreen(if on { Some(Fullscreen::Borderless(None)) } else { None });
+                            let mut st = load_settings(&self.args.data);
+                            st.fullscreen = on;
+                            save_settings(&self.args.data, &st);
+                        }
+                    }
+                    S::Rebind => {
+                        r.menu.toggle();
+                        r.app.paused = true;
+                    }
+                    S::Resume | S::Restart => {}
+                }
+            }
+            // quitting: the run's replay and the story's saves first; an online / link match is left (the peers are
+            // told when the session goes)
+            if sys_quit.0 || sys_quit.1 {
+                r.ctl.finalize(&r.app);
+                replays::service(&r.store, &mut r.ctl, &mut r.app, &mut r.replay_menu);
+                persist_saves(&self.args.data, &r.app, &mut r.saves_gen);
+                if r.online.in_match || r.online.lobby.is_some() {
+                    r.online.leave(&mut r.app, &mut r.ctl);
+                }
+            }
+        }
+        if sys_quit.1 {
+            self.quit = true;
+            return;
+        }
+        if sys_quit.0 {
+            self.enter_launcher();
+            return;
+        }
         let (back, exit) = match &mut self.phase {
             Phase::Ready(r) => {
                 let back = r.ctl.take_battle_select();
@@ -1087,6 +1208,7 @@ impl Shell {
                     r.ctl = Control::new(&mut r.app, load_hotkeys(&self.args.data), now_unix());
                     r.ctl.end_screen = true;
                     r.ctl.link_configured = self.args.link.is_some();
+                    sys_setup(&mut r.ctl, &self.args.data, &r.bindings, self.window.as_ref().is_some_and(|w| w.fullscreen().is_some()));
                     r.dirty = true;
                 }
                 persist_saves(&self.args.data, &r.app, &mut r.saves_gen);
@@ -1126,6 +1248,7 @@ impl Shell {
                 // netplay: the local player's camera
                 let me = net.as_ref().and_then(|s| s.borrow().local_slot).unwrap_or(0);
                 let f = r.ctl.render(&mut r.app, me, ww, wh);
+                r.fit = (f.view_w, f.view_h, f.scale);
                 replays::service(&r.store, &mut r.ctl, &mut r.app, &mut r.replay_menu);
                 r.app.stats.last_render_ms = t0.elapsed().as_secs_f64() * 1e3;
                 r.fps.0 += 1;
@@ -1303,6 +1426,11 @@ impl ApplicationHandler for Shell {
                 }
             }
             WindowEvent::RedrawRequested => self.redraw(),
+            WindowEvent::CursorMoved { position, .. } => {
+                self.mouse_at = (position.x, position.y);
+                self.mouse(false);
+            }
+            WindowEvent::MouseInput { state: ElementState::Pressed, button: winit::event::MouseButton::Left, .. } => self.mouse(true),
             WindowEvent::DroppedFile(p) => {
                 // a dropped replay file: import it and play it
                 if let Phase::Ready(r) = &mut self.phase {
@@ -1362,8 +1490,19 @@ impl ApplicationHandler for Shell {
                     self.enter_launcher();
                     return;
                 }
-                // the online lobby menu (F12; Esc in an online match): every key goes to it while open
-                if down && (code == KeyCode::F12 || (code == KeyCode::Escape && r.online.in_match && !r.online.menu.open)) {
+                // the system menu (Esc in every mode; Control::key): every key while open, Esc where no other menu has it
+                if r.ctl.sys.open || (code == KeyCode::Escape && !r.online.menu.open && !r.replay_menu.open && !r.menu.open) {
+                    let name = format!("{code:?}");
+                    r.ctl.key(&mut r.app, &name, r.mods, down, event.repeat, true);
+                    if !down {
+                        r.keys.set(&name, false);
+                    } else {
+                        r.keys.clear();
+                    }
+                    return;
+                }
+                // the online lobby menu (F12): every key goes to it while open
+                if down && code == KeyCode::F12 {
                     r.online.toggle(&mut r.app);
                     r.keys.clear();
                     return;
@@ -1416,9 +1555,7 @@ impl ApplicationHandler for Shell {
                 }
                 if down && !event.repeat {
                     match code {
-                        // (a replay: its menu - Resume / Exit to launcher)
-                        KeyCode::Escape if r.ctl.playing() => r.ctl.toggle_play_menu(&mut r.app),
-                        KeyCode::Escape => r.app.paused = !r.app.paused,
+                        KeyCode::Escape => {}
                         // F1: Classic 240x160 <-> PC wide, kept as the launcher's View setting
                         KeyCode::F1 => {
                             r.app.mode = match r.app.mode {
@@ -1562,6 +1699,7 @@ fn headless(a: &mut Args) -> Result<(), String> {
     // (as the window: a battle ends on its end screen; playback never shows it)
     ctl.end_screen = true;
     ctl.link_configured = a.link.is_some();
+    sys_setup(&mut ctl, &a.data, &Bindings::default(), false);
     let mut replay_end = None;
     if let Some(p) = &a.replay {
         let b = std::fs::read(p).map_err(|e| format!("{}: {e}", p.display()))?;
@@ -1593,7 +1731,26 @@ fn headless(a: &mut Args) -> Result<(), String> {
     let mut f = 0u64;
     while f < frames {
         let inp = [script.get(f as usize).copied().unwrap_or(0)];
-        if !ctl.enabled {
+        // the host's keys / mouse (the system menu, Esc / Enter), as the window gives them
+        for (_, code) in a.host_keys.iter().filter(|k| k.0 == f) {
+            ctl.key(&mut s.app, code, Default::default(), true, false, true);
+            ctl.key(&mut s.app, code, Default::default(), false, false, true);
+        }
+        for &(_, x, y, c) in a.host_mouse.iter().filter(|m| m.0 == f) {
+            ctl.sys_pointer(&mut s.app, x, y, c);
+        }
+        let mut quit = false;
+        while let Some(act) = ctl.take_sys_action() {
+            eprintln!("system menu: {act:?} at host frame {f}");
+            quit |= matches!(act, wf_app::sysmenu::SysAction::QuitToLauncher | wf_app::sysmenu::SysAction::QuitGame);
+        }
+        if quit {
+            break;
+        }
+        ctl.tick_hint(1.0 / wf_view::GBA_FPS);
+        if ctl.sys.open {
+            // the menu holds the game (the window loop's pause)
+        } else if !ctl.enabled {
             s.step(&inp); // demo world: no recording
         } else if ctl.playing() && a.frames.is_some() {
             // a replay watched for `--frames` host frames as the window does: the `--input` buttons drive its menu
@@ -1812,7 +1969,7 @@ fn main() {
         }
         return;
     }
-    let mut shell = Shell { phase: Phase::NeedRom(None), window: None, surface: None, last: Instant::now(), ui: Vec::new(), args, quit: false };
+    let mut shell = Shell { phase: Phase::NeedRom(None), window: None, surface: None, last: Instant::now(), ui: Vec::new(), args, quit: false, mouse_at: (0.0, 0.0) };
     let stored_rom = shell.args.data.join("rom.gba");
     if let Some(p) = shell.args.rom.clone() {
         match std::fs::read(&p) {

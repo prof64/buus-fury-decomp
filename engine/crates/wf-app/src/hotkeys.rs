@@ -196,7 +196,8 @@ impl Default for Hotkeys {
             ("Equal", "faster"),
             ("BracketLeft", "seek_back"),
             ("BracketRight", "seek_forward"),
-            ("Home", "restart"),
+            // (no Home key on a Mac laptop)
+            ("Shift+KeyR", "restart"),
             ("F10", "replays"),
             ("KeyB", "take_over"),
             ("KeyI", "input_display"),
@@ -236,6 +237,16 @@ impl Hotkeys {
         let n = a.name();
         self.keys.iter().filter(|(_, x)| *x == n).map(|(c, _)| c.clone()).collect()
     }
+    /// Keys saved before a default changed: Home (restart) - a key Mac laptops lack - becomes Shift+R.
+    pub fn migrate(&mut self) {
+        let taken = self.keys.iter().any(|(c, _)| c == "Shift+KeyR");
+        for (c, a) in self.keys.iter_mut() {
+            if c == "Home" && a == "restart" && !taken {
+                *c = "Shift+KeyR".into();
+            }
+        }
+    }
+
     /// `action` now comes from `combo` only (the combo is taken from any other action).
     pub fn rebind(&mut self, action: Action, combo: &str) {
         let n = action.name();

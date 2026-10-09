@@ -262,8 +262,18 @@ async function boot(baseTarBytes) {
       let done = false;
       let prevPad = 0;
       const PAD = [[12, 'ArrowUp'], [13, 'ArrowDown'], [14, 'ArrowLeft'], [15, 'ArrowRight'], [0, 'Enter'], [9, 'Enter'], [1, 'Escape'], [4, 'PageUp'], [5, 'PageDown']];
-      const key = (code) => {
-        if (done || !withStr(code, (p, n) => x.wf_launcher_key(p, n))) return;
+      const key = (code) => handle(() => withStr(code, (p, n) => x.wf_launcher_key(p, n)));
+      // the mouse: hover highlights a row, a click picks it (a value steps by the click's side)
+      const pointer = (e, click) => {
+        const r = canvas.getBoundingClientRect();
+        const lx = Math.floor(((e.clientX - r.left) * 240) / r.width);
+        const ly = Math.floor(((e.clientY - r.top) * 160) / r.height);
+        handle(() => x.wf_launcher_pointer(lx, ly, click ? 1 : 0));
+      };
+      canvas.onmousemove = (e) => pointer(e, false);
+      canvas.onmousedown = (e) => e.button === 0 && pointer(e, true);
+      const handle = (call) => {
+        if (done || !call()) return;
         const out = JSON.parse(str());
         lsSet('wf.launcher', out.settings);
         lsSet('wf.bindings', out.bindings);
@@ -282,6 +292,7 @@ async function boot(baseTarBytes) {
         } else if (c.kind === 'story' || c.kind === 'title' || c.kind === 'battle' || c.kind === 'replays') {
           done = true;
           removeEventListener('keydown', onKey);
+          canvas.onmousemove = canvas.onmousedown = null;
           x.wf_launcher_close();
           window.wfLauncher = false;
           resolve(c.kind === 'replays' ? { kind: 'battle', config: out.battle, replays: true } : c);
@@ -330,7 +341,7 @@ async function boot(baseTarBytes) {
   try {
     hotkeys = JSON.parse(localStorage.getItem('wf.hotkeys'));
   } catch {}
-  const cfg = { players: Number(qs.get('players') || 1), bindings, hotkeys, now: Date.now() / 1000 };
+  const cfg = { players: Number(qs.get('players') || 1), bindings, hotkeys, now: Date.now() / 1000, volume: Math.round(((lsGet('wf.prefs') || {}).vol ?? 1) * 100), fullscreen: !!document.fullscreenElement };
   // the launcher's pick: story (new game / a save slot) or a battle config; the save slots go along
   if (launch) Object.assign(cfg, { launch, slots: readSlots() });
   // the launcher's Story > Link play (host / join a room): the title with link play, as ?link=host:ROOM
@@ -496,8 +507,40 @@ async function boot(baseTarBytes) {
   }
 
   let drawnSize = '';
+  function sysActions() {
+    for (let k = x.wf_app_sys_action(); k; k = x.wf_app_sys_action()) {
+      if (k === 1) {
+        replays.pump().then(() => (location.href = location.pathname));
+      } else if (k === 3) {
+        const classic = (prefs.mode || 'gba:0').startsWith('gba');
+        prefs.mode = classic ? prefs.last_pc || 'pc:0' : 'gba:0';
+        savePrefs();
+        applyMode();
+        const ls = lsGet('wf.launcher') || {};
+        ls.view = prefs.mode;
+        lsSet('wf.launcher', ls);
+      } else if (k === 4) {
+        prefs.vol = Number(str()) / 100;
+        savePrefs();
+        pushAudio();
+        const ls = lsGet('wf.launcher') || {};
+        ls.volume = Number(str());
+        lsSet('wf.launcher', ls);
+      } else if (k === 5) {
+        if (document.fullscreenElement) document.exitFullscreen?.();
+        else document.documentElement.requestFullscreen?.().catch(() => {});
+      } else if (k === 6) toggleSettings();
+    }
+  }
+  const viewAt = (e) => {
+    const r = canvas.getBoundingClientRect();
+    return [Math.floor(((e.clientX - r.left) * canvas.width) / r.width), Math.floor(((e.clientY - r.top) * canvas.height) / r.height)];
+  };
+  canvas.addEventListener('mousemove', (e) => x.wf_app_sys_pointer && x.wf_app_sys_pointer(...viewAt(e), 0));
+  canvas.addEventListener('mousedown', (e) => e.button === 0 && x.wf_app_sys_pointer && x.wf_app_sys_pointer(...viewAt(e), 1));
   function frame() {
     pollPads();
+    sysActions();
     const dpr = window.devicePixelRatio || 1;
     const W = Math.floor(innerWidth * dpr);
     // (the button bar's height comes off the picture: the game never draws under the buttons)
@@ -602,11 +645,16 @@ async function boot(baseTarBytes) {
       return;
     }
     if (e.code === 'Escape') {
-      if (replays.open()) replays.close();
-      // a replay playing: its own menu (Resume / Exit to launcher)
-      else if (x.wf_app_play_menu && x.wf_app_play_menu()) return;
-      else toggleSettings();
-      return;
+      // the page's own panels close first; otherwise the game's system menu (Resume / Restart / Settings / Controls /
+      // Quit to main menu) - the Settings button still opens the page's panel
+      if (replays.open()) {
+        replays.close();
+        return;
+      }
+      if (settingsOpen()) {
+        toggleSettings();
+        return;
+      }
     }
     // F1: Classic 240x160 <-> PC wide (kept as the launcher's View setting too)
     if (e.code === 'F1') {

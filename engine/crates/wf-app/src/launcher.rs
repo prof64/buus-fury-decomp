@@ -431,6 +431,8 @@ pub struct ModEntry {
 pub struct Launcher {
     pub screen: Screen,
     cursor: usize,
+    /// the rows drawn last (240x160 px): rect, row index, Some(x) = a value stepped by the click's side of x
+    pub(crate) hits: Vec<([i32; 4], usize, Option<i32>)>,
     pub settings: Settings,
     /// slot summaries (None = empty)
     pub slots: Vec<Option<String>>,
@@ -589,6 +591,7 @@ impl Launcher {
         Launcher {
             screen: Screen::Main,
             cursor: 0,
+            hits: Vec::new(),
             settings,
             slots: vec![None; SLOTS],
             mods: Vec::new(),
@@ -882,6 +885,25 @@ impl Launcher {
     }
 
     /// A key went down (W3C `code`). Arrows / Enter / Escape, plus the game's default A (X) and B (Z) buttons.
+    /// The mouse in launcher pixels (240x160; `click`: the left button went down): hover highlights a row, a click
+    /// picks it - on a value ("< x >", the Battle page's settings) the click's side steps it back / on.
+    pub fn pointer(&mut self, x: i32, y: i32, click: bool) -> Choice {
+        if self.rebind.open {
+            return Choice::None;
+        }
+        let Some(&(_, i, mid)) = self.hits.iter().find(|h| x >= h.0[0] && x < h.0[2] && y >= h.0[1] && y < h.0[3]) else { return Choice::None };
+        let rows = self.rows();
+        let Some(&row) = rows.get(i) else { return Choice::None };
+        self.cursor = i;
+        if !click {
+            return Choice::None;
+        }
+        match mid {
+            Some(m) => self.change(row, if x < m { -1 } else { 1 }),
+            None => self.activate(row),
+        }
+    }
+
     pub fn key(&mut self, code: &str) -> Choice {
         if self.rebind.open {
             let r = self.rebind.key(code, &mut self.bindings);
@@ -1081,9 +1103,11 @@ impl Launcher {
             for p in [py, py + ph - 1] {
                 tiny::fill_rect(fb, w, h, px, p, pw, 1, ACCENT);
             }
+            self.hits.clear();
             for (k, &row) in rows.iter().enumerate() {
                 let (l, _) = self.label(row);
                 let y = py + 2 + k as i32 * 10;
+                self.hits.push(([px - ox, y - 1 - oy, px + pw - ox, y + 9 - oy], k, None));
                 let sel = k == self.cursor;
                 if sel {
                     tiny::fill_rect(fb, w, h, px + 3, y - 1, pw - 6, 10, 0xFF2E_3A48);
@@ -1092,6 +1116,12 @@ impl Launcher {
             }
             if !self.message.is_empty() {
                 tiny::draw_text(fb, w, h, ox + 4, oy + 150, &self.message, 0xFFFF_7A6B);
+            } else {
+                // how to drive it (PC keys and the mouse), small at the bottom
+                let hint = "Arrows / mouse, Enter: OK, Esc: back";
+                let tw = tiny::text_width(hint);
+                tiny::fill_rect(fb, w, h, ox + (240 - tw) / 2 - 3, oy + 150, tw + 6, 9, 0xA000_0000);
+                tiny::draw_text(fb, w, h, ox + (240 - tw) / 2, oy + 151, hint, 0xFFB8_B8B8);
             }
             return;
         }

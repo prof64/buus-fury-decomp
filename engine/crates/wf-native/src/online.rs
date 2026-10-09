@@ -187,6 +187,17 @@ impl Online {
         self.sync_pause(app);
     }
 
+    /// Leave the room / match (the system menu's "Leave match" / quitting): the peers are told when the match's
+    /// session goes (`NetSim`'s drop: its "bye"), as the lobby menu's Leave does.
+    pub fn leave(&mut self, app: &mut App, ctl: &mut Control) {
+        self.lobby = None;
+        if self.in_match {
+            self.leave_match(app, ctl);
+        }
+        wf_net::netsim::clear_current();
+        self.menu.open = false;
+    }
+
     fn leave_match(&mut self, app: &mut App, ctl: &mut Control) {
         self.in_match = false;
         match wf_app::battle::session(&app.packs, self.local.clone()) {

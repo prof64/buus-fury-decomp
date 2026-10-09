@@ -25,6 +25,7 @@ pub mod rebind;
 pub mod replay_menu;
 pub mod session;
 pub mod story;
+pub mod sysmenu;
 
 use wf_content::Packs;
 use wf_render::{fit, AutoZoom, Fit, Renderer, ViewMode};

@@ -262,6 +262,24 @@ pub fn draw(l: &mut Launcher, packs: &Packs, fb: &mut [u32], w: usize, h: usize)
     let mut p = Pen::new(MenuFont::Bold, 156, 84, 0, YELLOW, Some(SHADOW));
     cv.text(t, &mut p, &units("GO"));
 
+    // (the mouse: each setting's line steps by the click's side of its middle; the names too; GO starts)
+    let idx = |r: Row| rows.iter().position(|&x| x == r);
+    l.hits.clear();
+    let mut hit = |r: Row, rect: [i32; 4], mid: Option<i32>| {
+        if let Some(i) = idx(r) {
+            l.hits.push((rect, i, mid));
+        }
+    };
+    hit(Row::Fighter, [8, 5, 118, 22], Some(63));
+    hit(Row::Enemy, [120, 4, 232, 34], Some(176));
+    // (GO: A on any row starts the fight - the page lists no row of its own for it)
+    hit(if idx(Row::Fight).is_some() { Row::Fight } else { Row::Fighter }, [134, 64, 182, 92], None);
+    hit(Row::Form, [6, 100, 232, 111], Some(140));
+    hit(Row::Outfit, [6, 111, 232, 121], Some(140));
+    hit(Row::Level, [6, 121, 104, 131], Some(70));
+    hit(Row::Players, [168, 121, 232, 131], Some(212));
+    hit(Row::Arena, [6, 131, 232, 141], Some(140));
+
     // the setup
     cv.panel(3, 96, 233, 155);
     let (lx, vx) = (9, 44);
@@ -350,10 +368,12 @@ pub(super) fn list_page(l: &mut Launcher, packs: &Packs, fb: &mut [u32], w: usiz
     let room = (226 - vx).max(40);
     let visible = 10usize;
     let first = cursor.saturating_sub(visible - 1);
+    l.hits.clear();
     for (k, r) in rows.iter().enumerate().skip(first).take(visible) {
         let y = 38 + (k - first) as i32 * 11;
         let focus = k == cursor;
         let changeable = r.value.starts_with("< ") && r.value.ends_with(" >");
+        l.hits.push(([6, y - 10, 230, y + 1], k, changeable.then_some(vx + (226 - vx) / 2)));
         let label_col = if r.accent { RED } else { YELLOW };
         if r.value.is_empty() {
             // an action: the label is the focus

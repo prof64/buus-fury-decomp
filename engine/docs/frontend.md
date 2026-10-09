@@ -91,6 +91,21 @@ SimEvent::Audio(PlaySong | StopSong | PlaySfx{id, volume, pan} | StopSfx | StopA
   Select. Rebinding: web settings panel (localStorage), native `<data>/bindings.json`. Gamepads: standard mapping
   (web Gamepad API / gilrs), positional (right face = A, bottom = B), shoulders L/R, left stick = d-pad. Taps shorter
   than a frame are latched so they still reach the game.
+* **The PC system menu** (`wf_app::sysmenu`, run by `Control`; native and web): **Esc in every mode** (Story, Battle,
+  2P, link, online, replays) opens "PAUSED" - Resume / Restart fight (a local battle) / Settings (view, volume, full
+  screen, change keys) / Controls (every key in plain words, the hotkeys included) / Quit to main menu ("Leave match"
+  online) / Quit game (native). Esc or Resume closes it; Esc (or Z / Backspace) on a sub-page goes back. Enter (Start)
+  opens it too where the game has no Start menu of its own (a battle outside its end screen); in Story, Enter stays the
+  game's own Start menu. The game pauses under it (an online / link match keeps running). Story: quitting with more
+  than ~10 s of play since the last save asks "Quit without saving / Keep playing". Online: leaving drops the match's
+  session (its "bye" tells the peers); link play drops its connection. Drawn in the game's menu look over the dimmed
+  picture, scaled by the largest integer the view takes. "Esc: Menu" shows bottom-left for 5 s at a game's start
+  (the last second fading); the launcher's main page shows how to drive it.
+* **The mouse** in the launcher (main page, Story / Settings / Mods pages, the Battle page's settings, names and GO) and
+  the system menu: hover highlights, a click picks; on a "< value >" setting the click's side steps it back / on.
+* Hotkeys needing keys a Mac laptop lacks: Restart was Home - now Shift+R (saved settings move over).
+* Headless driving (tests, playtests): `--host-keys "120:Escape,140:ArrowDown"` and `--host-mouse "200:x:y:1"` (view
+  px; 1 = a click) at host frames; the menu's choices are printed ("system menu: ...").
 
 ## 4. ROM flow and content cache
 

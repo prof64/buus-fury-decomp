@@ -104,6 +104,27 @@ pub unsafe extern "C" fn wf_launcher_key(ptr: *const u8, len: usize) -> u32 {
     })
 }
 
+/// The mouse over the launcher (240x160 px; `click` 1: the left button went down): as [`wf_launcher_key`].
+#[no_mangle]
+pub extern "C" fn wf_launcher_pointer(x: i32, y: i32, click: u32) -> u32 {
+    L.with(|s| {
+        let mut s = s.borrow_mut();
+        let Some(st) = s.as_mut() else { return 0 };
+        let c = st.l.pointer(x, y, click != 0);
+        if c == Choice::None {
+            return 0;
+        }
+        let out = serde_json::json!({
+            "choice": c.to_json(),
+            "settings": st.l.settings,
+            "bindings": st.l.bindings,
+            "battle": st.l.battle_config(),
+        });
+        crate::set_str(&out.to_string());
+        1
+    })
+}
+
 /// Draw the launcher; returns the integer scale for a `win_w` x `win_h` window.
 #[no_mangle]
 pub extern "C" fn wf_launcher_frame(win_w: u32, win_h: u32) -> u32 {
