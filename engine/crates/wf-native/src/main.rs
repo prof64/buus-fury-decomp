@@ -374,6 +374,14 @@ fn parse_args() -> Args {
     a
 }
 
+/// Dev builds skip the ROM prompt: `$WF_ROM`, or `roms/buu.gba` in a folder above the binary (the source checkout).
+/// Only the known good dump is taken, so a player's build without one still asks.
+fn dev_rom() -> Option<Vec<u8>> {
+    let exe = std::env::current_exe().ok()?;
+    let found = std::env::var_os("WF_ROM").map(PathBuf::from).into_iter().chain(exe.ancestors().map(|d| d.join("roms/buu.gba")));
+    found.filter_map(|p| std::fs::read(p).ok()).find(|b| rom_problem(b).is_none())
+}
+
 /// A message for a ROM that is not the supported dump (None = OK).
 fn rom_problem(rom: &[u8]) -> Option<String> {
     let sha = wf_rom::sha1_hex(rom);
@@ -1605,7 +1613,7 @@ fn headless(a: &mut Args) -> Result<(), String> {
     if a.reextract || !content_ok(&a.content) {
         let rom = match &a.rom {
             Some(p) => std::fs::read(p).map_err(|e| format!("cannot read {}: {e}", p.display()))?,
-            None => std::fs::read(a.data.join("rom.gba")).map_err(|_| "no content and no ROM (pass the ROM path)".to_string())?,
+            None => std::fs::read(a.data.join("rom.gba")).ok().or_else(dev_rom).ok_or("no content and no ROM (pass the ROM path)")?,
         };
         let rx = spawn_extract(rom, a.content.clone(), a.data.clone());
         loop {
@@ -1979,6 +1987,8 @@ fn main() {
     } else if content_ok(&shell.args.content) && !shell.args.reextract {
         shell.start();
     } else if let Ok(b) = std::fs::read(&stored_rom) {
+        shell.begin_extract(b);
+    } else if let Some(b) = dev_rom() {
         shell.begin_extract(b);
     }
     let el = EventLoop::new().expect("event loop");
