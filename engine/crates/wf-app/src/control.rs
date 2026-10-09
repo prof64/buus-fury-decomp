@@ -51,7 +51,29 @@ pub enum Request {
     /// The battle's end screen chose "Change fighter": back to the launcher's Battle page (the recording is saved
     /// first, [`Control::finalize`]).
     BattleSelect,
+    /// A replay's menu chose "Exit" / "Back": back to the launcher ([`Control::take_exit_replay`]).
+    ExitReplay,
 }
+
+/// A replay's own menu (playback: the player's buttons drive nothing else): Start / B / Esc during playback pause it
+/// with "Resume" / "Exit to launcher"; at the replay's end it opens by itself with "Watch again" / "Back". UP / DOWN
+/// pick, A / START confirm, B is the way back (resume / exit). Playtest: "I watched a replay and spammed, nothing
+/// happened, I could not get out once it was over" - the end only said "B takes over, Home restarts" in a toast.
+#[derive(Clone, Debug)]
+struct PlayMenu {
+    finished: bool,
+    sel: u8,
+    /// host frames since it opened (the buttons do nothing for the first few: a press that opened it, mashing)
+    age: u32,
+    /// host frames since player 1 last held a button: a pick needs a short pause before its press, so mashing
+    /// leaves the menu up (in sight) instead of flipping it shut / open or picking blindly
+    quiet: u32,
+}
+
+/// host frames a replay menu ignores the buttons once open
+const PLAY_MENU_LOCK: u32 = 12;
+/// host frames with no button held before a replay menu takes a pick
+const PLAY_MENU_QUIET: u32 = 8;
 
 /// The battle's end (live play only): some frames after the outcome the game's "You Win!!" / "You Lose!!" (the link
 /// Dojo's strings 111 / 112, its big title font) over the arena and its choice box "Retry" / "Change fighter" (the
@@ -146,6 +168,11 @@ pub struct Control {
     pub end_screen: bool,
     /// "Change fighter" was chosen (native shell: [`Control::take_battle_select`])
     battle_select: bool,
+    /// a replay's menu ([`PlayMenu`]) and player 1's buttons last host frame (its edges)
+    play_menu: Option<PlayMenu>,
+    play_prev: u16,
+    /// a replay's menu chose to leave (native shell: [`Control::take_exit_replay`])
+    exit_replay: bool,
 }
 
 fn fmt_time(frames: u64) -> String {
@@ -228,6 +255,9 @@ impl Control {
             end: None,
             end_screen: false,
             battle_select: false,
+            play_menu: None,
+            play_prev: 0,
+            exit_replay: false,
         };
         if enabled {
             c.timeline.capture(app.sim.as_ref());
@@ -319,6 +349,108 @@ impl Control {
     }
 
     /// The end screen chose "Change fighter" (cleared by the call): the host goes back to the launcher's Battle page.
+    /// A replay's menu chose to leave (the shell goes back to the launcher).
+    pub fn take_exit_replay(&mut self) -> bool {
+        std::mem::take(&mut self.exit_replay)
+    }
+
+    /// A replay is playing (its menu takes the player's buttons).
+    pub fn playing(&self) -> bool {
+        self.play.is_some()
+    }
+
+    /// Open a replay's pause menu (Esc in the shells), or close it as "Resume" when open and not at the end.
+    pub fn toggle_play_menu(&mut self, app: &mut App) {
+        if self.play.is_none() {
+            return;
+        }
+        match &self.play_menu {
+            Some(m) if !m.finished => {
+                self.play_menu = None;
+                app.paused = false;
+            }
+            Some(_) => {}
+            None => {
+                self.play_menu = Some(PlayMenu { finished: false, sel: 0, age: 0, quiet: 0 });
+                app.paused = true;
+            }
+        }
+    }
+
+    /// The replay menu's buttons (player 1's edges), every host frame of a playback.
+    fn play_menu_input(&mut self, app: &mut App, live: &[u16]) {
+        use wf_core::input::{A, B, DOWN, START, UP};
+        let held = live.first().copied().unwrap_or(0);
+        let pressed = held & !self.play_prev;
+        self.play_prev = held;
+        let Some(m) = &mut self.play_menu else {
+            if pressed & (START | B) != 0 {
+                self.play_menu = Some(PlayMenu { finished: false, sel: 0, age: 0, quiet: 0 });
+                app.paused = true;
+                app.audio_out.push(AudioEvent::PlaySfx { id: wf_core::menu::SFX_ACCEPT as u8, volume: 64, pan: 0 });
+            }
+            return;
+        };
+        m.age = m.age.saturating_add(1);
+        let quiet = m.quiet;
+        m.quiet = if held == 0 { m.quiet.saturating_add(1) } else { 0 };
+        if m.age < PLAY_MENU_LOCK {
+            return;
+        }
+        if pressed & (UP | DOWN) != 0 {
+            m.sel ^= 1;
+            app.audio_out.push(AudioEvent::PlaySfx { id: wf_core::menu::SFX_CURSOR as u8, volume: 64, pan: 0 });
+        }
+        // B: the way back (resume a paused replay, leave a finished one)
+        let pick = if quiet < PLAY_MENU_QUIET {
+            None
+        } else if pressed & (A | START) != 0 {
+            Some(m.sel)
+        } else if pressed & B != 0 {
+            Some(if m.finished { 1 } else { 0 })
+        } else {
+            None
+        };
+        let Some(sel) = pick else { return };
+        let finished = m.finished;
+        app.audio_out.push(AudioEvent::PlaySfx { id: wf_core::menu::SFX_ACCEPT as u8, volume: 64, pan: 0 });
+        self.play_menu = None;
+        match (finished, sel) {
+            // Resume
+            (false, 0) => app.paused = false,
+            // Watch again: from the start
+            (true, 0) => {
+                let t = self.log_start();
+                self.seek(app, t);
+                app.paused = false;
+            }
+            // Exit to launcher / Back
+            _ => {
+                self.exit_replay = true;
+                self.requests.push(Request::ExitReplay);
+            }
+        }
+    }
+
+    /// the replay menu over the picture: its title in the big font, the choice box with its cursor
+    fn play_menu_view(&self, app: &mut App) {
+        let Some(m) = &self.play_menu else { return };
+        let Some(id) = self.play.as_ref().map(|p| p.id.clone()) else { return };
+        let _ = id;
+        let title = if m.finished { "Replay finished" } else { "Replay paused" };
+        app.view.title = vec![wf_view::TitleView { text: wf_core::menu::text::units(title), x: 120, y: 44 }];
+        app.view.dialog = Some(wf_view::DialogView {
+            text: if m.finished { "- Watch again\n- Back".into() } else { "- Resume\n- Exit to launcher".into() },
+            style: 1,
+            page: 0,
+            position: wf_view::DialogPos::Bottom,
+            portrait: None,
+            portrait_left: false,
+            cursor: Some(m.sel),
+        });
+        app.view.dialog_anim = Some(wf_view::DialogAnim { scale: 0, typed: None, cursor_draws: Some(0) });
+    }
+
     pub fn take_battle_select(&mut self) -> bool {
         std::mem::take(&mut self.battle_select)
     }
@@ -394,8 +526,9 @@ impl Control {
             Some(p) => match p.replay.inputs.get(f) {
                 Some(x) => x.to_vec(),
                 None => {
-                    if !app.paused {
-                        self.toast("End of replay: B takes over, Home restarts");
+                    // the end: the replay's menu opens by itself ("Watch again" / "Back")
+                    if !self.play_menu.as_ref().is_some_and(|m| m.finished) {
+                        self.play_menu = Some(PlayMenu { finished: true, sel: 0, age: 0, quiet: 0 });
                     }
                     app.paused = true;
                     return false;
@@ -484,6 +617,11 @@ impl Control {
         }
         if !self.enabled {
             return app.advance(dt, &|| 0.0);
+        }
+        if self.play.is_some() {
+            self.play_menu_input(app, live);
+        } else {
+            self.play_menu = None;
         }
         self.since_save += dt;
         if self.since_save >= self.autosave_secs {
@@ -755,6 +893,7 @@ impl Control {
         checker.check(&r, sim.frame(), || sim.state_hash());
         let diff = r.header.content.diff(&self.content);
         self.play = Some(Playback { id: id.to_string(), replay: r, checker });
+        self.play_menu = None;
         self.rec = None;
         app.paused = false;
         self.speed = NORMAL;
@@ -768,7 +907,7 @@ impl Control {
         } else if !diff.is_empty() {
             self.warn(format!("Recorded with other content: {}", diff.join("; ")));
         } else {
-            self.toast(format!("Playing {id}"));
+            self.toast(format!("Playing {id} - Start / B: menu"));
         }
         Ok(())
     }
@@ -777,6 +916,7 @@ impl Control {
     /// player's from here (a new recording that names the replay as its parent).
     pub fn take_over(&mut self, app: &mut App) {
         let Some(p) = self.play.take() else { return };
+        self.play_menu = None;
         let f = app.sim.frame();
         let mut r = p.replay;
         r.inputs.truncate(f);
@@ -935,6 +1075,7 @@ impl Control {
     pub fn render(&mut self, app: &mut App, player: usize, win_w: u32, win_h: u32) -> Fit {
         app.sim.view(&mut app.view);
         self.end_view(app);
+        self.play_menu_view(app);
         if let Some(g) = &self.ghost {
             let mut gv = RenderView::default();
             g.sim.view(&mut gv);

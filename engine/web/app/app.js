@@ -603,6 +603,8 @@ async function boot(baseTarBytes) {
     }
     if (e.code === 'Escape') {
       if (replays.open()) replays.close();
+      // a replay playing: its own menu (Resume / Exit to launcher)
+      else if (x.wf_app_play_menu && x.wf_app_play_menu()) return;
       else toggleSettings();
       return;
     }
@@ -836,6 +838,8 @@ async function boot(baseTarBytes) {
             sessionStorage.setItem('wf.launcher.screen', 'battle');
             location.href = location.pathname;
           }
+          // a replay's menu: Exit / Back -> the launcher
+          else if (k === 6) location.href = location.pathname;
         }
       } catch (e) {
         console.error('replays', e);

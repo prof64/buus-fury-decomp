@@ -989,18 +989,22 @@ impl Shell {
 
         // phase transitions
         // a battle's end screen chose "Change fighter": its recording saved, back to the launcher's Battle page
-        let back = match &mut self.phase {
+        let (back, exit) = match &mut self.phase {
             Phase::Ready(r) => {
                 let back = r.ctl.take_battle_select();
-                if back {
+                // a replay's menu chose Exit / Back: the launcher (its main page)
+                let exit = r.ctl.take_exit_replay();
+                if back || exit {
                     r.ctl.finalize(&r.app);
                     replays::service(&r.store, &mut r.ctl, &mut r.app, &mut r.replay_menu);
                 }
-                back
+                (back, exit)
             }
-            _ => false,
+            _ => (false, false),
         };
-        if back {
+        if exit {
+            self.enter_launcher();
+        } else if back {
             self.enter_launcher();
             if let Phase::Launcher(ls) = &mut self.phase {
                 ls.l.show(wf_app::launcher::Screen::Battle);
@@ -1073,7 +1077,9 @@ impl Shell {
                 }
                 let live = r.app.inputs.clone();
                 let stepped = r.ctl.advance(&mut r.app, dt, &live);
-                if stepped > 0 {
+                // (paused - a replay's menu, the pause: no step consumes the taps; they are read every frame, so
+                // they go now, or a tapped key stayed "held" and the menu never saw a press)
+                if stepped > 0 || r.app.paused {
                     r.keys.consumed();
                 }
                 // (after the frame's steps: a safe point for a dev reload; the restarted scene records afresh)
@@ -1410,6 +1416,8 @@ impl ApplicationHandler for Shell {
                 }
                 if down && !event.repeat {
                     match code {
+                        // (a replay: its menu - Resume / Exit to launcher)
+                        KeyCode::Escape if r.ctl.playing() => r.ctl.toggle_play_menu(&mut r.app),
                         KeyCode::Escape => r.app.paused = !r.app.paused,
                         // F1: Classic 240x160 <-> PC wide, kept as the launcher's View setting
                         KeyCode::F1 => {
@@ -1587,6 +1595,16 @@ fn headless(a: &mut Args) -> Result<(), String> {
         let inp = [script.get(f as usize).copied().unwrap_or(0)];
         if !ctl.enabled {
             s.step(&inp); // demo world: no recording
+        } else if ctl.playing() && a.frames.is_some() {
+            // a replay watched for `--frames` host frames as the window does: the `--input` buttons drive its menu
+            // (Start / B: Resume / Exit; at its end Watch again / Back), it pauses there instead of stopping
+            if ctl.advance(&mut s.app, 1.0 / wf_view::GBA_FPS, &inp) > 0 {
+                s.after_step();
+            }
+            if ctl.take_exit_replay() {
+                eprintln!("replay menu: exit to the launcher at host frame {f}");
+                break;
+            }
         } else if ctl.step(&mut s.app, &inp) {
             s.after_step();
         } else {

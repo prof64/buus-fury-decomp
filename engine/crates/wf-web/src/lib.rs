@@ -348,7 +348,9 @@ pub extern "C" fn wf_app_frame(win_w: u32, win_h: u32, player: u32) -> u32 {
         if steps > 0 {
             g.app.stats.last_step_ms = (unsafe { now_ms() } - t0) / steps as f64;
         }
-        if steps > 0 {
+        // (paused - a replay's menu, the pause: no step consumes the taps; they are read every frame, so they go
+        // now, or a tapped key stayed "held" for good and the menu never saw a press: playtest, stuck in a replay)
+        if steps > 0 || g.app.paused {
             g.keys.iter_mut().for_each(|k| k.consumed());
         }
         for e in g.app.take_audio() {
@@ -612,6 +614,8 @@ pub extern "C" fn wf_app_next_request() -> u32 {
                 g.ctl.finalize(&g.app);
                 5
             }
+            // a replay's menu: Exit / Back -> the launcher
+            Some(Request::ExitReplay) => 6,
         }
     })
     .unwrap_or(0)
@@ -728,6 +732,21 @@ pub extern "C" fn wf_app_current_replay() -> u32 {
         None => 1,
     })
     .unwrap_or(1)
+}
+
+/// Esc during a replay: its menu.
+#[no_mangle]
+pub extern "C" fn wf_app_play_menu() -> u32 {
+    // Esc during a replay: its menu (Resume / Exit to launcher); 0 = no replay playing (Esc does what it did)
+    with_game(|g| {
+        if g.ctl.playing() {
+            g.ctl.toggle_play_menu(&mut g.app);
+            1
+        } else {
+            0
+        }
+    })
+    .unwrap_or(0)
 }
 
 /// Queue the live recording for saving (page hide / unload).

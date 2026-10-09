@@ -131,6 +131,8 @@ pub fn service(store: &Store, ctl: &mut Control, app: &mut App, menu: &mut Repla
             }
             // (the battle's end screen: the window loop goes back to the launcher, `Control::take_battle_select`)
             Request::BattleSelect => {}
+            // (a replay's menu: Exit / Back - the window loop goes back to the launcher, `Control::take_exit_replay`)
+            Request::ExitReplay => {}
         }
     }
 }
