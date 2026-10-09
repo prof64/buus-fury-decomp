@@ -722,8 +722,12 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                 Fx::DragonFist {
                     seg, dir, dying, ..
                 } => {
-                    for k in 0..6 {
-                        let ix = if k != 0 {
+                    // segment 5 is the head (the steered end: record dir * 4 + 1, dying 1 + (t >> 3)), 0 .. 4 the
+                    // body back to the root; the head on top (facing up: the root on top) - reference skillfx.ts
+                    // DragonFistFx `draw` (later on top there; first OAM entry on top here)
+                    let order: [usize; 6] = if *dir == 1 { [0, 1, 2, 3, 4, 5] } else { [5, 4, 3, 2, 1, 0] };
+                    for k in order {
+                        let ix = if k != 5 {
                             0
                         } else if *dying < 0 {
                             1
