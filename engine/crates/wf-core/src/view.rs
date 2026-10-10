@@ -771,6 +771,11 @@ fn render_view_with(w: &World, link: Option<&LinkDraw>, out: &mut RenderView) {
         out.palette_fade = Some(wf_view::PaletteFade { level, target: 0 });
     }
     out.menu = crate::menu::view(w);
+    // the boot screens (power-on, the soft reset): their picture instead of the title waiting under them
+    out.boot = crate::menu::title::boot_view(w);
+    if out.boot.is_some() {
+        out.menu = None;
+    }
     // (the link's page under the link error's script: `World::under`)
     if out.menu.is_none() {
         out.menu = w.under.as_deref().cloned();

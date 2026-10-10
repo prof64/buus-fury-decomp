@@ -76,6 +76,9 @@ SCENARIOS = {
     # the game over (work/states/buu_died.ss = run 2's death, on the death scene's "You have died!"): A, the script's
     # fade-out, `return_to_title` - the title's first picture and its cursor's blink (menu_parity gives the remake the
     # return at `rtt_row`; the scene's frames before it are not compared)
+    # the soft reset (A + B + SELECT + START) on the title: the boot screens (legal, logos), then the title again - its
+    # first picture and its cursor's blink from the boot
+    'title_boot': (T, None, ['-:7'], ['-:10', 'A+B+SELECT+START:2', '-:798'], title_open()),
     'title_gameover': ('buu_died.ss', None, [], ['-:31', 'A:3', '-:142'], {'rtt': 'game_over', 'probe': _vt, 'finish': _rtt}),
     # move between START / OPTIONS, START -> Single / Multiplayer -> back (B) -> START -> Single -> Select Game
     # (two empty slots), move, toggle Delete Game (L / R) and back, B -> back

@@ -68,6 +68,8 @@ pub struct RenderView {
     pub obj_shake: Option<(i32, i32)>,
     /// Damage numbers (object `0x0800AD3E`, vtable 0x0804C904): a 32x8 OBJ at world (x, y), priority 1.
     pub damage_numbers: Vec<DamageNumberView>,
+    /// a boot screen up (it replaces everything)
+    pub boot: Option<BootView>,
     /// A script's title text (`show_title_text` 0xB2, "Chapter 12 ..." / "Match 2 Fight!"): the string's units,
     /// centred at (x, y) (object `0x0802BECC`: a 32-px-high surface, the title font outlined, OBJs at (x - w / 2,
     /// y - 16)).
@@ -98,6 +100,15 @@ pub struct RenderView {
     /// over, credits, mini-games, map screen): when set the renderer shows only this (plus `palette_fade` /
     /// `fade_black`), not the map, sprites, HUD or dialogue.
     pub menu: Option<MenuView>,
+}
+
+/// A boot screen (the legal text, the logos): the full-screen picture `a` blended toward the picture `b` (a
+/// cross-fade) or black, `level` 0 (all `a`) ..= 256 in steps of 16 (the hardware's 16 blend steps).
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub struct BootView {
+    pub a: String,
+    pub b: Option<String>,
+    pub level: u16,
 }
 
 /// A screen the game draws by code into 8bpp surfaces (see `engine/docs/ui.md` "Menus"). Everything is in the
@@ -327,6 +338,7 @@ pub enum DialogPos {
 impl RenderView {
     pub fn clear(&mut self) {
         self.frame = 0;
+        self.boot = None;
         self.see_through.clear();
         self.map = None;
         self.sprites.clear();

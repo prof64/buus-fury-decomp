@@ -385,7 +385,7 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
             }
         }
         // (`meta.field`: the scenario runs on into a scene - the link error's script -, its frames compared as well)
-        if v.menu.is_none() && meta["field"].as_bool() != Some(true) {
+        if v.menu.is_none() && v.boot.is_none() && meta["field"].as_bool() != Some(true) {
             if log {
                 eprintln!("{name} {k:4} keys {keys:03x} field ({:?})", sim.world().menu.phase);
             }

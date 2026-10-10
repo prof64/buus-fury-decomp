@@ -874,6 +874,37 @@ pub fn open_title_boot(w: &mut World) {
     w.menu.boot_draw = Some(());
 }
 
+/// the boot screens' picture at the boot's logic frame `lf` (the counter 0x03000F94 from the reset; the soft reset
+/// recorded on the emulator, every iteration matched with the fade routine `0x08007074` - menu_parity title_boot):
+/// the legal text in from black (1 ..= 16, 16 a step), held, out (151 ..= 166), black; the Atari logo from 180,
+/// cross-faded into FUNimation's (341 ..= 356), that into Webfoot's (501 ..= 516), Webfoot's out from 681 (level
+/// 144, 16 every second iteration), black from 695; the title's first iteration is 697
+pub fn boot_view(w: &World) -> Option<wf_view::BootView> {
+    if w.menu.boot == 0 {
+        return None;
+    }
+    let (total, left) = (if w.opts.no_lag { BOOT_LOGIC } else { BOOT_FRAMES as i64 }, w.menu.boot as i64);
+    let i = total - left;
+    // (with lag frames: the boot's 9 slow-down frames spread evenly - not placed)
+    let lf = if w.opts.no_lag { i } else { i * BOOT_LOGIC / BOOT_FRAMES as i64 };
+    let pic = |n: &str| format!("ui/images/screen_{n}.png");
+    let v = |a: &str, b: Option<&str>, level: i64| wf_view::BootView { a: pic(a), b: b.map(pic), level: level.clamp(0, 256) as u16 };
+    Some(match lf {
+        ..=0 => v("legal", None, 256),
+        1..=16 => v("legal", None, 256 - 16 * lf),
+        17..=150 => v("legal", None, 0),
+        151..=166 => v("legal", None, 16 * (lf - 150)),
+        167..=179 => v("legal", None, 256),
+        180..=340 => v("atari", None, 0),
+        341..=356 => v("atari", Some("funimation"), 16 * (lf - 340)),
+        357..=500 => v("funimation", None, 0),
+        501..=516 => v("funimation", Some("webfoot"), 16 * (lf - 500)),
+        517..=680 => v("webfoot", None, 0),
+        681..=694 => v("webfoot", None, 144 + 16 * ((lf - 681) / 2)),
+        _ => v("webfoot", None, 256),
+    })
+}
+
 /// video frames from the soft reset to the title's first iteration (the boot screens' modes and switches)
 pub const BOOT_FRAMES: u16 = 705;
 /// the frame counter 0x03000F94 before the title's first iteration (the boot screens' logic frames)

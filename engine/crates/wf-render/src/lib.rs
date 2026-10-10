@@ -476,6 +476,41 @@ impl Renderer {
             }
             return &self.fb;
         }
+        if let Some(b) = view.boot.as_ref() {
+            // a boot screen: its picture (cross-)faded per pixel, placed as a menu screen is
+            let mut load = |p: &str| packs.read(p).and_then(|x| wf_content::image::decode_indexed(&x).ok());
+            let (ia, ib) = (load(&b.a), b.b.as_deref().and_then(&mut load));
+            let px = |im: &Option<wf_content::image::Indexed>, x: i32, y: i32| -> u32 {
+                im.as_ref()
+                    .filter(|im| (x as u32) < im.w && (y as u32) < im.h)
+                    .map(|im| im.palette.get(im.idx[(y as u32 * im.w + x as u32) as usize] as usize).copied().unwrap_or(0) & 0xFF_FFFF)
+                    .unwrap_or(0)
+            };
+            self.fb.fill(0xFF00_0000);
+            let k = ((w as i32 / GBA_W).min(h as i32 / GBA_H)).max(1);
+            let (ox, oy) = ((w as i32 - GBA_W * k) / 2, (h as i32 - GBA_H * k) / 2);
+            for y in 0..GBA_H {
+                for x in 0..GBA_W {
+                    // (the hardware's blend at the emulator's 8-bit channels: (a * (16 - k) + b * k) >> 4)
+                    let (ca, cb, ev) = (px(&ia, x, y), px(&ib, x, y), (b.level as u32 / 16).min(16));
+                    let mut c = 0xFF00_0000;
+                    for sh in [16, 8, 0] {
+                        c |= ((((ca >> sh) & 0xFF) * (16 - ev) + ((cb >> sh) & 0xFF) * ev) >> 4) << sh;
+                    }
+                    for dy in 0..k {
+                        for dx in 0..k {
+                            let (fx, fy) = (ox + x * k + dx, oy + y * k + dy);
+                            if fx >= 0 && fy >= 0 && (fx as usize) < w && (fy as usize) < h {
+                                self.fb[fy as usize * w + fx as usize] = c;
+                            }
+                        }
+                    }
+                }
+            }
+            let (vx, vy, cx, cy) = Self::view_origin(view, player, w, h);
+            self.origin = (vx, vy, cx, cy);
+            return &self.fb;
+        }
         if let Some(mv) = view.menu.as_ref() {
             // a menu screen replaces everything: the 240x160 picture centred in the view, black around it - scaled
             // by the largest integer that fits (playtest 20: the title / Select Game / pause menu were a 240x160

@@ -78,6 +78,11 @@ friend's leaving does the same to whatever page shows (`link::friend_left`, `lin
 game the list has the box "No Saved Games" over it (`dojo::WaitKind::NoSaves`, `link_nosaves`: B leaves after the
 box's exit-stub iteration) and its A prompt is grey from the start.
 
+**The boot screens** (power-on, the soft reset A + B + SELECT + START): the legal text and the Atari / FUNimation /
+Webfoot logos with their fades and cross-fades (`title::boot_view` -> `RenderView::boot`, a full-screen picture
+blended per pixel as the hardware does), per logic frame as recorded on the emulator - menu_parity `title_boot`
+(748 frames from the reset to the title's first cursor blinks, all exact). They were black before.
+
 **`return_to_title`** (the link error's s001, the game over's s000, the ending) without lag frames (`Options::no_lag`,
 the app): the title is made in the script's own iteration and runs its first step there (`Session::step_post`) - its
 picture is up at that iteration's end, its cursor's first redraw 8 iterations on. Measured on the emulator in all
