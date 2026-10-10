@@ -33,6 +33,93 @@ fn dragon_drawn(w: &World, seg: &[[i32; 2]; 6], dir: crate::geom::Dir, shifted: 
     out
 }
 
+/// `render_view_link`'s order: the side's world list (props, the fighters, then the objects and the fight's own list
+/// objects by their place) sorted as the game does; back to front
+fn link_order(w: &World, l: &LinkDraw, order: Vec<((i32, i32, u32), Option<usize>, usize)>) -> Vec<((i32, i32, u32), Option<usize>, usize)> {
+    type E = ((i32, i32, u32), Option<usize>, usize);
+    // (None: a list object without a sprite of ours)
+    let mut list: Vec<((i32, i32), Option<E>)> = vec![];
+    // (the array takes the objects whose draw check passes: a prop overlapping the side's camera (0x0800CF42), a
+    // fighter whose position is on it (0x0801003A); our props and fighters still draw - the renderer clips them -
+    // but sort as the game's array has them)
+    let cam = w.cameras[l.local.min(crate::world::MAX_PLAYERS - 1)].rect;
+    let mut props: Vec<E> = order.iter().filter(|o| o.1.is_none()).cloned().collect();
+    props.sort_by_key(|o| o.2);
+    let mut skipped: Vec<E> = vec![];
+    for o in props {
+        let on = crate::fieldview::prop_rect(w, o.2).is_some_and(|r| r.x0 < cam.x1 && cam.x0 < r.x1 && r.y0 < cam.y1 && cam.y0 < r.y1);
+        if on {
+            list.push(((o.0 .0, o.0 .1), Some(o)));
+        } else {
+            skipped.push(o);
+        }
+    }
+    let player = |s: usize| w.players.get(s).and_then(|&id| w.find(id));
+    let fighters = [player(0), player(1)];
+    for f in fighters.into_iter().flatten() {
+        if let Some(o) = order.iter().find(|o| o.1 == Some(f)) {
+            let a = &w.pl_ref(f).a;
+            let (x, y) = (a.x >> 8, a.y >> 8);
+            if x >= cam.x0 && x < cam.x1 && y >= cam.y0 && y < cam.y1 {
+                list.push(((o.0 .0, o.0 .1), Some(*o)));
+            } else {
+                skipped.push(*o);
+            }
+        }
+    }
+    // the rest by their place: entities by id, the objects without sprites before the entities made after them
+    // (the loot's sort depth: a coin's its loot point y, a dropped item's its box bottom - the game's +4, link
+    // recording dojo_px3's world list: both 236 under a fighter at y 232)
+    let key = |o: &E| -> (i32, i32) {
+        match o.1.map(|i| &w.ents[i].body) {
+            Some(Body::Pickup(p)) => match p.kind {
+                crate::fieldobj::PickupKind::Zenie(_) => (0, (p.y >> 8) - 4),
+                _ => (0, p.bx[3] - 4),
+            },
+            // (a fighter's Energy Blast (0x0804B454) is layer 0x38, depth its y, in every facing - fired up too: link
+            // recording dojo_px1's world list, behind the fighter firing it up)
+            Some(Body::Shot(s)) if matches!(&s.kind, crate::shots::ShotKind::Straight(o) if o.name == crate::shots::SName::KiBlast)
+                && w.find(s.owner).is_some_and(|k| matches!(w.ents[k].body, Body::Player(_))) =>
+            {
+                (0, s.py() - 4)
+            }
+            _ => (o.0 .0, o.0 .1),
+        }
+    };
+    let mut rest: Vec<(crate::world::EntityId, u32, (i32, i32), Option<E>)> = order
+        .iter()
+        .filter(|o| o.1.is_some_and(|i| !fighters.contains(&Some(i))))
+        .map(|o| (w.ents[o.1.unwrap()].id, 1, key(o), Some(*o)))
+        .collect();
+    rest.extend(l.objs.iter().map(|&(place, k)| (place, 0, k, None)));
+    // (the damage numbers (vtable 0x0804C904): list objects at their place, layer 16, depth their y + 8 - none set in
+    // the update that made them: a heap leftover, large in the recordings)
+    if w.field.is_none() {
+        for p in w.battle.popups.iter().filter(|p| p.2 > w.frame) {
+            let y8 = p.4 - 4 * w.frame.wrapping_sub(p.1) as i32;
+            let d = if p.1 == w.frame { 0x0202_0000 } else { (y8 >> 3) + 4 };
+            rest.push((p.7, 0, (0x38 - 16, d), None));
+        }
+    }
+    rest.sort_by_key(|r| (r.0, r.1));
+    list.extend(rest.into_iter().map(|r| (r.2, r.3)));
+    let mut a: Vec<((i32, i32), Option<E>)> = list.into_iter().rev().collect();
+    if std::env::var("LINKDBG").ok().and_then(|f| f.parse::<u32>().ok()) == Some(w.frame) {
+        let d: Vec<String> = a.iter().map(|x| format!("{:?}{}", x.0, x.1.and_then(|e| e.1).map(|i| format!(" id{} {}", w.ents[i].id, match &w.ents[i].body { Body::Player(p) => format!("player y{}", p.a.y >> 8), Body::Pickup(p) => format!("pickup y{}", p.y >> 8), _ => "other".into() })).unwrap_or_default())).collect();
+        eprintln!("link array f{} local {} players {:?}: {:?}", w.frame, l.local, w.players, d);
+    }
+    if a.len() > 1 {
+        let n = a.len() - 1;
+        game_qsort(&mut a, 0, n, &|x, y| x.0 < y.0);
+    }
+    if std::env::var("LINKDBG").ok().and_then(|f| f.parse::<u32>().ok()) == Some(w.frame) {
+        eprintln!("  sorted: {:?}", a.iter().map(|x| (x.0, x.1.and_then(|e| e.1).map(|i| w.ents[i].id))).collect::<Vec<_>>());
+    }
+    // (the sorted array is front first - the OAM's order; ours back to front; what the array left out draws
+    // nothing on the GBA - here behind the rest, clipped)
+    skipped.into_iter().chain(a.into_iter().rev().filter_map(|x| x.1)).collect()
+}
+
 /// an actor's sort depth on the actors' y scale: the game's +4 = y + (footprint h >> 1) (the actor draw 0x080101C6:
 /// obj+0x19D; Goku's 8 -> y + 4, Spopovich's 16 -> y + 8 - his fist in front of Goku 3 px below him, opponent audit
 /// oa_t70_left f80); here less the usual 4
@@ -502,6 +589,72 @@ fn it_ring(w: &World, id: u32, group: u32, t: i32, x: i32, y: i32, out: &mut Ren
 
 /// fill `out` from the world (read-only)
 pub fn render_view(w: &World, out: &mut RenderView) {
+    render_view_with(w, None, out)
+}
+
+/// The link fight's world list on one side's GBA, for its draw order (`render_view_link`): each side's fight makes
+/// both fighters in slot order (the world list 0x03001C4C: the arena's props, the host's fighter, the guest's, then the
+/// fight's objects as they are made - link recordings, both sides' OAM); the side's camera decides what is drawn.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct LinkDraw {
+    /// the side's own fighter (its slot: its camera)
+    pub local: usize,
+    /// the fight's objects that draw no sprite here but are in the list and sorted (the HUD, the boss bar, the
+    /// round timer, the title texts): their place (the next entity id when made - the objects made later come after
+    /// them) and sort key (our layer = 0x38 - the game's +8, depth = the game's +4 - 4)
+    pub objs: Vec<(crate::world::EntityId, (i32, i32))>,
+}
+
+/// [`render_view`] as one side of a link fight draws it: the draw order is the game's sort of that side's world list
+/// (0x080115B0: the drawable objects from the list's last to its first, the quicksort 0x080531A4 - median of three,
+/// comparator 0x08052EE0, unstable: objects at an equal key come out as the whole array partitions; in the Dojo every
+/// object in the list has its keys, so the order is the game's - link recordings, both sides' OAM)
+pub fn render_view_link(w: &World, link: &LinkDraw, out: &mut RenderView) {
+    render_view_with(w, Some(link), out)
+}
+
+/// the game's draw-array quicksort (0x080531A4 over [lo, hi]; `behind(x, y)` = 0x08052EE0(x, y): x goes after y) -
+/// front first
+fn game_qsort<T>(a: &mut [T], lo: usize, hi: usize, before: &impl Fn(&T, &T) -> bool) {
+    let (mut lo, hi) = (lo, hi);
+    while lo < hi {
+        let mid = lo + ((hi - lo) >> 1);
+        if lo == mid {
+            if before(&a[lo], &a[hi]) {
+                a.swap(lo, hi);
+            }
+            return;
+        }
+        if before(&a[mid], &a[lo]) {
+            a.swap(lo, mid);
+        }
+        if before(&a[lo], &a[hi]) {
+            a.swap(lo, hi);
+        }
+        let (mut i, mut j) = (lo, hi);
+        loop {
+            while before(&a[j], &a[lo]) {
+                j -= 1;
+            }
+            i += 1;
+            while i < j && before(&a[lo], &a[i]) {
+                i += 1;
+            }
+            if i >= j {
+                break;
+            }
+            a.swap(i, j);
+            j -= 1;
+        }
+        a.swap(lo, j);
+        if j > lo + 1 {
+            game_qsort(a, lo, j - 1, before);
+        }
+        lo = j + 1;
+    }
+}
+
+fn render_view_with(w: &World, link: Option<&LinkDraw>, out: &mut RenderView) {
     out.clear();
     out.frame = w.frame as u64;
     // (battle mode: the players show through foreground scenery - not the story, which is the game's picture)
@@ -774,6 +927,9 @@ pub fn render_view(w: &World, out: &mut RenderView) {
     // cannot be derived in general. Kept: at an equal key the later list object in front, which all locked pixel-gate
     // segments show)
     order.sort_by_key(|o| (o.0, o.2));
+    if let Some(l) = link {
+        order = link_order(w, l, order);
+    }
     // Dragon Fist Explosion: the chain builder 0x08038AD8 makes six objects, each placed among the others by its own
     // depth (Gogeta in front of a segment above him, behind one below), but among themselves in a fixed order: the
     // head in front down to the root (facing up: the root in front) - skill audit sa_f41_skill5 in every facing and

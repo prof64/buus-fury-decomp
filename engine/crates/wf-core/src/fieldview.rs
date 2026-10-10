@@ -195,6 +195,15 @@ fn battle_map_id(map: &str) -> Option<String> {
     Some(format!("area_{:02}_{:03}", a.parse::<u32>().ok()?, b.parse::<u32>().ok()?))
 }
 
+/// a prop's rect (the map's, or the field's live one)
+pub fn prop_rect(w: &World, k: usize) -> Option<crate::geom::Rect> {
+    let (md, live) = map_props(w)?;
+    match live {
+        Some(f) => f.props.get(k).map(|p| p.rect),
+        None => md.props.get(k).map(|d| d.rect),
+    }
+}
+
 /// one prop (and its breakable's shake)
 pub fn prop(w: &World, k: usize, out: &mut RenderView) {
     let Some((md, live)) = map_props(w) else { return };
@@ -230,6 +239,14 @@ pub fn prop(w: &World, k: usize, out: &mut RenderView) {
 
 /// the debris chips and the item-get icon (priority 2, rising 1 px per 16 frames above the player)
 pub fn front(w: &World, out: &mut RenderView) {
+    // a link fight's item-get: the same icon over the fighter holding the prize's supply
+    if let Some(g) = &w.link_get {
+        if let (Some(pi), Some(item)) = (w.player_idx(g.slot as usize), g.supply) {
+            let a = &w.pl_ref(pi).a;
+            let k = (60 - g.left).max(0);
+            put(out, 0, "effects/field_items".into(), item_frame(item), a.px(), a.py() - 40 - ((k + 2) >> 4), 2, SpriteEffect::None);
+        }
+    }
     let Some(f) = w.field.as_ref() else { return };
     if let Some(g) = &f.item_get {
         if let (Some(pi), Some(item)) = (w.player_idx(g.slot as usize), g.item) {
