@@ -5,7 +5,8 @@
 //! in step - and read the count after every row): per segment the runs `[row, value, step]`. The game counts it in the
 //! field update's own routine (0x0800425C, with the countdown and the stopwatch): one a frame while the field runs
 //! free. Ours: the segment's start with the same poke (`init.ram.poke`), replayed; compared at every row a logic
-//! iteration of the game ends on, while the segment matches. The file's `known` segments are reported, not failed.
+//! iteration of the game ends on, while the segment matches: all 550 exact (the file's `known` list, reported and not
+//! failed, is empty).
 //! `HOLY=name[,name]` only those; `HOLY_LOG=N` prints where ours and the game's part (N changes), `HOLY_DBG=a-b` our
 //! field's state over those rows.
 

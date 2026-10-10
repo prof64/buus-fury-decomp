@@ -417,6 +417,16 @@ pub fn start(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Value
             host.hs.boost_orphan = imp.world.player_idx(0).is_none();
         }
     }
+    // a script running at the cut inside the field mode's enter (an area loaded under it): the main loop's call of
+    // the mode (return 0x08007063) is followed on the stack by the enter's (0x08006BCB), not the update's (0x08006E53)
+    {
+        let stack = ram.read(0x0300_7A00, 0x600);
+        let words: Vec<u32> = stack.chunks_exact(4).map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]])).collect();
+        if let Some(k) = words.iter().rposition(|&w| w == 0x0800_7063) {
+            let below = words[..k].iter().rev().find(|&&w| w & 1 == 1 && (0x0800_0000..0x0806_0000).contains(&w));
+            host.hs.enter_event = host.running() && below == Some(&0x0800_6BCB);
+        }
+    }
     // the cartridge's EEPROM at the cut (`init.eeprom`, base64(zlib); tools/wholerun/resync.py): the save slots
     if let Some(s) = doc["init"]["eeprom"].as_str() {
         let ee = crate::ram::b64(s).and_then(|z| miniz_oxide::inflate::decompress_to_vec_zlib(&z).map_err(|e| format!("eeprom: inflate {e:?}")))?;
