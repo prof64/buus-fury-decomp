@@ -410,7 +410,7 @@
    "effect": {
     "restore_ep": 20,
     "restore_ep_with_straw": 25,
-    "bug": "with the Primordial Twisty-Straw owned the game sets HP = EP + bonus instead of EP += bonus"
+    "bug": "with the Primordial Twisty-Straw worn (is_equipped 118) the game sets HP = EP + bonus instead of EP += bonus (menu_parity inventory_use_straw_worn; only owned: EP += 20 as usual)"
    }
   },
   {
@@ -444,7 +444,7 @@
    "effect": {
     "restore_ep": 40,
     "restore_ep_with_straw": 50,
-    "bug": "with the Primordial Twisty-Straw owned the game sets HP = EP + bonus instead of EP += bonus"
+    "bug": "with the Primordial Twisty-Straw worn (is_equipped 118) the game sets HP = EP + bonus instead of EP += bonus (menu_parity inventory_use_straw_worn; only owned: EP += 20 as usual)"
    }
   },
   {
@@ -478,7 +478,7 @@
    "effect": {
     "restore_ep": 80,
     "restore_ep_with_straw": 100,
-    "bug": "with the Primordial Twisty-Straw owned the game sets HP = EP + bonus instead of EP += bonus"
+    "bug": "with the Primordial Twisty-Straw worn (is_equipped 118) the game sets HP = EP + bonus instead of EP += bonus (menu_parity inventory_use_straw_worn; only owned: EP += 20 as usual)"
    }
   },
   {
@@ -512,7 +512,7 @@
    "effect": {
     "restore_ep": 125,
     "restore_ep_with_straw": 156,
-    "bug": "with the Primordial Twisty-Straw owned the game sets HP = EP + bonus instead of EP += bonus"
+    "bug": "with the Primordial Twisty-Straw worn (is_equipped 118) the game sets HP = EP + bonus instead of EP += bonus (menu_parity inventory_use_straw_worn; only owned: EP += 20 as usual)"
    }
   },
   {
@@ -546,7 +546,7 @@
    "effect": {
     "restore_ep": 175,
     "restore_ep_with_straw": 219,
-    "bug": "with the Primordial Twisty-Straw owned the game sets HP = EP + bonus instead of EP += bonus"
+    "bug": "with the Primordial Twisty-Straw worn (is_equipped 118) the game sets HP = EP + bonus instead of EP += bonus (menu_parity inventory_use_straw_worn; only owned: EP += 20 as usual)"
    }
   },
   {
@@ -580,7 +580,7 @@
    "effect": {
     "restore_ep": 250,
     "restore_ep_with_straw": 313,
-    "bug": "with the Primordial Twisty-Straw owned the game sets HP = EP + bonus instead of EP += bonus"
+    "bug": "with the Primordial Twisty-Straw worn (is_equipped 118) the game sets HP = EP + bonus instead of EP += bonus (menu_parity inventory_use_straw_worn; only owned: EP += 20 as usual)"
    }
   },
   {
@@ -614,7 +614,7 @@
    "effect": {
     "restore_ep": 350,
     "restore_ep_with_straw": 438,
-    "bug": "with the Primordial Twisty-Straw owned the game sets HP = EP + bonus instead of EP += bonus"
+    "bug": "with the Primordial Twisty-Straw worn (is_equipped 118) the game sets HP = EP + bonus instead of EP += bonus (menu_parity inventory_use_straw_worn; only owned: EP += 20 as usual)"
    }
   },
   {
@@ -648,7 +648,7 @@
    "effect": {
     "restore_ep": 500,
     "restore_ep_with_straw": 625,
-    "bug": "with the Primordial Twisty-Straw owned the game sets HP = EP + bonus instead of EP += bonus"
+    "bug": "with the Primordial Twisty-Straw worn (is_equipped 118) the game sets HP = EP + bonus instead of EP += bonus (menu_parity inventory_use_straw_worn; only owned: EP += 20 as usual)"
    }
   },
   {
@@ -682,7 +682,7 @@
    "effect": {
     "restore_ep": 750,
     "restore_ep_with_straw": 938,
-    "bug": "with the Primordial Twisty-Straw owned the game sets HP = EP + bonus instead of EP += bonus"
+    "bug": "with the Primordial Twisty-Straw worn (is_equipped 118) the game sets HP = EP + bonus instead of EP += bonus (menu_parity inventory_use_straw_worn; only owned: EP += 20 as usual)"
    }
   },
   {
@@ -716,7 +716,7 @@
    "effect": {
     "restore_ep": 1000,
     "restore_ep_with_straw": 1250,
-    "bug": "with the Primordial Twisty-Straw owned the game sets HP = EP + bonus instead of EP += bonus"
+    "bug": "with the Primordial Twisty-Straw worn (is_equipped 118) the game sets HP = EP + bonus instead of EP += bonus (menu_parity inventory_use_straw_worn; only owned: EP += 20 as usual)"
    }
   },
   {
