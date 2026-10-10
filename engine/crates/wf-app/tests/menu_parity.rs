@@ -243,6 +243,7 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
     let mut emu_snd: Vec<i64> = Vec::new();
     // the previous compared row and our picture's hash there
     let mut prev_cmp: Option<(usize, String)> = None;
+    let mut link_pending: Option<Value> = None;
     for (k, row) in rows.iter().enumerate() {
         let keys = i(&row["keys"]) as u16;
         let logic = k == 0 || lf[k] != lf[k - 1];
@@ -276,6 +277,16 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
                 if up && t.wait.is_some() && t.link_up.is_none() {
                     t.link_up = Some(0);
                 }
+            }
+        }
+        // the friend's side of a link page as the emulator's game learned it (a row's `link`: the trade's offer /
+        // answer), given before the iteration that acted on it - as the app's link flow sets `link::Friend`
+        if meta["link"].as_bool() == Some(true) && !row["link"].is_null() {
+            link_pending = Some(row["link"].clone());
+        }
+        if logic {
+            if let Some(v) = link_pending.take() {
+                wf_core::menu::link::harness(&mut sim.session.world, &v);
             }
         }
         if logic && !opened_fade {

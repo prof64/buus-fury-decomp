@@ -76,10 +76,15 @@ def run(name, sc):
         sc['probe0'](a, sc['open'])
     c.frames, c.screens = [], []
     ka, kb = program(sc['keys']), program(sc.get('keys_b', []))
+    # (a scenario's own per-frame probe of emulator A, merged into the row; `post(frames, rows)` turns it into what
+    # the rows carry for the remake, e.g. the friend's side of the trade: `link`)
+    probe = capture.probe
+    if sc.get('probe'):
+        probe = lambda e: {**capture.probe(e), **sc['probe'](e)}  # noqa: E731
     for i, k in enumerate(ka):
         c.keys_b = kb[i] if i < len(kb) else 0
         # (the link's up flag [0x03002F54] per frame: the title's link box counts from it)
-        c.step(k, lambda e: dict(capture.probe(e), up=e.r32(0x03002F54)))
+        c.step(k, lambda e: dict(probe(e), up=e.r32(0x03002F54)))
     d = OUT / name
     d.mkdir(parents=True, exist_ok=True)
     from PIL import Image
@@ -90,6 +95,8 @@ def run(name, sc):
     meta = {'open': sc['open'], 'link': True, 'saves': saves}
     rows = [dict(keys=f['keys'], lf=f['lf'], snd=f['snd'], h=f['h'], **({'up': f['up']} if sc.get('up') else {}))
             for f in c.frames]
+    if sc.get('post'):
+        sc['post'](c.frames, rows)
     capture.DATA.mkdir(parents=True, exist_ok=True)
     (capture.DATA / f'{name}.json').write_text(json.dumps(dict(scenario=name, state='link', meta=meta, story=st, frames=rows),
                                                           separators=(',', ':')))

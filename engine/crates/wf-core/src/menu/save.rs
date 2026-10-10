@@ -287,6 +287,10 @@ pub struct GameList {
     /// link's Select Saved Game shows none: menu_parity link_saves)
     #[serde(default = "yes")]
     pub corners: bool,
+    /// the list mode's vt +0x2C after a figure build (`0x08005E9A`) runs: the chosen character walks (the link's
+    /// Select Saved Game for the Trading Post skips it, `0x080202C8`: no walker - menu_parity link_trade_declined)
+    #[serde(default = "yes")]
+    pub walker: bool,
     #[serde(default)]
     pub figs_key: Option<(i32, Vec<i32>, Vec<bool>)>,
     /// generator draws the last figure build owes the world: each figure is made under the idle state
@@ -382,7 +386,7 @@ impl GameList {
                 };
                 // `0x08005E9A` (after the build): the selected slot's chosen character walks (its vt +0x28 (1));
                 // the others keep the idle state (standing, facing the viewer)
-                let walk = sel && self.first + row == self.sel && s.ids.get(k) == Some(&s.chosen);
+                let walk = self.walker && sel && self.first + row == self.sel && s.ids.get(k) == Some(&s.chosen);
                 self.figs.push(Fig {
                     sprite,
                     x: 16 * k as i32 + 0x12,
@@ -453,7 +457,14 @@ impl GameList {
         let Some(d) = w.data.menu.as_ref() else {
             return out;
         };
-        for f in self.figs.iter().filter(|f| f.live) {
+        // OAM order: the figures as made (the walker's list, link_saves); the list without a walker (the Trading
+        // Post's, `0x080202C8` skipped) has them the other way round - the last made in front (menu_parity
+        // link_trade_declined: the turned-away Gohan over Goku). INFERRED: the walker's re-made state restores the order
+        let mut order: Vec<&Fig> = self.figs.iter().filter(|f| f.live).collect();
+        if !self.walker {
+            order.reverse();
+        }
+        for f in order {
             let Some(sp) = w.data.sprite(f.sprite) else {
                 continue;
             };
@@ -583,6 +594,7 @@ impl GameList {
             down,
             figs: Vec::new(),
             corners: true,
+            walker: true,
             figs_key: None,
             rng_owed: 0,
             fig_vram: Vec::new(),
