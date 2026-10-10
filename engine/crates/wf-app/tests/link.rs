@@ -410,7 +410,7 @@ fn link_without_a_saved_game() {
     };
     let a = Player { sim: LinkSim::new(inner, cfg), dir: hdir };
     let b = player(&p, &net, &clock, "nosave-guest", false, LinkKind::Dojo, &sb, eps);
-    let mut r = Run { packs: p, renderer: wf_render::Renderer::new(), drawn: Vec::new(), net, t, a, b, b_alive: true };
+    let mut r = Run { packs: p, renderer: wf_render::Renderer::new(), drawn: Vec::new(), net, t, a, b, b_alive: true, songs: Vec::new() };
     // (its scripted player presses B on the link's pages)
     r.a.sim.bot_mut().unwrap().matches = 0;
     let (mut boxed, mut seen) = (false, std::collections::BTreeSet::new());
