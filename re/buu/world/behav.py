@@ -1,6 +1,6 @@
 """Catalogue actor behaviour lists (count + ptr to pointer list of {fn, params} records)."""
 import sys
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
 from collections import Counter, defaultdict
 from common import *
 AREAS = 0x0808E2E0

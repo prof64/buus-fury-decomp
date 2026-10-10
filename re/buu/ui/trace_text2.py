@@ -1,7 +1,7 @@
 """Find the dialog object + its surface; trace writes into the surface pixels and ROM reads by the writer."""
 import sys, struct
 from collections import Counter
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
 from common import *
 e = emu('buu_menus.ss')
 bp = e.breakpoint(0x0800ada0)

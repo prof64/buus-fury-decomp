@@ -1,6 +1,6 @@
 """Trigger activation-mode singletons in IWRAM: print vtables."""
 import sys
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
 from common import *
 from vtab import entries
 e = emu('buu_snakeway_start.ss')

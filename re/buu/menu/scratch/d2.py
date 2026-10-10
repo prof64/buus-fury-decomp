@@ -1,4 +1,4 @@
-p = '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/engine/crates/wf-core/src/menu/minigame.rs'
+p = '/Users/prof/source/buus-fury-decomp/engine/crates/wf-core/src/menu/minigame.rs'
 s = open(p).read()
 a = s[s.index("/// Watch This! (`0x08027DB0(level)`)"):s.index("/// `run_power_struggle` (0xC6)")]
 b = r'''/// what the 160x64 surface holds (`+0x34`, the box picture `0x08071758` + text + button icons)

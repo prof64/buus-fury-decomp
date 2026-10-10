@@ -1,5 +1,5 @@
 import sys
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu/menu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu/menu')
 from cap import Cap, program, contact, OUT
 from scenarios_minigame import native
 which = sys.argv[1]

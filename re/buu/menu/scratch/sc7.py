@@ -1,5 +1,5 @@
 import sys
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
 from common import u32
 for i in (115, 19, 78, 61):
     a = 0x0874D380 + 16 * i

@@ -1,6 +1,6 @@
 """Map header +0x40 count / +0x44 list."""
 import sys
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
 from common import *
 AREAS = 0x0808E2E0
 want = set(sys.argv[1:])

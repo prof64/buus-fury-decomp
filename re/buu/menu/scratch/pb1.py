@@ -1,4 +1,4 @@
-p = '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/engine/crates/wf-core/src/menu/kit.rs'
+p = '/Users/prof/source/buus-fury-decomp/engine/crates/wf-core/src/menu/kit.rs'
 s = open(p).read()
 a = """    Cursor(Cursor),
     /// a removed child slot (keeps indices stable for pages that refer to their children by index)

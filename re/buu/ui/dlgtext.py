@@ -1,5 +1,5 @@
 import sys, struct
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
 from common import *
 e = emu('buu_menus.ss')
 obj = 0x0203dee4

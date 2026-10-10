@@ -11,7 +11,7 @@ lists in RAM (`[0x080716B0]`, `[0x080716B4]`: u32 count + pointers) and
 usage: verify_objects.py <content base dir>
 """
 import sys, json, glob
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
 from common import *
 from warp import warp
 

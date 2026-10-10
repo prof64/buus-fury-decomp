@@ -1,5 +1,5 @@
 import json, glob
-for p in sorted(glob.glob('/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/work/db/lp/segs/*.json')):
+for p in sorted(glob.glob('/Users/prof/source/buus-fury-decomp/work/db/lp/segs/*.json')):
     L = open(p).read().split('\n')
     fr = [json.loads(x.rstrip(',')) for x in L[1:] if x.startswith('{')]
     first = next((i for i, f in enumerate(fr) if f.get('p')), None)

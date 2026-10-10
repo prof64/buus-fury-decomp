@@ -1,6 +1,6 @@
 """Survey area object lists: group records by ctor."""
 import sys
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
 from collections import defaultdict, Counter
 from common import *
 AREAS = 0x0808E2E0

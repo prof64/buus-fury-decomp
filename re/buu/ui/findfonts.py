@@ -1,6 +1,6 @@
 """Scan ROM for font structs {u16* T, u32 wide_w, u16* wide_data|0} as used by 0x0803F444."""
 import sys, struct
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
 from common import *
 r = rom()
 N = len(r)

@@ -1,7 +1,7 @@
 #!/bin/sh
 # midcuts2.sh SRC.json OUTDIR PREFIX LEN F1 F2 ...: cut a recording at arbitrary video frames (mid-area cuts) of LEN
 # frames, named PREFIX_F (unique across chapters); each cut's start state is kept in OUTDIR/states (python tools)
-R=/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard
+R=/Users/prof/source/buus-fury-decomp
 SRC=$1
 OUT=$2
 P=$3

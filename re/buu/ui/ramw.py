@@ -1,7 +1,7 @@
 """ramw.py STATE LO HI [keys...] : writes into [LO,HI) grouped by (pc, lr); shows addr range and sample regs"""
 import sys
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu/ui')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu/ui')
 from common import *
 from cap import drive
 e = emu(sys.argv[1])

@@ -1,7 +1,7 @@
 """Warp to a map with a breakpoint on the palette fade routine 0x08007074 (r0,r1,r2 = target RGB, r3 = level):
 print the distinct (args, caller) seen and the frames."""
 import sys
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/tools/extract')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/tools/extract')
 import emu_states
 from emu_states import buu_snakeway
 

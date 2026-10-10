@@ -1,7 +1,7 @@
 """findseq.py : search the ROM for the map-screen frame tilemap row (any base offset, u16 or u8)"""
 import sys, struct
 import numpy as np
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
 from common import *
 row = [0x0373, 0x0374, 0x037b, 0x037c, 0x037d, 0x037d, 0x037d, 0x037d, 0x037d, 0x037e, 0x037f]
 d = [row[i + 1] - row[i] for i in range(len(row) - 1)]

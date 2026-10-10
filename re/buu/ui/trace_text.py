@@ -1,7 +1,7 @@
 """Advance the dialog in buu_menus.ss and log who writes the text OBJ tiles."""
 import sys
 from collections import Counter
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
 from common import *
 e = emu('buu_menus.ss')
 e.press(KEY.A, 3, 3)
@@ -14,7 +14,7 @@ for (pc, lr), n in c.most_common(20):
     print(f'pc={pc:08x} lr={lr:08x} n={n}')
 print(len(h))
 e.clear(w)
-e.screenshot('/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu/ui/out/menus2.png', scale=1)
+e.screenshot('/Users/prof/source/buus-fury-decomp/re/buu/ui/out/menus2.png', scale=1)
 # read accesses to ROM during that: rerun with ROM read watch
 e = emu('buu_menus.ss')
 e.press(KEY.A, 3, 3)

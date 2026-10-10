@@ -30,7 +30,7 @@ agent/.claude-plugin/marketplace.json   a one-plugin local marketplace (for /plu
 3. **Load the plugin in Claude Code** - pick one:
    - for a session, in place (no copy, no global config change): `claude --plugin-dir agent/plugin`
    - as an installed plugin from the local marketplace in `agent/` (read in place, not copied):
-     `/plugin marketplace add ./agent` then `/plugin install buu-battle@legacy-of-goku-x`
+     `/plugin marketplace add ./agent` then `/plugin install buu-battle@buus-fury-decomp`
    - MCP server only, project scope: a `.mcp.json` at the repository root with
      `{"mcpServers": {"buu-battle": {"command": "agent/plugin/bin/buu-mcp"}}}`, and the skill copied or linked to
      `.claude/skills/buu-battle`.

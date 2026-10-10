@@ -1,8 +1,8 @@
 """romreads.py STATE [keys...] : ROM data reads (outside code) during the key sequence, clustered."""
 import sys
 from collections import defaultdict
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu/ui')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu/ui')
 from common import *
 from cap import drive
 

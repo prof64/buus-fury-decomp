@@ -1,5 +1,5 @@
 import os
-D = '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/engine/crates/wf-core/src/menu/'
+D = '/Users/prof/source/buus-fury-decomp/engine/crates/wf-core/src/menu/'
 p = D + 'mod.rs'
 s = open(p).read()
 a = s[s.index("/// the pause menu's pages and the other screens (one variant per mode class)"):s.index("/// the pause page L (`right` = false) / R of page `from`")]

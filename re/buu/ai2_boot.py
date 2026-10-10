@@ -7,5 +7,5 @@ HERE = Path(__file__).resolve().parent
 try:
     import common  # noqa: F401
 except ImportError:
-    sys.path.append('/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+    sys.path.append('/Users/prof/source/buus-fury-decomp/re/buu')
     import common  # noqa: F401

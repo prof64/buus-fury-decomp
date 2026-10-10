@@ -1,4 +1,4 @@
-R = '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/'
+R = '/Users/prof/source/buus-fury-decomp/'
 src = open(R + 're/buu/menu/scratch/ms_export.rs').read()
 p = R + 'engine/crates/wf-ui/src/mapscreen.rs'
 s = open(p).read()

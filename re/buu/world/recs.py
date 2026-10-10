@@ -1,6 +1,6 @@
 """recs.py CTOR [N] [LEN]: dump example object defs for a ctor (from area lists)."""
 import sys, struct
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
 from common import *
 AREAS = 0x0808E2E0
 ctor = int(sys.argv[1], 16)

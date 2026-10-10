@@ -1,7 +1,7 @@
 """Text banks: table 0x087B5B64 of webfoot-LZ blobs of UTF-16 text; dialog refs u32 = bank(6) | off_chars(15) << 6 | len(11) << 21."""
 import sys, struct
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/tools/extract')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/tools/extract')
 from common import *
 from gba import wf_decompress
 T = 0x087B5B64

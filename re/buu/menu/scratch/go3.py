@@ -1,6 +1,6 @@
 """words at an address: go3.py ADDR N"""
 import sys, struct
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
 from common import rom
 r = rom()
 a, n = int(sys.argv[1], 16), int(sys.argv[2])

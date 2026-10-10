@@ -4,7 +4,7 @@ cap.py STATE NAME [keys...]   keys like START:60 A:30 DOWN:20 wait:60
 """
 import sys, struct
 from pathlib import Path
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
 from common import *
 from PIL import Image
 

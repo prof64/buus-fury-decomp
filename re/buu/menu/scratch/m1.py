@@ -1,5 +1,5 @@
 import sys
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu/menu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu/menu')
 from cap import Cap, program
 c = Cap('buu_snakeway_start.ss')
 keys = program(['-:2', 'SELECT:1', '-:50'] + (sys.argv[1].split(',') if len(sys.argv) > 1 else []))

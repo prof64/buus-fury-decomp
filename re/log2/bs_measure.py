@@ -3,7 +3,7 @@ For each (class, gfx) and start distance (player stands still after initial plac
 the debug Map Test state, godmode HP): hits on the player (frame, damage), projectiles (kind, life, speeds), state trace."""
 from bs_watch import watch
 import json, math
-OUT='/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/log2/bs_measure_results.json'
+OUT='/Users/prof/source/buus-fury-decomp/re/log2/bs_measure_results.json'
 RUNS=[('android17',3,9),('android18',4,11),('android19',5,12),('android20',6,14),('android20_b',7,14),('cooler',29,34),
       ('cell_imperfect',60,28),('cell_nonperfect',76,29),('perfect_cell_78',78,30),('perfect_cell_21',21,30),('perfect_cell_25',25,30),
       ('cell_jr',26,31),('general_tao',44,50),('triceratops_king',101,127),('yamcha',106,156),('krillin',64,76),('tien',98,121),

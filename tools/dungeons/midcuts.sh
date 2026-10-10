@@ -1,6 +1,6 @@
 #!/bin/sh
 # midcuts.sh SRC.json OUTDIR LEN F1 F2 ...: cut a recording at arbitrary video frames (mid-area cuts) of LEN frames
-R=/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard
+R=/Users/prof/source/buus-fury-decomp
 SRC=$1
 OUT=$2
 LEN=$3

@@ -1,4 +1,4 @@
-p = '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu/menu/scenarios_minigame.py'
+p = '/Users/prof/source/buus-fury-decomp/re/buu/menu/scenarios_minigame.py'
 s = open(p).read()
 a = "SCENARIOS = {"
 b = '''from script_nat_b_lib import INTERP_AT

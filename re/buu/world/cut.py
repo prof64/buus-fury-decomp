@@ -1,7 +1,7 @@
 """cut.py HDR...: print the sections of a script/cutscene header (list of section pointers)."""
 import sys, struct
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/tools/extract')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/tools/extract')
 from common import *
 from gba import wf_decompress
 T = 0x087B5B64

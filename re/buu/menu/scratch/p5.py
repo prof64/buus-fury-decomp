@@ -1,4 +1,4 @@
-p = '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/engine/crates/wf-core/src/menu/mod.rs'
+p = '/Users/prof/source/buus-fury-decomp/engine/crates/wf-core/src/menu/mod.rs'
 s = open(p).read()
 s = s.replace('''    /// opened by a script (the script waits for `result`) rather than by START
     pub scripted: bool,

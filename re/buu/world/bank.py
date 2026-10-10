@@ -1,6 +1,6 @@
 """Locate the text bank in the EWRAM dump and test text refs from dialog sections."""
 import sys, struct
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
 from common import *
 ram = open('/tmp/ewram.bin', 'rb').read()
 iw = open('/tmp/iwram.bin', 'rb').read()

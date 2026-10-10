@@ -1,7 +1,7 @@
 """romreads2.py STATE START END [keys...] : for reads in [START,END) print (pc, lr, regs) distinct by lr"""
 import sys
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu/ui')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu/ui')
 from common import *
 from cap import drive
 e = emu(sys.argv[1])

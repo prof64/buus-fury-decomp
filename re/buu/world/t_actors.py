@@ -1,6 +1,6 @@
 """List live world objects (vtable, position) after warping to an area; print exported actors for comparison."""
 import sys, json
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
 from common import *
 from warp import warp
 base, key = sys.argv[1], sys.argv[2]

@@ -1,4 +1,4 @@
-p = '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/engine/crates/wf-core/src/menu/kit.rs'
+p = '/Users/prof/source/buus-fury-decomp/engine/crates/wf-core/src/menu/kit.rs'
 s = open(p).read()
 a = s[s.index("/// an event a child sends to its page: (child index, code)"):s.index("    /// container vt +0x1C: the selected control's cursor point (first child answering)")]
 b = '''/// how an event's sender treats the page's answer
@@ -263,7 +263,7 @@ s = s.replace('''    pub fn step(&mut self, w: &mut crate::world::World) -> supe
     }''')
 open(p, 'w').write(s)
 
-p = '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/engine/crates/wf-core/src/menu/status.rs'
+p = '/Users/prof/source/buus-fury-decomp/engine/crates/wf-core/src/menu/status.rs'
 s = open(p).read()
 a = s[s.index("    pub fn step(&mut self, w: &mut World) -> Action {"):s.index("        // done check 0x080157A4")]
 b = '''    pub fn step(&mut self, w: &mut World) -> Action {

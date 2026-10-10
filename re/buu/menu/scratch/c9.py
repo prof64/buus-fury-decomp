@@ -1,6 +1,6 @@
 """OAM + party objects of a title / charsel scenario at given frames: c9.py SCENARIO FRAME..."""
 import sys
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu/menu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu/menu')
 from cap import Cap, program
 import capture
 name = sys.argv[1]

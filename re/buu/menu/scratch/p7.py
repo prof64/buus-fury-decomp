@@ -1,4 +1,4 @@
-p = '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/engine/crates/wf-app/tests/menu_parity.rs'
+p = '/Users/prof/source/buus-fury-decomp/engine/crates/wf-app/tests/menu_parity.rs'
 s = open(p).read()
 
 s = s.replace('''//! Menu screens vs the emulator, frame by frame (headless, muted; skipped without the ROM or without the captures
@@ -152,7 +152,7 @@ assert a in s
 s = s.replace(a, b)
 open(p, 'w').write(s)
 
-p = '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/engine/crates/wf-app/Cargo.toml'
+p = '/Users/prof/source/buus-fury-decomp/engine/crates/wf-app/Cargo.toml'
 s = open(p).read()
 if 'sha1' not in s.split('[dev-dependencies]')[1]:
     s = s.replace('[dev-dependencies]\npng = { workspace = true }', '[dev-dependencies]\npng = { workspace = true }\nsha1 = { workspace = true }')

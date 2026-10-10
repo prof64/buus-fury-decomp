@@ -2,7 +2,7 @@
 # gates_with.sh COMMIT FILE...: the gated segments (data/segments, strict) on COMMIT's engine (a clean export in
 # /tmp/bis, private target /tmp/bis-target) with the given working-tree files (paths under engine/) copied over it -
 # one agent's changes checked without the other agents' uncommitted edits
-R=/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard
+R=/Users/prof/source/buus-fury-decomp
 B=/tmp/bis
 C=$1
 shift

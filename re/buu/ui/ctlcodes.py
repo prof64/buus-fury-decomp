@@ -1,6 +1,6 @@
 import sys, re
 from collections import Counter
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
 from common import *
 from strtab import table, ustr
 c = Counter()

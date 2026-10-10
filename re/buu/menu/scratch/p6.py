@@ -1,5 +1,5 @@
 import os, re
-D = '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/engine/crates/wf-core/src/menu/'
+D = '/Users/prof/source/buus-fury-decomp/engine/crates/wf-core/src/menu/'
 p = D + 'mod.rs'
 s = open(p).read()
 if 'pub fn open_from_json' not in s:

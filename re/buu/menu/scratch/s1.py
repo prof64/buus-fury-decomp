@@ -1,4 +1,4 @@
-import sys; sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu/menu')
+import sys; sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu/menu')
 from cap import *
 c = Cap('buu_snakeway_start.ss')
 c.run(['-:5', 'START:1', '-:60', 'R:1', '-:30', 'L:1', '-:30', 'B:1', '-:60'])

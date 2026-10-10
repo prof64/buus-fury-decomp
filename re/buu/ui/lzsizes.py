@@ -1,7 +1,7 @@
 """lzsizes.py SIZE... : 4-aligned LZ containers {type 1|2, size} with given decompressed sizes"""
 import sys, struct
 import numpy as np
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
 from common import *
 r = np.frombuffer(rom()[:len(rom()) // 4 * 4], dtype='<u4')
 for s in sys.argv[1:]:

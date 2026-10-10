@@ -1,4 +1,4 @@
-D = '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/engine/crates/wf-core/src/'
+D = '/Users/prof/source/buus-fury-decomp/engine/crates/wf-core/src/'
 p = D + 'menu/mod.rs'
 s = open(p).read()
 

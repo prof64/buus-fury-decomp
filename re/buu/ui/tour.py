@@ -3,8 +3,8 @@
 tour.py NAME STATE|boot step... ; step = keys separated by ','  e.g. START:60  R:40  'A:30,DOWN:20'
 """
 import sys, json
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu/ui')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu/ui')
 from common import *
 from cap import drive, OUT
 

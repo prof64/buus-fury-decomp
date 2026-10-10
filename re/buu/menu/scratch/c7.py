@@ -1,4 +1,4 @@
-R = '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/engine/crates/wf-core/src/'
+R = '/Users/prof/source/buus-fury-decomp/engine/crates/wf-core/src/'
 p = R + 'menu/mod.rs'
 s = open(p).read()
 if 'pub overlay: Option<Box<Screen>>' not in s:

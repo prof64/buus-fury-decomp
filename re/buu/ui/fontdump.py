@@ -1,6 +1,6 @@
 """fontdump.py FONTSTRUCT... : render glyphs 0..255 of a font to out/font_<addr>.png (16 per row, 18 px cells)"""
 import sys
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
 from common import *
 from PIL import Image
 for fa in sys.argv[1:]:
@@ -26,5 +26,5 @@ for fa in sys.argv[1:]:
                     px[(c % 16) * 18 + x, (c // 16) * 18 + y] = (255, 255, 255)
                     maxh = max(maxh, y + 1)
     im = im.resize((im.width * 3, im.height * 3), Image.NEAREST)
-    im.save(f'/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu/ui/out/font_{f:08x}.png')
+    im.save(f'/Users/prof/source/buus-fury-decomp/re/buu/ui/out/font_{f:08x}.png')
     print(fa, 'T', hex(t), 'glyphs', n, 'max rows', maxh, 'field4', u32(f + 4), 'field8', hex(u32(f + 8)))

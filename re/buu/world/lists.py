@@ -1,6 +1,6 @@
 """lists.py: dump the +0x18 / +0x1C / +0x20 area lists."""
 import sys, struct
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
 from common import *
 AREAS = 0x0808E2E0
 which = sys.argv[1]

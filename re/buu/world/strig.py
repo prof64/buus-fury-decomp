@@ -1,7 +1,7 @@
 """Disassemble script-trigger bytecode (ctor 0x08007387 def+0x10) for some areas; count natives."""
 import sys
 from collections import Counter
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
 from common import *
 from scriptdis import dis_script
 AREAS = 0x0808E2E0

@@ -1,6 +1,6 @@
 """bgmap.py STATEFILE BG : print the BG tilemap (32x20) of a captured state"""
 import sys, struct
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
 from common import *
 e = emu(sys.argv[1])
 bg = int(sys.argv[2])

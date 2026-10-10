@@ -1,6 +1,6 @@
 import sys
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu/menu')
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu/menu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
 from cap import *
 from script_nat_b_lib import asm, start_call, CODE_AT, HDR_AT, INTERP_AT
 

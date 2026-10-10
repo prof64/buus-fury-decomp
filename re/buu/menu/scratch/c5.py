@@ -1,7 +1,7 @@
 """make work/states/buu_title_saved.ss: Snakeway, save into slot 1 (save_menu), soft reset, the title idle"""
 import sys
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu/menu')
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/tools/story_playthrough')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu/menu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/tools/story_playthrough')
 from cap import *
 from route import soft_reset
 from scenarios_shop import inject

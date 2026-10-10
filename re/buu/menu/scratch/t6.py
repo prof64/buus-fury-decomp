@@ -1,6 +1,6 @@
 import sys
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu/menu')
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu/menu/emut')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu/menu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu/menu/emut')
 from emut import emut
 from cap import program
 FRAME = 280896

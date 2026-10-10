@@ -1,6 +1,6 @@
 """findptr.py VALUE... : 4-aligned occurrences of a u32 in the ROM"""
 import sys, struct
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
 from common import *
 r = rom()
 for v in sys.argv[1:]:

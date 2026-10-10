@@ -1,8 +1,8 @@
 """Character survey of the text banks + inline UTF-16 strings: non-ASCII code units and their contexts."""
 import sys, struct
 from collections import Counter
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/tools/extract')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/tools/extract')
 from common import *
 from gba import wf_decompress
 T = 0x087B5B64

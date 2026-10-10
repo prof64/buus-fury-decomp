@@ -1,9 +1,9 @@
 """Boot from power-on, screenshot + palette every 30 frames; log full-screen LZ loads."""
 import sys, struct
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
 from common import *
 from pathlib import Path
-OUT = Path('/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu/ui/out/boot')
+OUT = Path('/Users/prof/source/buus-fury-decomp/re/buu/ui/out/boot')
 OUT.mkdir(exist_ok=True)
 e = emu()
 bp = e.breakpoint(0x03000040)

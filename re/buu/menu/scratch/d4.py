@@ -1,4 +1,4 @@
-p = '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/engine/crates/wf-core/src/menu/minigame.rs'
+p = '/Users/prof/source/buus-fury-decomp/engine/crates/wf-core/src/menu/minigame.rs'
 s = open(p).read()
 def rep(a, b):
     global s
@@ -53,7 +53,7 @@ rep('''        "punch" => Minigame::punch(w, v["mode"].as_i64().unwrap_or(0) as 
         "watch_this"''')
 open(p, 'w').write(s)
 
-p = '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu/menu/scenarios_minigame.py'
+p = '/Users/prof/source/buus-fury-decomp/re/buu/menu/scenarios_minigame.py'
 s = open(p).read()
 a = '''def finish_result(frames, extra):
     """the native's push (stack top) after the script ended; Watch This: the sequence it drew"""

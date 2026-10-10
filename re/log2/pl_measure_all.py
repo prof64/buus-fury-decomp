@@ -1,8 +1,8 @@
 """Run pl_measure.py for every player attack; summaries -> work/log2/pl_measure_summary.txt, raw -> work/log2/pl_meas_*.json"""
 import subprocess, sys
-PY='/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/.venv/bin/python'
-M='/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/log2/pl_measure.py'
-O='/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/work/log2/'
+PY='/Users/prof/source/buus-fury-decomp/.venv/bin/python'
+M='/Users/prof/source/buus-fury-decomp/re/log2/pl_measure.py'
+O='/Users/prof/source/buus-fury-decomp/work/log2/'
 G,PI,V,T,K,H=[f'log2_pl_{n}.ss' for n in ('gohan','piccolo','vegeta','trunks','goku','hercule')]
 R=[
  # name, state, slot, seq, facing, enemies, flags

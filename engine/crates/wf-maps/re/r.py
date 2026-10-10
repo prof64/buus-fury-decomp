@@ -1,6 +1,6 @@
 """Helpers for map RE: ROM access + capstone disassembly."""
 import struct, sys
-ROOT = '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard'
+ROOT = '/Users/prof/source/buus-fury-decomp'
 sys.path.insert(0, ROOT + '/tools/extract')
 from gba import Rom, wf_decompress
 R = Rom('buu')

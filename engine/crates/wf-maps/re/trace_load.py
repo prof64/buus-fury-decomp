@@ -1,6 +1,6 @@
 """Warp to a map and log every webfoot-LZ decompress (dst, src) and palette RAM writers during the load."""
 import sys
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/tools/extract')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/tools/extract')
 from emu_states import buu_snakeway, BUU_TRIG, BUU_EXIT, BUU_PLAYER, BUU_AREA, KEY
 
 world, area = int(sys.argv[1]), int(sys.argv[2])

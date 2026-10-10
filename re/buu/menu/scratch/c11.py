@@ -1,5 +1,5 @@
 import json, glob
-R = '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/'
+R = '/Users/prof/source/buus-fury-decomp/'
 d = json.load(open(R + 'data/menu/title_continue.json'))
 s = d['meta']['saves'][0]
 print([(k, c['form'], c['flags']) for k, c in enumerate(s['chars'])][:4], s['current'])

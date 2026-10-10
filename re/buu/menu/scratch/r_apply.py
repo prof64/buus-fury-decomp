@@ -1,4 +1,4 @@
-R = '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/engine/crates/'
+R = '/Users/prof/source/buus-fury-decomp/engine/crates/'
 p = R + 'wf-render/src/menu.rs'
 s = open(p).read()
 a = s[s.index("        for &li in &order {\n            let l = &mv.layers[li];"):s.index("        let fb = fade_black.min(16) as u32;")]

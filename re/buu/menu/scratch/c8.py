@@ -1,5 +1,5 @@
 import json
-R = '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/'
+R = '/Users/prof/source/buus-fury-decomp/'
 p = R + 're/buu/menu/scenarios_title.py'
 s = open(p).read()
 a = """            if e.r32(o) == 0x08049898:

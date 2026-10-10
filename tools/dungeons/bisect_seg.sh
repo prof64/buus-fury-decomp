@@ -1,7 +1,7 @@
 #!/bin/sh
 # bisect_seg.sh COMMIT SEGDIR SEGMENT: replay one segment on the engine as it was at COMMIT (exported read-only with
 # git archive into /tmp/bis, built in the private target dir /tmp/bis-target); prints the segment's result line
-R=/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard
+R=/Users/prof/source/buus-fury-decomp
 B=/tmp/bis
 mkdir -p $B/roms
 rm -rf $B/engine/crates

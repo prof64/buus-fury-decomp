@@ -3,7 +3,7 @@
 # each dungeon's start state is built on the previous dungeon's real end state (tools/dungeons/dbN_save.py), the
 # route is played by the real game (dbN_route.py), the recording is cut into segments (work/db/dbN/segs).
 # Logs: work/db/chain.log. Stops at the first failing step.
-R=/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard
+R=/Users/prof/source/buus-fury-decomp
 cd $R || exit 1
 PY=.venv/bin/python
 LOG=work/db/chain.log

@@ -1,4 +1,4 @@
-p = '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/engine/crates/wf-core/src/menu/kit.rs'
+p = '/Users/prof/source/buus-fury-decomp/engine/crates/wf-core/src/menu/kit.rs'
 s = open(p).read()
 if 'Item(ItemCtl)' not in s:
     a = """    /// a tab header box (ctor `0x08015C62`, vt `0x080493F4`; Journal's Goals / Completed Goals)

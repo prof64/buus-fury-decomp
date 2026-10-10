@@ -1,6 +1,6 @@
 """Relative search: find words under any additive byte (or u16) encoding."""
 import sys, struct
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
 from common import *
 import numpy as np
 r = np.frombuffer(rom(), dtype=np.uint8).astype(np.int16)

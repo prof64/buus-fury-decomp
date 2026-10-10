@@ -1,4 +1,4 @@
-p = '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/engine/crates/wf-app/tests/menu_parity.rs'
+p = '/Users/prof/source/buus-fury-decomp/engine/crates/wf-app/tests/menu_parity.rs'
 s = open(p).read()
 a = """            if oracle {
                 let m = &mut sim.session.world.menu;

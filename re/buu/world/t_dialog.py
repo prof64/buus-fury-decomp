@@ -1,6 +1,6 @@
 """Find where dialog text lives at runtime: walk into the snakeway text trigger, then search RAM for UTF-16 text."""
 import sys, re
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
 from common import *
 
 e = emu('buu_snakeway_start.ss')

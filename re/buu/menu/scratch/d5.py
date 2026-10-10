@@ -1,4 +1,4 @@
-D = '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/engine/crates/wf-core/src/menu/'
+D = '/Users/prof/source/buus-fury-decomp/engine/crates/wf-core/src/menu/'
 p = D + 'credits.rs'
 s = open(p).read()
 def rep(a, b):

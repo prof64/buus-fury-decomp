@@ -1,8 +1,12 @@
-# Legacy of Goku X
+# Buu's Fury decomp
 
-Reverse engineering of the three Webfoot DBZ GBA action RPGs (The Legacy of
-Goku, The Legacy of Goku II, Buu's Fury), a local dashboard of everything
-learned, and a browser battle simulator built on the real mechanics.
+A faithful recreation of *Dragon Ball Z: Buu's Fury* (GBA) in Rust, rebuilt from reverse engineering the original
+game, plus the research on all three Webfoot DBZ GBA games (The Legacy of Goku, The Legacy of Goku II, Buu's Fury).
+
+This repo is the reference: Story mode matches the original frame for frame (three full recorded playthroughs replay
+exactly; see `tools/wholerun/check.sh`), and the engine crates here are what new games build on. New design work
+(UI, online battle game, new content) lives in **Legacy of Goku X** (`github.com/prof64/legacy-of-goku-x`), which uses
+the mechanics from this repo.
 
 ROMs are not in the repo. Put them in `roms/` as `log1.gba`, `log2.gba`, `buu.gba`.
 Everything derived from them (images, emulator save states) is gitignored and rebuilt locally.

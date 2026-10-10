@@ -1,4 +1,4 @@
-R = '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/engine/crates/'
+R = '/Users/prof/source/buus-fury-decomp/engine/crates/'
 p = R + 'wf-ui/src/menupics/screens.rs'
 open(p, 'w').write('''//! Shop, save / load, title, character switch, game over.
 //!

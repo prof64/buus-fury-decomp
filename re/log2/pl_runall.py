@@ -1,8 +1,8 @@
 """Run the move battery for every character/slot; writes work/log2/pl_bat_<name>.txt"""
 import subprocess, sys
-PY='/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/.venv/bin/python'
-B='/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/log2/pl_battery.py'
-O='/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/work/log2/'
+PY='/Users/prof/source/buus-fury-decomp/.venv/bin/python'
+B='/Users/prof/source/buus-fury-decomp/re/log2/pl_battery.py'
+O='/Users/prof/source/buus-fury-decomp/work/log2/'
 runs=[
  ('goku_s1_spirit_hold200','log2_pl_goku.ss',1,'W:2 B:200 W:200',60),
  ('goku_s1_spirit_hold40','log2_pl_goku.ss',1,'W:2 B:40 W:200',60),

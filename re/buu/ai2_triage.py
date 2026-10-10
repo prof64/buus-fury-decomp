@@ -11,7 +11,7 @@ from ai2_collect import walk_state, ET
 from ai2_inspect import runtime_vtable, full, COMMON
 
 NAMES = {e['type']: e['name'] for e in json.load(open(
-    '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/data/buu/enemies.json'))['enemies']}
+    '/Users/prof/source/buus-fury-decomp/data/buu/enemies.json'))['enemies']}
 
 
 def calls_lits(fn):

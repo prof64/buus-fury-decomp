@@ -1,5 +1,5 @@
 import sys, struct
-ROOT='/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/'
+ROOT='/Users/prof/source/buus-fury-decomp/'
 sys.path.insert(0,ROOT+'tools/emu')
 from emu import Emu, KEY
 W=ROOT+'work/'

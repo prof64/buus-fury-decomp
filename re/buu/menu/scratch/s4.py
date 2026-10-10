@@ -1,4 +1,4 @@
-import sys; sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu/menu')
+import sys; sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu/menu')
 from cap import *
 c = Cap('buu_snakeway_start.ss')
 REC = 0x03001560

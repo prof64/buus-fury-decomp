@@ -1,6 +1,6 @@
 """palcmp.py STATEFILE... : compare palette RAM with the ROM global palette (0x080701B0, RGB888 x512) and 0x0805652C"""
 import sys, struct
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
 from common import *
 G = [(u8(0x080701B0 + 3 * i), u8(0x080701B1 + 3 * i), u8(0x080701B2 + 3 * i)) for i in range(512)]
 def to555(c):

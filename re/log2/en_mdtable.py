@@ -1,5 +1,5 @@
 import json
-d=json.load(open('/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/data/log2/enemies.json'))
+d=json.load(open('/Users/prof/source/buus-fury-decomp/data/log2/enemies.json'))
 print('| id | name(s) | HP | exp | STR | POW | END | melee/energy taken | ai | aggro px (facing?) | chase px/f | attacks | spawns | boss/scripted |')
 print('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|')
 for c in d['classes']:

@@ -1,6 +1,6 @@
 """Undecoded map-header words (+0x24..+0x50) and area words for some areas."""
 import sys
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
 from common import *
 AREAS = 0x0808E2E0
 want = set(sys.argv[1:])

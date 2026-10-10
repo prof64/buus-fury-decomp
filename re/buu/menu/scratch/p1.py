@@ -1,4 +1,4 @@
-p = '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/engine/crates/wf-core/src/menu/mod.rs'
+p = '/Users/prof/source/buus-fury-decomp/engine/crates/wf-core/src/menu/mod.rs'
 s = open(p).read()
 a = s[s.index("/// pause-menu entry timing (captures"):s.index("/// what the top screen's step asks for")]
 b = '''/// pause-menu timing (captures `re/buu/menu/capture.py` status_open_close, frame 0 = START):

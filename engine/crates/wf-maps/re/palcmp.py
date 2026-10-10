@@ -1,6 +1,6 @@
 """Warp to a map, compare palette RAM with candidate ROM palettes."""
 import sys, struct
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/tools/extract')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/tools/extract')
 from emu_states import buu_warp
 from r import R
 world, area = int(sys.argv[1]), int(sys.argv[2])

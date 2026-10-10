@@ -13,13 +13,13 @@ Outputs (engine/crates/wf-ui/tests/data/):
 """
 import sys, struct, json, hashlib, shutil
 from pathlib import Path
-sys.path.insert(0, '/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/re/buu')
+sys.path.insert(0, '/Users/prof/source/buus-fury-decomp/re/buu')
 from common import *
 from PIL import Image
 
 HERE = Path(__file__).resolve().parent
 OUT = HERE / 'out'
-DST = Path('/Users/prof/source/legacy-of-goku-x/.claude/worktrees/re-dashboard/engine/crates/wf-ui/tests/data')
+DST = Path('/Users/prof/source/buus-fury-decomp/engine/crates/wf-ui/tests/data')
 DST.mkdir(parents=True, exist_ok=True)
 
 for name, f in (('legal', 3), ('atari', 7), ('funimation', 12), ('webfoot', 19), ('title', 30)):
