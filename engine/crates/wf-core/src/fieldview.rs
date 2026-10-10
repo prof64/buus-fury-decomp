@@ -159,30 +159,53 @@ pub fn props(w: &World, out: &mut RenderView) {
 /// stand, the counter props (layer 0x38, depth 704) over the girl at 700; Airship 12-17's lift (0x3C) behind the
 /// player. Returned as (prop, our layer = 0x38 - layer, depth on the actors' y scale = bottom - 4)
 pub fn prop_keys(w: &World) -> Vec<(usize, i32, i32)> {
-    let Some(f) = w.field.as_ref() else {
+    let Some((md, live)) = map_props(w) else {
         return vec![];
     };
-    let Some(md) = w.data.field.as_ref().and_then(|d| d.maps.get(&f.map)) else {
-        return vec![];
-    };
-    f.props
+    md.props
         .iter()
         .enumerate()
-        .filter_map(|(k, p)| {
-            let d = md.props.get(k).filter(|d| p.visible && d.frame.is_some())?;
-            Some((k, 0x38 - ((d.tile >> 16) & 0xFF) as i32, p.rect.y1 - 4))
+        .filter_map(|(k, d)| {
+            let (visible, rect) = match live {
+                Some(f) => {
+                    let p = f.props.get(k)?;
+                    (p.visible, p.rect)
+                }
+                None => (d.visible, d.rect),
+            };
+            (visible && d.frame.is_some()).then_some((k, 0x38 - ((d.tile >> 16) & 0xFF) as i32, rect.y1 - 4))
         })
         .collect()
 }
 
+/// The props of the map on show: the field's (with their live state), else a battle arena's map (`w.arena.map`
+/// "8-70" -> `area_08_070`), whose props stand as the map loads them - the game draws the arena maps' props (Rocky
+/// Canyon 8-70's four rock pillars, emulator; their bases are solid in the map's own walk grid either way).
+fn map_props(w: &World) -> Option<(&crate::fieldcontent::MapDef, Option<&crate::field::Field>)> {
+    let fd = w.data.field.as_ref()?;
+    match w.field.as_ref() {
+        Some(f) => fd.maps.get(&f.map).map(|m| (m, Some(&**f))),
+        None => fd.maps.get(&battle_map_id(&w.arena.map)?).map(|m| (m, None)),
+    }
+}
+
+/// "8-70" -> "area_08_070"
+fn battle_map_id(map: &str) -> Option<String> {
+    let (a, b) = map.split_once('-')?;
+    Some(format!("area_{:02}_{:03}", a.parse::<u32>().ok()?, b.parse::<u32>().ok()?))
+}
+
 /// one prop (and its breakable's shake)
 pub fn prop(w: &World, k: usize, out: &mut RenderView) {
-    let Some(f) = w.field.as_ref() else { return };
-    let Some(md) = w.data.field.as_ref().and_then(|d| d.maps.get(&f.map)) else {
-        return;
-    };
-    let Some(p) = f.props.get(k) else { return };
+    let Some((md, live)) = map_props(w) else { return };
     let Some(def) = md.props.get(k) else { return };
+    let rect = match live {
+        Some(f) => match f.props.get(k) {
+            Some(p) => p.rect,
+            None => return,
+        },
+        None => def.rect,
+    };
     let Some(frame) = def.frame else { return };
     let (mut dx, mut dy) = (0, 0);
     for e in &w.ents {
@@ -196,10 +219,10 @@ pub fn prop(w: &World, k: usize, out: &mut RenderView) {
     put(
         out,
         0,
-        format!("effects/props_{}", f.map),
+        format!("effects/props_{}", md.id),
         frame,
-        p.rect.x0 + dx,
-        p.rect.y0 + dy,
+        rect.x0 + dx,
+        rect.y0 + dy,
         def.priority,
         SpriteEffect::None,
     );

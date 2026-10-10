@@ -726,34 +726,7 @@ fn audit(path: &std::path::Path, packs: &wf_app::wf_content::Packs, out_dir: &st
     let mut prev = 0u16;
     let mut last_e = None;
     let mut f = 0u32;
-    // the map's props (the field draws them; a battle world does not): the emulator's scenario is the field
-    let props: Vec<wf_view::SpriteDraw> = {
-        let w = &s.world;
-        let mid = w.arena.map.split_once('-').and_then(|(a, b)| Some(format!("area_{:02}_{:03}", a.parse::<u32>().ok()?, b.parse::<u32>().ok()?))).unwrap_or_default();
-        w.data
-            .field
-            .as_ref()
-            .and_then(|d| d.maps.get(&mid))
-            .map(|md| {
-                md.props
-                    .iter()
-                    .filter(|d| d.visible)
-                    .filter_map(|d| {
-                        Some(wf_view::SpriteDraw {
-                            entity: 0,
-                            sheet: format!("effects/props_{mid}"),
-                            frame: wf_view::FrameSel::Frame { index: d.frame?.max(0) as u16, flip: false },
-                            x: d.rect.x0,
-                            y: d.rect.y0,
-                            priority: d.priority,
-                            mirror: false,
-                            effect: wf_view::SpriteEffect::None,
-                        })
-                    })
-                    .collect()
-            })
-            .unwrap_or_default()
-    };
+    // (the map's props: a battle world draws them itself now, `fieldview::map_props`)
     // (and the solid ones block the grids as the field's breakables do - `fieldobj` 0x0800C858: Southwest Forest 8-3's
     // stumps; oa_t50_idle f580, the Ninja Boss's align step into prop 0's hit box blocked, the node ends and he throws)
     {
@@ -953,7 +926,6 @@ fn audit(path: &std::path::Path, packs: &wf_app::wf_content::Packs, out_dir: &st
                 boxes.push([x - 48, y - 80, x + 64, y + 24]);
             }
         }
-        view.sprites.splice(0..0, props.iter().cloned());
         (renderer.render(packs, &view, 0, W, H).to_vec(), boxes)
     };
     let inside = |boxes: &[[i32; 4]], k: usize| {
