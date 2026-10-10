@@ -172,7 +172,8 @@ struct Run {
     a: Player,
     b: Player,
     /// the guest's app is running (a test kills it and restarts it from its folder)
-    b_alive: bool,
+    b_alive: bool,    /// the host's song requests in order (-1: a stop)
+    songs: Vec<i32>,
 }
 
 fn run(name: &str, kind: LinkKind, sa: &SaveData, sb: &SaveData, seed: u64) -> Option<Run> {
@@ -189,7 +190,7 @@ fn run_on(name: &str, kind: LinkKind, sa: &SaveData, sb: &SaveData, seed: u64, c
     let eps = Rc::new(RefCell::new(0));
     let a = player(&p, &net, &clock, &format!("{name}-host"), true, kind, sa, eps.clone());
     let b = player(&p, &net, &clock, &format!("{name}-guest"), false, kind, sb, eps);
-    Some(Run { packs: p, renderer: wf_render::Renderer::new(), drawn: Vec::new(), net, t, a, b, b_alive: true })
+    Some(Run { packs: p, renderer: wf_render::Renderer::new(), drawn: Vec::new(), net, t, a, b, b_alive: true, songs: Vec::new() })
 }
 
 impl Run {
@@ -197,6 +198,14 @@ impl Run {
         self.t.set(self.t.get() + 1000.0 / 59.7275);
         let mut ev = Vec::new();
         self.a.sim.step(&[0], &mut ev);
+        // (the host's song requests: the music's transitions over a flow)
+        for e in &ev {
+            match e {
+                wf_view::SimEvent::Audio(wf_view::AudioEvent::PlaySong(id)) => self.songs.push(*id as i32),
+                wf_view::SimEvent::Audio(wf_view::AudioEvent::StopSong) => self.songs.push(-1),
+                _ => {}
+            }
+        }
         if self.b_alive {
             self.b.sim.step(&[0], &mut ev);
         }
@@ -248,6 +257,14 @@ impl Run {
         }
         panic!("{what}: host {} / guest {} ({:?} / {:?})", self.a.sim.phase(), self.b.sim.phase(), self.a.sim.last, self.b.sim.last);
     }
+}
+
+/// the game's song requests over a link flow (data/link/music.json, tools/link/music_record.py: the host's sound
+/// object per frame on two linked emulators): the songs in the order they start
+fn game_songs(flow: &str) -> Vec<i32> {
+    let p = wf_rom::testutil::repo_root().join("data/link/music.json");
+    let v: serde_json::Value = serde_json::from_slice(&std::fs::read(p).expect("data/link/music.json")).unwrap();
+    v[flow]["changes"].as_array().expect("flow").iter().filter(|c| c[2].as_i64() == Some(1)).map(|c| c[3].as_i64().unwrap() as i32).collect()
 }
 
 #[test]
@@ -318,6 +335,10 @@ fn dojo_rematch_from_the_character_page() {
     r.until(20_000, "the second ending", |r| r.a.sim.record.is_some() && r.b.sim.record.is_some());
     let (ra, rb) = (r.a.sim.record.clone().unwrap(), r.b.sim.record.clone().unwrap());
     assert_eq!((ra.frame, ra.checksum), (rb.frame, rb.checksum), "both confirm the same second match");
+    // the music: the title's song (45, from the boot) through the pages, the Dojo's (19) from the first fight's load
+    // and on - one request, as the game's (no restart for the rounds, the character page or the second fight)
+    assert_eq!(game_songs("fight_then_back"), vec![45, 19]);
+    assert_eq!(r.songs, game_songs("fight_then_back"), "the host's song requests");
     assert_eq!(ra.inputs, rb.inputs);
     assert!(ra.frame > 60);
     r.until(4000, "back at the title", |r| r.a.done() && r.b.done());
@@ -510,6 +531,9 @@ fn dojo_disconnect_mid_match() {
     assert!(said, "the box: You have been disconnected.");
     assert!(r.a.done(), "host back at the title");
     assert_eq!(r.a.sim.last.as_deref(), Some("Disconnected"));
+    // the music: the Dojo's song through the link error's scene, the title's again at the title
+    let songs: Vec<i32> = r.songs.iter().copied().filter(|&s| s >= 0).collect();
+    assert_eq!(songs, game_songs("lost_in_fight"), "the host's song requests (raw {:?})", r.songs);
     assert!(
         matches!(r.a.sim.inner.session.world.menu.stack.last(), Some(wf_core::menu::Screen::Title(t)) if t.page == wf_core::menu::title::TPage::Title),
         "the title's first page"
@@ -564,6 +588,8 @@ fn trade_disconnect_before_commit() {
     r.until(3000, "host: the link error", |r| r.a.sim.phase() == "lost" || r.a.done());
     r.until(3000, "host leaves after Disconnected", |r| r.a.done());
     assert_eq!(r.a.sim.last.as_deref(), Some("disconnected"));
+    // the music: a link lost on a page - the title's song plays on through the link error and the title, no request
+    assert_eq!(r.songs, game_songs("lost_on_page"), "the host's song requests");
     assert_eq!(r.a.slot(), sa, "nothing applied");
     assert_eq!(r.b.slot(), sb, "nothing applied");
 }

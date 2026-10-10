@@ -128,6 +128,22 @@ the default extraction (`extract_rendered`).
   stop all SFX, the tracks cleared (`0x0803F0E6`, `Driver::clear_tracks`: the sequencer runs on) and the scripts'
   stop_music (native 0x24 `0x08000900`: the playing byte only), each call before the game's own mix chunk: 5 / 5
   sequences identical, every sample (15 s each).
+  Also the Options' volumes mid-song (`volume_change`: `0x0803F18C` / `0x0803E42A` - `Driver::set_music_volume` /
+  `set_sfx_volume` - up, down under a running SFX, to 0 and back, new SFX after each): identical, every sample.
+* **The music's state along the real runs** (`tools/wholerun/music.py` -> `data/realrun*/music.json.gz`; compared by
+  `examples/wholerun.rs --music`, part of `tools/wholerun/check.sh`): the game's playing byte (player +5), its song
+  (+0xC) and the Options' volumes after every frame of the three whole runs against the app's (its song requests and
+  stops applied in order, `Menu.settings`) after each logic iteration: 5,881,800 iterations, all equal. This covers
+  what the request comparison (PlaySfx / PlaySong breakpoints) cannot see: the stops (`stop_music` writes the
+  playing byte only), the area loads' stop and the volume changes. Rule found with it: **an area without a song
+  (area record +0x24 = 0xFF) stops the music at its load** (`0x08008C72`: the playing byte cleared; else PlaySong
+  unless that song is playing) - `field.rs` load; scene loads (`load_scene`) do not run that step.
+* **The link flows' music** (`tools/link/music_record.py` -> `data/link/music.json`, two linked emulators; wf-app
+  `tests/link.rs`): the title's song 45 plays through the link's pages; the Dojo's song 19 is requested once, at the
+  first fight's load, and plays on through the rounds and knockdowns (no death song 8), the character page after the
+  fight, further fights and the pages back to the title; a link lost in a fight ends on the title with 45 requested,
+  lost on a page with nothing requested (the title's enter checks the playing song, `0x08005402` - so does
+  `return_to_title`'s request now).
 * **vs the site's emulator rips** (`tests/rips.rs`, `work/audio/cache/…_v7`): these are mGBA's 32 768 Hz output
   (blip_buf resampling, DC high-pass, gain ≈ 0.75 of FIFO×256). After sample-and-hold upsampling, band filtering
   both sides (~32 Hz–6.5 kHz) and alignment: songs correlation median 0.9990, worst 0.904 (song 16), 0.950 (song

@@ -70,6 +70,10 @@ def run(leg):
     cmd = [str(exe), str(P['master']), '--lag', lag, '--frames', str(e), '--report', str(rep)]
     if lag == 'none' and P['sounds'].exists():
         cmd += ['--sounds', str(P['sounds'])]
+    # (the music state per logic iteration: the playing byte, the song, the Options' volumes - music.py)
+    mus = P['sounds'].with_name('music.json.gz')
+    if lag == 'none' and mus.exists():
+        cmd += ['--music', str(mus)]
     cmd += ['--import', str(P['cuts'] / f'c{s}.json'), '--from-row', str(s)] if s else ['--power-on', str(power_on)]
     if rep.exists():
         rep.unlink()
@@ -96,6 +100,11 @@ def problems(chain, r, e):
         probs.append(f"sound at row {sf['row']:,} ({sf['stretch']}): {sf['what'][:160]} ({r['sounds_bad']} iterations)")
         if first is None or sf['row'] < first[0]:
             first = (sf['row'], f"sound: {sf['what'][:160]}", sf['stretch'])
+    mf = r.get('music_first')
+    if mf:
+        probs.append(f"music at row {mf['row']:,} ({mf['stretch']}): {mf['what'][:160]} ({r['music_bad']} iterations)")
+        if first is None or mf['row'] < first[0]:
+            first = (mf['row'], f"music: {mf['what'][:160]}", mf['stretch'])
     if r['script_errors']:
         probs.append(f"{r['script_errors']} script errors")
     return probs, first

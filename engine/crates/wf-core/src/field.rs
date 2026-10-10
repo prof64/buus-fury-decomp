@@ -1258,10 +1258,20 @@ pub fn load_area_with(
         }
         _ => None,
     });
-    if let Some(s) = song {
+    if let Some(s) = song.filter(|&s| s != 0xFF) {
         // the area's song is requested only when another one plays (the game's PlaySong 0x0803F110 is not called for
         // the song already on: whole-run sound requests, Diablo Desert 10-x loads keep song 27 without a request)
         crate::scene::play_song(w, s);
+    } else if (song == Some(0xFF) || matches!(a.song, crate::fieldcontent::Song::None))
+        && !w.field.as_ref().is_some_and(|f| f.scene_loading)
+    {
+        // an area without a song (0xFF, `0x08008C72`): the load stops the music - the player's playing byte cleared,
+        // as the scripts' stop_music (whole-run music state, run 1 row 960,478: s026's warp_fade(0, 21, 1) - the
+        // ruins' song 51 stops at the load, the script's play_music(44) comes after the fade-in)
+        if w.scene.song >= 0 {
+            w.events.push(crate::world::Event::SongStop);
+            w.scene.song = -1;
+        }
     }
     for o in a.objects.iter().filter(|o| objects && list_of(o) == 1) {
         if cond_holds(w, &o.cond) {
