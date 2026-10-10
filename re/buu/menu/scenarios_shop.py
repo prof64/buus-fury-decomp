@@ -3,7 +3,7 @@ open_shop_buy 0xCE / open_shop_sell 0xCF) right before frame 0; the remake opens
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from menuhelp import setup_zenie, setup_supplies, setup_equipment, chain
+from menuhelp import setup_zenie, setup_supplies, setup_equipment, chain, REC
 
 
 def inject(items):
@@ -55,4 +55,8 @@ SCENARIOS = {
     'shop_sell_eq': (S, chain(setup_zenie(100), setup_supplies({0: 1}), setup_equipment([5, 8, 5])), ['-:3'],
                      ['-:50', 'DOWN:2', '-:12', 'RIGHT:2', '-:12', 'RIGHT:2', '-:12', 'A:2', '-:16', 'A:2', '-:16', 'DOWN:2', '-:12',
                       'A:2', '-:16', 'B:2', '-:70'], sell(25)),
+    # sell equipment a character wears: the list's first entry is Gohan's Cotton Gi (marked 2 << 28, his body slot 5)
+    'shop_sell_worn': (S, chain(setup_zenie(100), setup_supplies({0: 1}), setup_equipment([0x20000005, 8, 5]),
+                                lambda e: e.w32(REC + 0x68 + 0x3C, 5)), ['-:3'],
+                       ['-:50', 'DOWN:2', '-:12', 'A:2', '-:16', 'A:2', '-:16', 'A:2', '-:16', 'B:2', '-:70'], sell(25)),
 }

@@ -114,7 +114,8 @@ def gd_json(gd, p, area):
     u = lambda o, n=4: int.from_bytes(gd[o:o + n], 'little')
     s16 = lambda o: int.from_bytes(gd[o:o + 2], 'little', signed=True)
     n = min(u(0xE4), 250)
-    eq = sorted(u(0xE8 + 4 * k) & 0x0FFFFFFF for k in range(n) if u(0xE8 + 4 * k) >> 28 == 0)
+    # (every owned copy, the worn ones too - the high nibble is the wearer's mark)
+    eq = sorted(u(0xE8 + 4 * k) & 0x0FFFFFFF for k in range(n))
     chars = []
     for c in range(9):
         a = 0x4F8 + 0x68 * c

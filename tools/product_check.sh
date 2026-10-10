@@ -6,6 +6,8 @@
 #   savecheck in-game save -> Continue on the app vs the game, at the whole-run cuts (tools/wholerun/savecheck.py
 #             --compare of the game side - cached in work/wholerun/savecheck.json, made once from run 1's cuts - and
 #             examples/savecheck.rs)
+#   cartcheck real cartridge saves (work/run2/*.sav) -> Continue on the app (imported as the EEPROM) vs the game
+#             (tools/wholerun/cartcheck.py, cached in work/wholerun/cartcheck.json; compared as the save check)
 #   features  examples/features.rs - replays, save states into fresh sims, rewind, along run 1 from power-on
 #   netstory  examples/netstory.rs - story mode through the rollback netcode (two peers, latency / jitter / loss)
 #   wideview  tests/wide_view.rs - the zoomed-out PC view against the GBA view at the pixel gate's frames
@@ -14,7 +16,7 @@
 #   tools/product_check.sh [--only browser,savecheck,...] [--build] [--steps N] [--fresh-savecheck]
 #     --build            rebuild the wasm (engine/web/app/build.sh) before the browser check
 #     --steps N          features: steps of run 1 (default 400000; 0 = the whole run)
-#     --fresh-savecheck  re-make the game side of the save check (emulator, a few minutes)
+#     --fresh-savecheck  re-make the game side of the save checks (emulator, a few minutes)
 # CARGO_TARGET_DIR is honoured (default engine/target). Needs the ROM (roms/buu.gba or $WF_ROM), run 1's whole-run
 # master (tools/wholerun/record.py) and power_on.json, and engine/web/tests' npm install.
 cd "$(dirname "$0")/.." || exit 2
@@ -26,7 +28,7 @@ export CARGO_TARGET_DIR="$TD"
 LOG=$ROOT/work/product_check
 mkdir -p "$LOG"
 
-ONLY=browser,savecheck,features,netstory,wideview
+ONLY=browser,savecheck,cartcheck,features,netstory,wideview
 BUILD=
 STEPS=400000
 FRESH=
@@ -87,6 +89,23 @@ if want savecheck; then
       case "$last" in *" 0 differ"*) pass savecheck "$last" ;; *) fail savecheck "$last" ;; esac
     else
       fail savecheck "$(tail -1 "$LOG/savecheck.log")"
+    fi
+  fi
+fi
+
+if want cartcheck; then
+  GAME=$ROOT/work/wholerun/cartcheck.json
+  ok=1
+  if [ -n "$FRESH" ] || [ ! -f "$GAME" ]; then
+    # shellcheck disable=SC2046
+    run cartcheck_game "$PY" tools/wholerun/cartcheck.py $(ls "$ROOT"/work/run2/*.sav) --out "$GAME" || { fail cartcheck "the game side failed"; ok=; }
+  fi
+  if [ -n "$ok" ]; then
+    if run cartcheck sh -c "cd '$ROOT/engine' && cargo run -q --release -p wf-app --example savecheck -- '$GAME' '$LOG/cartcheck_app.json' && cd '$ROOT' && '$PY' tools/wholerun/savecheck.py --compare '$GAME' '$LOG/cartcheck_app.json'"; then
+      last=$(tail -1 "$LOG/cartcheck.log")
+      case "$last" in *" 0 differ"*) pass cartcheck "$last" ;; *) fail cartcheck "$last" ;; esac
+    else
+      fail cartcheck "$(tail -1 "$LOG/cartcheck.log")"
     fi
   fi
 fi

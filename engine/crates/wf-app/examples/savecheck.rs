@@ -10,7 +10,14 @@ use wf_app::wf_content::{FileSource, MemSource, Packs};
 use wf_view::{Sim, SimEvent};
 
 fn story_json(w: &wf_core::world::World) -> serde_json::Value {
-    let st = &w.story;
+    let p = w.player_idx(0).map(|i| {
+        let a = &w.pl_ref(i).a;
+        serde_json::json!([a.x >> 8, a.y >> 8, a.facing])
+    });
+    story_part(&w.story, w.field.as_ref().map(|f| [f.area.world, f.area.area, f.area.variant]), p)
+}
+
+fn story_part(st: &wf_core::story::Story, area: Option<[i32; 3]>, p: Option<serde_json::Value>) -> serde_json::Value {
     let mut eq: Vec<i32> = st.equipment.clone();
     eq.sort();
     let chars: Vec<serde_json::Value> = st
@@ -22,12 +29,8 @@ fn story_json(w: &wf_core::world::World) -> serde_json::Value {
             serde_json::json!([r.xp, r.hp, r.max_hp, r.ep, r.max_ep, r.str_, r.pow, r.end, r.spd, r.points, c.form, c.sel, c.skills])
         })
         .collect();
-    let p = w.player_idx(0).map(|i| {
-        let a = &w.pl_ref(i).a;
-        serde_json::json!([a.x >> 8, a.y >> 8, a.facing])
-    });
     serde_json::json!({
-        "area": w.field.as_ref().map(|f| [f.area.world, f.area.area, f.area.variant]),
+        "area": area,
         "p": p,
         "current": st.current,
         "zenie": st.zenie,
@@ -50,8 +53,14 @@ fn main() {
         if e.get("skip").is_some() {
             continue;
         }
-        let doc_path = state.replace(".ss", ".json");
-        let doc: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&doc_path).expect("cut doc")).expect("json");
+        // (a cartridge save, tools/wholerun/cartcheck.py: the cut's world with the .sav as its EEPROM, game 1 continued)
+        let sav = e["sav"].as_str();
+        let doc_path = e["cut"].as_str().unwrap_or(state).replace(".ss", ".json");
+        let mut doc: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&doc_path).expect("cut doc")).expect("json");
+        if let Some(sav) = sav {
+            let raw = std::fs::read(sav).expect("sav");
+            doc["init"]["eeprom"] = serde_json::Value::String(b64(&miniz_oxide::deflate::compress_to_vec_zlib(&raw, 6)));
+        }
         let mut app = match StorySim::from_segment(&packs, &doc) {
             Ok(a) => a,
             Err(err) => {
@@ -63,11 +72,20 @@ fn main() {
         let mut ev: Vec<SimEvent> = vec![];
         // (the state is savecheck.py's ready cut: the game saved there, no frame run)
         let w = &mut app.session.world;
-        let d = wf_core::menu::save::save_data(w, false);
-        let before = story_json(w);
+        let d = match sav {
+            Some(_) => match w.saves.slots.first().cloned().flatten() {
+                Some(d) => d,
+                None => {
+                    out.push(serde_json::json!({"state": state, "skip": "game 1 not imported"}));
+                    continue;
+                }
+            },
+            None => wf_core::menu::save::save_data(w, false),
+        };
+        let before = if sav.is_some() { story_part(&d.story, None, None) } else { story_json(w) };
+        let chosen = d.story.current;
         w.saves.set(0, Some(d));
         w.saves.current = 0;
-        let chosen = w.story.current;
         // through the session's own path: a menu step runs, `title::boot` builds the world, its load events stay for the
         // script host (the area's on-enter script runs in the Continue's load)
         wf_core::menu::title::open_title(w);
@@ -90,4 +108,20 @@ fn main() {
         println!("{}: continued in {n} steps", state.rsplit('/').next().unwrap_or(state));
     }
     std::fs::write(&args[1], serde_json::to_string(&out).unwrap()).expect("write");
+}
+
+fn b64(b: &[u8]) -> String {
+    const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut o = String::new();
+    for c in b.chunks(3) {
+        let n = (c[0] as u32) << 16 | (*c.get(1).unwrap_or(&0) as u32) << 8 | *c.get(2).unwrap_or(&0) as u32;
+        for k in 0..4 {
+            if k <= c.len() {
+                o.push(T[(n >> (18 - 6 * k)) as usize & 63] as char);
+            } else {
+                o.push('=');
+            }
+        }
+    }
+    o
 }

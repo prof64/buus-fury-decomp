@@ -181,9 +181,12 @@ pub fn import_story(data: &GameData, ram: &GbaRam) -> Story {
     for k in 0..st.flags.len().min(0x8F) {
         st.flags[k] = gd[0x55 + k];
     }
-    // the remake's owned list holds unequipped copies (equipped ones are the characters' slots): marked entries out
+    // the owned list holds every copy, the worn ones too (high nibble = wearer + 1, as `menu::equip::marks` derives
+    // them from the characters' slots): the mark stripped, the entry kept (MEASURED: run 2's save lists Gohan's worn
+    // Cotton Gi / Leather Moccasins as 0x2000_0005 / 0x2000_0055, the Trading Post lists and trades them -
+    // data/link/trade_*.json; they had been dropped)
     let n = (u32le(&gd, 0xE4) as usize).min(250);
-    st.equipment = (0..n).map(|k| u32le(&gd, 0xE8 + 4 * k)).filter(|v| v >> 28 == 0).map(|v| (v & 0x0FFF_FFFF) as i32).collect();
+    st.equipment = (0..n).map(|k| (u32le(&gd, 0xE8 + 4 * k) & 0x0FFF_FFFF) as i32).collect();
     st.zenie = u32le(&gd, 0x4F4);
     st.play_frames = (ram.lf() as i64 + u32le(&gd, 0x4D0) as i32 as i64).max(0) as u64;
     st.lf_bias = ram.lf() as i64 - st.play_frames as i64;
@@ -5045,6 +5048,16 @@ fn import_options(w: &mut World, ram: &GbaRam) {
 /// RAM holds it as a bias to the frame counter); +0x8A0 world, area, variant (bytes), +0x8A4 / +0x8A6 the leader's
 /// x / y (px, u16). Script words L / G and the variant byte are not in the slot (a Continue starts them fresh).
 /// (The checksum is not checked: a slot counts when its "game exists" bit is set.)
+/// Adler-32 (the save slot's check, `0x0803FC4E`)
+fn adler32(b: &[u8]) -> u32 {
+    let (mut a, mut s) = (1u32, 0u32);
+    for &x in b {
+        a = (a + x as u32) % 65521;
+        s = (s + a) % 65521;
+    }
+    (s << 16) | a
+}
+
 pub fn import_saves(data: &GameData, ram: &GbaRam, eeprom: &[u8], saves: &mut wf_core::menu::save::Saves) {
     use wf_core::menu::save::{SaveData, SLOTS};
     let b: Vec<u8> = eeprom.chunks(8).flat_map(|c| c.iter().rev().copied().collect::<Vec<_>>()).collect();
@@ -5052,7 +5065,11 @@ pub fn import_saves(data: &GameData, ram: &GbaRam, eeprom: &[u8], saves: &mut wf
     for s in 0..SLOTS {
         let o = 0x10 + s * 0x8B0;
         let Some(gd) = b.get(o..o + 0x8A8) else { continue };
-        if gd[1] & 1 == 0 || gd.iter().all(|&v| v == 0xFF) {
+        // the slot's load (0x080048A0) checks the Adler-32 of its 0x8A8 bytes (0x0803FC4E) against the word after
+        // them: a mismatch loads a fresh, empty GameData (MEASURED: run 2's blank cartridge saves - mostly 0xFF, check
+        // word 0 - are "Empty Game" on the game: tools/wholerun/cartcheck.py)
+        let sum = b.get(o + 0x8A8..o + 0x8AC).map(|w| u32::from_le_bytes([w[0], w[1], w[2], w[3]]));
+        if gd[1] & 1 == 0 || sum != Some(adler32(gd)) {
             saves.slots[s] = None;
             continue;
         }
