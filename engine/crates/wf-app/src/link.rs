@@ -190,6 +190,8 @@ struct Match {
     m: DojoMatch,
     /// the last frame whose sounds were played
     audio_at: i32,
+    /// the match's ending once settled (the fight's fade-out still shows), and the steps since
+    ended: Option<(Ending, u32)>,
 }
 
 #[allow(dead_code)] // (the cursor fields of the pages wf-core draws now)
@@ -244,6 +246,10 @@ struct Flow {
     picked_given: bool,
     started: bool,
     fight: bool,
+    /// the matches played on this link, the last one's ending, and: the character page is due again (after a match)
+    played: u32,
+    result: Option<Ending>,
+    to_chars: bool,
 }
 
 /// a finished Dojo match as this peer confirmed it (the tests compare both peers')
@@ -316,6 +322,9 @@ impl Flow {
             picked_given: false,
             started: false,
             fight: false,
+            played: 0,
+            result: None,
+            to_chars: false,
         })
     }
 
@@ -512,7 +521,7 @@ impl Flow {
             self.answered_given = answered;
         }
         if !self.picked_given && matches!(self.phase, Phase::Chars { .. }) {
-            if let Some(d) = fd.as_ref().filter(|d| d.picked) {
+            if let Some(d) = fd.as_ref().filter(|d| d.picked && d.played == self.played) {
                 picked = Some(d.page_pick);
                 self.picked_given = true;
             }
@@ -574,7 +583,7 @@ impl Flow {
             Phase::Chars { confirmed, .. } => {
                 let (host, c) = (self.role == Role::Host, *confirmed);
                 // the host starts once the guest confirmed this very setup with its pick
-                if host && c && self.friend.as_ref().and_then(|(_, h)| h.dojo.as_ref()).is_some_and(|d| d.picked && d.setup == Some(self.setup)) {
+                if host && c && self.friend.as_ref().and_then(|(_, h)| h.dojo.as_ref()).is_some_and(|d| d.picked && d.played == self.played && d.setup == Some(self.setup)) {
                     self.net.lobby.request_start();
                 }
                 // (the page's fade to the fight first)
@@ -597,7 +606,7 @@ impl Flow {
     }
 
     fn send_dojo_hello(&mut self, setup: Option<DojoSetup>) {
-        let d = DojoHello { save: self.dsave.clone().unwrap_or_default(), pick: self.pick, setup, picked: self.picked.is_some(), page_pick: self.picked.unwrap_or(0) };
+        let d = DojoHello { save: self.dsave.clone().unwrap_or_default(), pick: self.pick, setup, picked: self.picked.is_some(), page_pick: self.picked.unwrap_or(0), played: self.played };
         let h = LinkHello { link_id: self.link_id.clone(), dojo: Some(d) };
         self.net.set_hello(&h);
     }
@@ -617,7 +626,7 @@ impl Flow {
         let sess = P2PSession::new(game, ncfg, vec![slot], peers, Vec::new(), st.host == me, now);
         self.setup = setup;
         let def = serde_json::json!({ "config": st.config, "setup": setup, "rules": self.rules });
-        self.set_phase(Phase::Match(Box::new(Match { sess, conf, hashes: Vec::new(), def, m: DojoMatch::new(slot as u8), audio_at: 0 })));
+        self.set_phase(Phase::Match(Box::new(Match { sess, conf, hashes: Vec::new(), def, m: DojoMatch::new(slot as u8), audio_at: 0, ended: None })));
         Out::None
     }
 
@@ -666,6 +675,33 @@ impl Flow {
             let h = m.conf.checksum(&m.conf.save());
             m.hashes.push(h);
         }
+        // the match settled: its fade-out plays on (64 updates from the result), then both are back on "Choose your
+        // character!" (link recording dojo_px3) - also when the friend's side is there first and its inputs stop
+        if let Some((_, k)) = m.ended.as_mut() {
+            *k += 1;
+            let g = &m.sess.game;
+            let faded = g.st.over_at.is_some_and(|o| g.st.frame >= o + 64);
+            if dropped {
+                let e = m.m.disconnected().clone();
+                self.result = Some(e.clone());
+                self.set_phase(Phase::Result(e));
+            } else if faded || *k > 64 + 90 {
+                self.result = m.ended.take().map(|e| e.0);
+                self.played += 1;
+                self.picked = None;
+                self.picked_given = false;
+                self.fight = false;
+                self.to_chars = true;
+                self.net.lobby.reopen();
+                if !self.host() {
+                    self.net.lobby.set_ready(false);
+                }
+                self.set_phase(Phase::Chars { sel: 0, confirmed: false });
+                let s = self.setup;
+                self.send_dojo_hello(Some(s));
+            }
+            return Out::None;
+        }
         let Some(mut save) = self.saves.get(self.slot).cloned().flatten() else { return Out::None };
         let before_save = save.clone();
         let ended = m.m.settle(&m.conf, &self.rules, &mut save).cloned();
@@ -683,7 +719,12 @@ impl Flow {
             hashes: m.hashes.clone(),
             def: m.def.clone(),
         });
-        self.set_phase(Phase::Result(e));
+        if e == Ending::Disconnected {
+            self.result = Some(e.clone());
+            self.set_phase(Phase::Result(e));
+        } else {
+            m.ended = Some((e, 0));
+        }
         if save != before_save {
             self.saves[self.slot] = Some(save.clone());
             if let Some(dir) = &self.saves_dir {
@@ -869,32 +910,7 @@ impl Flow {
         v
     }
 
-    /// the match's banner over the battle ("Round N" between rounds, the result once over)
-    fn match_overlay(&self, d: &MenuData) -> Option<MenuView> {
-        let Phase::Match(m) = &self.phase else { return None };
-        let t = &d.text;
-        let g = &m.sess.game;
-        let s: &[u16] = match g.st.phase {
-            DPhase::Between { .. } => t.s(106 + (g.st.round as usize).min(4)),
-            DPhase::Over => match g.result() {
-                Some(wf_net::dojo::DojoResult::Win(x)) if x as usize == m.m.slot as usize => t.s(111),
-                Some(wf_net::dojo::DojoResult::Win(_)) => t.s(112),
-                _ => t.s(113),
-            },
-            DPhase::Fight => return None,
-        };
-        let mut cv = Canvas::new();
-        let mut p = Pen::new(MenuFont::Bold, 120, 80, 1, 6, Some(1));
-        cv.text(t, &mut p, s);
-        let mut v = wf_core::menu::surface_view(cv);
-        v.overlay = true;
-        Some(v)
-    }
 }
-
-
-
-
 
 /// the page's offer entries as the trade's offer
 fn offer_from(e: &[TradeEntry]) -> Offer {
@@ -1065,10 +1081,11 @@ impl LinkSim {
     }
     /// the Dojo's ending once decided
     pub fn ending(&self) -> Option<&Ending> {
-        match self.flow.as_ref().map(|f| &f.phase) {
-            Some(Phase::Result(e)) => Some(e),
-            _ => None,
-        }
+        self.flow.as_ref().and_then(|f| f.result.as_ref())
+    }
+    /// the matches played on this link (the scripted player leaves after its first)
+    pub fn played(&self) -> u32 {
+        self.flow.as_ref().map_or(0, |f| f.played)
     }
     /// the trade screen's state (tests): (accepted, friend accepted, friend's offer, rows' counts)
     pub fn trade_state(&self) -> Option<(bool, bool, Option<Offer>)> {
@@ -1342,6 +1359,9 @@ impl LinkSim {
                                     }
                                     wf_core::menu::link::open_trade(w);
                                 }
+                                _ if std::mem::take(&mut flow.to_chars) => {
+                                    wf_core::menu::link::open_chars(w, flow.setup.mode == DojoMode::Balanced, flow.slot, flow.role == Role::Host);
+                                }
                                 _ => {
                                     let mut l = wf_core::menu::link::Link::saves(w, trade);
                                     l.host = flow.role == Role::Host;
@@ -1421,6 +1441,8 @@ impl LinkSim {
                     Phase::Message(m) if !m.is_empty() => String::from_utf16_lossy(m),
                     Phase::Message(_) => "disconnected".into(),
                     Phase::Result(e) => format!("{e:?}"),
+                    // (after a match: its ending)
+                    _ if flow.result.is_some() => format!("{:?}", flow.result.as_ref().unwrap()),
                     _ => "left".into(),
                 });
                 self.flow = None;
@@ -1442,9 +1464,10 @@ impl LinkSim {
             Some(_) if self.page.is_some() => self.inner.view(out),
             Some(f) if !matches!(f.phase, Phase::Waiting) => {
                 let Some(d) = self.inner.session.world.data.menu.clone() else { return self.inner.view(out) };
+                // the fight: the game's own picture of this side (`DojoGame::view`: its camera, its HUD and the
+                // friend's bar, the round texts, the timer, the fades - tests/dojo_pixels.rs)
                 if let Phase::Match(m) = &f.phase {
-                    m.sess.game.s.view(out);
-                    out.menu = f.match_overlay(&d);
+                    m.sess.game.view(m.m.slot, out);
                     return;
                 }
                 *out = RenderView::default();
@@ -1505,6 +1528,8 @@ pub struct LinkBot {
     pub accept: bool,
     /// the proposal answered (ACCEPT pressed)
     answered: bool,
+    /// the Dojo: the matches to play before leaving (after a match both are back on the character page)
+    pub matches: u32,
     /// back at the title after a flow: go into the page again (a test's friend coming back to finish a trade)
     pub repeat: bool,
     downs: u32,
@@ -1527,6 +1552,7 @@ impl LinkBot {
             first: 2,
             zenie: 30,
             accept: true,
+            matches: 1,
             repeat: false,
             downs: 0,
             proposed: false,
@@ -1623,6 +1649,10 @@ impl LinkBot {
             "saves" | "setup" | "chars" => {
                 use wf_core::menu::link::LinkPage;
                 let Some(l) = sim.link_screen() else { return 0 };
+                // after its match: B back out of the pages to the title
+                if sim.played() >= self.matches {
+                    return wf_core::input::B;
+                }
                 if l.wait.is_some() {
                     return 0;
                 }

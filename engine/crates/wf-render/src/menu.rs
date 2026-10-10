@@ -457,10 +457,10 @@ impl MenuRenderer {
         };
         let wsum: i32 = text.iter().map(|&c| adv(c)).sum();
         // centred on column 16, an odd width a pixel left (opponent audit oa_t44_left f116 "18" over Goku,
-        // oa_t15_punch "101" / "113" over an enemy, oa_t61_left f295 crit "224" over Goku) - but a crit over an enemy a
-        // pixel right (pixel gate db6_007_13-43 f90, crit "854" over a sniper; the only such frame recorded: an
-        // empirical split, the reason not found)
-        let x = if crit && enemy { 16 - (wsum >> 1) } else { 16 - ((wsum + 1) >> 1) };
+        // oa_t15_punch "101" / "113" over an enemy, oa_t61_left f295 crit "224" over Goku; pixel gate db6_007_13-43
+        // f90, crit "854" over a sniper - a pixel right of it by the crit's screen shake, `DamageNumberView::shake`)
+        let _ = enemy;
+        let x = 16 - ((wsum + 1) >> 1);
         let ops = vec![MenuOp::TextOutline { font, x, y: 7, colour: if crit { 4 } else if heal { 6 } else { 3 }, outline: 1, clip: [0, 0, 32, 8], text }];
         let s = self.surface(packs, &wf_view::MenuLayer { w: 32, h: 8, x: 0, y: 0, priority: 1, ops });
         s.px.iter().map(|&c| if c == 0 { 0 } else { (c as u32) << 24 | (self.pal.get(c as usize).copied().unwrap_or(0) & 0xFF_FFFF) }).collect()

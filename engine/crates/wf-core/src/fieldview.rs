@@ -49,7 +49,7 @@ pub fn pickup(w: &World, id: u32, p: &Pickup, out: &mut RenderView) {
             if p.t > 0x1E0 && w.frame & 4 != 0 {
                 return;
             }
-            let mut cel = (((p.phase as i32).wrapping_add(p.t)) & 0xFF) >> 3;
+            let mut cel = (((p.phase as i32).wrapping_add(p.t + p.spin)) & 0xFF) >> 3;
             if cel > 3 {
                 cel = 0;
             }
@@ -240,7 +240,8 @@ pub fn prop(w: &World, k: usize, out: &mut RenderView) {
 /// the debris chips and the item-get icon (priority 2, rising 1 px per 16 frames above the player)
 pub fn front(w: &World, out: &mut RenderView) {
     // a link fight's item-get: the same icon over the fighter holding the prize's supply
-    if let Some(g) = &w.link_get {
+    // (to the frame its fighter goes idle: link recording dojo_px3 lf 3,493, the icon gone)
+    if let Some(g) = w.link_get.as_ref().filter(|g| g.left > 0) {
         if let (Some(pi), Some(item)) = (w.player_idx(g.slot as usize), g.supply) {
             let a = &w.pl_ref(pi).a;
             let k = (60 - g.left).max(0);

@@ -864,7 +864,7 @@ fn render_view_with(w: &World, link: Option<&LinkDraw>, out: &mut RenderView) {
     }
     out.damage_numbers = crate::vram::damage_numbers(w)
         .into_iter()
-        .map(|(x, y, value, crit, heal, enemy)| wf_view::DamageNumberView { x, y, value, crit, heal, enemy })
+        .map(|(x, y, value, crit, heal, enemy)| wf_view::DamageNumberView { x, y, value, crit, heal, enemy, shake: (0, 0) })
         .collect();
     out.timer = w.scene.timer_hud.map(|k| match k {
         crate::scene::TimerHud::Countdown => w.scene.timers.countdown,
@@ -1724,7 +1724,7 @@ fn render_view_with(w: &World, link: Option<&LinkDraw>, out: &mut RenderView) {
             });
         }
     }
-    obj_shake_baked(w, out);
+    obj_shake_baked(w, link.map_or(0, |l| l.local), out);
 }
 
 /// the screen shake on the world's OBJs (emulator, sc_janemba f5,130): the camera object 0x030019A4 holds its 22.10
@@ -1735,8 +1735,9 @@ fn render_view_with(w: &World, link: Option<&LinkDraw>, out: &mut RenderView) {
 /// unshaken (an actor's shadow / halo is part of the actor's draw: shaken with it - leaving every `effects/` sheet
 /// unshaken cost 300+ exact frames, sb_006 / sb_007). Baked here, at the sprites' build: their OAM is a frame late
 /// with them
-fn obj_shake_baked(w: &World, out: &mut RenderView) {
-    let Some(c) = w.cameras.first() else { return };
+fn obj_shake_baked(w: &World, local: usize, out: &mut RenderView) {
+    // (a link fight's side: its own camera - dojo_px1 lf 2,718 .., the guest's "741" a pixel under the host's)
+    let Some(c) = w.cameras.get(local).or(w.cameras.first()) else { return };
     let (ox, oy) = w.g.shake_off;
     let (dx, dy) = (((c.x + ox) >> 10) - (c.x >> 10), ((c.y + oy) >> 10) - (c.y >> 10));
     for s in out.sprites.iter_mut() {
@@ -1746,13 +1747,23 @@ fn obj_shake_baked(w: &World, out: &mut RenderView) {
         // offset - opponent audit oa_t81_punch f295 .. f308, the bandages on Goku held still while he shook)
         let effect = w.find(s.entity).is_some_and(|k| match &w.ents[k].body {
             Body::Fx(f) => matches!(f.as_ref(), crate::fx::Fx::Anim { .. } | crate::fx::Fx::Loop { .. }),
-            Body::Shot(sh) => matches!(&sh.kind, ShotKind::Wrap(m) if m.stuck),
+            // (the Energy Blast class 0x0804B454 too: its draw check 0x08019BF4 places it from the camera's rect - link
+            // recording dojo_px1 lf 5,901 .. 5,905, a blast flying on unshaken through a crit's shake)
+            Body::Shot(sh) => {
+                matches!(&sh.kind, ShotKind::Wrap(m) if m.stuck)
+                    || matches!(&sh.kind, ShotKind::Straight(o) if o.name == crate::shots::SName::KiBlast && o.fx_end == 16 && !o.fragile)
+            }
             _ => false,
         });
         if !effect {
             s.x -= dx;
             s.y -= dy;
         }
+    }
+    // (a damage number's draw takes the shaken position too: link recordings dojo_px1 lf 2,716 .. 2,729, the crit
+    // "741" at ((pos + shake) >> 10) - (pos >> 10) of the build's shake, every frame of the shake)
+    for n in out.damage_numbers.iter_mut() {
+        n.shake = (dx, dy);
     }
     out.obj_shake = Some((0, 0));
 }

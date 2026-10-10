@@ -329,12 +329,19 @@ network options, `--net-name`, `--net-key` apply); B (Cancel) leaves as in the g
 * **Select Saved Game** (the slots; "No Saved Games" when none can be used) ->
 * **Dojo**: the setup page: the host changes "Character Mode:" Balanced / In-Game and "Rounds:" 1 / 3 / 5
   (left / right), the guest sees them live; **Start Fight** -> "Choose your character!" (Balanced: the game's
-  fixed roster of 24, strings 116..139; In-Game: the save's party at its level); the guest's pick confirms the host's
+  roster - the page lists 32, strings 116..147; the fight has the first 24 so far; In-Game: the save's party at its level); the guest's pick confirms the host's
   setup (a changed setup sends it back to the setup page) -> the match: `DojoGame` in a rollback
-  `P2PSession` on the same connection (lobby packets still handled), "Round N" between rounds, then "You Win!!" /
-  "You Lose!!" / "Draw!!" and "Grab your prize!" / "Go back to training!". The result and any prize
-  (`DojoRules.prize`, None = the ROM: no item) come from the **confirmed** inputs only (`DojoMatch::settle`, once),
-  into the save's slot file and the running title's slot.
+  `P2PSession` on the same connection (lobby packets still handled). The fight's picture is the game's own for this
+  side (`DojoGame::view(slot)`: its camera, its HUD and the friend's bar, "Round N", the timer, "You Win!!" /
+  "You Lose!!" / "Draw!!", "Grab your prize!" / "Go back to training!", the fades), gated picture for picture
+  against two linked emulators (wf-app `tests/dojo_pixels.rs`: recordings `data/link/dojo_px1` / `dojo_px3` with a
+  `video` list, 16,150 pictures over both sides - every one exact or torn as the tear rule allows, core.md). The
+  result and any prize (`DojoRules.prize`, None = the ROM: no item) come from the **confirmed** inputs only
+  (`DojoMatch::settle`, once), into the save's slot file and the running title's slot. After the fight's fade-out
+  (64 updates from the result) both are back on "Choose your character!" with the same setup, as in the game
+  (recording dojo_px3): the lobby is open again (`Lobby::reopen`: hellos resume, a new session id), a pick counts
+  for the match it was made for (`DojoHello::played`), and the next fight starts from the two picks; B leaves by the
+  pages (tests/link.rs `dojo_rematch_from_the_character_page`). "Disconnected" (93) is still the app's own page.
 * **Trading Post**: the game's own pages (wf-core `menu::link::trade`, gated frame by frame against two linked
   emulators: menu_parity `link_trade_*`): the picker ("Your Trade:", the list with its arrows, "How many to
   trade?"), R **Propose Trade** -> "Waiting for a friend..." until the friend's proposal -> the proposal ("Your

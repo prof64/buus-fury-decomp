@@ -674,6 +674,18 @@ pub fn open_json(w: &World, v: &serde_json::Value) -> Option<(super::Screen, sup
     Some((super::Screen::Link(l), super::title::BOOT, false))
 }
 
+/// the Dojo's character pick on show: where the link is after a fight (link recording dojo_px3: the fight's fade-out,
+/// then "Choose your character!" again, the same Character Mode) - the app's link flow
+pub fn open_chars(w: &mut World, balanced: bool, slot: usize, host: bool) {
+    let Some(md) = w.data.menu.clone() else { return };
+    let c = chars::Chars::new(w, &md.text, balanced, slot);
+    let mut l = Link::new(LinkPage::Chars(c), false);
+    l.friend.balanced = Some(balanced);
+    l.slot = slot;
+    l.host = host;
+    open(w, l);
+}
+
 /// the Trading Post's picker on show (the app's link flow, after Select Saved Game loaded the save into the story)
 pub fn open_trade(w: &mut World) {
     let t = trade::Trade::new(w);

@@ -507,6 +507,8 @@ pub struct DamageNumberView {
     pub heal: bool,
     /// over an enemy (the crit digits' centring: `wf-render` `MenuRenderer::damage_number`)
     pub enemy: bool,
+    /// the screen shake's pixels at its build (`wf-core` `obj_shake_baked`): the OBJ is drawn that much up-left
+    pub shake: (i32, i32),
 }
 
 /// A script's title text (see `RenderView::title`).

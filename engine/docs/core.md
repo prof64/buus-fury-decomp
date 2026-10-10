@@ -203,6 +203,16 @@ the new state, the previous palette, the previous scroll or both previous; on a 
 runs, a pixel is accepted when it equals the new or the previous-palette picture. Such frames are reported as "torn
 (hardware)", and the pixel gate locks them with per-line specs (`""` new, `"o"` previous palette, `"s"` previous
 scroll, `"b"` both, else a 240-bit hex mask of the previous-palette pixels) next to the game picture's hash.
+The link fight's gate (`tests/dojo_pixels.rs`) applies the same rule to its recordings, checked against our own
+pictures: the last lines still the previous picture, the HUD's / the friend's bars still the frame before's (their
+tiles are drawn in the frame's draw pass), the lines above or below one split with the frame before's BG scroll.
+
+**The screen shake on the OBJs** (`view::obj_shake_baked`, segments.md "the screen shake on the OBJs"): actors and
+props move by ((camera + shake) >> 10) - (camera >> 10) of the side's own camera; **damage numbers too** (link
+recording dojo_px1: a crit's number jumps with every shake step - the story's one "a pixel right" crit number, db6_007
+f90, was this); the generic effect objects and the **Energy Blast** (class 0x0804B454: its draw check 0x08019BF4
+places it from the camera's unshaken rect) do not. In a link fight every player's camera is held in the frame a shake
+ends (`World::camera_held_by_shake_of`).
 
 ## 9. Coordination (in progress, 2026-10-02)
 

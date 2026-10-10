@@ -879,7 +879,7 @@ pub fn camera(w: &mut World, slot: usize) {
     let view = w.arena.view;
     // a screen shake replaces the camera controller (the shake object 0x0804A720 takes the mode's camera slot): the
     // follow does not run while it lasts, nor in the frame it ended (as the field's `field::camera`; TS mirrors it)
-    let shaking = w.camera_held_by_shake();
+    let shaking = w.camera_held_by_shake_of(slot);
     let c = &mut w.cameras[slot];
     c.shown = if c.init { c.rect } else { Rect::default() };
     c.shown_fine = (c.x, c.y);

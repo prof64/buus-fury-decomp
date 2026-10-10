@@ -173,6 +173,10 @@ pub struct DojoHello {
     pub picked: bool,
     #[serde(default)]
     pub page_pick: i32,
+    /// the matches played on this link so far: a pick counts for the match it was made for (after a match both are
+    /// back on "Choose your character!" - the friend's last hello still shows its pick of the match before)
+    #[serde(default)]
+    pub played: u32,
 }
 
 /// The rule constants - the defaults are the ROM's (module doc); tests shorten them.
@@ -407,6 +411,8 @@ pub struct DojoGame {
     /// the OBJs each side shows: its draw pass before the last update (the presenter's one-frame lag) in that side's
     /// draw order (`wf_core::view::render_view_link`) - not rollback state, like the session's presenter
     shown: [Option<Vec<wf_view::SpriteDraw>>; 2],
+    /// the damage numbers' shake pixels on each side (its own camera's, from the same build as `shown`)
+    num_shake: [(i32, i32); 2],
 }
 
 impl DojoGame {
@@ -420,15 +426,19 @@ impl DojoGame {
             st: DojoState { round: 0, phase: Phase::Between { left: rules.start_frames.max(1) }, t: 0, wins: [0; 2], results: Vec::new(), over_at: None, frame: 0, down_for: 0, zenie: 0, banner_place: None },
             s,
             shown: [None, None],
+            num_shake: [(0, 0); 2],
         }
     }
     /// the draw pass's sprites on both sides, before an update
     fn draw_pass(&mut self) {
+        let mut num_shake = [(0, 0); 2];
         self.shown = [0u8, 1].map(|s| {
             let mut v = wf_view::RenderView::default();
             wf_core::view::render_view_link(&self.s.world, &self.link_draw(s), &mut v);
+            num_shake[s as usize] = v.damage_numbers.first().map_or((0, 0), |n| n.shake);
             Some(v.sprites)
         });
+        self.num_shake = num_shake;
     }
     /// that side's world list beyond the props and fighters (their sort keys on our scale: layer 0x38 - the game's,
     /// depth the game's - 4): "Round N" (a title text: layer 0, depth 0) while it shows; from the fight's start the
@@ -565,6 +575,9 @@ impl DojoGame {
         // the OBJs in this side's draw order
         if let Some(sp) = &self.shown[s] {
             out.sprites = sp.clone();
+        }
+        for n in out.damage_numbers.iter_mut() {
+            n.shake = self.num_shake[s];
         }
         // the HUD's bars as the frame leaves them (drawn from the fighters' records in the draw pass: an Energy
         // Blast's EP in its own frame - link recording dojo_px1)

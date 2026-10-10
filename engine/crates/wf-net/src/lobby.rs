@@ -330,6 +330,18 @@ impl Lobby {
     pub fn request_start(&mut self) {
         self.start_requested = true;
     }
+    /// the match is over and the players are back in the lobby (the link Dojo's character page after a fight):
+    /// hellos go out again, what the others said before the match no longer counts, the next start is a new session
+    pub fn reopen(&mut self) {
+        self.start = None;
+        self.grant = None;
+        self.start_requested = false;
+        self.nonce = self.nonce.wrapping_add(2);
+        self.last_hello = f64::NEG_INFINITY;
+        for p in self.peers.values_mut() {
+            p.hello = None;
+        }
+    }
 
     pub fn connected(&mut self, id: &str) {
         self.peers.entry(id.to_string()).or_default().connected = true;

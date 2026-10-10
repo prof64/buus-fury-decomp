@@ -6,10 +6,15 @@
 //! The match is replayed as `tests/dojo_link.rs` does in wf-net (the app's `DojoGame`, advanced with the recorded
 //! keys from the fighters' creation), and after each logic frame its picture on that side (`DojoGame::view`, the app's
 //! match view -> wf-render, 240x160) is compared with the game's picture of that logic frame (its last video frame:
-//! the app recreates no lag frames). Every compared frame must be exact, except the tears (a picture differing from
-//! both neighbours, the VRAM copy racing the scanout, as menu_parity) - counted and printed.
+//! the app recreates no lag frames). Every compared frame must be exact, or torn as the tear rule allows (core.md:
+//! the game writes while the screen is drawn - mostly the guest, whose frames the link's waits shift): the last lines
+//! (from 150) still our previous picture; the HUD's / the friend's bars still the frame before's (a hit's frame); the
+//! lines above or below a split with the frame before's BG scroll. Each of those is checked against our own pictures
+//! and counted; a picture the rule would call torn (differing from both neighbours next to a lag frame) that none of
+//! them explains is counted apart and printed.
 //! `DOJO_PIX_OUT=<dir>` writes emulator | ours | diff strips of differing frames, `DOJO_PIX_ONLY=name` one recording,
-//! `DOJO_PIX_LOG=1` prints every differing frame.
+//! `DOJO_PIX_LOG=1` prints every differing / torn frame; `DOJO_PIX_SPR=<lf>` that frame's sprites and shots,
+//! `DOJO_PIX_CAM=<lf>-<lf>` the cameras / shake / bars / pickups over a range, `DOJO_PIX_HP=1` the fighters' HP.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -120,7 +125,7 @@ struct Side {
 }
 
 /// (frames compared, exact, tears, first differing logic frames)
-fn run(packs: &Packs, data: &Arc<GameData>, name: &str) -> Vec<(u8, usize, usize, usize, Vec<i64>)> {
+fn run(packs: &Packs, data: &Arc<GameData>, name: &str) -> Vec<(u8, usize, usize, usize, Vec<i64>, usize)> {
     let p = repo().join(format!("data/link/dojo_{name}.json"));
     let doc: serde_json::Value = serde_json::from_slice(&std::fs::read(&p).unwrap()).unwrap();
     let v = |x: &serde_json::Value| x.as_i64().unwrap();
@@ -184,15 +189,16 @@ fn run(packs: &Packs, data: &Arc<GameData>, name: &str) -> Vec<(u8, usize, usize
     let log = std::env::var("DOJO_PIX_LOG").is_ok();
     let off: i64 = std::env::var("DOJO_PIX_OFF").ok().and_then(|s| s.parse().ok()).unwrap_or(0);
     let mut renderer = Renderer::new();
-    let mut res: Vec<(u8, usize, usize, usize, Vec<i64>)> = sides.iter().map(|s| (s.slot, 0, 0, 0, vec![])).collect();
+    let mut res: Vec<(u8, usize, usize, usize, Vec<i64>, usize)> = sides.iter().map(|s| (s.slot, 0, 0, 0, vec![], 0)).collect();
     let mut written = 0;
     // per side: the last picture still to judge (its logic frame, the game's hash and video frame, the tear rule, ours,
     // what the match was doing) - judged once the next picture is known (the guest's scanout tear)
     #[allow(clippy::type_complexity)]
-    let mut pend: Vec<Option<(i64, String, i64, bool, Vec<u32>, String)>> = vec![None; sides.len()];
-    let mut last: Vec<Option<Vec<u32>>> = vec![None; sides.len()];
-    let mut judge = |si: usize, p: (i64, String, i64, bool, Vec<u32>, String), prev: Option<&Vec<u32>>, next: Option<&Vec<u32>>, res: &mut Vec<(u8, usize, usize, usize, Vec<i64>)>| {
-        let (lf, h, vf, tear, ours, what) = p;
+    let mut pend: Vec<Option<(i64, String, i64, bool, Vec<u32>, String, RenderView)>> = vec![None; sides.len()];
+    let mut last: Vec<Option<(Vec<u32>, RenderView)>> = vec![None; sides.len()];
+    let mut tear_renderer = Renderer::new();
+    let mut judge = |si: usize, p: (i64, String, i64, bool, Vec<u32>, String, RenderView), prev: Option<&(Vec<u32>, RenderView)>, res: &mut Vec<(u8, usize, usize, usize, Vec<i64>, usize)>| {
+        let (lf, h, vf, tear, ours, what, view) = p;
         let side = &sides[si];
         let e = &mut res[si];
         e.1 += 1;
@@ -203,23 +209,57 @@ fn run(packs: &Packs, data: &Arc<GameData>, name: &str) -> Vec<(u8, usize, usize
         // a scanout tear at the bottom: the game's last lines (at most 10) still show the previous frame (the frame's
         // VRAM / palette copy ran into the picture's end - the guest, whose updates the link's waits shift): our
         // picture with that band of our previous one
-        let _ = next;
-        for (tag, n) in [("prev", prev)] {
-            let Some(n) = n else { continue };
+        if let Some((n, pv)) = prev {
             if let Some(y0) = (150..160).rev().find(|&y0| {
                 let mut c = ours.clone();
                 c[y0 * 240..].copy_from_slice(&n[y0 * 240..]);
                 hash(&c) == h
             }) {
                 if log {
-                    eprintln!("dojo_{name} side {} lf {lf}: bottom tear ({tag}) from line {y0}", side.slot);
+                    eprintln!("dojo_{name} side {} lf {lf}: bottom tear from line {y0}", side.slot);
                 }
                 e.3 += 1;
                 return;
             }
+            // the bars' tiles still the frame before's (drawn into the tiles in the frame's draw pass, after the
+            // scanout passed the HUD: a hit's frame - both sides show the same logic frame's bars differently)
+            let mut bars = view.clone();
+            for (b, o) in bars.hud.iter_mut().zip(&pv.hud) {
+                (b.hp, b.hp_max, b.ep, b.ep_max) = (o.hp, o.hp_max, o.ep, o.ep_max);
+            }
+            for (b, o) in bars.boss_bars.iter_mut().zip(&pv.boss_bars) {
+                b.fill = o.fill;
+            }
+            let bars_pic = tear_renderer.render(packs, &bars, 0, 240, 160).to_vec();
+            if hash(&bars_pic) == h {
+                if log {
+                    eprintln!("dojo_{name} side {} lf {lf}: the bars of the frame before", side.slot);
+                }
+                e.3 += 1;
+                return;
+            }
+            // the BG scroll still the frame before's on the lines above or below a split (the tear rule, core.md:
+            // the registers written while the screen is drawn)
+            let mut sc = view.clone();
+            sc.cameras = pv.cameras.clone();
+            sc.map = pv.map.clone();
+            let scroll_pic = tear_renderer.render(packs, &sc, 0, 240, 160).to_vec();
+            for (a, b, tag) in [(&ours, &scroll_pic, "new over old"), (&scroll_pic, &ours, "old over new"), (&bars_pic, &scroll_pic, "new (old bars) over old")] {
+                if let Some(y0) = (0..=160).find(|&y0| {
+                    let mut c = a.clone();
+                    c[y0 * 240..].copy_from_slice(&b[y0 * 240..]);
+                    hash(&c) == h
+                }) {
+                    if log {
+                        eprintln!("dojo_{name} side {} lf {lf}: scroll tear ({tag}) at line {y0}", side.slot);
+                    }
+                    e.3 += 1;
+                    return;
+                }
+            }
         }
         if tear {
-            e.3 += 1;
+            e.5 += 1;
             return;
         }
         if e.4.len() < 4000 {
@@ -252,15 +292,28 @@ fn run(packs: &Packs, data: &Arc<GameData>, name: &str) -> Vec<(u8, usize, usize
         if g.st.over_at.is_some_and(|o| g.st.frame >= o + 64) {
             break;
         }
+        if std::env::var("DOJO_PIX_HP").is_ok() {
+            let hp: Vec<i32> = g.s.world.players.iter().map(|&id| g.s.world.pl_ref(g.s.world.find(id).unwrap()).rec.hp).collect();
+            eprintln!("HP lf {lf} {hp:?} frame {}", g.s.world.frame);
+        }
         for (si, side) in sides.iter().enumerate() {
             let mut view = RenderView::default();
             g.view(side.slot, &mut view);
+            if std::env::var("DOJO_PIX_SPR").ok().and_then(|f| f.parse::<i64>().ok()) == Some(lf) {
+                for e in g.s.world.ents.iter().filter(|e| !e.removed) {
+                    match &e.body {
+                        wf_core::world::Body::Fx(f) => eprintln!("   ent {} fx {}", e.id, format!("{f:?}").chars().take(300).collect::<String>()),
+                        wf_core::world::Body::Shot(f) => eprintln!("   ent {} shot {}", e.id, format!("{:?}", f.kind).chars().take(200).collect::<String>()),
+                        _ => {}
+                    }
+                }
+                eprintln!("lf {lf} side {}: sprites {:?} numbers {:?}", side.slot, view.sprites.iter().map(|s| (s.entity, s.sheet.clone(), s.priority, s.x, s.y, format!("{:?}", s.effect))).collect::<Vec<_>>(), view.damage_numbers);
+            }
             let ours = renderer.render(packs, &view, 0, 240, 160).to_vec();
             if let Some(p) = pend[si].take() {
-                let next = (p.0 + 1 == lf).then_some(&ours);
-                let pic = p.4.clone();
-                judge(si, p, last[si].as_ref(), next, &mut res);
-                last[si] = Some(pic);
+                let keep = (p.4.clone(), p.6.clone());
+                judge(si, p, last[si].as_ref(), &mut res);
+                last[si] = Some(keep);
             }
             let Some((h, vf)) = side.want.get(&(lf + off)) else { continue };
             // the tear rule (menu_parity): the game's picture differs from both neighbours and they from each other
@@ -271,6 +324,8 @@ fn run(packs: &Packs, data: &Arc<GameData>, name: &str) -> Vec<(u8, usize, usize
             if std::env::var("DOJO_PIX_CAM").is_ok_and(|r| r.split('-').map(|x| x.parse::<i64>().unwrap_or(0)).collect::<Vec<_>>().windows(2).any(|w| (w[0]..=w[1]).contains(&lf))) {
                 let c = &g.s.world.cameras[side.slot as usize];
                 eprintln!("lf {lf} side {} camera {:?} fine {:?} view {:?}", side.slot, c.rect, (c.x, c.y), view.cameras);
+                eprintln!("   hud {:?} bars {:?} recs {:?}", view.hud.iter().map(|h| (h.hp, h.hp_max, h.ep, h.ep_max)).collect::<Vec<_>>(), view.boss_bars, g.s.world.players.iter().map(|&id| { let p = g.s.world.pl_ref(g.s.world.find(id).unwrap()); (p.rec.hp, p.rec.max_hp, p.hp(), p.ep(), p.regen_timer, p.hp_regen_acc) }).collect::<Vec<_>>());
+                eprintln!("   shake off {:?} shown {:?} ticked {} frame {} shakes {} numbers {:?}", g.s.world.g.shake_off, g.s.world.g.shake_shown, g.s.world.g.shakes_ticked, g.s.world.frame, g.s.world.g.shakes.len(), view.damage_numbers);
                 eprintln!("   sprites {:?} players {:?}", view.sprites.iter().map(|d| (d.entity, d.sheet.clone(), d.x, d.y)).collect::<Vec<_>>(), g.s.world.players);
                 let w = &g.s.world;
                 let pk: Vec<_> = w.ents.iter().filter(|e| !e.removed).filter_map(|e| match &e.body {
@@ -280,12 +335,12 @@ fn run(packs: &Packs, data: &Arc<GameData>, name: &str) -> Vec<(u8, usize, usize
                 let pp: Vec<_> = w.battle.popups.iter().map(|p| (p.0, p.1, p.2, p.4 >> 3, p.7)).collect();
                 eprintln!("   pickups {pk:?} popups {pp:?} next_id {} frame {} fighters {:?}", w.next_id, w.frame, w.players.iter().map(|&id| { let a = &w.pl_ref(w.find(id).unwrap()).a; (a.x >> 8, a.y >> 8, a.foot_h) }).collect::<Vec<_>>());
             }
-            pend[si] = Some((lf, h.clone(), *vf, tear, ours, format!("{:?} t {} down {}", g.st.phase, g.st.t, g.st.down_for)));
+            pend[si] = Some((lf, h.clone(), *vf, tear, ours, format!("{:?} t {} down {}", g.st.phase, g.st.t, g.st.down_for), view));
         }
     }
     for (si, p) in pend.into_iter().enumerate() {
         if let Some(p) = p {
-            judge(si, p, last[si].as_ref(), None, &mut res);
+            judge(si, p, last[si].as_ref(), &mut res);
         }
     }
     res
@@ -313,7 +368,7 @@ fn dojo_fight_screen_matches_the_game() {
         if doc["video"].is_null() {
             continue;
         }
-        for (slot, n, exact, tears, diffs) in run(&packs, &data, name) {
+        for (slot, n, exact, tears, diffs, torn) in run(&packs, &data, name) {
             // (the differing logic frames as ranges)
             let mut rg: Vec<(i64, i64)> = vec![];
             for &f in &diffs {
@@ -322,7 +377,7 @@ fn dojo_fight_screen_matches_the_game() {
                     _ => rg.push((f, f)),
                 }
             }
-            eprintln!("dojo_{name} side {slot}: {exact} / {n} pictures exact, {tears} tear frames skipped; differing {}: {:?}", diffs.len(), &rg[..rg.len().min(40)]);
+            eprintln!("dojo_{name} side {slot}: {exact} / {n} pictures exact, {tears} torn as the tear rule allows, {torn} more torn frames skipped; differing {}: {:?}", diffs.len(), &rg[..rg.len().min(40)]);
             if !diffs.is_empty() {
                 bad.push(format!("dojo_{name} side {slot}"));
             }

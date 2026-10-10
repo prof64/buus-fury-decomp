@@ -965,6 +965,16 @@ impl World {
         self.g.shake_ended = false;
         held
     }
+    /// `camera_held_by_shake` for a player's camera: the end mark holds every player's camera in that frame (link
+    /// recording dojo_px1 lf 6,125: the guest's camera a frame behind ours after a crit's shake) - consumed by the
+    /// last one's
+    pub fn camera_held_by_shake_of(&mut self, slot: usize) -> bool {
+        let held = !self.g.shakes.is_empty() || self.g.shake_ended;
+        if slot + 1 >= self.players.len() {
+            self.g.shake_ended = false;
+        }
+        held
+    }
     /// shake tasks: every `period` frames two RNG draws pick the offset ((next - 0x8000) * intensity) >> 19
     pub fn tick_shakes(&mut self) {
         let mut shakes = std::mem::take(&mut self.g.shakes);

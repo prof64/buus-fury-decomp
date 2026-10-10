@@ -4748,7 +4748,11 @@ fn link_prize(w: &mut World, i: usize) {
             } else {
                 0
             };
-            crate::fieldobj::drop_zenie_from(w, loot, size);
+            if let Some(k) = crate::fieldobj::drop_zenie_from(w, loot, size).and_then(|id| w.find(id)) {
+                if let Body::Pickup(p) = &mut w.ents[k].body {
+                    p.spin = 1;
+                }
+            }
         } else {
             // s499: a level band's supply
             let g0 = if level - 15 > 160 { 160 } else { level };

@@ -59,7 +59,8 @@ friend's answer (`Friend::answered`) and both go on to the character pick: "Batt
 figures in a row of five with the selected one walking in a frame (BG0), LEFT / RIGHT prompts (auto-repeat, sound
 39), "Choose your character!" (105); A (sound 40) runs the pick's wait box (31 steps after the friend's pick), then
 the 16-step fade to the fight; B (sound 40) goes back to the setup page (host) / Select Saved Game (guest). The
-match's banners and the prize (106..115) and "Disconnected" (93) are still `wf_app::link`'s own drawing.
+fight's texts (106..115) are the fight's own picture (`wf_net::dojo::DojoGame::view`, netcode.md); after a fight the
+link shows the character pick again (`link::open_chars`). "Disconnected" (93) is still `wf_app::link`'s own drawing.
 engine/docs/netcode.md "Link play: playing it".
 
 The **Trading Post's pages are the game's own, in wf-core** (`menu::link::trade`, a [`Link`] page

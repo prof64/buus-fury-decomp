@@ -293,6 +293,36 @@ fn dojo_match_between_two_apps() {
     let _ = r.net.stats();
 }
 
+/// after a match both are back on "Choose your character!" (the game's flow), and a second match starts from there
+#[test]
+fn dojo_rematch_from_the_character_page() {
+    let Some(dir) = content_dir() else { return };
+    let d = wf_app::battle::load_data(&packs(&dir)).unwrap();
+    let sa = save(&d, &[(0, 90)], &[], 0);
+    let sb = save(&d, &[(4, 60)], &[], 0);
+    let Some(mut r) = run("dojo-again", LinkKind::Dojo, &sa, &sb, 7) else { return };
+    r.a.sim.bot_mut().unwrap().matches = 2;
+    r.b.sim.bot_mut().unwrap().matches = 2;
+    r.until(6000, "the first match", |r| r.a.sim.dojo().is_some() && r.b.sim.dojo().is_some());
+    r.until(20_000, "the first ending", |r| r.a.sim.record.is_some() && r.b.sim.record.is_some());
+    let first = (r.a.sim.record.clone().unwrap(), r.b.sim.record.clone().unwrap());
+    assert_eq!((first.0.frame, first.0.checksum), (first.1.frame, first.1.checksum));
+    // the fight's fade-out, then the character page on both (wf-core's link screen)
+    r.until(3000, "both back on the character page", |r| {
+        [&r.a, &r.b].iter().all(|p| p.sim.played() == 1 && matches!(p.sim.link_screen().map(|l| &l.page), Some(wf_core::menu::link::LinkPage::Chars(_))))
+            || (r.a.sim.played() == 1 && r.b.sim.played() == 1 && r.a.sim.dojo().is_some() && r.b.sim.dojo().is_some())
+    });
+    r.a.sim.record = None;
+    r.b.sim.record = None;
+    r.until(6000, "the second match", |r| r.a.sim.dojo().is_some() && r.b.sim.dojo().is_some());
+    r.until(20_000, "the second ending", |r| r.a.sim.record.is_some() && r.b.sim.record.is_some());
+    let (ra, rb) = (r.a.sim.record.clone().unwrap(), r.b.sim.record.clone().unwrap());
+    assert_eq!((ra.frame, ra.checksum), (rb.frame, rb.checksum), "both confirm the same second match");
+    assert_eq!(ra.inputs, rb.inputs);
+    assert!(ra.frame > 60);
+    r.until(4000, "back at the title", |r| r.a.done() && r.b.done());
+}
+
 #[test]
 fn dojo_disconnect_mid_match() {
     let Some(dir) = content_dir() else { return };

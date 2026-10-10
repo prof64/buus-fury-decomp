@@ -1637,7 +1637,7 @@ pub fn camera(w: &mut World, slot: usize) {
     let max = w.field.as_ref().map(|f| f.camera_max).unwrap_or((0, 0));
     // a screen shake replaces the camera controller (the shake object 0x0804A720 takes the mode's camera slot):
     // the follow does not run while it lasts (story playthrough: the camera holds for a strong hit's 15-frame shake)
-    let shaking = w.camera_held_by_shake();
+    let shaking = w.camera_held_by_shake_of(slot);
     let c = &mut w.cameras[slot];
     c.shown = c.rect;
     c.shown_fine = (c.x, c.y);

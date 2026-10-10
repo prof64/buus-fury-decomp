@@ -59,6 +59,14 @@ pub struct Pickup {
     /// completed pass (`Field::completing`) gives the coin its normal update instead
     #[serde(default)]
     pub held: Option<(u32, i32, i32, [i32; 4], i32, i32)>,
+    /// a link fight's coin: what its spin is ahead of its age. The spin's counter (+0x28, from the constructor's random
+    /// phase) counts the draws (0x08018284: +1, then the cel = (counter & 0xFF) >> 3, 0 beyond 3), the age (+0x24) the
+    /// updates: the item-get's hold draws without an update (link recording dojo_px3 lf 3,503 .. 3,508: after the 61
+    /// held frames the cel of age + 62), and the prize is drawn once before its first update (dojo_px1 lf 7,473 /
+    /// 7,481 / 7,489: the cel a frame before the age's). Not the field's holds: there the cel stays with the age
+    /// (pixel gate earth_2_9_5 f510 / f660, earth_2_8_1 f5,220, rclose_067_071_14-2 f1,380 / f2,340)
+    #[serde(default)]
+    pub spin: i32,
 }
 
 impl Pickup {
@@ -248,6 +256,7 @@ pub fn spawn_map_item(w: &mut World, o: &crate::fieldcontent::ObjDef) -> Option<
         solid: Some(solid),
         spawn: None,
         held: None,
+        spin: 0,
     })));
     // its icon's tiles (ctor `0x0800DCDC`, vt 0x0804A314 +0xC: 4 blocks (0x100 bytes), no shadow; exit-fade cuts
     // 8-56 -> 8-57 / 4-24 -> 4-30: the block right after the props', before the player's)
@@ -510,6 +519,7 @@ pub fn drop_zenie_from(w: &mut World, loot: (i32, i32, i32, i32), size: i32) -> 
         solid: None,
         spawn: None,
         held: None,
+        spin: 0,
     };
     if w.field.as_ref().is_some_and(|f| f.pre_update) {
         p.spawn = Some((w.frame + 1, p.coin_rect()));
@@ -560,6 +570,7 @@ pub fn drop_item_from(w: &mut World, loot: (i32, i32, i32, i32), item: i32) -> O
         solid: None,
         spawn: None,
         held: None,
+        spin: 0,
     };
     let id = w.add(Body::Pickup(Box::new(p)));
     // its icon's tiles (the item's icon size, 0x100 for most: real run 4-1 tile r002_006+11,000 f104, block (135, 4);
@@ -674,6 +685,9 @@ pub fn pickup_update(w: &mut World, i: usize) {
     // dojo_ig7 f3,600 .. f3,661: age 20 throughout, the moves counter 21 .. 60)
     if w.link_get.is_some() {
         coin_move(w, i);
+        if let Body::Pickup(p) = &mut w.ents[i].body {
+            p.spin += 1;
+        }
         return;
     }
     let Body::Pickup(p) = &w.ents[i].body else {
