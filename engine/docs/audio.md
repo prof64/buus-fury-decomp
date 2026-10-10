@@ -123,6 +123,11 @@ the default extraction (`extract_rendered`).
   loop (10–201 s, 34 min total) and every SFX (4 s). With the track RAM the game had at the song start loaded into
   the driver (`Driver::seed_track_ram`, see the carry-over note in §3): **53/53 songs and 64/64 SFX identical, every
   sample**. A fresh `Driver` (all memories zero) is what a freshly booted game would play.
+* **Transitions** (`tests/fifo_exact.rs` `transitions_match_fifo_capture`, captures by `re/fifo_trans.py`): one
+  driver across a song replaced mid-play, a song after a song (vibrato carry-over), quick switches, SFX over music,
+  stop all SFX, the tracks cleared (`0x0803F0E6`, `Driver::clear_tracks`: the sequencer runs on) and the scripts'
+  stop_music (native 0x24 `0x08000900`: the playing byte only), each call before the game's own mix chunk: 5 / 5
+  sequences identical, every sample (15 s each).
 * **vs the site's emulator rips** (`tests/rips.rs`, `work/audio/cache/…_v7`): these are mGBA's 32 768 Hz output
   (blip_buf resampling, DC high-pass, gain ≈ 0.75 of FIFO×256). After sample-and-hold upsampling, band filtering
   both sides (~32 Hz–6.5 kHz) and alignment: songs correlation median 0.9990, worst 0.904 (song 16), 0.950 (song

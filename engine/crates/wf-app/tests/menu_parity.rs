@@ -207,6 +207,7 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
         }
     }
     let rows = frames["frames"].as_array()?;
+    let errs_dbg = std::env::var("MENU_PARITY_ERRS").is_ok();
     // script-opened screens: the remake opens the screen the frame the emulator's script did
     // the save slots (the game's EEPROM cache, title scenarios): `meta.saves[k]` = a story dict + location
     if let Some(sv) = meta["saves"].as_array() {
@@ -314,6 +315,9 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
         if std::env::var("MENU_PARITY_STORY").is_ok_and(|v| v.split(',').any(|x| x.parse::<usize>().ok() == Some(k))) {
             let st = &sim.world().story;
             eprintln!("{name} {k}: equipment {:?} equip {:?} supplies {:?}", st.equipment, st.chars.iter().map(|c| c.equip).collect::<Vec<_>>(), st.supplies.iter().enumerate().filter(|(_, n)| **n > 0).collect::<Vec<_>>());
+            let w = sim.world();
+            let pl = w.player_idx(0).map(|i| (w.pl_ref(i).rec.hp, w.pl_ref(i).rec.ep, w.pl_ref(i).equip));
+            eprintln!("{name} {k}: rec0 hp/ep {} / {} player {:?}", st.chars[0].rec.hp, st.chars[0].rec.ep, pl);
         }
         // sounds of menu frames (and the START frame): the emulator's play calls vs ours
         let mut v = RenderView::default();
@@ -419,6 +423,9 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
         }
     }
     println!("menu {name}: {iters} logic iterations; {tears} tear frames skipped");
+    if errs_dbg {
+        eprintln!("{name}: script errors {:?}", sim.errors);
+    }
     Some((compared, exact, snd_bad, bad_frames))
 }
 

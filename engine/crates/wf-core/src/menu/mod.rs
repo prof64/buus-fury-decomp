@@ -648,6 +648,11 @@ static DEBUG_FRAMES: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32
 /// One video frame of an active menu (called instead of the world update).
 pub fn step(w: &mut World) {
     let p0 = w.story.play_frames;
+    // the game keeps one record per character: what an item's script did to the live fighter (the inventory's use)
+    // is what the next page reads (menu_parity inventory_use_chop: the Rice Ball's +50 on the Status page)
+    if w.field.is_some() {
+        crate::story::sync_from_players(w);
+    }
     step_inner(w);
     // the screen's logic frames (its mode loop's iterations, counted in `play_frames`) count on 0x03000F94 too: an
     // enemy's state stamp is that much older after a pause menu (real route 0-21, Goku vs Majin Buu: the on-hit

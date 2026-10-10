@@ -86,7 +86,7 @@ def supply_effect(i, s):
             eff = dict(restore_hp=pushes[2], restore_hp_with_chopsticks=pushes[1])
     if any(l.startswith('native 0x0e') for l in lines) and len(pushes) >= 3 and not eff:
         eff = dict(restore_ep=pushes[2], restore_ep_with_straw=pushes[1],
-                   bug='with the Primordial Twisty-Straw owned the game sets HP = EP + bonus instead of EP += bonus')
+                   bug='with the Primordial Twisty-Straw worn (is_equipped 118) the game sets HP = EP + bonus instead of EP += bonus (menu_parity inventory_use_straw_worn; only owned: EP += 20 as usual)')
     if any(l.startswith('native 0xf2') for l in lines):
         eff = dict(holy_water=True, duration_seconds=30, STR=25, POW=25, END=25, SPD=25,
                    note='native 0xF2 pushes (30, 25,25,25,25); bonuses live in GameData+0x4C0 and are applied by 0x080046AE')

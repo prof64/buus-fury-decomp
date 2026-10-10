@@ -98,7 +98,7 @@ fn supply_effect(c: &Ctx, addr: u32) -> (Value, Value) {
         eff.insert("restore_ep_with_straw".into(), json!(pushes[1]));
         eff.insert(
             "bug".into(),
-            json!("with the Primordial Twisty-Straw owned the game sets HP = EP + bonus instead of EP += bonus"),
+            json!("with the Primordial Twisty-Straw worn (is_equipped 118) the game sets HP = EP + bonus instead of EP += bonus (menu_parity inventory_use_straw_worn; only owned: EP += 20 as usual)"),
         );
     }
     if any("native 0xf2") {

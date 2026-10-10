@@ -931,6 +931,16 @@ impl<'a> Driver<'a> {
         p.playing = true;
     }
 
+    /// `0x0803F0E6`: silence the player's 15 tracks - the sequencer runs on (its next notes sound again; a stop is this
+    /// and the player's playing byte +5 cleared: [`Driver::stop_song`]) - re/fifo_trans.py sfx_over_song
+    pub fn clear_tracks(&mut self) {
+        for t in self.player.tracks.iter_mut() {
+            t.mode = 0;
+            t.cflags = 0;
+            t.v.flags = 0;
+        }
+    }
+
     pub fn stop_song(&mut self) {
         self.player.playing = false;
         for t in self.player.tracks.iter_mut() {

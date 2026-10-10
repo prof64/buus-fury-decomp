@@ -91,3 +91,63 @@ fn songs_and_sfx_match_fifo_capture() {
     }
     assert!(failures.is_empty(), "{failures:?}");
 }
+
+/// Sound transitions (re/fifo_trans.py): a song replaced mid-play, SFX over music, stop all SFX, the tracks cleared,
+/// songs after songs (the driver state carried over) - replayed on one `Driver` with the game's own mix chunks and
+/// each call before the chunk it preceded; every sample must equal the game's FIFO bytes.
+#[test]
+fn transitions_match_fifo_capture() {
+    let Some(rom) = testutil::rom() else { return };
+    let mut bank = SoundBank::from_rom(&rom);
+    apply_harness_patch(&mut bank);
+    let dir = testutil::repo_root().join("work/audio/fifo_ref");
+    let Ok(rd) = std::fs::read_dir(&dir) else { return };
+    let mut names: Vec<String> = rd
+        .flatten()
+        .filter_map(|e| e.file_name().to_string_lossy().strip_prefix("trans_").and_then(|n| n.strip_suffix(".json")).map(String::from))
+        .collect();
+    names.sort();
+    let mut failures = Vec::new();
+    for name in &names {
+        let j: serde_json::Value = serde_json::from_slice(&std::fs::read(dir.join(format!("trans_{name}.json"))).unwrap()).unwrap();
+        let pcm: Vec<(i8, i8)> = std::fs::read(dir.join(format!("trans_{name}.bin"))).unwrap().chunks_exact(2).map(|c| (c[0] as i8, c[1] as i8)).collect();
+        let mut d = Driver::new(&bank);
+        let pans: Vec<i8> = j["tracks"].as_array().unwrap().iter().map(|t| t["pan"].as_u64().unwrap_or(0) as u8 as i8).collect();
+        d.set_track_pans(&pans);
+        if let Some(a) = j["track_ram"].as_array() {
+            for (t, h) in a.iter().enumerate() {
+                d.seed_track_ram(t, &unhex(h.as_str().unwrap()));
+            }
+        }
+        let ops = j["ops"].as_array().unwrap();
+        let mut out = Vec::new();
+        for (c, n) in j["chunks"].as_array().unwrap().iter().enumerate() {
+            for op in ops.iter().filter(|o| o[0].as_u64() == Some(c as u64)) {
+                let i = |k: usize| op[k].as_i64().unwrap_or(0);
+                match op[1].as_str().unwrap() {
+                    "song" => d.play_song(i(2) as usize),
+                    "sfx" => {
+                        d.play_sfx(i(2) as u8, i(3) as u8, i(4) as i8);
+                    }
+                    "stop_sfx" => d.stop_all_sfx(),
+                    "clear" => d.clear_tracks(),
+                    "stop" => d.stop_song(),
+                    o => panic!("op {o}"),
+                }
+            }
+            d.render_into(&mut out, n.as_u64().unwrap() as usize);
+        }
+        let bad = out.iter().zip(&pcm).position(|(a, b)| a != b);
+        eprintln!("transition {name}: {} samples, first mismatch {bad:?}", pcm.len());
+        if let Some(b) = bad {
+            failures.push(format!("{name}: sample {b} (chunk {})", {
+                let mut s = 0;
+                j["chunks"].as_array().unwrap().iter().take_while(|n| {
+                    s += n.as_u64().unwrap() as usize;
+                    s <= b
+                }).count()
+            }));
+        }
+    }
+    assert!(failures.is_empty(), "transitions not exact: {failures:?}");
+}
