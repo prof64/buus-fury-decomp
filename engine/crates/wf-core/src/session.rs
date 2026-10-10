@@ -152,10 +152,10 @@ impl Session {
             self.presenter.reset();
             return;
         }
-        // `return_to_title` (0x8E) last frame: the session restarts on the title screen (menu/title.rs; the link
-        // error's in the script's own iteration - `step_post`)
-        // (a request the link error / the game over left before this step - a harness's - is `step_post`'s)
-        let own = w.link_error || (w.game_over && w.opts.no_lag);
+        // `return_to_title` (0x8E) last frame, with lag frames: the session restarts on the title screen
+        // (menu/title.rs; without them in the script's own iteration - `step_post`)
+        // (without lag frames a request left before this step - a harness's - is `step_post`'s)
+        let own = w.link_error || w.opts.no_lag;
         if !own
             && w.scene
                 .requests
@@ -374,15 +374,14 @@ impl Session {
     }
     /// the rest of the frame: cameras and the field / battle rules after the update
     pub fn step_post(&mut self) -> &[Event] {
-        // the link error's `return_to_title` (s001, `menu::link::lost`) in this frame's scripts: the title is made in
-        // this iteration and runs its first step in it - its picture is up at the iteration's end, its cursor has
-        // counted (two linked emulators: menu_parity link_lost_*, the title on the iteration's last video frame, its
-        // first cursor redraw 6 iterations after the next one). The ending's stays the next frame's start
-        // (`step_begin`): its title's cursor is 3 to 6 steps behind this one's (pixel gate sb_044_04_20 f24,090 /
-        // rsbk_002_04_21 f23,850 - which step exactly, and the game over's, not measured)
-        // (the game over's too, without lag frames: run 2's death replayed on the emulator - menu_parity
-        // title_gameover, the title on the iteration's last video frame, its first cursor redraw 8 iterations on)
-        let own = self.world.link_error || (self.world.game_over && self.world.opts.no_lag);
+        // `return_to_title` (0x8E) in this frame's scripts, without lag frames (one step = one iteration: the app): the
+        // title is made in this iteration and runs its first step in it - its picture is up at the iteration's end,
+        // its cursor has counted. Measured on the emulator after the link error's s001 (two linked ones, one reset:
+        // menu_parity link_lost_*), the game over's s000 (run 2's death replayed: title_gameover) and the ending
+        // (segment sb_044_04_20 replayed: the same frames - the title on the iteration's last video frame, the
+        // cursor's first redraw presented 8 iterations on). With lag frames the title's making and its first step
+        // are video frames of that long iteration: the next frame's start (`step_begin`)
+        let own = self.world.link_error || self.world.opts.no_lag;
         if own && self.world.scene.requests.iter().any(|r| matches!(r, crate::scene::Request::ReturnToTitle)) {
             let w = &mut self.world;
             if let Some(c0) = w.g.clock_mark.take() {

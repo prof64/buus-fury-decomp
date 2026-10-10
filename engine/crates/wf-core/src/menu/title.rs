@@ -944,13 +944,11 @@ pub fn title_world(data: &Arc<crate::content::GameData>, w: &World) -> World {
     });
     nw.events.insert(0, crate::world::Event::SongStop);
     open_title(&mut nw);
-    // after the link error's script (`Session::step_post`: the title made and first stepped in the script's own
-    // iteration) the title's cursor counts from the iteration that makes it, as the link's Select Saved Game
-    // (`link::open_saves`): after that first step it has counted two - the
-    // page's first cursor redraw comes 6 iterations after the next one, 8 between the later ones (two linked
-    // emulators, the link error's s001: menu_parity link_lost_*)
-    // (the game over's `return_to_title` the same: run 2's death replayed on the emulator - menu_parity title_gameover)
-    if let Some(super::Screen::Title(t)) = nw.menu.stack.last_mut().filter(|_| w.link_error || (w.game_over && w.opts.no_lag)) {
+    // without lag frames (`Session::step_post`: the title made and first stepped in the script's own iteration) the
+    // title's cursor counts from the iteration that makes it, as the link's Select Saved Game (`link::open_saves`):
+    // the page's first cursor redraw is presented 8 iterations after that one (menu_parity link_lost_* /
+    // title_gameover)
+    if let Some(super::Screen::Title(t)) = nw.menu.stack.last_mut().filter(|_| w.link_error || w.opts.no_lag) {
         for k in t.c.kids.iter_mut() {
             if let Widget::Cursor(c) = k {
                 c.t = 1;

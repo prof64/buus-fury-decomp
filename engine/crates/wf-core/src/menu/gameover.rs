@@ -62,14 +62,9 @@ pub fn tick(w: &mut World) {
     }
     let Some(i) = w.player_idx(0) else { return };
     let (dead, ko) = (w.pl_ref(i).dead, w.pl_ref(i).ko_at);
-    // (not under a `return_to_title` already asked for: a harness gives the game over's that way)
-    if !dead && !w.scene.requests.iter().any(|r| matches!(r, crate::scene::Request::ReturnToTitle)) {
-        w.game_over = false;
-    }
     if !dead || ko < 0 || w.frame as i64 - ko != DEATH_DELAY {
         return;
     }
-    w.game_over = true;
     let form = w.pl_ref(i).form;
     let to = w
         .data

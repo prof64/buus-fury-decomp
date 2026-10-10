@@ -612,9 +612,6 @@ pub struct World {
     pub link_lost: u8,
     /// ... and the script running is the link error's (until its `return_to_title`: `Session::step_post`)
     pub link_error: bool,
-    /// the game over's script (s000) was started for the fallen leader (`menu::gameover::tick`; cleared once the
-    /// leader stands again - the Lazarus Crystal): its `return_to_title` (`Session::step_post`)
-    pub game_over: bool,
     /// the HP / EP the HUD's bars show, per player slot (hp, max, ep, max): read by the HUD object's update at its
     /// place in the object pass (`hud_sample`) - not hashed (the view's)
     pub hud_bars: Vec<(i32, i32, i32, i32)>,
@@ -813,7 +810,6 @@ impl World {
             under_late: None,
             link_lost: 0,
             link_error: false,
-            game_over: false,
             hud_bars: Vec::new(),
             hud_bars_at: u32::MAX,
             hud_end: Vec::new(),

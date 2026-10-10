@@ -78,13 +78,13 @@ friend's leaving does the same to whatever page shows (`link::friend_left`, `lin
 game the list has the box "No Saved Games" over it (`dojo::WaitKind::NoSaves`, `link_nosaves`: B leaves after the
 box's exit-stub iteration) and its A prompt is grey from the start.
 
-**`return_to_title` after the link error (s001) and the game over (s000)**: the title is made in the script's own
-iteration and runs its first step there (`Session::step_post`; `World::link_error` / `World::game_over`, the latter
-without lag frames only - the app) - its picture is up at that iteration's end and its cursor has counted two. Both
-measured on the emulator: two linked ones with one reset (menu_parity `link_lost_*`), and run 2's death replayed
-(`title_gameover`: `meta.rtt` gives the remake the return at `rtt_row`). The ending's `return_to_title` keeps its own
-timing (the title made at the next step's start, its cursor 3 to 6 steps behind - pixel gate sb_044_04_20 /
-rsbk_002_04_21); why it differs is not known.
+**`return_to_title`** (the link error's s001, the game over's s000, the ending) without lag frames (`Options::no_lag`,
+the app): the title is made in the script's own iteration and runs its first step there (`Session::step_post`) - its
+picture is up at that iteration's end, its cursor's first redraw 8 iterations on. Measured on the emulator in all
+three cases, frame for frame the same: two linked ones with one reset (menu_parity `link_lost_*`), run 2's death
+replayed (`title_gameover`: `meta.rtt` gives the remake the return at `rtt_row`), and the ending's segment replayed.
+(The app was two steps late; the pixel gate's two sampled title frames after the ending, which sat inside a cursor
+redraw's slow-down frames and matched only through that lateness, are no longer locked.)
 engine/docs/netcode.md "Link play: playing it".
 
 The **Trading Post's pages are the game's own, in wf-core** (`menu::link::trade`, a [`Link`] page
