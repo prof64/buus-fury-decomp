@@ -116,8 +116,10 @@ fn link_order(w: &World, l: &LinkDraw, order: Vec<((i32, i32, u32), Option<usize
         eprintln!("  sorted: {:?}", a.iter().map(|x| (x.0, x.1.and_then(|e| e.1).map(|i| w.ents[i].id))).collect::<Vec<_>>());
     }
     // (the sorted array is front first - the OAM's order; ours back to front; what the array left out draws
-    // nothing on the GBA - here behind the rest, clipped)
-    skipped.into_iter().chain(a.into_iter().rev().filter_map(|x| x.1)).collect()
+    // nothing: a prop just above the camera stays out when a shake's offset would bring its last lines onto the
+    // screen - link recording dojo_r4 lf 6,663 .. 6,676)
+    let _ = skipped;
+    a.into_iter().rev().filter_map(|x| x.1).collect()
 }
 
 /// an actor's sort depth on the actors' y scale: the game's +4 = y + (footprint h >> 1) (the actor draw 0x080101C6:

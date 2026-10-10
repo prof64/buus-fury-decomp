@@ -9,7 +9,8 @@
 //! the app recreates no lag frames). Every compared frame must be exact, or torn as the tear rule allows (core.md:
 //! the game writes while the screen is drawn - mostly the guest, whose frames the link's waits shift): the last lines
 //! (from 150) still our previous picture; the HUD's / the friend's bars still the frame before's (a hit's frame); the
-//! lines above or below a split with the frame before's BG scroll. Each of those is checked against our own pictures
+//! lines above or below a split with the frame before's BG scroll; our previous picture down to a line; those
+//! together; a tear through the OBJs locked in the recording (`torn`, hex masks). Each of those is checked against our own pictures
 //! and counted; a picture the rule would call torn (differing from both neighbours next to a lag frame) that none of
 //! them explains is counted apart and printed.
 //! `DOJO_PIX_OUT=<dir>` writes emulator | ours | diff strips of differing frames, `DOJO_PIX_ONLY=name` one recording,
@@ -194,11 +195,12 @@ fn run(packs: &Packs, data: &Arc<GameData>, name: &str) -> Vec<(u8, usize, usize
     // per side: the last picture still to judge (its logic frame, the game's hash and video frame, the tear rule, ours,
     // what the match was doing) - judged once the next picture is known (the guest's scanout tear)
     #[allow(clippy::type_complexity)]
-    let mut pend: Vec<Option<(i64, String, i64, bool, Vec<u32>, String, RenderView)>> = vec![None; sides.len()];
+    let mut pend: Vec<Option<(i64, String, i64, bool, Vec<u32>, String, RenderView, bool)>> = vec![None; sides.len()];
     let mut last: Vec<Option<(Vec<u32>, RenderView)>> = vec![None; sides.len()];
     let mut tear_renderer = Renderer::new();
-    let mut judge = |si: usize, p: (i64, String, i64, bool, Vec<u32>, String, RenderView), prev: Option<&(Vec<u32>, RenderView)>, res: &mut Vec<(u8, usize, usize, usize, Vec<i64>, usize)>| {
-        let (lf, h, vf, tear, ours, what, view) = p;
+    let torn = doc["torn"].clone();
+    let mut judge = |si: usize, p: (i64, String, i64, bool, Vec<u32>, String, RenderView, bool), prev: Option<&(Vec<u32>, RenderView)>, res: &mut Vec<(u8, usize, usize, usize, Vec<i64>, usize)>| {
+        let (lf, h, vf, tear, ours, what, view, long) = p;
         let side = &sides[si];
         let e = &mut res[si];
         e.1 += 1;
@@ -210,6 +212,14 @@ fn run(packs: &Packs, data: &Arc<GameData>, name: &str) -> Vec<(u8, usize, usize
         // VRAM / palette copy ran into the picture's end - the guest, whose updates the link's waits shift): our
         // picture with that band of our previous one
         if let Some((n, pv)) = prev {
+            // a long iteration's picture (a lag frame next to it): still the one before, whole
+            if long && hash(n) == h {
+                if log {
+                    eprintln!("dojo_{name} side {} lf {lf}: a long iteration, our previous picture", side.slot);
+                }
+                e.3 += 1;
+                return;
+            }
             if let Some(y0) = (150..160).rev().find(|&y0| {
                 let mut c = ours.clone();
                 c[y0 * 240..].copy_from_slice(&n[y0 * 240..]);
@@ -217,6 +227,18 @@ fn run(packs: &Packs, data: &Arc<GameData>, name: &str) -> Vec<(u8, usize, usize
             }) {
                 if log {
                     eprintln!("dojo_{name} side {} lf {lf}: bottom tear from line {y0}", side.slot);
+                }
+                e.3 += 1;
+                return;
+            }
+            // our previous picture down to a line, the new one below (the OAM / scroll copy while the screen is drawn)
+            if let Some(y0) = (1..160).find(|&y0| {
+                let mut c = ours.clone();
+                c[..y0 * 240].copy_from_slice(&n[..y0 * 240]);
+                hash(&c) == h
+            }) {
+                if log {
+                    eprintln!("dojo_{name} side {} lf {lf}: our previous picture to line {y0}", side.slot);
                 }
                 e.3 += 1;
                 return;
@@ -255,6 +277,158 @@ fn run(packs: &Packs, data: &Arc<GameData>, name: &str) -> Vec<(u8, usize, usize
                     }
                     e.3 += 1;
                     return;
+                }
+            }
+            // the OBJs still the frame before's (the OAM copy after the scanout: where they were on the screen then)
+            // over this frame's BG
+            {
+                let mut ob = view.clone();
+                let d = match (view.cameras.first(), pv.cameras.first()) {
+                    (Some(c), Some(o)) => (c.x - o.x, c.y - o.y),
+                    _ => (0, 0),
+                };
+                ob.sprites = pv.sprites.clone();
+                for sp in ob.sprites.iter_mut() {
+                    sp.x += d.0;
+                    sp.y += d.1;
+                }
+                ob.damage_numbers = pv.damage_numbers.clone();
+                for dn in ob.damage_numbers.iter_mut() {
+                    dn.x += d.0;
+                    dn.y += d.1;
+                }
+                let pic = tear_renderer.render(packs, &ob, 0, 240, 160).to_vec();
+                let hit = if hash(&pic) == h {
+                    Some(160)
+                } else {
+                    (150..160).rev().find(|&y1| {
+                        let mut c = pic.clone();
+                        c[y1 * 240..].copy_from_slice(&n[y1 * 240..]);
+                        hash(&c) == h
+                    })
+                };
+                if let Some(y1) = hit {
+                    if log {
+                        eprintln!("dojo_{name} side {} lf {lf}: torn - the OBJs of the frame before, our previous picture from line {y1}", side.slot);
+                    }
+                    e.3 += 1;
+                    return;
+                }
+            }
+            // those together: the bars and the scroll each old or new above and below one split, and the last lines
+            // still our previous picture (the guest in a moving camera's frame with a hit)
+            let mut both = bars.clone();
+            both.cameras = pv.cameras.clone();
+            both.map = pv.map.clone();
+            let both_pic = tear_renderer.render(packs, &both, 0, 240, 160).to_vec();
+            let bases = [(&ours, "new"), (&bars_pic, "old bars"), (&scroll_pic, "old scroll"), (&both_pic, "old bars and scroll")];
+            for (a, ta) in bases {
+                for (b, tb) in bases {
+                    for y0 in 0..=160usize {
+                        if y0 == 0 && !std::ptr::eq(a, b) {
+                            continue;
+                        }
+                        let mut c = a.clone();
+                        c[y0 * 240..].copy_from_slice(&b[y0 * 240..]);
+                        let hit = if hash(&c) == h {
+                            Some(160)
+                        } else {
+                            (150..160).rev().find(|&y1| {
+                                let mut d = c.clone();
+                                d[y1 * 240..].copy_from_slice(&n[y1 * 240..]);
+                                hash(&d) == h
+                            })
+                        };
+                        if let Some(y1) = hit {
+                            if log {
+                                eprintln!("dojo_{name} side {} lf {lf}: torn - {ta} to line {y0}, {tb} below, our previous picture from line {y1}", side.slot);
+                            }
+                            e.3 += 1;
+                            return;
+                        }
+                        if std::ptr::eq(a, b) {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        // a tear through the OBJs (the OAM copy while the screen is drawn): an older picture down to a line, then a few
+        // lines where each pixel is that picture's or the new one's, the new picture below - locked in the recording
+        // as `torn: {side: {lf: [kind, first mixed line, hex masks of the older picture's pixels ..]}}`; the older
+        // picture: "p" our previous one, "o" the previous frame's OBJs over this frame's BG, "ob" that with the
+        // previous bars (`DOJO_PIX_LOCK=1` prints the lock of such a frame from the emulator's picture)
+        if let Some((n, pv)) = prev {
+            let mut older = |kind: &str| -> Vec<u32> {
+                if kind == "p" {
+                    return n.clone();
+                }
+                let mut ob = view.clone();
+                let d = match (view.cameras.first(), pv.cameras.first()) {
+                    (Some(c), Some(o)) => (c.x - o.x, c.y - o.y),
+                    _ => (0, 0),
+                };
+                ob.sprites = pv.sprites.clone();
+                for sp in ob.sprites.iter_mut() {
+                    sp.x += d.0;
+                    sp.y += d.1;
+                }
+                ob.damage_numbers = pv.damage_numbers.clone();
+                for dn in ob.damage_numbers.iter_mut() {
+                    dn.x += d.0;
+                    dn.y += d.1;
+                }
+                if kind == "ob" {
+                    for (b, o) in ob.hud.iter_mut().zip(&pv.hud) {
+                        (b.hp, b.hp_max, b.ep, b.ep_max) = (o.hp, o.hp_max, o.ep, o.ep_max);
+                    }
+                    for (b, o) in ob.boss_bars.iter_mut().zip(&pv.boss_bars) {
+                        b.fill = o.fill;
+                    }
+                }
+                tear_renderer.render(packs, &ob, 0, 240, 160).to_vec()
+            };
+            if let Some(l) = torn[&side.slot.to_string()][&lf.to_string()].as_array() {
+                let n = older(l[0].as_str().unwrap_or("p"));
+                let y0 = l[1].as_u64().unwrap_or(0) as usize;
+                let mut c = ours.clone();
+                c[..y0 * 240].copy_from_slice(&n[..y0 * 240]);
+                for (j, m) in l[2..].iter().enumerate() {
+                    let m = m.as_str().unwrap_or("").as_bytes();
+                    for x in 0..240 {
+                        let nib = m.get(x / 4).map_or(0, |&ch| (ch as char).to_digit(16).unwrap_or(0));
+                        if nib >> (3 - x % 4) & 1 == 1 {
+                            c[(y0 + j) * 240 + x] = n[(y0 + j) * 240 + x];
+                        }
+                    }
+                }
+                if hash(&c) == h {
+                    if log {
+                        eprintln!("dojo_{name} side {} lf {lf}: torn through the OBJs at line {y0} (locked)", side.slot);
+                    }
+                    e.3 += 1;
+                    return;
+                }
+            }
+            if std::env::var("DOJO_PIX_LOCK").is_ok() {
+                if let Some(emu) = load_png(&side.dir.join(format!("{vf:06}.png"))) {
+                    for kind in ["p", "o", "ob"] {
+                        let n = older(kind);
+                        let line = |p: &[u32], y: usize| p[y * 240..(y + 1) * 240].to_vec();
+                        // (the last line that is not the new picture's, and the first that is not the older one's)
+                        let last_old = (0..160).rev().find(|&y| line(&emu, y) != line(&ours, y));
+                        let first_new = (0..160).find(|&y| line(&emu, y) != line(&n, y));
+                        let (Some(lo), Some(fnw)) = (last_old, first_new) else { continue };
+                        let fnw = fnw.min(lo + 1);
+                        let either = (fnw..=lo).all(|y| (0..240).all(|x| emu[y * 240 + x] == n[y * 240 + x] || emu[y * 240 + x] == ours[y * 240 + x]));
+                        if lo + 1 - fnw <= 4 && either {
+                            let masks: Vec<String> = (fnw..=lo)
+                                .map(|y| (0..60).map(|q| format!("{:x}", (0..4).fold(0, |a, b| a << 1 | u32::from(emu[y * 240 + q * 4 + b] != ours[y * 240 + q * 4 + b])))).collect::<String>())
+                                .collect();
+                            eprintln!("LOCK {name} {} {lf} {kind} {fnw} {}", side.slot, masks.join(" "));
+                            break;
+                        }
+                    }
                 }
             }
         }
@@ -310,6 +484,13 @@ fn run(packs: &Packs, data: &Arc<GameData>, name: &str) -> Vec<(u8, usize, usize
                 eprintln!("lf {lf} side {}: sprites {:?} numbers {:?}", side.slot, view.sprites.iter().map(|s| (s.entity, s.sheet.clone(), s.priority, s.x, s.y, format!("{:?}", s.effect))).collect::<Vec<_>>(), view.damage_numbers);
             }
             let ours = renderer.render(packs, &view, 0, 240, 160).to_vec();
+            // (`DOJO_PIX_DUMP=<lf>-<lf>` with `DOJO_PIX_OUT`: our pictures of those frames)
+            if let (Some(o), Ok(r)) = (std::env::var("DOJO_PIX_OUT").ok(), std::env::var("DOJO_PIX_DUMP")) {
+                let r: Vec<i64> = r.split('-').filter_map(|x| x.parse().ok()).collect();
+                if r.len() == 2 && (r[0]..=r[1]).contains(&lf) {
+                    save(&PathBuf::from(o).join(format!("ours_{name}_{}_{lf}.png", side.slot)), &[&ours]);
+                }
+            }
             if let Some(p) = pend[si].take() {
                 let keep = (p.4.clone(), p.6.clone());
                 judge(si, p, last[si].as_ref(), &mut res);
@@ -335,7 +516,7 @@ fn run(packs: &Packs, data: &Arc<GameData>, name: &str) -> Vec<(u8, usize, usize
                 let pp: Vec<_> = w.battle.popups.iter().map(|p| (p.0, p.1, p.2, p.4 >> 3, p.7)).collect();
                 eprintln!("   pickups {pk:?} popups {pp:?} next_id {} frame {} fighters {:?}", w.next_id, w.frame, w.players.iter().map(|&id| { let a = &w.pl_ref(w.find(id).unwrap()).a; (a.x >> 8, a.y >> 8, a.foot_h) }).collect::<Vec<_>>());
             }
-            pend[si] = Some((lf, h.clone(), *vf, tear, ours, format!("{:?} t {} down {}", g.st.phase, g.st.t, g.st.down_for), view));
+            pend[si] = Some((lf, h.clone(), *vf, tear, ours, format!("{:?} t {} down {}", g.st.phase, g.st.t, g.st.down_for), view, long));
         }
     }
     for (si, p) in pend.into_iter().enumerate() {

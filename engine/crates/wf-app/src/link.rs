@@ -602,7 +602,7 @@ impl Flow {
     }
 
 
-    /// the characters to choose from: In-Game the save's party, Balanced the game's fixed roster (strings 116..139)
+    /// the characters to choose from: In-Game the save's party, Balanced the game's fixed roster (strings 116..147)
     fn char_list(&self) -> Vec<DojoChar> {
         match self.setup.mode {
             DojoMode::Balanced => balanced_roster(),

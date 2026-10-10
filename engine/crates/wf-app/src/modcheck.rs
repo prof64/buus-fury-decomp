@@ -253,6 +253,9 @@ fn data_pass(packs: &Packs, r: &mut Report) {
         for &fm in &f.forms {
             match d.form(fm) {
                 None => r.err(format!("fighter {}", f.id), format!("no form {fm}"), "`forms` lists forms/*.json `index` values"),
+                // (the game's plain form 45 has no sprite of its own: a link fighter's comes with its setup,
+                // `FighterSetup::sprite`)
+                Some(form) if form.gfx == 0 && f.id == "f45" => {}
                 Some(form) => {
                     let spr = (0..=3).map(|k| form.gfx - 9 - k).find(|&s| d.sprite(s).is_some());
                     match spr.and_then(|s| d.sprite(s)) {
