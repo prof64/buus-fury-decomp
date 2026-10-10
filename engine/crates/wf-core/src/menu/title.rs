@@ -136,6 +136,14 @@ impl Title {
         t
     }
 
+    /// the Multiplayer page (Dojo / Trading Post) as its mode starts (`0x0801E7B4`): where the link's pages go back
+    /// to (the Trading Post after TRADE COMPLETE!)
+    pub fn multi(w: &World) -> Title {
+        let mut t = Title::new(w);
+        t.set_page(w, TPage::Multi);
+        t
+    }
+
     fn set_page(&mut self, w: &World, p: TPage) {
         let t = &w.data.menu.as_ref().expect("menu content").text;
         self.page = p;
@@ -320,7 +328,7 @@ fn confirm_kids(t: &TextData) -> Container {
 /// "Waiting for a friend..." (mode vt `0x0804AEBC`, enter `0x08024120`): the state's string (+0x114: 0 -> 90,
 /// 1 -> 92, 2 -> 91, 3 -> 93; the title's Dojo / Trading Post both run it with 0) at (16, 16), B + "Cancel" at
 /// (12, 28) / (28, 40) on a 136x56 surface (redraw `0x0802428E`), BG0 at (56, 64)
-fn wait_kids(t: &TextData, state: u8) -> Container {
+pub(crate) fn wait_kids(t: &TextData, state: u8) -> Container {
     let mut c = Container::default();
     c.add(Widget::Button(Button::new(BTN_B, 0xC, 0x1C, 1, true, false)));
     c.add(Widget::Label(Label {
@@ -349,7 +357,7 @@ fn wait_kids(t: &TextData, state: u8) -> Container {
 }
 
 /// the box of `0x08005096` on a w x h surface
-fn popup_box(cv: &mut Canvas, w: i32, h: i32) {
+pub(crate) fn popup_box(cv: &mut Canvas, w: i32, h: i32) {
     cv.background(12, 4, w - 24, h - 16);
     cv.panel(8, 0, w - 8, h - 8);
 }

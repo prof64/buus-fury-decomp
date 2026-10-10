@@ -62,3 +62,8 @@ LINK = {
                                                                  'RIGHT', 'RIGHT', 'LEFT', 'A') + ['-:30'],
                             open={'kind': 'link_trade'}),
 }
+
+# the Trading Post's pages (scenarios_trade.py)
+from scenarios_trade import TRADE, probe as _trade_probe, post as _trade_post  # noqa: E402
+LINK['link_trade_list'].update(probe0=cursor_t, probe=_trade_probe, post=_trade_post)
+LINK.update(TRADE)

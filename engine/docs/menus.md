@@ -51,11 +51,20 @@ Select Saved Game (94; "No Saved Games" 91), Dojo (95): the setup page (104, "Ch
 In-Game 97 / 98, "Rounds:" 100 with 101..103, "Start Fight" 96), "Choose your character!" (105; Balanced: the
 roster 116..139, In-Game: the save's party), the match's
 "Round N" (106..110) and "You Win!!" / "You Lose!!" / "Draw!!" (111..113) banners over the battle, "Grab your
-prize!" / "Go back to training!" (114 / 115), Trading Post (79) "Your Trade:" / "Friend's Trade:" (80 / 81),
-"Zenie" (82), "How many to trade?" (83), "Propose Trade" / "Accept" / "Decline" (84..86), "You have accepted
-trade" (87), "TRADE" "COMPLETE!" (88 / 89), "Disconnected" (93). Layouts are INFERRED (no cable in the emulator, so
-no capture): the title picture behind one game window, the game's fonts, colours and cursor. engine/docs/netcode.md
-"Link play: playing it".
+prize!" / "Go back to training!" (114 / 115), "Disconnected" (93). engine/docs/netcode.md "Link play: playing
+it".
+
+The **Trading Post's pages are the game's own, in wf-core** (`menu::link::trade`, a [`Link`] page
+`LinkPage::Trade`), gated pixel for pixel against two linked emulators (`re/buu/menu/scenarios_trade.py`, the
+`link_trade_*` scenarios, all exact): the picker (79 "Trading Post": the list of equipment, tradable supplies and
+"Zenie (n)" (82), scrolling 6 rows with its UP / DOWN prompts; "Your Trade:" (80) with up to 5 entries; A Select /
+B Cancel / R "Propose Trade" (84); RIGHT / LEFT between the two columns), "How many to trade?" (83; held LEFT /
+RIGHT speed up by 10 and 100), "Waiting for a friend..." (90) after Propose Trade and after an answer, the proposal
+("Your Trade:" / "Friend's Trade:" (81), ACCEPT / DECLINE (85 / 86) boxes with the cursor), "TRADE" "COMPLETE!"
+(88 / 89) for 61 updates, then the title's Multiplayer page; B on the picker goes back to Select Saved Game.
+"You have accepted trade" (87) is not used by the game. The friend's side comes in as `link::Friend` (`offer`,
+`answer`), our moves go out as `LinkAction`s (Propose, CancelPropose, Answer, CancelAnswer, LeaveProposal,
+Complete, Unpick); the harness feeds a trace row's `link` (`link::harness`).
 
 ## 4. Verification (`crates/wf-app/tests/menu_parity.rs`)
 

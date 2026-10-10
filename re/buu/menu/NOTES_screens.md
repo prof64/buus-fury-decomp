@@ -63,8 +63,10 @@ cable in the emulator either; INFERRED from the code and the strings 79..115):
   "Round N" banner's length, that the host's settings apply to both, which side is the host.
 * **Trading Post** - "Your Trade:" / "Friend's Trade:" (80 / 81), items and "Zenie" (82), "How many to trade?" (83),
   "Propose Trade" / "Accept" / "Decline" (84..86), "You have accepted trade" (87), "TRADE" "COMPLETE!" (88 / 89).
-  Mode tables: `0x08049450`, `0x0804A3BC`, `0x0804AFA0`, `0x0804B550`, `0x0804CAA8` (built by `0x080232A6`,
-  `0x080237CC`, `0x08023C22`), `0x08049424`, `0x0804A8AC`. Item picker `0x0801F44E`: supplies whose record bit 0
+  Mode tables (CORRECTED 2026-10-10: the list above was the Dojo's): the picker `0x0804A60C` (ctor `0x0801F506`),
+  "How many to trade?" `0x0804BC04`, the propose box `0x0804CAD4`, the proposal `0x0804B604`, the answer box
+  `0x0804C0F0`, TRADE COMPLETE! `0x08049B5C` - all decoded and built in engine/crates/wf-core/src/menu/link/trade.rs
+  (exact against linked emulators, scenarios_trade.py). Item picker `0x0801F44E`: supplies whose record bit 0
   (`0x083BD2F8` + 0x34 x id, `story_item`) is clear (ids 0..24), every equipment entry, zenie if not 0; apply
   `0x080231AE` (supplies saturate at 255, equipment add `0x08004448` / remove `0x08004468`).
 * **Mapping to the remake (plan, nothing built):** the link maps onto online play (engine/docs/netcode.md: wf-net's

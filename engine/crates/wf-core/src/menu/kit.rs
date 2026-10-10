@@ -212,6 +212,22 @@ pub struct TabBox {
     pub rect: [i32; 4],
     pub text: Vec<u16>,
     pub active: bool,
+    /// as a selectable control (the ctor's id / neighbours, base `0x08005FBE`; the Trading Post's ACCEPT / DECLINE):
+    /// the selected one moves the selection (`0x08005FD4`: the first pressed direction that has a neighbour) and
+    /// is the cursor's point (x + 3, y + 5) (`0x08015CD2`); no activation (vt +0x18 the base's). `NO_ID`: a plain box
+    #[serde(default = "no_id")]
+    pub id: i32,
+    #[serde(default = "no_nav")]
+    pub nav: [i32; 4],
+}
+
+/// a [`TabBox`] that is not a selectable control
+pub const NO_ID: i32 = i32::MIN;
+fn no_id() -> i32 {
+    NO_ID
+}
+fn no_nav() -> [i32; 4] {
+    [-1; 4]
 }
 
 impl TabBox {
@@ -221,6 +237,8 @@ impl TabBox {
             rect: [x, y, x + w + 6, y + 10],
             text: text.to_vec(),
             active,
+            id: NO_ID,
+            nav: [-1; 4],
         }
     }
 }
@@ -507,6 +525,21 @@ impl Container {
                 }
                 (false, None)
             }
+            Widget::TabBox(t) => {
+                if sel != t.id {
+                    return (false, None);
+                }
+                // 0x08005FD4: UP / DOWN / LEFT / RIGHT, each only when it has a neighbour
+                for (bit, to) in [(UP, t.nav[0]), (DOWN, t.nav[1]), (LEFT, t.nav[2]), (RIGHT, t.nav[3])] {
+                    if k.pressed & bit != 0 && to >= 0 {
+                        sfx.push(super::SFX_CURSOR);
+                        self.sel = to;
+                        self.drawn = false;
+                        return (true, None);
+                    }
+                }
+                (false, None)
+            }
             _ => (false, None),
         }
     }
@@ -530,6 +563,9 @@ impl Container {
                 Widget::Item(c) if c.id == self.sel => {
                     let m = t.font(MenuFont::Small).measure(&c.text);
                     return Some((c.x - (m >> 1), c.y - 3));
+                }
+                Widget::TabBox(tb) if tb.id == self.sel => {
+                    return Some((tb.rect[0] + 3, tb.rect[1] + 5));
                 }
                 Widget::Tabs(tb) if tb.id == self.sel => {
                     let mut x = tb.x0;
