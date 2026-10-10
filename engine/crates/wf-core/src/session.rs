@@ -154,10 +154,13 @@ impl Session {
         }
         // `return_to_title` (0x8E) last frame: the session restarts on the title screen (menu/title.rs; the link
         // error's in the script's own iteration - `step_post`)
-        if w.scene
-            .requests
-            .iter()
-            .any(|r| matches!(r, crate::scene::Request::ReturnToTitle))
+        // (a request the link error / the game over left before this step - a harness's - is `step_post`'s)
+        let own = w.link_error || (w.game_over && w.opts.no_lag);
+        if !own
+            && w.scene
+                .requests
+                .iter()
+                .any(|r| matches!(r, crate::scene::Request::ReturnToTitle))
         {
             *w = crate::menu::title::title_world(&self.data, w);
             w.input = inputs;
@@ -377,7 +380,10 @@ impl Session {
         // first cursor redraw 6 iterations after the next one). The ending's stays the next frame's start
         // (`step_begin`): its title's cursor is 3 to 6 steps behind this one's (pixel gate sb_044_04_20 f24,090 /
         // rsbk_002_04_21 f23,850 - which step exactly, and the game over's, not measured)
-        if self.world.link_error && self.world.scene.requests.iter().any(|r| matches!(r, crate::scene::Request::ReturnToTitle)) {
+        // (the game over's too, without lag frames: run 2's death replayed on the emulator - menu_parity
+        // title_gameover, the title on the iteration's last video frame, its first cursor redraw 8 iterations on)
+        let own = self.world.link_error || (self.world.game_over && self.world.opts.no_lag);
+        if own && self.world.scene.requests.iter().any(|r| matches!(r, crate::scene::Request::ReturnToTitle)) {
             let w = &mut self.world;
             if let Some(c0) = w.g.clock_mark.take() {
                 if !crate::menu::active(w) {
@@ -388,6 +394,11 @@ impl Session {
             *w = crate::menu::title::title_world(&self.data, w);
             // (the events of the frame that ended there stay the frame's: its sounds, the script's stops)
             let mut ev = ev;
+            // (the title song asked for by `return_to_title` itself in this frame is the title's: once - whole run 2
+            // row 18,041, the game over's sounds)
+            if ev.iter().any(|e| matches!(e, crate::world::Event::Song { .. })) {
+                w.events.retain(|e| !matches!(e, crate::world::Event::Song { .. }));
+            }
             ev.append(&mut w.events);
             w.events = ev;
             // (the counter: this iteration is the title's first - `menu::step` counts it)

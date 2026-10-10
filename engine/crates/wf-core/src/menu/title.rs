@@ -949,7 +949,8 @@ pub fn title_world(data: &Arc<crate::content::GameData>, w: &World) -> World {
     // (`link::open_saves`): after that first step it has counted two - the
     // page's first cursor redraw comes 6 iterations after the next one, 8 between the later ones (two linked
     // emulators, the link error's s001: menu_parity link_lost_*)
-    if let Some(super::Screen::Title(t)) = nw.menu.stack.last_mut().filter(|_| w.link_error) {
+    // (the game over's `return_to_title` the same: run 2's death replayed on the emulator - menu_parity title_gameover)
+    if let Some(super::Screen::Title(t)) = nw.menu.stack.last_mut().filter(|_| w.link_error || (w.game_over && w.opts.no_lag)) {
         for k in t.c.kids.iter_mut() {
             if let Widget::Cursor(c) = k {
                 c.t = 1;

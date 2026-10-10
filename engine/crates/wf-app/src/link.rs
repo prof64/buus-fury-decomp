@@ -98,7 +98,13 @@ struct Net {
     t: Box<dyn Transport>,
     lobby: Lobby,
     out: Vec<(String, Vec<u8>)>,
+    /// when a packet last came in (ms): a friend silent for `LINK_TIMEOUT_MS` on a link page is a lost link
+    heard: f64,
 }
+
+/// the game's link error comes 180 updates after the friend's console stops answering (two linked emulators, one
+/// reset on a link page): 3 s without a packet (hellos go every 250 ms)
+const LINK_TIMEOUT_MS: f64 = 3000.0;
 
 impl Net {
     /// one pump: connection changes, the lobby's packets (handled), the rest for the match / the trade
@@ -113,6 +119,7 @@ impl Net {
         let Some(me) = self.t.local_id() else { return (changes, Vec::new()) };
         let mut rest = Vec::new();
         for (from, b) in self.t.recv(now) {
+            self.heard = now;
             match decode(&b) {
                 Some(Msg::Lobby(j)) => {
                     let _ = self.lobby.handle(&me, &from, &j, &mut self.out);
@@ -316,7 +323,7 @@ impl Flow {
         Ok(Flow {
             kind,
             data,
-            net: Net { t, lobby: Lobby::new(settings, nonce), out: Vec::new() },
+            net: Net { t, lobby: Lobby::new(settings, nonce), out: Vec::new(), heard: f64::NAN },
             role,
             phase: Phase::Waiting,
             t: 0,
@@ -583,7 +590,12 @@ impl Flow {
             self.friend_left = true;
         }
         // (a friend that left with B is not a lost link: its page ends by itself - `LinkSim`)
-        let lost = !self.friend_left && (self.friend_gone() || self.net.t.closed());
+        // (... nor is one not heard yet; a friend gone silent is: the game's 3 s)
+        if self.friend.is_some() && self.net.heard.is_nan() {
+            self.net.heard = now;
+        }
+        let silent = self.friend.is_some() && now - self.net.heard > LINK_TIMEOUT_MS;
+        let lost = !self.friend_left && (self.friend_gone() || self.net.t.closed() || silent);
         if lost && !matches!(self.phase, Phase::Waiting | Phase::Message(_) | Phase::Lost) {
             self.set_phase(Phase::Lost);
             return Out::None;
@@ -725,6 +737,7 @@ impl Flow {
                 self.fight = false;
                 self.to_chars = true;
                 self.net.lobby.reopen();
+                self.net.heard = f64::NAN;
                 if !self.host() {
                     self.net.lobby.set_ready(false);
                 }

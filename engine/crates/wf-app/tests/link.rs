@@ -354,6 +354,128 @@ fn dojo_friend_leaves_with_b() {
     }
 }
 
+/// a player without any saved game: the game's Select Saved Game with "No Saved Games" over it, B leaves the link -
+/// and the friend's page follows
+#[test]
+fn link_without_a_saved_game() {
+    let Some(dir) = content_dir() else { return };
+    let d = wf_app::battle::load_data(&packs(&dir)).unwrap();
+    let sb = save(&d, &[(4, 60)], &[], 0);
+    let p = packs(&dir);
+    let net = SimNet::new(Conditions { latency_ms: 80.0, jitter_ms: 20.0, loss: 0.05 }, 21);
+    let t = Rc::new(Cell::new(0.0f64));
+    let tc = t.clone();
+    let clock: Clock = Rc::new(move || tc.get());
+    let eps = Rc::new(RefCell::new(0));
+    // the host: an empty cartridge
+    let hdir = tmp("nosave-host");
+    std::fs::create_dir_all(hdir.join("saves")).unwrap();
+    let _ = std::fs::remove_file(hdir.join("saves/slot1.sav"));
+    let inner = wf_app::launcher::title_sim(&p, &[], 7).unwrap();
+    let (hnet, e2) = (net.clone(), eps.clone());
+    let cfg = LinkConfig {
+        connect: Box::new(move |_k| {
+            *e2.borrow_mut() += 1;
+            Ok((Box::new(hnet.endpoint("nosave-host")), Role::Host))
+        }),
+        clock: clock.clone(),
+        link_id: "link-nosave-host".into(),
+        name: "nosave-host".into(),
+        saves_dir: Some(hdir.join("saves")),
+        rules: rules(),
+        seed: 11,
+        bot: Some(LinkBot::new(LinkKind::Dojo, true)),
+        report: None,
+    };
+    let a = Player { sim: LinkSim::new(inner, cfg), dir: hdir };
+    let b = player(&p, &net, &clock, "nosave-guest", false, LinkKind::Dojo, &sb, eps);
+    let mut r = Run { packs: p, renderer: wf_render::Renderer::new(), drawn: Vec::new(), net, t, a, b, b_alive: true };
+    // (its scripted player presses B on the link's pages)
+    r.a.sim.bot_mut().unwrap().matches = 0;
+    let (mut boxed, mut seen) = (false, std::collections::BTreeSet::new());
+    for _ in 0..6000 {
+        if r.a.done() && r.b.done() {
+            break;
+        }
+        r.step();
+        boxed |= r.a.sim.link_screen().is_some_and(|l| {
+            matches!(l.page, wf_core::menu::link::LinkPage::Saves(_)) && l.wait.as_ref().is_some_and(|w| w.kind == wf_core::menu::link::dojo::WaitKind::NoSaves)
+        });
+        seen.insert(r.a.sim.phase());
+        seen.insert(r.b.sim.phase());
+    }
+    assert!(boxed, "No Saved Games over Select Saved Game");
+    assert!(r.a.done() && r.b.done(), "both back at the title ({} / {})", r.a.sim.phase(), r.b.sim.phase());
+    assert!(!seen.contains("lost") && !seen.contains("nosaves") && !seen.contains("message"), "phases seen {seen:?}");
+    assert_eq!((r.a.sim.last.as_deref(), r.b.sim.last.as_deref()), (Some("left"), Some("left")));
+}
+
+/// the link is lost while a link page shows (no fight yet): the game's link error over the page, then the title's
+/// first page
+#[test]
+fn dojo_link_lost_on_a_page() {
+    let Some(dir) = content_dir() else { return };
+    let d = wf_app::battle::load_data(&packs(&dir)).unwrap();
+    let sa = save(&d, &[(0, 90)], &[], 0);
+    let sb = save(&d, &[(4, 60)], &[], 0);
+    let Some(mut r) = run("dojo-page-drop", LinkKind::Dojo, &sa, &sb, 15) else { return };
+    r.until(6000, "the host's setup page", |r| r.a.sim.phase() == "setup" && r.a.sim.link_screen().is_some());
+    r.net.kill("dojo-page-drop-guest");
+    r.b.sim.drop_link();
+    r.b_alive = false;
+    r.until(3000, "host: the link error", |r| r.a.sim.phase() == "lost");
+    let mut v = wf_view::RenderView::default();
+    wf_view::Sim::view(&r.a.sim, &mut v);
+    assert!(v.menu.is_some(), "the page under the script's fade");
+    let mut said = false;
+    for _ in 0..2000 {
+        if r.a.done() {
+            break;
+        }
+        r.step();
+        wf_view::Sim::view(&r.a.sim, &mut v);
+        said |= v.dialog.as_ref().is_some_and(|d| d.text.contains("disconnected"));
+    }
+    assert!(said && r.a.done(), "the box, then the title ({})", r.a.sim.phase());
+    assert_eq!(r.a.sim.last.as_deref(), Some("disconnected"));
+    assert!(
+        matches!(r.a.sim.inner.session.world.menu.stack.last(), Some(wf_core::menu::Screen::Title(t)) if t.page == wf_core::menu::title::TPage::Title),
+        "the title's first page"
+    );
+    assert_eq!(r.a.slot(), sa);
+}
+
+/// the friend leaves the Trading Post's link with B before anything is proposed: ours goes back to the Multiplayer
+/// page by itself, nothing traded, no link error
+#[test]
+fn trade_friend_leaves_with_b() {
+    let Some(dir) = content_dir() else { return };
+    let d = wf_app::battle::load_data(&packs(&dir)).unwrap();
+    let sa = save(&d, &[(0, 20)], &[(0, 5)], 500);
+    let sb = save(&d, &[(4, 20)], &[(1, 4)], 100);
+    let Some(mut r) = run("trade-leave", LinkKind::Trade, &sa, &sb, 17) else { return };
+    r.b.sim.bot_mut().unwrap().matches = 0;
+    // (the host only looks at its picker: no offer, no proposal)
+    {
+        let b = r.a.sim.bot_mut().unwrap();
+        b.first = 0;
+        b.zenie = 0;
+        b.accept = false;
+    }
+    let mut seen = std::collections::BTreeSet::new();
+    for _ in 0..6000 {
+        if r.a.done() && r.b.done() {
+            break;
+        }
+        r.step();
+        seen.insert(r.a.sim.phase());
+    }
+    assert!(r.a.done() && r.b.done(), "both back at the title ({} / {}; host saw {seen:?})", r.a.sim.phase(), r.b.sim.phase());
+    assert!(!seen.contains("lost") && !seen.contains("message"), "the host saw {seen:?}");
+    assert_eq!(r.a.sim.last.as_deref(), Some("left"));
+    assert_eq!((r.a.slot(), r.b.slot()), (sa, sb), "nothing traded");
+}
+
 #[test]
 fn dojo_disconnect_mid_match() {
     let Some(dir) = content_dir() else { return };

@@ -302,6 +302,12 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
         if row["lost"].as_bool() == Some(true) {
             wf_core::menu::link::lost(&mut sim.session.world);
         }
+        // the game over's `return_to_title` (`meta.rtt`: the row whose iteration made the title in the game)
+        if logic && meta["rtt"].as_str() == Some("game_over") && meta["rtt_row"].as_u64() == Some(k as u64) {
+            let w = &mut sim.session.world;
+            w.game_over = true;
+            w.scene.requests.push(wf_core::scene::Request::ReturnToTitle);
+        }
         // the friend left the link with B (the row whose iteration made the Multiplayer page of ours)
         if row["left"].as_bool() == Some(true) {
             wf_core::menu::link::friend_left(&mut sim.session.world);

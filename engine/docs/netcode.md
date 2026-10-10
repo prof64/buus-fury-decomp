@@ -352,6 +352,8 @@ network options, `--net-name`, `--net-key` apply); B (Cancel) leaves as in the g
   under the script's fade); `LinkSim` keeps the fight's last picture there instead when the link was lost in one
   (phase "lost"). Gated frame by frame, the scene's frames and the title after it included: menu_parity
   `link_lost_setup` / `link_lost_saves` / `link_lost_chars`. A trade in doubt keeps its page (the journal's lock).
+  On a link page a friend that stops answering without its connection closing (a dead network) is lost after 3 s
+  without a packet (`LINK_TIMEOUT_MS`: the game's 180 updates; tests/link.rs `dojo_link_lost_on_a_page`).
 * **Leaving with B** (Select Saved Game's Cancel): the page becomes the title's Multiplayer page (menu_parity
   `link_saves_back`), and the friend's page follows by itself whatever it shows - no link error (two linked
   emulators: `link_friend_left` / `link_friend_left_setup`; the game's side follows 9 to 60 iterations later, ours

@@ -78,11 +78,13 @@ friend's leaving does the same to whatever page shows (`link::friend_left`, `lin
 game the list has the box "No Saved Games" over it (`dojo::WaitKind::NoSaves`, `link_nosaves`: B leaves after the
 box's exit-stub iteration) and its A prompt is grey from the start.
 
-**The link error's `return_to_title`** (s001): the title is made in the script's own iteration and runs its first
-step there (`Session::step_post`, `World::link_error`) - its picture is up at that iteration's end and its cursor has
-counted two. The ending's `return_to_title` keeps its own timing (the title made at the next step's start; its cursor
-3 to 6 steps behind the link error's - pixel gate sb_044_04_20 / rsbk_002_04_21); why the two differ, and which the
-game over's s000 follows, is not measured yet.
+**`return_to_title` after the link error (s001) and the game over (s000)**: the title is made in the script's own
+iteration and runs its first step there (`Session::step_post`; `World::link_error` / `World::game_over`, the latter
+without lag frames only - the app) - its picture is up at that iteration's end and its cursor has counted two. Both
+measured on the emulator: two linked ones with one reset (menu_parity `link_lost_*`), and run 2's death replayed
+(`title_gameover`: `meta.rtt` gives the remake the return at `rtt_row`). The ending's `return_to_title` keeps its own
+timing (the title made at the next step's start, its cursor 3 to 6 steps behind - pixel gate sb_044_04_20 /
+rsbk_002_04_21); why it differs is not known.
 engine/docs/netcode.md "Link play: playing it".
 
 The **Trading Post's pages are the game's own, in wf-core** (`menu::link::trade`, a [`Link`] page

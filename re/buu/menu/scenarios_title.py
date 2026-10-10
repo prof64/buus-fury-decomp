@@ -63,7 +63,20 @@ def title_open(page='title'):
 T = 'buu_title.ss'
 TS = 'buu_title_saved.ss'
 
+def _vt(e):
+    return dict(vt=e.r32(e.r32(0x03000F90)))
+
+
+def _rtt(frames, extra):
+    """the row whose iteration ran `return_to_title` (the title's mode, vt 0x0804A404, made): `rtt_row`"""
+    extra['rtt_row'] = next(i for i, f in enumerate(frames) if f.get('vt') == 0x0804A404)
+
+
 SCENARIOS = {
+    # the game over (work/states/buu_died.ss = run 2's death, on the death scene's "You have died!"): A, the script's
+    # fade-out, `return_to_title` - the title's first picture and its cursor's blink (menu_parity gives the remake the
+    # return at `rtt_row`; the scene's frames before it are not compared)
+    'title_gameover': ('buu_died.ss', None, [], ['-:31', 'A:3', '-:142'], {'rtt': 'game_over', 'probe': _vt, 'finish': _rtt}),
     # move between START / OPTIONS, START -> Single / Multiplayer -> back (B) -> START -> Single -> Select Game
     # (two empty slots), move, toggle Delete Game (L / R) and back, B -> back
     'title_menus': (T, None, ['-:7'],
