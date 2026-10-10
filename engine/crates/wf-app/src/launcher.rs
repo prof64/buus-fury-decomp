@@ -811,7 +811,7 @@ impl Launcher {
         // own skill list (Energy Blast)
         if let Some(d) = self.data.as_ref().filter(|d| d.fighter(&f.fighter).is_some_and(|fd| fd.character == 8 && fd.fusion.is_none())) {
             let (r, _, _) = wf_core::battle::build_record(d, &FighterSetup { fighter: "goku".into(), level, auto_spend: "even".into(), ..Default::default() });
-            f.fixed = Some(wf_core::battle::FixedRecord { hp: r.max_hp, ep: r.max_ep, stats: [r.str_, r.pow, r.end, r.spd], skills: None });
+            f.fixed = Some(wf_core::battle::FixedRecord { hp: r.max_hp, ep: r.max_ep, stats: [r.str_, r.pow, r.end, r.spd], skills: None, ..Default::default() });
         }
         // one opponent, ended by a KO; the arena rules (`Options::arena`) over the game's
         let phases = vec![Phase { enemy: b.enemy.clone(), count: 1 }];

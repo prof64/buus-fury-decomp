@@ -136,7 +136,7 @@ fn setup(data: &GameData, fighter: &str, form: i32, level: i32) -> FighterSetup 
     let mut f = FighterSetup { fighter: fighter.into(), form, level, auto_spend: "even".into(), skill_level, full_gauge: true, ..Default::default() };
     if data.fighter(fighter).is_some_and(|fd| fd.character == 8 && fd.fusion.is_none()) {
         let (r, _, _) = wf_core::battle::build_record(data, &FighterSetup { fighter: "goku".into(), level, auto_spend: "even".into(), ..Default::default() });
-        f.fixed = Some(wf_core::battle::FixedRecord { hp: r.max_hp, ep: r.max_ep, stats: [r.str_, r.pow, r.end, r.spd], skills: None });
+        f.fixed = Some(wf_core::battle::FixedRecord { hp: r.max_hp, ep: r.max_ep, stats: [r.str_, r.pow, r.end, r.spd], skills: None, ..Default::default() });
     }
     f
 }

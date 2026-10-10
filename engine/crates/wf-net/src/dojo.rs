@@ -1,8 +1,8 @@
 //! Link play: the **Dojo** (title -> Multiplayer -> Dojo; `re/buu/menu/NOTES_screens.md`, engine/docs/netcode.md
 //! "Link play: Dojo"): two players pick one of their saves and a character from its party, the host sets "Character
 //! Mode:" (Balanced / In-Game) and "Rounds:" (1 / 3 / 5), and they fight a rollback versus match in the Dojo
-//! (area 0-90) in rounds; the winner "Grab[s] your prize!" (a banner only - the ROM writes no item), the loser "Go back to
-//! training!".
+//! (area 0-90) in rounds; the knockdown of the match drops a prize (coins, perhaps a supply) the winner collects in
+//! the 300 updates before the result - "Grab your prize!" -, the loser "Go back to training!".
 //!
 //! Pieces (all deterministic plain data; the network is the lobby's `dojo` room kind + the rollback session):
 //! * [`DojoSave`]: what a peer shows of a local save (its party: fighter, form, level, stats, equipment), built from a
@@ -16,27 +16,32 @@
 //! * [`DojoMatch`]: a peer's end of the match: the result once its frame is confirmed by every input, an optional prize
 //!   written to the local save exactly once, "Disconnected" (no result, no prize) if the link drops first.
 //!
-//! What comes from the ROM (static disassembly; the emulator has no link cable - engine/docs/netcode.md "Link play:
-//! Dojo" has the table with addresses):
+//! What comes from the ROM (static disassembly, and recordings of two linked emulators, tools/link/dojo_record.py ->
+//! data/link/dojo_*.json, gated by tests/dojo_link.rs - engine/docs/netcode.md "Link play: Dojo" has the table with
+//! addresses):
 //! * MEASURED: the texts (strings 79..139: Select Saved Game 94, Dojo 95, Start Fight 96, Character Mode 97..99,
 //!   Rounds 100..103, "Choose your character!" 105, Round 1..5 106..110, You Win!! / You Lose!! / Draw!! 111..113,
 //!   Grab your prize! / Go back to training! 114 / 115, Disconnected 93); the fight (0x0802193A, state block
 //!   0x03002BFC: +0 / +1 the two players' round wins, +4 the round timer's seconds): the RNG words 0x03004A5C / 60 are
 //!   zeroed once when the fight starts (both carts from (0, 0); the generator then runs on through every round); area
 //!   0-90 (0x08008E70), the two fighters 50 px left / right of (152, 220); "Round N" = 106 + both players' wins (a
-//!   drawn round keeps its number); a round: 180 seconds (0xB4) of 60 updates each; it ends the update a fighter's HP
-//!   (record +0x16) is 0 - one down: the other wins the round, both down: Draw!!, the timer at 0 with both standing:
-//!   Draw!! (no HP comparison); the result shows 300 updates (0x12C) before the next round; the match runs until a
-//!   player has more than rounds / 2 wins (draws do not count: no limit on the number of rounds); "Grab your prize!" /
-//!   "Go back to training!" are only the match winner's / loser's banners - the Dojo writes nothing to the save (the
-//!   only save write of the link code is the Trading Post's, 0x080231AE). Character Mode: Balanced (the option page's
+//!   drawn round keeps its number); a round: 180 seconds (0xB4) of 60 updates each; a knockdown (HP, record +0x16, at
+//!   0) decides it 300 updates (0x12C) later - one down: the other wins the round, both down: Draw!! - the timer, the
+//!   fighters and the fallen one's regeneration running on; the timer at 0 with both standing: Draw!! (no HP
+//!   comparison); then 63 updates of the old fighters, the next round's made in an update of their own, 125 of "Round
+//!   N" (`DojoRules`, measured); the match runs until a player has more than rounds / 2 wins (draws do not count: no
+//!   limit on the number of rounds). The knockdown that decides the match runs the loot script s498 with the fallen
+//!   fighter's level (`player::link_prize`): coins (s500) and at most a first-roll supply (s499), picked up as in the
+//!   field (coins by touch once landed, a supply with A and its 61-update hold) - the zenie goes into the game data in
+//!   RAM; the only save write of the link code is the Trading Post's (0x080231AE). Character Mode: Balanced (the option page's
 //!   mode byte 1) = a fixed roster of 24 fighters (strings 116..139: Goku .. Pikkon, list 0x08023120) with the table
 //!   0x0872BFCC's records - HP 15000, EP 100, STR 67, POW 67, END 25, SPD 50 (Hercule STR 60 / POW 74), one skill
 //!   (7, Energy Blast) - built by 0x08022904 / 0x0801339C; In-Game (mode byte 0) = the save's party (the 12-byte list
 //!   at +0x584, names 158+) with each character's own record packed whole (0x08022934 -> 0x080229B0: level, form,
-//!   skills and skill levels, max HP / EP as current, STR..SPD, equipment).
-//! * INFERRED: how long "Round N" shows before a round (`between_frames` counts the 300-update result display), and
-//!   that the host's mode / rounds apply to both (the option page's link exchange is not decoded).
+//!   skills and skill levels, max HP / EP as current, STR..SPD, equipment, the selected skill). A fighter as made has
+//!   the plain form controller and no form stat bonus whatever its form (`Player::link_plain`) until it transforms.
+//! * INFERRED: that the host's mode / rounds apply to both (the option page's link exchange is not decoded; the
+//!   recordings set both sides' to the same).
 
 use std::sync::Arc;
 
@@ -103,6 +108,11 @@ pub struct DojoChar {
     pub max_ep: i32,
     #[serde(default)]
     pub skills: Vec<i32>,
+    /// the selected skill and each skill's chosen level (In-Game Mode: the record's)
+    #[serde(default)]
+    pub sel: usize,
+    #[serde(default)]
+    pub skill_levels: Vec<i32>,
 }
 
 /// What a peer shows of one of its saves.
@@ -141,6 +151,8 @@ impl DojoSave {
                 max_hp: c.rec.max_hp,
                 max_ep: c.rec.max_ep,
                 skills: c.skills.clone(),
+                sel: c.sel.max(0) as usize,
+                skill_levels: (0..c.skills.len()).map(|k| c.skill_cur(k)).collect(),
             });
         }
         (!party.is_empty()).then_some(DojoSave { slot, party })
@@ -162,7 +174,8 @@ pub struct DojoHello {
 pub struct DojoRules {
     /// frames per round before the timer ends it in a draw (ROM: 180 s x 60 updates)
     pub round_frames: u32,
-    /// frames between rounds (ROM: the result shows 300 updates)
+    /// a round's result to the next round's fighters: the fighters go on without keys (63 updates, measured: the link
+    /// recording dojo_b3)
     pub between_frames: u32,
     /// a round's start: its fighters stand while "Round N" shows, before the timer runs and the keys count (their idle
     /// animations and EP regeneration go on) - 125 updates from their creation, measured from the link recording
@@ -183,7 +196,7 @@ fn d_start_frames() -> u32 {
 
 impl Default for DojoRules {
     fn default() -> Self {
-        DojoRules { round_frames: 180 * 60, between_frames: 300, start_frames: d_start_frames(), balanced_hp: 15000, max_rounds: 0, prize: None }
+        DojoRules { round_frames: 180 * 60, between_frames: 63, start_frames: d_start_frames(), balanced_hp: 15000, max_rounds: 0, prize: None }
     }
 }
 
@@ -254,6 +267,8 @@ pub fn balanced_roster() -> Vec<DojoChar> {
             max_hp: 0,
             max_ep: 0,
             skills: Vec::new(),
+            sel: 0,
+            skill_levels: Vec::new(),
         })
         .collect()
 }
@@ -274,7 +289,7 @@ pub fn fighter_setup(c: &DojoChar, mode: DojoMode, rules: &DojoRules, d: &GameDa
                 form: e.2,
                 level: 50,
                 auto_spend: "none".into(),
-                fixed: Some(FixedRecord { hp: rules.balanced_hp, ep: BALANCED_EP, stats: e.3, skills: Some(BALANCED_SKILLS.to_vec()) }),
+                fixed: Some(FixedRecord { hp: rules.balanced_hp, ep: BALANCED_EP, stats: e.3, skills: Some(BALANCED_SKILLS.to_vec()), level: 50, ..Default::default() }),
                 ..Default::default()
             }
         }
@@ -292,7 +307,15 @@ pub fn fighter_setup(c: &DojoChar, mode: DojoMode, rules: &DojoRules, d: &GameDa
                 level: c.level,
                 auto_spend: "none".into(),
                 equip: c.equip,
-                fixed: Some(FixedRecord { hp, ep, stats: c.stats, skills: (!c.skills.is_empty()).then(|| c.skills.clone()) }),
+                fixed: Some(FixedRecord {
+                    hp,
+                    ep,
+                    stats: c.stats,
+                    skills: (!c.skills.is_empty()).then(|| c.skills.clone()),
+                    sel: c.sel,
+                    skill_levels: c.skill_levels.clone(),
+                    level: c.level,
+                }),
                 ..Default::default()
             }
         }
@@ -354,7 +377,12 @@ pub struct DojoState {
     /// timer runs on)
     #[serde(default)]
     pub down_for: u32,
+    /// the prize picked up so far (zenie: the coins the match-deciding knockdown dropped, `wf_core::player::link_prize`)
+    #[serde(default)]
+    pub zenie: i32,
 }
+
+
 
 /// a knockdown to the round's result (link recording dojo_fight2: HP 0 at frame 6,757, the win at 7,056)
 pub const KO_FRAMES: u32 = 300;
@@ -371,25 +399,33 @@ pub struct DojoGame {
 
 impl DojoGame {
     pub fn new(data: Arc<GameData>, cfg: MatchConfig, setup: DojoSetup, rules: DojoRules) -> DojoGame {
-        let s = Self::round_session(&data, &cfg, None);
+        let s = Self::round_session(&data, &cfg, None, setup.rounds, [0; 2]);
         DojoGame {
             data,
             cfg,
             setup,
             rules,
-            st: DojoState { round: 0, phase: Phase::Between { left: rules.start_frames.max(1) }, t: 0, wins: [0; 2], results: Vec::new(), over_at: None, frame: 0, down_for: 0 },
+            st: DojoState { round: 0, phase: Phase::Between { left: rules.start_frames.max(1) }, t: 0, wins: [0; 2], results: Vec::new(), over_at: None, frame: 0, down_for: 0, zenie: 0 },
             s,
         }
     }
     /// a round: the match's fighters afresh; the generator goes on from where the last round left it (`rng`; the ROM
     /// zeroes it once, when the fight starts)
-    fn round_session(data: &Arc<GameData>, cfg: &MatchConfig, rng: Option<[u32; 2]>) -> Session {
+    fn round_session(data: &Arc<GameData>, cfg: &MatchConfig, rng: Option<[u32; 2]>, rounds: u8, wins: [u8; 2]) -> Session {
         let mut c = cfg.clone();
         if let Some([a, b]) = rng {
             c.battle.rng = RngInit::State(a, b);
         }
         let mut s = c.session(data.clone());
         s.world.opts.link = true;
+        s.world.opts.link_rounds = rounds;
+        s.world.opts.link_wins = wins;
+        // (a link fighter's stats have no form bonus)
+        for i in 0..s.world.ents.len() {
+            if s.world.players.contains(&s.world.ents[i].id) {
+                wf_core::player::link_made(&mut s.world, i);
+            }
+        }
         place_fighters(&mut s);
         s
     }
@@ -409,6 +445,10 @@ impl DojoGame {
     }
     /// the round's end, if it ended this update (ROM 0x08021CC0): a fighter's HP at 0 - one down: the other wins,
     /// both: Draw!!; the timer at 0 with both standing: Draw!!
+    /// the prize's next drop picked up (`PRIZE_PICKUP` after the knockdown, one a frame)
+    fn prize_pickup(&mut self) {
+        self.st.zenie = self.s.world.story.zenie as i32;
+    }
     fn downs(&self) -> (bool, bool) {
         let w = &self.s.world;
         let down = |slot: usize| w.players.get(slot).and_then(|&id| w.find(id)).is_none_or(|i| w.pl_ref(i).dead || w.pl_ref(i).rec.hp <= 0);
@@ -442,8 +482,13 @@ impl Game for DojoGame {
         match self.st.phase {
             Phase::Over => {}
             Phase::Between { left } => {
-                // (the round's fighters exist for its last `start_frames`: they stand and idle, no keys)
-                if left <= self.rules.start_frames {
+                // after a round's result its fighters go on for `between_frames` without keys, then the next round's
+                // are made (an update of its own) and stand / idle for `start_frames` (link recording dojo_b3: the
+                // result at 9,932, the old fighters to 9,995, the new ones made at 9,996, the timer at 180 from 10,121)
+                if left == self.rules.start_frames + 1 {
+                    let rng = self.s.world.rng.state();
+                    self.s = Self::round_session(&self.data, &self.cfg, Some(rng), self.setup.rounds, self.st.wins);
+                } else {
                     self.s.step(&[0, 0]);
                 }
                 if left <= 1 {
@@ -455,12 +500,19 @@ impl Game for DojoGame {
             }
             Phase::Fight => {
                 let k = inputs.iter().map(|&v| v & crate::core_game::BUTTONS_MASK).collect::<Vec<_>>();
+                let held = self.s.world.link_get.is_some();
                 self.s.step(&k);
-                self.st.t += 1;
-                if self.st.down_for > 0 || self.downs() != (false, false) {
-                    self.st.down_for += 1;
+                self.prize_pickup();
+                // (a supply's item-get holds the round's clocks for the 61 frames after the pick-up's - link
+                // recording dojo_c9: that second of the timer 121 frames, the round's result 61 frames later)
+                if !held {
+                    self.st.t += 1;
+                    if self.st.down_for > 0 || self.downs() != (false, false) {
+                        self.st.down_for += 1;
+                    }
                 }
                 if let Some(r) = self.round_end() {
+                    wf_core::player::link_round_over(&mut self.s.world);
                     self.st.down_for = 0;
                     self.st.results.push(r);
                     if let RoundResult::Win(x) = r {
@@ -473,11 +525,7 @@ impl Game for DojoGame {
                         self.st.over_at = Some(self.st.frame);
                     } else {
                         self.st.round = self.st.round.saturating_add(1);
-                        let rng = self.s.world.rng.state();
-                        self.s = Self::round_session(&self.data, &self.cfg, Some(rng));
-                        // (the result banner, then the next round's start - INFERRED: only the first round's start is
-                        // recorded)
-                        self.st.phase = Phase::Between { left: self.rules.between_frames + self.rules.start_frames };
+                        self.st.phase = Phase::Between { left: self.rules.between_frames + 1 + self.rules.start_frames };
                     }
                 }
             }

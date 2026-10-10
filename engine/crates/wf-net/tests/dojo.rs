@@ -298,7 +298,7 @@ fn dojo_rom_rules() {
     use wf_net::dojo::{balanced_roster, BALANCED_ROSTER};
     let fd = common::field_data();
     let r = DojoRules::default();
-    assert_eq!(r, DojoRules { round_frames: 10800, between_frames: 300, start_frames: 125, balanced_hp: 15000, max_rounds: 0, prize: None });
+    assert_eq!(r, DojoRules { round_frames: 10800, between_frames: 63, start_frames: 125, balanced_hp: 15000, max_rounds: 0, prize: None });
     let roster = balanced_roster();
     assert_eq!(roster.len(), 24);
     for c in &roster {

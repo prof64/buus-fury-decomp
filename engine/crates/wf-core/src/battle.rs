@@ -222,6 +222,22 @@ pub struct FixedRecord {
     pub stats: [i32; 4],
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub skills: Option<Vec<i32>>,
+    /// the selected skill (an index into the list) and each skill's chosen level (the record's +0x15 and +0x2E + 2i:
+    /// In-Game Mode's fighter keeps its save's - link recording dojo_ig1: Goku on Meditate, B with full HP does nothing)
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub sel: usize,
+    /// the record's level (its XP the level's first): 0 = the setup's. Balanced Mode's record has none (XP 0: level 50
+    /// - its prize script's level, link recording dojo_c5: Trunks, whose own records start at 60)
+    #[serde(default, skip_serializing_if = "is_zero_i")]
+    pub level: i32,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub skill_levels: Vec<i32>,
+}
+fn is_zero(v: &usize) -> bool {
+    *v == 0
+}
+fn is_zero_i(v: &i32) -> bool {
+    *v == 0
 }
 fn d_growth() -> String {
     "average".into()
@@ -415,6 +431,10 @@ pub fn build_record(d: &GameData, f: &FighterSetup) -> (Record, Vec<i32>, Vec<i3
         rec.end = fx.stats[2];
         rec.spd = fx.stats[3];
         rec.points = 0;
+        if fx.level > 0 {
+            rec.level = fx.level.clamp(50, 200);
+            rec.xp = d.xp_table.get((rec.level - 50) as usize).copied().unwrap_or(0);
+        }
         if let Some(s) = &fx.skills {
             skills = s.clone();
         }
@@ -599,6 +619,15 @@ pub fn create(data: Arc<GameData>, cfg: &BattleConfig) -> World {
                 pl.ss3_gauge = pl.rec.max_ep as i64 * 65536;
             } else if ss {
                 pl.ss_gauge = pl.rec.max_ep;
+            }
+        }
+        if let Some(fx) = &f.fixed {
+            if fx.sel < pl.skills.len() {
+                pl.sel = fx.sel;
+            }
+            pl.fixed_levels = fx.skill_levels.clone();
+            if let Some(&lv) = pl.fixed_levels.get(pl.sel) {
+                pl.skill_level = lv;
             }
         }
         let (sx, sy) = match (&w.col, spawn) {
@@ -921,6 +950,23 @@ pub fn pre_step(w: &mut World) {
 
 /// after the world update: cameras, the HUD low-HP beep, phases
 pub fn post_step(w: &mut World) {
+    // a link fight: the coins of the prize are picked up by touch, each fighter standing tested in slot order (the
+    // field's trigger check: `fieldobj::coin_check`, the footprint's top-left)
+    let held = w.link_get.is_some();
+    crate::fieldobj::link_get_step(w);
+    if w.opts.link && !held {
+        for s in 0..w.players.len() {
+            let Some(pi) = w.player_idx(s) else { continue };
+            let pl = w.pl_ref(pi);
+            if pl.rec.hp == 0 || pl.dead {
+                continue;
+            }
+            let (px, py) = (pl.a.px(), pl.a.py());
+            if crate::fieldobj::coin_check(w, px, py, s as u8) {
+                break;
+            }
+        }
+    }
     // the task list (screen shakes) after the whole object pass, before the camera (as the field's step_post: the
     // OBJs take the new offset, the BG layers the one before - `view::render_view`); the TS reference mirrors it
     w.tick_shakes();

@@ -475,7 +475,13 @@ fn scatter(w: &mut World, vx: i32, vy: i32) -> (i32, i32) {
 
 /// `drop_zenie(size)` (`0x08018346`): a coin at the loot position (5 RNG draws)
 pub fn drop_zenie(w: &mut World, size: i32) -> Option<EntityId> {
-    let (lx, ly, lvx, lvy) = w.field.as_ref()?.loot;
+    let loot = w.field.as_ref()?.loot;
+    drop_zenie_from(w, loot, size)
+}
+
+/// `drop_zenie` at a given loot block (position, velocity) - a link fight's prize (no field: `player::link_prize`)
+pub fn drop_zenie_from(w: &mut World, loot: (i32, i32, i32, i32), size: i32) -> Option<EntityId> {
+    let (lx, ly, lvx, lvy) = loot;
     let size = size.clamp(0, 3);
     // no coin (and no draws) when the object tiles are short: room < 0x3000 (`0x08018356`)
     if crate::vram::room_of(w).is_some_and(|r| r < 0x3000) {
@@ -524,7 +530,13 @@ pub fn drop_zenie(w: &mut World, size: i32) -> Option<EntityId> {
 
 /// `drop_item(i)` / `drop_equipment(e)` (`0x0800D30E`): item >= 0 supply, < 0 equipment (4 RNG draws)
 pub fn drop_item(w: &mut World, item: i32) -> Option<EntityId> {
-    let (lx, ly, lvx, lvy) = w.field.as_ref()?.loot;
+    let loot = w.field.as_ref()?.loot;
+    drop_item_from(w, loot, item)
+}
+
+/// `drop_item` at a given loot block (`drop_zenie_from`)
+pub fn drop_item_from(w: &mut World, loot: (i32, i32, i32, i32), item: i32) -> Option<EntityId> {
+    let (lx, ly, lvx, lvy) = loot;
     let (vx, vy) = scatter(w, lvx, lvy);
     let kind = if item >= 0 {
         PickupKind::Supply(item)
@@ -658,6 +670,12 @@ pub fn pickup_update(w: &mut World, i: usize) {
         }
         return;
     }
+    // (a link fight's item-get holds them the same way: the coins' age stops, their moves run on - link recording
+    // dojo_ig7 f3,600 .. f3,661: age 20 throughout, the moves counter 21 .. 60)
+    if w.link_get.is_some() {
+        coin_move(w, i);
+        return;
+    }
     let Body::Pickup(p) = &w.ents[i].body else {
         return;
     };
@@ -725,6 +743,12 @@ pub fn coin_check(w: &mut World, px: i32, py: i32, slot: u8) -> bool {
         // the coin's touch trigger (rect = its box grown by 19 / 11 / 4 / 4, moved with it) holds from its creation
         // (story playthrough: a coin dropped next to the player is collected in its first frame, in the air)
         if !matches!(p.kind, PickupKind::Zenie(_)) {
+            continue;
+        }
+        // (a link fight's prize: only from its age 60 - link recording dojo_b3, the winner stands on the two coins for
+        // their 39 first frames and takes them when back at frame 91; dojo_ig7: coins whose flight ended during a
+        // supply's hold, age 20, are taken when their age reaches 60, not before)
+        if w.opts.link && p.t <= 60 {
             continue;
         }
         let r = match p.spawn {
@@ -802,6 +826,83 @@ pub fn collect(w: &mut World, k: usize, slot: u8) {
     }
     w.events
         .push(Event::Field(FieldEvent::Collected { kind, slot }));
+}
+
+/// A link fight's item-get: the prize's supply picked up with A (the field's presentation, `ItemGet`, in a battle).
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct LinkGet {
+    /// frames left (61, the field's)
+    pub left: i32,
+    pub slot: u8,
+    pub supply: Option<i32>,
+    /// the objects the interrupted pass had not reached: their update comes at the end
+    pub rest: Vec<EntityId>,
+}
+
+/// a link fight's A press that hit nobody (`player::melee`): the interact message to the objects last to first - a
+/// dropped supply under the facing's box is picked up as in the field: the item goes, the fighter holds it up (raw
+/// 14, cel 1, its tick kept) and the fight holds 61 frames (link recording dojo_c9 f6,981: the winner's A by the
+/// prize's supply - no regeneration, no round clock, the knocked-down fighter's animation runs on)
+pub fn link_interact(w: &mut World, pi: usize) -> bool {
+    if w.link_get.is_some() {
+        return false;
+    }
+    let (px, py, facing) = {
+        let a = &w.pl_ref(pi).a;
+        (a.px(), a.py(), a.facing)
+    };
+    let me = w.ents[pi].id;
+    let slot = w.players.iter().position(|&id| id == me).unwrap_or(0) as u8;
+    let b = crate::fieldnpc::TALK_BOX[facing as usize & 3];
+    let bx = [px + b[0], py + b[1], px + b[2], py + b[3]];
+    let ov = |r: [i32; 4]| r[0] < bx[2] && bx[0] < r[2] && r[1] < bx[3] && bx[1] < r[3];
+    for k in (0..w.ents.len()).rev() {
+        if w.ents[k].removed {
+            continue;
+        }
+        let Body::Pickup(p) = &w.ents[k].body else { continue };
+        if !p.by_a() || !ov(p.rect()) {
+            continue;
+        }
+        let supply = match p.kind {
+            PickupKind::Supply(s) => Some(s),
+            _ => None,
+        };
+        w.ents[k].removed = true;
+        crate::vram::entity_gone(w, k);
+        w.sfx(45, 64);
+        let tick = w.pl_ref(pi).ap.tick;
+        crate::player::script_pose(w, pi, 13, 1);
+        crate::player::set_tick(w, pi, tick);
+        w.link_get = Some(LinkGet { left: 61, slot, supply, rest: Vec::new() });
+        return true;
+    }
+    false
+}
+
+/// the link item-get's frame (after the object pass, as the field's `item_get_step`): the count; at 0 the fighter
+/// goes idle (SetAnim(0)); a frame later the objects the pass had not reached get their update and the supply counts
+pub fn link_get_step(w: &mut World) {
+    let Some(g) = w.link_get.as_mut() else { return };
+    g.left -= 1;
+    if g.left > 0 {
+        return;
+    }
+    if g.left == 0 {
+        let slot = g.slot as usize;
+        if let Some(pi) = w.player_idx(slot) {
+            crate::player::set_idle(w, pi);
+        }
+        return;
+    }
+    let g = w.link_get.take().unwrap();
+    for id in g.rest.into_iter().rev() {
+        let Some(k) = w.find(id).filter(|&k| !w.ents[k].removed) else { continue };
+        w.update_entity(k);
+    }
+    if let Some(s) = g.supply {
+        w.story.add_supply(s, 1);
+    }
 }
 
 /// the item-get presentation's frame (blocking: the players get no input, no trigger check); at its end the supply

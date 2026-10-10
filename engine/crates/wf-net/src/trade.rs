@@ -61,14 +61,15 @@ pub struct Inventory {
     /// supply only when bit 0 of its record's first halfword (`0x083BD2F8` + 0x34 x id) is clear - the items table's
     /// `story_item`: ids 25..82; tradable are the supplies 0..24, the equipment list, and zenie when not 0)
     pub story: Vec<bool>,
-    /// the equipment list: (item id, worn) - worn entries cannot be traded (`0x08004468`, remove equipment, skips
-    /// entries with the worn marker in the high nibble: MEASURED from the ROM)
+    /// the equipment list: (item id, worn). Worn entries are traded too: the picker lists every entry, and remove
+    /// equipment (`0x08004468`) takes the first unworn copy, else the first worn one - its wearer's slot goes back to
+    /// "-None-" (MEASURED: link recordings data/link/trade_*.json, Gohan's worn Cotton Gi / Leather Moccasins traded)
     pub equipment: Vec<(i32, bool)>,
     pub zenie: u32,
 }
 
 impl Inventory {
-    /// `give` may leave this inventory: every count / copy / zenie is there and unworn, no story item
+    /// `give` may leave this inventory: every count / copy (worn or not) / zenie is there, no story item
     pub fn check_give(&self, give: &Offer) -> Result<(), String> {
         for (&i, &n) in &give.supplies {
             if n == 0 {
@@ -83,10 +84,8 @@ impl Inventory {
             }
         }
         let mut free: BTreeMap<i32, usize> = BTreeMap::new();
-        for &(id, worn) in &self.equipment {
-            if !worn {
-                *free.entry(id).or_default() += 1;
-            }
+        for &(id, _) in &self.equipment {
+            *free.entry(id).or_default() += 1;
         }
         let mut want: BTreeMap<i32, usize> = BTreeMap::new();
         for &id in &give.equipment {
@@ -95,7 +94,7 @@ impl Inventory {
         for (id, n) in want {
             let have = free.get(&id).copied().unwrap_or(0);
             if have < n {
-                return Err(format!("equipment {id}: offering {n}, have {have} not worn"));
+                return Err(format!("equipment {id}: offering {n}, have {have}"));
             }
         }
         if self.zenie < give.zenie {
@@ -113,7 +112,7 @@ impl Inventory {
             inv.supplies[i as usize] -= n;
         }
         for id in &give.equipment {
-            let k = inv.equipment.iter().position(|&(x, worn)| x == *id && !worn).unwrap();
+            let k = inv.equipment.iter().position(|&(x, worn)| x == *id && !worn).or_else(|| inv.equipment.iter().position(|&(x, _)| x == *id)).unwrap();
             inv.equipment.remove(k);
         }
         inv.zenie -= give.zenie;
@@ -554,8 +553,11 @@ mod tests {
         assert!(a.check_give(&o).is_ok());
         o.supplies.insert(0, 6);
         assert!(a.check_give(&o).is_err());
-        let worn = Offer { equipment: vec![7, 7], ..Default::default() };
-        assert!(a.check_give(&worn).is_err(), "one Weighted copy is worn");
+        // (worn copies trade too - the unworn one goes first)
+        let two = Offer { equipment: vec![7], ..Default::default() };
+        assert_eq!(a.after(&two, &Offer::default()).unwrap().equipment, vec![(7, true), (9, false)]);
+        assert!(a.check_give(&Offer { equipment: vec![7, 7], ..Default::default() }).is_ok());
+        assert!(a.check_give(&Offer { equipment: vec![7, 7, 7], ..Default::default() }).is_err(), "two copies only");
         let mut story = Offer::default();
         story.supplies.insert(60, 1);
         assert!(inv(&[], &[], 0).check_give(&story).is_err());

@@ -349,6 +349,16 @@ pub struct Player {
     pub skills: Vec<i32>,
     pub skill_level: i32,
     pub sel: usize,
+    /// a fixed record's chosen level per skill (`battle::FixedRecord::skill_levels`): the selected one's is
+    /// `skill_level` (a skill switch takes the new one's)
+    #[serde(default)]
+    pub fixed_levels: Vec<i32>,
+    /// a link fighter as made: the plain form controller (slot 0x03001B70 whatever the form - no Super Saiyan gauge
+    /// or drain), no form stat bonuses (link recordings dojo_c1 / c6 .. c9: SS3 Goku walks 352 a frame, Balanced SPD
+    /// 50's 5 * 50 + 102, its EP is the record's); a transformation's form change ends it (dojo_ig3 / ig4: In-Game
+    /// Goku turned Super Saiyan walks 480 (+ 128), the slot 0x03001B78, the gauge at max EP and draining)
+    #[serde(default)]
+    pub link_plain: bool,
     pub state: PState,
     pub t: i32,
     pub sk: Option<SkillInst>,
@@ -449,6 +459,8 @@ impl Player {
             sel: init.sel.min(init.skills.len().saturating_sub(1)),
             skills: init.skills,
             skill_level: init.skill_level,
+            fixed_levels: Vec::new(),
+            link_plain: false,
             state: PState::Idle,
             t: 0,
             sk: None,
@@ -557,9 +569,28 @@ impl Player {
     pub fn swinging(&self) -> bool {
         self.ap.raw == 20
     }
+    /// the form object's controller slot (the form record's +8): a link fighter as made has the plain one,
+    /// 0x03001B70 (`link_plain`; measured obj+0x22C's +4 for SS3 Goku, SS Goku, SS Vegeta, SS3 Gotenks, SS Vegito)
+    pub fn ctl_slot(&self, w: &World) -> u32 {
+        if self.link_plain {
+            0x3001b70
+        } else {
+            self.form_ref(w).controller
+        }
+    }
+    /// whose EP a form spends (the EP accessor 0x08003CF4): (Super Saiyan gauge, SS3 gauge) - neither for a link
+    /// fighter as made, whose plain controller keeps no gauge (`link_plain`; link recording dojo_c1: SS3 Goku's
+    /// Energy Blast takes the record's EP, 100 -> 94)
+    pub fn gauge_kind(&self, w: &World) -> (bool, bool) {
+        if self.link_plain {
+            return (false, false);
+        }
+        let f = self.form_ref(w);
+        (f.ss, f.ss3)
+    }
     /// story Trunks: form 24 (0x03001B88) / 25 (0x03001B8C)
     pub fn story_form(&self, w: &World) -> bool {
-        let c = self.form_ref(w).controller;
+        let c = self.ctl_slot(w);
         c == 0x3001b88 || c == 0x3001b8c
     }
     /// 0x0800FF44: the shot origin on the body box: down (cx, position y), up (cx, cy), left (x0, cy), right (x1, cy)
@@ -578,6 +609,7 @@ impl Player {
     }
     pub fn apply_form(&mut self, w: &World, id: i32) {
         self.form = id;
+        self.link_plain = false;
         let f = w.data.form(id).expect("form");
         let mut spr = None;
         for k in 0..=3 {
@@ -603,7 +635,10 @@ impl Player {
             &eq,
             (self.holy_left > 0).then_some(self.boost),
         );
-        let b = w.data.form(self.form).expect("form");
+        let mut b = w.data.form(self.form).expect("form").clone();
+        if self.link_plain {
+            (b.b_str, b.b_pow, b.b_end, b.b_end2, b.b_walk, b.b_dash) = (0, 0, 0, 0, 0, 0);
+        }
         let e = self.eff;
         self.a.stats = CombatStats {
             str_: e.str_ + b.b_str,
@@ -635,20 +670,20 @@ impl Player {
     }
     fn can_afford(&self, w: &World, cost: i32) -> bool {
         let c = self.scaled(cost) as i64;
-        let f = self.form_ref(w);
-        if f.ss3 {
+        let (ss, ss3) = self.gauge_kind(w);
+        if ss3 {
             return (self.ss3_gauge >> 16) >= c;
         }
-        if f.ss {
+        if ss {
             return self.ss_gauge as i64 >= c;
         }
         self.rec.ep as i64 >= c
     }
     fn energy_left(&self, w: &World) -> i64 {
-        let f = self.form_ref(w);
-        if f.ss3 {
+        let (ss, ss3) = self.gauge_kind(w);
+        if ss3 {
             self.ss3_gauge >> 16
-        } else if f.ss {
+        } else if ss {
             self.ss_gauge as i64
         } else {
             self.rec.ep as i64
@@ -673,7 +708,7 @@ impl Player {
             .is_some()
     }
     fn idle_state(&self, w: &World) -> Gs {
-        if self.form_ref(w).controller == 0x3001b64 {
+        if self.ctl_slot(w) == 0x3001b64 {
             Gs::Idle2
         } else {
             Gs::Idle
@@ -750,10 +785,7 @@ fn spend(w: &mut World, i: usize, cost: i32, scaled_already: bool) {
     if c <= 0 {
         return;
     }
-    let (ss, ss3) = {
-        let f = pr(w, i).form_ref(w);
-        (f.ss, f.ss3)
-    };
+    let (ss, ss3) = pr(w, i).gauge_kind(w);
     let pl = p(w, i);
     if ss3 {
         pl.ss3_gauge = 0.max(pl.ss3_gauge - c as i64 * 65536);
@@ -785,6 +817,11 @@ fn set_resist(w: &mut World, i: usize, v: i32) {
     pl.resist = v;
     pl.a.stats.res_m = v;
     pl.a.stats.res_e = v;
+}
+/// a link fighter as made (`Player::link_plain`): the plain controller, no form bonus - the stats recomputed
+pub fn link_made(w: &mut World, i: usize) {
+    p(w, i).link_plain = true;
+    refresh(w, i);
 }
 fn refresh(w: &mut World, i: usize) {
     let mut pl = pr(w, i).clone();
@@ -872,6 +909,34 @@ pub fn script_pose(w: &mut World, i: usize, id: usize, frame: i32) {
     pl.ap.raw = raw;
     pl.ap.frame = frame;
     pl.ap.tick = 0;
+}
+
+/// a link round's result: a fighter in its transformation or charging a beam stops it - the idle (SetAnim(0)), the
+/// form kept (link recordings dojo_ig2 f3,646 / dojo_ig5 f2,318: the winner's power-up cut in the result's frame, form
+/// 0, gauge 0; dojo_ig4 f2,523: a Kamehameha at charge tick 14 ends, no EP spent; dojo_ig8: a Big Bang charging). A
+/// punch or a thrown Energy Blast runs on (dojo_c3 / dojo_c8)
+pub fn link_round_over(w: &mut World) {
+    for s in 0..w.players.len() {
+        let Some(i) = w.player_idx(s) else { continue };
+        let charging = match pr(w, i).gs {
+            Gs::Skill(20) | Gs::SsUp => true,
+            Gs::Skill(_) => pr(w, i).sk.as_ref().is_some_and(|k| match w.data.skill_kind(k.id) {
+                15 | 16 | 6 | 1 | 3 => k.proj == 0,
+                // (the Big Bang's ball charging in the hand: dojo_ig8 f3,090, Vegeta's cut at tick 9)
+                2 => true,
+                _ => false,
+            }),
+            _ => false,
+        };
+        if charging {
+            set_anim_id(w, i, 0);
+        }
+    }
+}
+
+/// the animation tick as is (a pose that keeps it: the link item-get, `fieldobj::link_interact`)
+pub fn set_tick(w: &mut World, i: usize, tick: i32) {
+    p(w, i).ap.tick = tick;
 }
 
 /// scripts: the state's animation has finished (vfunc +0x34): back in idle, or holding
@@ -1642,6 +1707,7 @@ pub fn update(w: &mut World, i: usize) {
         .field
         .as_ref()
         .is_some_and(|f| f.busy || f.item_get.is_some() || f.passive_hold_at == Some(w.frame))
+        || w.link_get.is_some()
         || crate::scene::is_puppet(w, w.ents[i].id)
             && w.scene.depth == 0
             && !w.scene.ai_wait.is_empty()
@@ -1949,7 +2015,7 @@ fn story_tick(w: &mut World, i: usize) {
         return;
     }
     let f = pr(w, i).form_ref(w).clone();
-    if f.controller == 0x3001b88 {
+    if pr(w, i).ctl_slot(w) == 0x3001b88 {
         if pr(w, i).gs != Gs::SsUp {
             p(w, i).transform_to = f.up;
             set_anim_id(w, i, 23);
@@ -1963,7 +2029,7 @@ fn story_tick(w: &mut World, i: usize) {
 fn new_form_object(w: &mut World, i: usize) {
     // (a new object: not the one the frame's held pass skipped - `passive_after_scripts`)
     p(w, i).passive_held = false;
-    let c = pr(w, i).form_ref(w).controller;
+    let c = pr(w, i).ctl_slot(w);
     if c == 0x3001b88 {
         let r = w.rng.rand(180);
         p(w, i).story_cnt = 120 + r;
@@ -2336,6 +2402,10 @@ fn cycle_skill(w: &mut World, i: usize) {
 /// level of the skill selected when the player was built, 0, and picked 1). Battles keep the setup's level.
 pub fn sync_skill_level(w: &mut World, i: usize) {
     if w.field.is_none() {
+        let pl = p(w, i);
+        if let Some(&lv) = pl.fixed_levels.get(pl.sel) {
+            pl.skill_level = lv;
+        }
         return;
     }
     let Some(c) = crate::story::char_of_form(&w.data, pr(w, i).form) else {
@@ -2483,7 +2553,7 @@ fn passive(w: &mut World, i: usize) {
         w.g.candy -= 1;
     }
     let f = pr(w, i).form_ref(w).clone();
-    let drains = [0x3001b68, 0x3001b6c, 0x3001b78, 0x3001b80].contains(&f.controller);
+    let drains = [0x3001b68, 0x3001b6c, 0x3001b78, 0x3001b80].contains(&pr(w, i).ctl_slot(w));
     if pr(w, i).gs != Gs::SsRevert && drains {
         if f.ss3 {
             let max_ep = pr(w, i).rec.max_ep;
@@ -2528,7 +2598,7 @@ fn passive(w: &mut World, i: usize) {
         }
     }
     // the cutscene fusion's form object (0x0800E638): after the regen its countdown; negative -> the defuse script
-    if f.controller == 0x3001b64 {
+    if pr(w, i).ctl_slot(w) == 0x3001b64 {
         p(w, i).fus_cnt -= 1;
         if pr(w, i).fus_cnt < 0 {
             let pl = p(w, i);
@@ -2785,6 +2855,9 @@ fn melee(w: &mut World, i: usize) {
     if w.field.is_some() && !any && (crate::fieldnpc::interact(w, i) || !combat) {
         return;
     }
+    if w.opts.link && !any && crate::fieldobj::link_interact(w, i) {
+        return;
+    }
     if any {
         let s = 48 + w.rng.rand(2);
         sfx(w, s, 64);
@@ -2815,8 +2888,7 @@ pub fn on_dealt(w: &mut World, i: usize, msg: &HitMsg, dmg: i64) {
             // (through the EP accessor - script variable 14, `0x08003CF4`: a Super Saiyan form's EP is its gauge; run 3
             // 7-6 prelims row 211,885: Super Saiyan Goku's landed punch, the gauge 106 -> 107)
             let add = pl.eff.melee_ep;
-            let form = pl.form;
-            let (ss, ss3) = w.data.form(form).map(|f| (f.ss, f.ss3)).unwrap_or((false, false));
+            let (ss, ss3) = pr(w, i).gauge_kind(w);
             let pl = p(w, i);
             if ss3 {
                 let g = ((pl.ss3_gauge >> 16) + add as i64).min(pl.rec.max_ep as i64);
@@ -2853,6 +2925,9 @@ pub fn can_use_skill(w: &World, i: usize, id: i32) -> bool {
     match id {
         12 | 19 | 21 => false,
         18 => true,
+        // a link fight's fighter has no Instant Transmission: B with it selected does nothing (link recording
+        // dojo_ig1: Goku on it all fight, EP 963 throughout)
+        14 if w.opts.link => false,
         14 => pl.can_afford(w, 40),
         20 => {
             if f.up == f.down || f.ss3 {
@@ -3902,7 +3977,7 @@ pub fn aura_form(w: &World, i: usize) -> bool {
     [
         0x3001b68, 0x3001b6c, 0x3001b78, 0x3001b7c, 0x3001b80, 0x3001b84, 0x3001b8c,
     ]
-    .contains(&pr(w, i).form_ref(w).controller)
+    .contains(&pr(w, i).ctl_slot(w))
 }
 /// the object world's hide (0xA) / show (0xB) message to the leader: an aura form's loop (sound 54) stops / starts
 /// (`vram::world_hide` / `world_show`: menus, a saved field's scene)
@@ -4613,8 +4688,107 @@ fn after_hp_change(w: &mut World, i: usize) {
         // updates, whichever object dealt the KO (an injected hit lands before it: world.rs Injector)
         let fr = w.frame as i64 + 1;
         p(w, i).ko_at = fr;
+        if w.opts.link {
+            link_prize(w, i);
+        }
     }
 }
+
+/// a link fight's knockdown that decides the match (0x0801088A's link branch: the winner's wins + 1 over half the
+/// rounds) drops the prize at the fallen fighter: the loot point at its footprint's centre, its velocity
+/// ((rand(64) - 32) / 32) px per frame on each axis, then s498 with the fallen one's level index (level - 50) - 1..8 drops (1 + rand(100):
+/// <= 5 eight, <= 10 seven, <= 20 six, <= 30 five, <= 40 four, <= 55 three, <= 75 two, else one), each a coin
+/// (a chance(85) drawn, then s500: rand(400) against the level's thresholds, `drop_zenie`). The coins are picked up
+/// once landed (`battle::post_step`'s trigger check).
+/// Measured with the link cable (data/link/dojo_c2: six 5-zenie coins, 51 draws in the knockdown's frame)
+fn link_prize(w: &mut World, i: usize) {
+    let id = w.ents[i].id;
+    let Some(slot) = w.players.iter().position(|&p| p == id) else { return };
+    let winner = 1 - slot.min(1);
+    if (w.opts.link_rounds >> 1) as i32 >= w.opts.link_wins[winner] as i32 + 1 {
+        return;
+    }
+    // (s498's parameter: the fallen fighter's level from its XP, 0x080135D2 - the script's P0 = 50 for a Balanced
+    // fighter, XP 0: link recordings dojo_c5 / dojo_c9)
+    let level = crate::progression::level_of(pr(w, i).rec.xp, &w.data.xp_table);
+    let a = &pr(w, i).a;
+    let (lx, ly) = (a.px() + (a.foot_w >> 1), a.py() + (a.foot_h >> 1));
+    let lvx = ((w.rng.rand(0x40) - 0x20) / 32) << 8;
+    let lvy = ((w.rng.rand(0x40) - 0x20) / 32) << 8;
+    let loot = (lx, ly, lvx, lvy);
+    let g0 = 1 + w.rng.rand(100);
+    let n = match g0 {
+        ..=5 => 8,
+        ..=10 => 7,
+        ..=20 => 6,
+        ..=30 => 5,
+        ..=40 => 4,
+        ..=55 => 3,
+        ..=75 => 2,
+        _ => 1,
+    };
+    // the rolls (s498's loop): chance(85) is drawn every roll; it or G1 set -> a coin (s500, which leaves G1 =
+    // its rand(400)), else a supply (s499, then G1 = 1) - in effect only the first roll can be a supply, and a
+    // later one after a coin roll of 0 (link recordings dojo_c4: the third roll a coin on a failed chance; dojo_c9:
+    // the first roll a supply)
+    let mut g1 = 0;
+    for _ in 0..n {
+        let hit = w.rng.chance((85i64 * 0x28F5D) >> 8);
+        if hit || g1 != 0 {
+            // s500
+            let g = (level - 48) * 100;
+            let r = w.rng.rand(400);
+            g1 = r;
+            let size = if r <= g / 100 {
+                3
+            } else if r <= g / 83 {
+                2
+            } else if r <= g / 66 {
+                1
+            } else {
+                0
+            };
+            crate::fieldobj::drop_zenie_from(w, loot, size);
+        } else {
+            // s499: a level band's supply
+            let g0 = if level - 15 > 160 { 160 } else { level };
+            let gg1 = g0 * 100;
+            let hi = gg1 / (g0 - 15) + 1;
+            let lo = gg1 / (g0 + 5) - 1;
+            let pick = lo + w.rng.rand((hi - lo) as u32);
+            if let Some(item) = link_supply(g0, gg1, pick) {
+                crate::fieldobj::drop_item_from(w, loot, item);
+            }
+            g1 = 1;
+        }
+    }
+}
+
+/// s499's supply for a level (`g0`, `g1` = g0 * 100) and its draw (`pick`): the level bands (high, low, divisor,
+/// item) in the script's order - the first band holding the level whose `g1 / divisor` the pick is within gives its
+/// item, else the last band's item that held the level; 45..65 without a hit: supply 0; None: no band (no drop)
+fn link_supply(g0: i32, g1: i32, pick: i32) -> Option<i32> {
+    const BANDS: [(i32, i32, i32, i32); 19] = [
+        (175, 155, 160, 19), (170, 150, 155, 9), (160, 140, 145, 18), (155, 135, 140, 8), (145, 125, 130, 17),
+        (140, 120, 125, 6), (130, 110, 115, 16), (125, 105, 110, 7), (120, 100, 105, 15), (115, 95, 100, 5),
+        (110, 90, 95, 14), (105, 85, 90, 4), (100, 80, 85, 13), (95, 75, 80, 3), (90, 70, 75, 12), (85, 65, 70, 2),
+        (80, 60, 65, 11), (75, 55, 60, 1), (70, 50, 55, 10),
+    ];
+    let mut last = -1;
+    for (hi, lo, div, item) in BANDS {
+        if hi >= g0 && lo <= g0 {
+            if pick <= g1 / div {
+                return Some(item);
+            }
+            last = item;
+        }
+    }
+    if (45..=65).contains(&g0) {
+        return Some(0);
+    }
+    (last != -1).then_some(last)
+}
+
 
 // ---- lockstep ---------------------------------------------------------------------------------------------------------------
 

@@ -174,18 +174,25 @@ The game's Dojo ("Battle with your friends in the Dojo!") as a `dojo` room + one
 
 **Recorded from the real game (2026-10-10).** Two emulators wired by the link cable in one process (tools/emu shim
 `emu_link` / `emu_link_run_frames`: mGBA's lockstep coordinator, both cores' run loops interleaved; headless, muted):
-`tools/link/dojo_record.py NAME [--frames N] [--seed S]` boots both with run 2's saves, goes title -> Multiplayer ->
-Dojo -> Balanced / 1 round / Start Fight / Goku vs Goku, and fights on seeded closed-loop keys; per logic frame of the
-host it writes `data/link/dojo_NAME.json` (the keys each fighter's update read - `0x03002DA4` / `0x03002DAE`, the
-remote side's arrive 6 frames late, nothing is read while "Round N" shows -, the generator, the round timer, both
-fighters' position / facing / animation / HP / EP / regeneration count). `wf-net/tests/dojo_link.rs` advances the
-app's `DojoGame` with those keys from the fighters' creation: `dojo_fight1` 2,529 / 2,529 and `dojo_fight2` 5,535 /
-5,535 (to the round's result) frames exact - both fighters, the generator, the timer, the wins. Fixed on the way: the
-round starts as the game's (generator 0, per fighter rand(255) then its idle tick rand(255), at (102, 220) /
-(202, 220) facing down; "Round N" 125 updates with the fighters idling, `DojoRules::start_frames`); a landed punch
-gives no EP; the result comes 300 updates after a knockdown (`KO_FRAMES`; the timer runs on; the knocked-down
-fighter's regeneration too, no death script) - `Options::link`. Not recorded yet: later rounds, In-Game Mode, the
-Trading Post.
+`tools/link/dojo_record.py NAME [--frames N] [--seed S] [--mode balanced|ingame] [--rounds 1|3|5] [--pick-a N]
+[--pick-b N] [--switch]` boots both with run 2's saves, goes title -> Multiplayer -> Dojo -> the setup -> the picks,
+and fights on seeded closed-loop keys (`--switch`: L presses too, the In-Game skills); per logic frame of the host
+(written once complete, when the next has begun - a link stall leaves no half-updated row) it writes
+`data/link/dojo_NAME.json`: the keys each fighter's update read (`0x03002DA4` / `0x03002DAE`, the remote side's
+arrive 6 frames late, nothing is read while "Round N" shows), the generator, the round timer and wins, both fighters'
+position / facing / animation / HP / EP / regeneration count / form / gauges / controller slot, the coins on the
+floor, both sides' zenie, and the fighters' records as made (In-Game Mode). `wf-net/tests/dojo_link.rs` advances the
+app's `DojoGame` with those keys from the fighters' creation and compares every frame to the match's result: 23
+recordings, Balanced 1- and 3-round matches over all 24 characters (Super Saiyan forms included) and In-Game
+3-round matches (Goku, Vegeta) with skills, transformations and skill switching - all exact (fighters, generator, timer, wins,
+zenie). Fixed on the way: the round's start (generator 0, per fighter rand(255) then its idle tick rand(255), at
+(102, 220) / (202, 220) facing down; 125 updates of "Round N", `DojoRules::start_frames`); a landed punch gives no
+EP; the result 300 updates after a knockdown (`KO_FRAMES`: the timer, the fighters and the fallen one's regeneration
+run on, no death script); between rounds 63 updates of the old fighters (`between_frames`), the new ones made in an
+update of their own; a fighter as made has the plain form controller (slot 0x03001B70: no Super Saiyan gauge or
+drain, EP from the record) and no form stat bonus, until a transformation (`Player::link_plain`); the round's result
+cuts a transformation, a charging beam or a Big Bang in the hand (back to idle); Instant Transmission does nothing; the In-Game fighter keeps
+its save's selected skill and skill levels, a Balanced record has level 50 (XP 0); the prize (below).
 
 **The game's rules, decoded** (static disassembly of the link code). Fight function `0x0802193A`, state block `0x03002BFC` (+0 / +1 round wins, +4 the timer's
 seconds), fight context `0x0872A6B4`.
@@ -195,17 +202,16 @@ seconds), fight context `0x0872A6B4`.
 | Round timer: 180 s, 60 updates per second | `movs #0xB4` at `0x08021C4A`; 0x3C update counter `0x08021C4E` / `0x08021D2A` | MEASURED | `round_frames` 10800 (was 99 s) |
 | A round ends the update a fighter's HP (record +0x16) is 0: one down -> the other wins, both down -> Draw!! | `0x08021CE4`..`0x08021D1A` | MEASURED | `round_end` (was: 200 frames after the KO) |
 | Timer out with both standing = Draw!! (no HP comparison) | `0x08021D48`..`0x08021D4E` | MEASURED | (was: higher HP share wins) |
-| Result banner (You Win!! / You Lose!! / Draw!!, strings 0x6F..0x73) shown 300 updates before the next round | `0x08021D56`..`0x08021DB4`, `0x12C` at `0x08021DC4` | MEASURED | `between_frames` 300 (was 180) |
+| A knockdown decides the round 300 updates later; then 63 updates of the old fighters, the next round's made in an update of their own, 125 updates of "Round N" | `0x12C` at `0x08021DC4` | MEASURED (link recordings) | `KO_FRAMES`, `between_frames` 63, `start_frames` 125 |
 | "Round N" = string 106 + both players' wins: a drawn round repeats its number | `0x08021A90`..`0x08021AA8` | MEASURED | `st.round` |
 | Match: loop while a player's wins <= rounds / 2; draws don't count, no round limit, a match cannot end drawn | `0x08021B98`..`0x08021BAE` | MEASURED | `max_rounds` 0 (was: N rounds max, equal = Draw!!) |
 | RNG words `0x03004A5C` / `0x03004A60` zeroed once when the fight starts, then running on through all rounds | `0x0802193E`..`0x0802194C` | MEASURED | `RngInit::State(0, 0)`, carried (was: seed + round) |
 | Arena area 0-90, fighters at (102, 220) / (202, 220) | `movs #0x5A` at `0x08008E8C` | MEASURED | `dojo` arena |
-| Prize: none. No item / save write in the Dojo code; the only save write of the link code is the trade's | `0x080231AE` | MEASURED | `prize` None (was: one Senzu Bean) |
+| Prize: the match-deciding knockdown runs loot script s498 with the fallen fighter's level (from its XP, `0x080135D2`) at its footprint's centre: 1 + rand(100) -> 1..8 rolls, each chance(85) or a coin roll before -> a coin (s500), else a level-band supply (s499) - in effect only the first roll can be a supply. Coins are collected by touch from their age 60, a supply with A (61 updates' hold: the clocks and the coins' age stopped, their flight going on); the zenie goes into the RAM game data, no save write (the only one of the link code is the trade's) | `0x0801088A`, scripts 498..500, `0x080231AE` | MEASURED (link recordings) | `player::link_prize`, `fieldobj::link_interact`; `prize` None |
 | Character Mode byte: 1 = Balanced, 0 = In-Game | `0x0802195A`, `0x0802311A` | MEASURED | `DojoMode` |
 | Balanced roster: a fixed 24 (strings 116..139: Goku, SS Goku, SS3 Goku, Teen Gohan, SS Teen Gohan, Mystic Gohan, Great Saiyaman, Gohan, SS Gohan, Trunks, SS Trunks, Vegeta, SS Vegeta, Goten, SS Goten, Gotenks, SS Gotenks, SS3 Gotenks, Vegito, SS Vegito, SS Gogeta, Hercule, Videl, Pikkon), the same for both players | list builder `0x08023120` | MEASURED | `BALANCED_ROSTER` / `balanced_roster()` (was: the save's party) |
-| Balanced record: HP 15000, EP 100, STR 67, POW 67, END 25, SPD 50 (Hercule STR 60, POW 74); one skill, 7 Energy Blast; level index 0 | table `0x0872BFCC` (28 bytes: sprite, HP, EP, STR, POW, END, SPD), template `0x08022904`, applied by `0x0801339C` | MEASURED | `FighterSetup::fixed` (was: level 100, average growth, even points) |
+| Balanced record: HP 15000, EP 100, STR 67, POW 67, END 25, SPD 50 (Hercule STR 60, POW 74); one skill, 7 Energy Blast; XP 0 (level 50) | table `0x0872BFCC` (28 bytes: sprite, HP, EP, STR, POW, END, SPD), template `0x08022904`, applied by `0x0801339C` | MEASURED | `FighterSetup::fixed` (was: level 100, average growth, even points) |
 | In-Game: the save's party (12-byte list at page +0x584, names string 0x9E + id), each character's whole record packed and unpacked (level, form, skills + levels, max HP / EP as current, STR..SPD, equipment) | pack `0x08022934`, unpack `0x080229B0` | MEASURED | `fixed` from the save's record (was: level + approximated points) |
-| How long "Round N" shows before a round starts | - | INFERRED | folded into `between_frames` |
 | The host's mode / rounds apply to both | config over the link (`0x03002FB0`) not fully traced | INFERRED | host's `DojoSetup` |
 | Which side is the host (left / right) | - | INFERRED | host = slot 0, left |
 
@@ -265,18 +271,24 @@ files: (1) the journal stores the slot's post-trade bytes, (2) the slot file is 
 trade Committed and drops the log. `FileStore::open` finishes a commit a crash interrupted (the slot ends with the
 post-trade bytes, once).
 
-**The game's rules** (static disassembly; the emulator has no link cable, so nothing here is recorded from play):
+**The game's rules** (static disassembly, and trades recorded between two linked emulators:
+`tools/link/trade_record.py NAME --a PICKS --b PICKS` -> `data/link/trade_*.json`, each side's offer as the other's
+"Friend's Trade:" holds it (EWRAM `0x0203CDA4`) and game 1's supplies / equipment list / zenie / equipment slots
+before and after; `cargo test -p wf-net --test trade_link` applies `Inventory::after` to the before and compares -
+4 trades, both sides exact):
 * MEASURED from the ROM: the trade's apply step (`0x080231AE`, the receiving side, on the selected save's GameData,
   then the slot writer `0x080049F2`) adds the friend's 83 supply counts to the save's, **saturating at 255** (one
   byte each), adds the zenie, and appends each equipment entry with `0x08004448` - which **ignores an add at 250
-  entries**; equipment entries are copied without the worn marks (high nibble). Remove equipment (`0x08004468`) only
-  takes entries that are not worn. Here: a trade whose result would pass 255 of a supply or 250 equipment entries is
-  refused at Accept / Prepare instead of losing the excess; worn equipment cannot be offered.
+  entries**; equipment entries are copied without the worn marks (high nibble = wearer + 1). Remove equipment
+  (`0x08004468`) takes the first unworn copy, else the first worn one and sets its wearer's slot back to "-None-"
+  (MEASURED: run 2's Gohan wears the save's only Cotton Gi and Leather Moccasins - both traded, his slots emptied).
+  Here: a trade whose result would pass 255 of a supply or 250 equipment entries is refused at Accept / Prepare
+  instead of losing the excess; worn equipment is offered and removed as the game does (`wf_app::trade::apply`).
 * MEASURED from the ROM: the item picker (`0x0801F44E`) lists a supply only when bit 0 of its record
   (`0x083BD2F8` + 0x34 x id) is clear - the items table's `story_item` - so supplies 0..24 are tradable and the story
-  items 25..82 are not; every equipment-list entry is listed; zenie only when not 0. Same rule here (`Inventory::story`).
-* INFERRED: worn equipment can't be offered (the picker lists every entry; the remove step skips worn ones); no zenie
-  limit beyond u32 (none found in the apply step).
+  items 25..82 are not; every equipment-list entry is listed, worn ones too; zenie only when not 0 ("How many to
+  trade?": RIGHT raises the count). Same rule here (`Inventory::story`).
+* INFERRED: no zenie limit beyond u32 (none found in the apply step).
 * The Trading Post screens over `TradePeer` + `FileStore`: "Link play: playing it" below.
 
 **Tests** (headless, in-process): `cargo test -p wf-net --test trade` - two peers on the virtual network:

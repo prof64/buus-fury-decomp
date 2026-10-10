@@ -18,23 +18,27 @@ use wf_net::trade::{Inventory, Offer, Record, TState, TradeStore};
 /// the "-None-" item of each equipment slot (as `wf_core::menu::equip::NONE_ITEM`)
 const NONE_ITEM: [i32; 4] = [0, 44, 77, 112];
 
-/// the save's equipment list with the worn marks (the game marks the first matching unworn entry per worn item, as
-/// `wf_core::menu::equip::marks`)
-fn worn(sd: &SaveData) -> Vec<bool> {
+/// the save's equipment list with the wearers (character, slot): the game marks the first matching unworn entry per
+/// worn item, as `wf_core::menu::equip::marks`
+fn wearers(sd: &SaveData) -> Vec<Option<(usize, usize)>> {
     let st = &sd.story;
-    let mut m = vec![false; st.equipment.len()];
-    for cs in &st.chars {
+    let mut m = vec![None; st.equipment.len()];
+    for (c, cs) in st.chars.iter().enumerate() {
         for s in 0..4 {
             let id = cs.equip[s];
             if id == NONE_ITEM[s] {
                 continue;
             }
-            if let Some(k) = (0..m.len()).find(|&k| !m[k] && st.equipment[k] == id) {
-                m[k] = true;
+            if let Some(k) = (0..m.len()).find(|&k| m[k].is_none() && st.equipment[k] == id) {
+                m[k] = Some((c, s));
             }
         }
     }
     m
+}
+
+fn worn(sd: &SaveData) -> Vec<bool> {
+    wearers(sd).iter().map(|w| w.is_some()).collect()
 }
 
 /// the part of a save a trade can touch; `story`: the content's story-item flags by supply index
@@ -57,10 +61,18 @@ pub fn apply(sd: &SaveData, story: &[bool], give: &Offer, get: &Offer) -> Result
     for (&i, &n) in &give.supplies {
         st.supplies[i as usize] -= n as u8;
     }
+    // (remove equipment `0x08004468`: the first unworn copy, else the first worn one - its wearer's slot back to
+    // "-None-"; link recordings data/link/trade_*.json)
     for id in &give.equipment {
-        let w = worn(&out);
+        let w = wearers(&out);
         let st = &mut out.story;
-        let k = (0..st.equipment.len()).find(|&k| st.equipment[k] == *id && !w[k]).ok_or("equipment gone")?;
+        let k = (0..st.equipment.len())
+            .find(|&k| st.equipment[k] == *id && w[k].is_none())
+            .or_else(|| (0..st.equipment.len()).find(|&k| st.equipment[k] == *id))
+            .ok_or("equipment gone")?;
+        if let Some((c, s)) = w[k] {
+            st.chars[c].equip[s] = NONE_ITEM[s];
+        }
         st.equipment.remove(k);
     }
     let st = &mut out.story;

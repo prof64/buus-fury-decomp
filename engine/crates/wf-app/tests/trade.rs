@@ -132,10 +132,17 @@ fn crash_after_each_wal_write() {
 }
 
 #[test]
-fn worn_items_are_not_offered() {
+fn worn_items_are_traded() {
+    // (as the game: a worn copy can be offered; it leaves the list and its wearer's slot goes back to "-None-" -
+    // link recordings data/link/trade_*.json)
     let f = story_flags();
     let a = save(&[], &[200], 200, 0);
-    assert!(inventory_of(&a, &f).check_give(&offer(&[], &[200], 0)).is_err());
+    let give = offer(&[], &[200], 0);
+    assert!(inventory_of(&a, &f).check_give(&give).is_ok());
+    let a1 = apply(&a, &f, &give, &Offer::default()).unwrap();
+    assert!(a1.story.equipment.is_empty());
+    assert_eq!(a1.story.chars[0].equip[0], 0, "the wearer's body slot is -None-");
+    assert!(inventory_of(&a, &f).check_give(&offer(&[], &[200, 200], 0)).is_err(), "one copy only");
     let mut story = Offer::default();
     story.supplies.insert(60, 1);
     let b = save(&[(60, 1)], &[], 0, 0);

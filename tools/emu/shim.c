@@ -264,12 +264,13 @@ int emu_link_run_frames(struct Emu* a, struct Emu* b, int n) {
 	uint32_t btarget = b->core->frameCounter(b->core) + n;
 	while (a->core->frameCounter(a->core) < target || b->core->frameCounter(b->core) < btarget) {
 		bool ran = false;
+		// (with breakpoints set the debugger runs the core, an instruction at a time: they fire)
 		if (!a->asleep && a->core->frameCounter(a->core) < target) {
-			a->core->runLoop(a->core);
+			if (a->hasDebugger) mDebuggerRun(&a->debugger); else a->core->runLoop(a->core);
 			ran = true;
 		}
 		if (!b->asleep && b->core->frameCounter(b->core) < btarget) {
-			b->core->runLoop(b->core);
+			if (b->hasDebugger) mDebuggerRun(&b->debugger); else b->core->runLoop(b->core);
 			ran = true;
 		}
 		if (!ran) {

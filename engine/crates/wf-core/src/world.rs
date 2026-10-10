@@ -596,6 +596,8 @@ pub struct World {
     pub cameras: [Camera; MAX_PLAYERS],
     /// a modal loop of the game (Instant Transmission target pick): only these entities update
     pub modal: Option<Vec<EntityId>>,
+    /// a link fight's item-get (`fieldobj::link_interact`): the field's presentation without a field
+    pub link_get: Option<crate::fieldobj::LinkGet>,
     /// a cut's interrupted object pass (wf-import `finish_interrupted_pass`): only these entities - the game's list
     /// objects below the interrupted one, still to be updated in that pass - are updated by `finish_pass_after`
     pub pass_only: Option<Vec<EntityId>>,
@@ -674,6 +676,12 @@ pub struct Options {
     /// punch gives no EP (tools/link recording dojo_fight1 f425)
     #[serde(default)]
     pub link: bool,
+    /// the link match's rounds ("Rounds:" 1 / 3 / 5) and the wins before this round (`wf_net::dojo` sets them):
+    /// the knockdown that decides the match drops the prize (`player::link_prize`)
+    #[serde(default)]
+    pub link_rounds: u8,
+    #[serde(default)]
+    pub link_wins: [u8; 2],
 }
 impl Hash for Options {
     fn hash<H: Hasher>(&self, h: &mut H) {
@@ -700,6 +708,8 @@ impl Hash for Options {
         }
         if self.link {
             self.link.hash(h);
+            self.link_rounds.hash(h);
+            self.link_wins.hash(h);
         }
     }
 }
@@ -783,6 +793,7 @@ impl World {
             input: [InputFrame::default(); MAX_PLAYERS],
             cameras: Default::default(),
             modal: None,
+            link_get: None,
             pass_only: None,
             hud_bars: Vec::new(),
             hud_bars_at: u32::MAX,
@@ -1005,6 +1016,7 @@ impl World {
         // the lockstep fights' enemy, spawned after the area's HUD) - ours holds the opponents first: the HP as the
         // pass leaves it (their hits show at once), the EP as the pass found it (the player's own gains a frame late))
         let pre = self.bar_values();
+        let get_before = self.link_get.is_some();
         while c >= 0 {
             let l = live(self);
             if let Some(&i) = l.get(c as usize) {
@@ -1012,6 +1024,16 @@ impl World {
                     // (the damage numbers' place in the pass: `vram::damage_number_shown`)
                     self.battle.pass_at = self.ents[i].id;
                     self.update_entity(i);
+                    // a link item-get started in this update (`fieldobj::link_interact`): its presentation's loop
+                    // runs from here, the older objects wait for its end (link recording dojo_c9 f6,981: the fallen
+                    // fighter's tick stops for that frame)
+                    if !get_before && self.link_get.is_some() {
+                        let rest: Vec<EntityId> = live(self).into_iter().take(c.max(0) as usize).map(|k| self.ents[k].id).collect();
+                        if let Some(g) = self.link_get.as_mut() {
+                            g.rest = rest;
+                        }
+                        break;
+                    }
                 } else if matches!(self.ents[i].body, Body::Enemy(_)) && crate::player::ko_battle_ticks(self) {
                     // (the death script's loop from KO + 200: an enemy's state tick only - `player::ko_battle_ticks`;
                     // the field's: `enemy::ko_state_ticks`)
@@ -1169,7 +1191,7 @@ impl World {
         // an item-get that starts in this pass (a map item / dropped item picked up with A in the player's update)
         // runs the presentation's loop from there: the objects after it are not updated this frame (4-30's capsule:
         // the scientist's idle tick stops for that frame)
-        let item_get_before = self.field.as_ref().is_some_and(|f| f.item_get.is_some());
+        let item_get_before = self.field.as_ref().is_some_and(|f| f.item_get.is_some()) || self.link_get.is_some();
         // (the HUD's read of the HP / EP: `hud_sample`)
         let hud = self.hud_stamp();
         let mut sampled = from.is_some();
@@ -1236,7 +1258,7 @@ impl World {
                 }
             }
             c -= 1;
-            if !item_get_before && self.field.as_ref().is_some_and(|f| f.item_get.is_some()) {
+            if !item_get_before && (self.field.as_ref().is_some_and(|f| f.item_get.is_some()) || self.link_get.is_some()) {
                 // (the objects left: their update comes when the presentation's loop returns into this pass)
                 let rest: Vec<EntityId> = live(self)
                     .into_iter()
@@ -1244,7 +1266,9 @@ impl World {
                     .flatten()
                     .map(|k| self.ents[k].id)
                     .collect();
-                if let Some(f) = self.field.as_mut() {
+                if let Some(g) = self.link_get.as_mut() {
+                    g.rest = rest;
+                } else if let Some(f) = self.field.as_mut() {
                     f.item_get_rest = rest;
                 }
                 break;
@@ -1283,7 +1307,7 @@ impl World {
         }
     }
 
-    fn update_entity(&mut self, i: usize) {
+    pub(crate) fn update_entity(&mut self, i: usize) {
         match &self.ents[i].body {
             Body::Player(_) => crate::player::update(self, i),
             Body::Enemy(_) => crate::enemy::update(self, i),

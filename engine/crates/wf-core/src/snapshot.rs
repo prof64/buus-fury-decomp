@@ -24,6 +24,7 @@ struct WorldSer {
     input: [InputFrame; MAX_PLAYERS],
     cameras: [Camera; MAX_PLAYERS],
     modal: Option<Vec<EntityId>>,
+    link_get: Option<crate::fieldobj::LinkGet>,
     g: Globals,
     enemy_layer: Option<Vec<u8>>,
     arena: String,
@@ -53,6 +54,7 @@ pub fn to_bytes(w: &World) -> Vec<u8> {
         input: w.input,
         cameras: w.cameras.clone(),
         modal: w.modal.clone(),
+        link_get: w.link_get.clone(),
         g: w.g.clone(),
         enemy_layer: w.col.as_ref().map(|c| c.enemy.clone()),
         arena: w.arena.id.clone(),
@@ -107,6 +109,7 @@ pub fn from_bytes(data: &Arc<GameData>, bytes: &[u8]) -> Option<World> {
     w.input = s.input;
     w.cameras = s.cameras;
     w.modal = s.modal;
+    w.link_get = s.link_get;
     w.g = s.g;
     w.stats = s.stats;
     w.players = s.players;
