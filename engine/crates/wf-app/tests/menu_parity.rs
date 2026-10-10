@@ -260,6 +260,13 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
             iters += 1;
             ev.clear();
         }
+        // (the game's options block at the capture: the text speed of a scene's boxes)
+        if k == 0 {
+            if let Some(o) = meta["options"].as_array() {
+                let st = &mut sim.session.world.menu.settings;
+                (st.text_speed, st.sfx, st.music) = (i(&o[0]) as u8, i(&o[1]) as u8, i(&o[2]) as u8);
+            }
+        }
         if logic && k == 0 && meta["open"].is_object() {
             if !wf_core::menu::open_from_json(&mut sim.session.world, &meta["open"]) {
                 // the screen is not implemented (yet): nothing to compare (a STRICT scenario then fails: 0 frames)
@@ -289,6 +296,11 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
             if let Some(v) = link_pending.take() {
                 wf_core::menu::link::harness(&mut sim.session.world, &v);
             }
+        }
+        // the link gone (linkcap.py `reset_b`: the row whose iteration made the link error's scene): the page ends and
+        // the engine's script s001 runs, as the app's link flow does when its connection drops
+        if row["lost"].as_bool() == Some(true) {
+            wf_core::menu::link::lost(&mut sim.session.world);
         }
         // the link pages' friend (linkcap.py `flags` rows: [0x03002F54, 0x03002F50, 0x03002FB0, 0x03002FB4]): the
         // friend's answer (the wait box's flag) and its character pick arrive in the frame the trace first shows them
@@ -364,7 +376,8 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
                 snd_bad.push(format!("{name} frame {k}: emulator {emu:?} ours {ours:?}"));
             }
         }
-        if v.menu.is_none() {
+        // (`meta.field`: the scenario runs on into a scene - the link error's script -, its frames compared as well)
+        if v.menu.is_none() && meta["field"].as_bool() != Some(true) {
             if log {
                 eprintln!("{name} {k:4} keys {keys:03x} field ({:?})", sim.world().menu.phase);
             }

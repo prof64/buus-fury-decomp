@@ -328,6 +328,15 @@ impl Chars {
         }
         self.oam = self.slots.clone();
         self.oam_next = self.slots.clone();
+        // (the picture as its last redraw left it: the arrows' enabled state - `before_draw`)
+        let right = if self.balanced { self.sel < 31 } else { self.count() - 1 > self.sel };
+        let left = self.sel > 0;
+        if let Some(Widget::Button(b)) = self.c.kids.get_mut(self.right) {
+            b.enabled = right;
+        }
+        if let Some(Widget::Button(b)) = self.c.kids.get_mut(self.left) {
+            b.enabled = left;
+        }
         self.c.drawn = true;
     }
 

@@ -206,10 +206,12 @@ enum Phase {
     /// the Dojo page: rows 0 mode, 1 rounds, 2 Start Fight (the host sets it, the guest sees it)
     Setup { row: usize },
     Match(Box<Match>),
-    Result(Ending),
     Trade(Box<TradeUi>),
     /// a message (string) ended the flow; any key goes back
     Message(Vec<u16>),
+    /// the friend is gone: the game's link error runs on the title app (its script s001 over what the screen showed:
+    /// the fade, "You have been disconnected.", the title) - `LinkSim`
+    Lost,
 }
 
 /// what a flow asks the host sim to do
@@ -250,6 +252,8 @@ struct Flow {
     played: u32,
     result: Option<Ending>,
     to_chars: bool,
+    /// the link was lost in a fight: its last picture is what the link error's script fades out
+    lost_view: Option<Box<RenderView>>,
 }
 
 /// a finished Dojo match as this peer confirmed it (the tests compare both peers')
@@ -325,6 +329,7 @@ impl Flow {
             played: 0,
             result: None,
             to_chars: false,
+            lost_view: None,
         })
     }
 
@@ -542,7 +547,7 @@ impl Flow {
     fn step(&mut self, now: f64, clock: &Clock, held: u16, pressed: u16, ev: &mut Vec<SimEvent>) -> Out {
         self.t = self.t.wrapping_add(1);
         if let Some(r) = self.net.lobby.rejected.clone() {
-            if !matches!(self.phase, Phase::Message(_) | Phase::Match(_) | Phase::Result(_) | Phase::Trade(_)) {
+            if !matches!(self.phase, Phase::Message(_) | Phase::Match(_) | Phase::Lost | Phase::Trade(_)) {
                 self.set_phase(Phase::Message(units(&r)));
             }
         }
@@ -561,14 +566,14 @@ impl Flow {
             self.friend = Some(f);
         }
         let lost = self.friend_gone() || self.net.t.closed();
-        if lost && !matches!(self.phase, Phase::Waiting | Phase::Message(_) | Phase::Result(_)) {
-            self.set_phase(Phase::Message(Vec::new()));
+        if lost && !matches!(self.phase, Phase::Waiting | Phase::Message(_) | Phase::Lost) {
+            self.set_phase(Phase::Lost);
             return Out::None;
         }
         match &mut self.phase {
             // (the title's box: once the friend is there it counts its 10 updates and ends - `linked`)
             Phase::Waiting => Out::None,
-            Phase::NoSaves | Phase::Message(_) | Phase::Result(_) => {
+            Phase::NoSaves | Phase::Message(_) => {
                 if pressed & (A | B) != 0 {
                     sfx(ev, SFX_MENU);
                     return Out::Done;
@@ -592,7 +597,7 @@ impl Flow {
                 }
                 Out::None
             }
-            Phase::Match(_) | Phase::Trade(_) => Out::None,
+            Phase::Match(_) | Phase::Trade(_) | Phase::Lost => Out::None,
         }
     }
 
@@ -683,8 +688,11 @@ impl Flow {
             let faded = g.st.over_at.is_some_and(|o| g.st.frame >= o + 64);
             if dropped {
                 let e = m.m.disconnected().clone();
-                self.result = Some(e.clone());
-                self.set_phase(Phase::Result(e));
+                let mut v = RenderView::default();
+                m.sess.game.view(m.m.slot, &mut v);
+                self.lost_view = Some(Box::new(v));
+                self.result = Some(e);
+                self.set_phase(Phase::Lost);
             } else if faded || *k > 64 + 90 {
                 self.result = m.ended.take().map(|e| e.0);
                 self.played += 1;
@@ -720,8 +728,11 @@ impl Flow {
             def: m.def.clone(),
         });
         if e == Ending::Disconnected {
-            self.result = Some(e.clone());
-            self.set_phase(Phase::Result(e));
+            let mut v = RenderView::default();
+            m.sess.game.view(m.m.slot, &mut v);
+            self.lost_view = Some(Box::new(v));
+            self.result = Some(e);
+            self.set_phase(Phase::Lost);
         } else {
             m.ended = Some((e, 0));
         }
@@ -850,6 +861,10 @@ impl Flow {
             sfx(ev, SFX_MENU);
             return Out::Done;
         }
+        // the friend gone with nothing at stake: the game's link error (a trade in doubt keeps its page - above)
+        if u.away == Some(false) && u.done.is_none() {
+            self.set_phase(Phase::Lost);
+        }
         Out::None
     }
 
@@ -889,22 +904,9 @@ impl Flow {
             }
             // (Select Saved Game and the Dojo's pages are wf-core's link screen: `LinkSim.page`)
             Phase::Saves { .. } | Phase::Chars { .. } | Phase::Setup { .. } => {}
-            Phase::Result(e) => {
-                head(&mut cv, t.s(95));
-                let (a, b): (usize, Option<usize>) = match e {
-                    Ending::Won { .. } => (111, Some(114)),
-                    Ending::Lost => (112, Some(115)),
-                    Ending::Draw => (113, None),
-                    Ending::Disconnected => (93, None),
-                };
-                centre(&mut cv, 64, t.s(a), MenuFont::Bold, 6);
-                if let Some(b) = b {
-                    centre(&mut cv, 86, t.s(b), MenuFont::Menu, 2);
-                }
-            }
             // (the Trading Post's pages are wf-core's link screen: `LinkSim.page`)
             Phase::Trade(_) => {}
-            Phase::Match(_) => {}
+            Phase::Match(_) | Phase::Lost => {}
         }
         v.layers.push(MenuLayer { w: w as u16, h: h as u16, x: 8, y: 8, priority: 0, ops: cv.ops });
         v
@@ -1036,6 +1038,9 @@ pub struct LinkSim {
     /// a wf-core link page is open on the title app (`inner`): the title's state from before, restored when the
     /// flow ends, and the page open
     page: Option<(Box<crate::story::StoryState>, &'static str)>,
+    /// the link is lost: the title app runs the game's link error (`menu::link::lost`) - with the fight's last
+    /// picture, when it was lost in one, until the script's scene loads
+    lost: Option<Option<Box<RenderView>>>,
 }
 
 /// the title's link box: its kind (2 Dojo, 1 Trading Post) while open
@@ -1048,11 +1053,11 @@ pub fn title_wait(w: &wf_core::world::World) -> Option<u8> {
 
 impl LinkSim {
     pub fn new(inner: StorySim, cfg: LinkConfig) -> LinkSim {
-        LinkSim { inner, cfg, flow: None, wait_seen: false, closing: None, prev: 0, steps: 0, last: None, record: None, page: None }
+        LinkSim { inner, cfg, flow: None, wait_seen: false, closing: None, prev: 0, steps: 0, last: None, record: None, page: None, lost: None }
     }
 
-    /// what the link part shows now ("title", "waiting", "saves", "chars", "setup", "match", "result", "trade",
-    /// "complete", "message", "nosaves", "closing")
+    /// what the link part shows now ("title", "waiting", "saves", "chars", "setup", "match", "trade", "complete",
+    /// "message", "nosaves", "lost", "closing")
     pub fn phase(&self) -> &'static str {
         if self.closing.is_some() {
             return "closing";
@@ -1065,11 +1070,11 @@ impl LinkSim {
             Some(Phase::Chars { .. }) => "chars",
             Some(Phase::Setup { .. }) => "setup",
             Some(Phase::Match(_)) => "match",
-            Some(Phase::Result(_)) => "result",
             // (TRADE COMPLETE! shown, the trade settling)
             Some(Phase::Trade(u)) if u.done.is_some() => "complete",
             Some(Phase::Trade(_)) => "trade",
             Some(Phase::Message(_)) => "message",
+            Some(Phase::Lost) => "lost",
         }
     }
     /// the Dojo match's rollback session (tests: hashes, inputs, confirmed frames)
@@ -1332,6 +1337,34 @@ impl LinkSim {
         }
         let flow = self.flow.as_mut().expect("flow");
         let mut out = flow.step(now, &clock, held, pressed, events);
+        // the link is lost: the game's link error on the title app - its script s001 over what the screen showed (the
+        // page, or the fight's last picture), then the title; the flow ends there
+        if matches!(flow.phase, Phase::Lost) {
+            if let Some(r) = flow.record.take() {
+                self.record = Some(r);
+            }
+            if self.lost.is_none() {
+                self.lost = Some(flow.lost_view.take());
+                // (the title's state from before the link is not restored: the script ends on the title's first page)
+                self.page = None;
+                wf_core::menu::link::lost(&mut self.inner.session.world);
+            }
+            let result = flow.result.clone();
+            self.inner.step(inputs, events);
+            if matches!(self.inner.session.world.menu.stack.last(), Some(wf_core::menu::Screen::Title(_))) {
+                self.last = Some(match result {
+                    Some(e) => format!("{e:?}"),
+                    None => "disconnected".into(),
+                });
+                self.flow = None;
+                self.lost = None;
+                self.wait_seen = false;
+                if let Some(p) = &self.cfg.report {
+                    let _ = std::fs::write(p, serde_json::to_vec_pretty(&self.report_json()).unwrap_or_default());
+                }
+            }
+            return;
+        }
         // the phase's page: wf-core's link screen on the title app, stepped with the keys; its actions go to the flow
         if matches!(out, Out::None) {
             let want = flow.page();
@@ -1440,7 +1473,6 @@ impl LinkSim {
                 self.last = Some(match &flow.phase {
                     Phase::Message(m) if !m.is_empty() => String::from_utf16_lossy(m),
                     Phase::Message(_) => "disconnected".into(),
-                    Phase::Result(e) => format!("{e:?}"),
                     // (after a match: its ending)
                     _ if flow.result.is_some() => format!("{:?}", flow.result.as_ref().unwrap()),
                     _ => "left".into(),
@@ -1460,6 +1492,20 @@ impl LinkSim {
     }
 
     fn view_inner(&self, out: &mut RenderView) {
+        // the link error's script: the title app's picture - under its first fade the fight's last picture, when the
+        // link was lost in one
+        if let Some(fight) = &self.lost {
+            if let (Some(fv), true) = (fight, self.inner.session.world.under.is_some()) {
+                let mut iv = RenderView::default();
+                self.inner.view(&mut iv);
+                *out = (**fv).clone();
+                out.palette_scale = iv.palette_scale;
+                out.palette_fade = iv.palette_fade.or(iv.menu.as_ref().and_then(|m| m.fade));
+                out.fade_black = iv.fade_black;
+                return;
+            }
+            return self.inner.view(out);
+        }
         match self.flow.as_ref() {
             Some(_) if self.page.is_some() => self.inner.view(out),
             Some(f) if !matches!(f.phase, Phase::Waiting) => {
@@ -1776,8 +1822,8 @@ impl LinkBot {
             // TRADE COMPLETE!: the page goes back to the title's Multiplayer page by itself (a key there would open
             // the link box again)
             "complete" if self.kind == LinkKind::Trade => 0,
-            // the result / Disconnected: shown a while, then A
-            "result" | "complete" | "message" | "nosaves" => {
+            // the result / Disconnected ("You have been disconnected.": its box): shown a while, then A
+            "result" | "complete" | "message" | "nosaves" | "lost" => {
                 if self.in_phase > 40 {
                     A
                 } else {

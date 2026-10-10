@@ -152,7 +152,8 @@ impl Session {
             self.presenter.reset();
             return;
         }
-        // `return_to_title` (0x8E) last frame: the session restarts on the title screen (menu/title.rs)
+        // `return_to_title` (0x8E) last frame: the session restarts on the title screen (menu/title.rs; the link
+        // error's in the script's own iteration - `step_post`)
         if w.scene
             .requests
             .iter()
@@ -183,6 +184,7 @@ impl Session {
         if w.field.is_some() {
             crate::menu::run_then(w);
             crate::field::pre_step(w);
+            crate::menu::link::lost_tick(w);
             // the keys a held pass resumes with are the frame's own, not the cutscene mask's (Diablo Desert Express
             // 11-24: A pressed in the frame a one-frame on-defeat event ends - the punch starts in the resumed pass)
             if let Some(f) = w.field.as_mut().filter(|f| f.raw_input.is_some()) {
@@ -369,6 +371,30 @@ impl Session {
     }
     /// the rest of the frame: cameras and the field / battle rules after the update
     pub fn step_post(&mut self) -> &[Event] {
+        // the link error's `return_to_title` (s001, `menu::link::lost`) in this frame's scripts: the title is made in
+        // this iteration and runs its first step in it - its picture is up at the iteration's end, its cursor has
+        // counted (two linked emulators: menu_parity link_lost_*, the title on the iteration's last video frame, its
+        // first cursor redraw 6 iterations after the next one). The ending's stays the next frame's start
+        // (`step_begin`): its title's cursor is 3 to 6 steps behind this one's (pixel gate sb_044_04_20 f24,090 /
+        // rsbk_002_04_21 f23,850 - which step exactly, and the game over's, not measured)
+        if self.world.link_error && self.world.scene.requests.iter().any(|r| matches!(r, crate::scene::Request::ReturnToTitle)) {
+            let w = &mut self.world;
+            if let Some(c0) = w.g.clock_mark.take() {
+                if !crate::menu::active(w) {
+                    w.g.fc0 = c0 + 1 - w.frame as i64;
+                }
+            }
+            let ev = std::mem::take(&mut w.events);
+            *w = crate::menu::title::title_world(&self.data, w);
+            // (the events of the frame that ended there stay the frame's: its sounds, the script's stops)
+            let mut ev = ev;
+            ev.append(&mut w.events);
+            w.events = ev;
+            // (the counter: this iteration is the title's first - `menu::step` counts it)
+            w.g.fc0 -= 2;
+            self.presenter.reset();
+            crate::menu::step(w);
+        }
         self.step_post_world();
         // a logic frame whose object pass did not run still counts on the game's logic counter
         if let Some(c0) = self.world.g.clock_mark.take() {

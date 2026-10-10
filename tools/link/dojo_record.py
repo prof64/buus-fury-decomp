@@ -155,11 +155,6 @@ def main():
         VIDEO = Path(sys.argv[sys.argv.index('--video') + 1])
         VIDEO.mkdir(parents=True, exist_ok=True)
     # (`--trace F0-F1`: the host's generator calls in those frames, by caller - the comparison's diagnostics)
-    global SHOTS
-    if '--shots' in sys.argv:
-        k = sys.argv.index('--shots')
-        SHOTS = (sys.argv[k + 1], int(sys.argv[k + 2]))
-        Path(SHOTS[0]).mkdir(parents=True, exist_ok=True)
     if '--trace' in sys.argv:
         TRACE = [int(x) for x in sys.argv[sys.argv.index('--trace') + 1].split('-')]
     sav = (ROOT / 'work' / 'run2' / 'end.sav').read_bytes()

@@ -341,7 +341,18 @@ network options, `--net-name`, `--net-key` apply); B (Cancel) leaves as in the g
   (64 updates from the result) both are back on "Choose your character!" with the same setup, as in the game
   (recording dojo_px3): the lobby is open again (`Lobby::reopen`: hellos resume, a new session id), a pick counts
   for the match it was made for (`DojoHello::played`), and the next fight starts from the two picks; B leaves by the
-  pages (tests/link.rs `dojo_rematch_from_the_character_page`). "Disconnected" (93) is still the app's own page.
+  pages (tests/link.rs `dojo_rematch_from_the_character_page`).
+* **The friend gone** (its connection closed or lost - on a page, in a fight, on the trade's pages with nothing at
+  stake): the game's link error, as two linked emulators show it when one is reset (`re/buu/menu/linkcap.py`
+  `reset_b`; 180 updates after the reset on a page, 63 in a fight - ours: when the connection drops): the link mode
+  ends and the engine's hook script **s001** runs as a scene over what the screen shows - `hide_hud`, `fade_out(16)`
+  (the page / the fight's last picture fades), `load_scene(0, 2)`, `fade_in(16)`, the box "You have been
+  disconnected.", A, `fade_out(16)`, `return_to_title`: the title's first page (START / OPTIONS), not the
+  Multiplayer page. `wf_core::menu::link::lost(world)` on the title app does it (`World::under`: the page's picture
+  under the script's fade); `LinkSim` keeps the fight's last picture there instead when the link was lost in one
+  (phase "lost"). Gated frame by frame, the scene's frames and the title after it included: menu_parity
+  `link_lost_setup` / `link_lost_saves` / `link_lost_chars`. A trade in doubt keeps its page (the journal's lock).
+  Left as the app's own drawing: "No Saved Games" and the lobby's refusals (a full room, another version).
 * **Trading Post**: the game's own pages (wf-core `menu::link::trade`, gated frame by frame against two linked
   emulators: menu_parity `link_trade_*`): the picker ("Your Trade:", the list with its arrows, "How many to
   trade?"), R **Propose Trade** -> "Waiting for a friend..." until the friend's proposal -> the proposal ("Your

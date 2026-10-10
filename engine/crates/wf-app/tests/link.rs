@@ -339,7 +339,28 @@ fn dojo_disconnect_mid_match() {
     r.b.sim.drop_link();
     r.until(3000, "host: Disconnected", |r| r.a.sim.ending().is_some() || r.a.sim.record.is_some());
     assert_eq!(r.a.sim.record.as_ref().map(|x| x.ending.clone()), Some(Ending::Disconnected));
-    r.until(2000, "host back at the title", |r| r.a.done());
+    // the game's link error: its script fades the fight's last picture out, "You have been disconnected." on its
+    // black scene, then the title's first page
+    assert_eq!(r.a.sim.phase(), "lost");
+    let mut v = wf_view::RenderView::default();
+    wf_view::Sim::view(&r.a.sim, &mut v);
+    assert!(v.sprites.iter().filter(|s| s.sheet.starts_with("sprites/")).count() == 2, "the fight's picture under the fade");
+    let mut said = false;
+    for _ in 0..2000 {
+        if r.a.done() {
+            break;
+        }
+        r.step();
+        wf_view::Sim::view(&r.a.sim, &mut v);
+        said |= v.dialog.as_ref().is_some_and(|d| d.text.contains("disconnected"));
+    }
+    assert!(said, "the box: You have been disconnected.");
+    assert!(r.a.done(), "host back at the title");
+    assert_eq!(r.a.sim.last.as_deref(), Some("Disconnected"));
+    assert!(
+        matches!(r.a.sim.inner.session.world.menu.stack.last(), Some(wf_core::menu::Screen::Title(t)) if t.page == wf_core::menu::title::TPage::Title),
+        "the title's first page"
+    );
     assert_eq!(r.a.slot(), sa, "no prize after a drop");
 }
 
@@ -387,7 +408,9 @@ fn trade_disconnect_before_commit() {
     // the guest leaves before anyone accepted
     r.net.leave("trade-drop-guest");
     r.b.sim.drop_link();
+    r.until(3000, "host: the link error", |r| r.a.sim.phase() == "lost" || r.a.done());
     r.until(3000, "host leaves after Disconnected", |r| r.a.done());
+    assert_eq!(r.a.sim.last.as_deref(), Some("disconnected"));
     assert_eq!(r.a.slot(), sa, "nothing applied");
     assert_eq!(r.b.slot(), sb, "nothing applied");
 }

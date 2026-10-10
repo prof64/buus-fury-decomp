@@ -257,6 +257,25 @@ void emu_link(struct Emu* emu, int id) {
 
 int emu_link_asleep(struct Emu* emu) { return emu->asleep; }
 
+// pull the cable out of `emu` (the others stay on the coordinator: their transfers find nobody there)
+void emu_unlink(struct Emu* emu) {
+	if (!emu->linked) return;
+	GBASIOLockstepCoordinatorDetach(&coordinator, &emu->link);
+	emu->core->setPeripheral(emu->core, mPERIPH_GBA_LINK_PORT, NULL);
+	emu->linked = false;
+	emu->asleep = 0;
+}
+
+// run `n` frames of one emulator on the coordinator alone (after the other's `emu_unlink`); -1 when it sleeps
+int emu_link_run_one(struct Emu* a, int n) {
+	uint32_t target = a->core->frameCounter(a->core) + n;
+	while (a->core->frameCounter(a->core) < target) {
+		if (a->asleep) return -1;
+		if (a->hasDebugger) mDebuggerRun(&a->debugger); else a->core->runLoop(a->core);
+	}
+	return 0;
+}
+
 // run `n` frames of `a` (the primary: player 0) with `b` linked, interleaving their run loops; returns 0, or -1 when
 // both cores sleep (no progress possible)
 int emu_link_run_frames(struct Emu* a, struct Emu* b, int n) {

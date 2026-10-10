@@ -944,6 +944,18 @@ pub fn title_world(data: &Arc<crate::content::GameData>, w: &World) -> World {
     });
     nw.events.insert(0, crate::world::Event::SongStop);
     open_title(&mut nw);
+    // after the link error's script (`Session::step_post`: the title made and first stepped in the script's own
+    // iteration) the title's cursor counts from the iteration that makes it, as the link's Select Saved Game
+    // (`link::open_saves`): after that first step it has counted two - the
+    // page's first cursor redraw comes 6 iterations after the next one, 8 between the later ones (two linked
+    // emulators, the link error's s001: menu_parity link_lost_*)
+    if let Some(super::Screen::Title(t)) = nw.menu.stack.last_mut().filter(|_| w.link_error) {
+        for k in t.c.kids.iter_mut() {
+            if let Widget::Cursor(c) = k {
+                c.t = 1;
+            }
+        }
+    }
     // (the title song was requested by return_to_title's own frame (native 0x8E): playing already)
     if w.scene.song == TITLE_SONG {
         nw.events.retain(|e| {

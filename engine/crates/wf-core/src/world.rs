@@ -601,6 +601,17 @@ pub struct World {
     /// a cut's interrupted object pass (wf-import `finish_interrupted_pass`): only these entities - the game's list
     /// objects below the interrupted one, still to be updated in that pass - are updated by `finish_pass_after`
     pub pass_only: Option<Vec<EntityId>>,
+    /// the link's page still on screen under the scene that replaced it (`menu::link::lost`: the link error's script
+    /// s001 fades it out, then loads its own scene): the picture as it was last shown, its figures with it - the
+    /// view's, not hashed (as `Menu::overlay`, which shows a screen's surface only)
+    pub under: Option<Box<wf_view::MenuView>>,
+    /// ... and from the frame after: the page's objects as their last update left them (their OAM is a frame late)
+    pub under_late: Option<Box<wf_view::MenuView>>,
+    /// the link error's script s001 is due at the next step's script hook (`menu::link::lost`: 1), then the late
+    /// picture (2)
+    pub link_lost: u8,
+    /// ... and the script running is the link error's (until its `return_to_title`: `Session::step_post`)
+    pub link_error: bool,
     /// the HP / EP the HUD's bars show, per player slot (hp, max, ep, max): read by the HUD object's update at its
     /// place in the object pass (`hud_sample`) - not hashed (the view's)
     pub hud_bars: Vec<(i32, i32, i32, i32)>,
@@ -795,6 +806,10 @@ impl World {
             modal: None,
             link_get: None,
             pass_only: None,
+            under: None,
+            under_late: None,
+            link_lost: 0,
+            link_error: false,
             hud_bars: Vec::new(),
             hud_bars_at: u32::MAX,
             hud_end: Vec::new(),

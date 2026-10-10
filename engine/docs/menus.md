@@ -60,7 +60,15 @@ figures in a row of five with the selected one walking in a frame (BG0), LEFT / 
 39), "Choose your character!" (105); A (sound 40) runs the pick's wait box (31 steps after the friend's pick), then
 the 16-step fade to the fight; B (sound 40) goes back to the setup page (host) / Select Saved Game (guest). The
 fight's texts (106..115) are the fight's own picture (`wf_net::dojo::DojoGame::view`, netcode.md); after a fight the
-link shows the character pick again (`link::open_chars`). "Disconnected" (93) is still `wf_app::link`'s own drawing.
+link shows the character pick again (`link::open_chars`). A lost link is the game's link error (`link::lost`: the
+engine script s001 over the page - netcode.md; menu_parity `link_lost_*`, a scenario's `reset_b` resets the friend's
+emulator, `meta.field` has the scene's frames compared too and `meta.options` gives the text speed its box types at).
+
+**The link error's `return_to_title`** (s001): the title is made in the script's own iteration and runs its first
+step there (`Session::step_post`, `World::link_error`) - its picture is up at that iteration's end and its cursor has
+counted two. The ending's `return_to_title` keeps its own timing (the title made at the next step's start; its cursor
+3 to 6 steps behind the link error's - pixel gate sb_044_04_20 / rsbk_002_04_21); why the two differ, and which the
+game over's s000 follows, is not measured yet.
 engine/docs/netcode.md "Link play: playing it".
 
 The **Trading Post's pages are the game's own, in wf-core** (`menu::link::trade`, a [`Link`] page

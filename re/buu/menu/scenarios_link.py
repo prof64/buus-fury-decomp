@@ -126,6 +126,29 @@ LINK = {
                             open={'kind': 'link_trade'}),
 }
 
+
+
+def _vt(e):
+    return dict(vt=e.r32(e.r32(0x03000F90)))
+
+
+def _lost(frames, rows):
+    """the row whose iteration made the link error's scene mode (vt 0x08049D18, running s001): `lost`"""
+    for f, r in zip(frames, rows):
+        if f.get('vt') == 0x08049D18:
+            r['lost'] = True
+            break
+
+
+# the friend's console reset (the link gone): the page goes on for 180 updates, then the engine's script s001 as a scene
+# over it - the page fades out, "You have been disconnected." on the black scene 0-2, A: the fade and the title
+LOST = dict(reset_b=4, keys=['-:330', 'A:4', '-:120'], probe=_vt, post=_lost)
+LINK.update({
+    'link_lost_setup': dict(flow=TO_SETUP, open={'kind': 'link_setup', 'host': True}, probe0=setup_probe, **LOST),
+    'link_lost_saves': dict(flow=TO_SAVES_DOJO, open={'kind': 'link_saves', 'trade': False}, probe0=list_sel, **LOST),
+    'link_lost_chars': dict(flow=TO_CHARS, open={'kind': 'link_chars', 'host': True}, probe0=chars_probe, **LOST),
+})
+
 # the Trading Post's pages (scenarios_trade.py)
 from scenarios_trade import TRADE, probe as _trade_probe, post as _trade_post  # noqa: E402
 LINK['link_trade_list'].update(probe0=cursor_t, probe=_trade_probe, post=_trade_post)

@@ -322,6 +322,12 @@ pub fn open_from_json(w: &mut World, v: &serde_json::Value) -> bool {
                 .filter(|p| p.is_object())
                 .and_then(|p| tries.iter().find_map(|g| g(w, p)));
             open(w, sc, tr, scripted);
+            // (a page opened as drawn - its picture imported, no redraw due - is on show: the link's character pick)
+            if w.menu.shown.is_none() {
+                if let Some(top) = w.menu.stack.last().filter(|t| t.page().container_ref().drawn) {
+                    w.menu.shown = Some(Box::new(top.clone()));
+                }
+            }
             if let Some((mut ps, _, _)) = prev {
                 ps.before_draw(w);
                 w.menu.boot_shown = Some(Box::new(ps));

@@ -674,6 +674,57 @@ pub fn open_json(w: &World, v: &serde_json::Value) -> Option<(super::Screen, sup
     Some((super::Screen::Link(l), super::title::BOOT, false))
 }
 
+/// the link is gone (the friend's console off or reset, the cable out): the game's link error handler ends the link
+/// mode and runs the engine hook script s001 as a scene over what the screen shows (two linked emulators, one reset
+/// on every page: 180 updates later - 63 in a fight - the scene mode, `hide_hud`, `fade_out(16)`, `load_scene(0, 2)`,
+/// `fade_in(16)`, "You have been disconnected.", `fade_out(16)`, `return_to_title`). The page stays on screen under
+/// the script's fade (`World::under`) until its scene loads
+pub fn lost(w: &mut World) {
+    w.under = super::view(w).map(Box::new);
+    // (the object world's draw goes on for that iteration: the character pick's figures as their last update left
+    // them show from the next frame - menu_parity link_lost_chars, a figure's blink ending under the fade)
+    w.under_late = None;
+    if let Some(super::Screen::Link(mut l)) = w.menu.stack.pop() {
+        if let LinkPage::Chars(c) = &mut l.page {
+            c.update(w);
+            let sc = super::Screen::Link(l);
+            w.menu.shown = Some(Box::new(sc.clone()));
+            w.menu.stack.push(sc);
+            w.under_late = super::view(w).map(Box::new);
+        }
+    }
+    w.menu.stack.clear();
+    w.menu.shown = None;
+    w.menu.pending = None;
+    w.menu.phase = super::Phase::Idle;
+    w.link_lost = 1;
+    w.link_error = true;
+}
+
+/// the steps after [`lost`]: the script starts (the session's script hook follows); the frame after, the page's
+/// late picture
+pub fn lost_tick(w: &mut World) {
+    match w.link_lost {
+        1 => {
+            w.link_lost = 2;
+            w.events.push(crate::world::Event::Field(crate::field::FieldEvent::Run {
+                run: crate::fieldcontent::Callback::Event("s001".into()),
+                cause: crate::field::Cause::Menu,
+                slot: 0,
+            }));
+        }
+        2 => {
+            w.link_lost = 0;
+            if let Some(l) = w.under_late.take() {
+                if w.under.is_some() {
+                    w.under = Some(l);
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
 /// the Dojo's character pick on show: where the link is after a fight (link recording dojo_px3: the fight's fade-out,
 /// then "Choose your character!" again, the same Character Mode) - the app's link flow
 pub fn open_chars(w: &mut World, balanced: bool, slot: usize, host: bool) {

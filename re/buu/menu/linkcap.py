@@ -99,6 +99,9 @@ def run(name, sc):
         probe = lambda e: {**capture.probe(e), **sc['probe'](e)}  # noqa: E731
     for i, k in enumerate(ka):
         c.keys_b = kb[i] if i < len(kb) else 0
+        # (`reset_b`: the friend's console is soft reset at that recorded frame - the link is gone)
+        if sc.get('reset_b') == i:
+            dr.soft_reset(c.b)
         # (the link's up flag [0x03002F54] per frame: the title's link box counts from it)
         c.step(k, lambda e: dict(probe(e), up=e.r32(0x03002F54)))
     d = OUT / name
@@ -109,6 +112,11 @@ def run(name, sc):
     for i, s in enumerate(c.screens):
         Image.fromarray(s).save(d / f'f{i:04d}.png')
     meta = {'open': sc['open'], 'link': True, 'saves': saves, 'guest': guest}
+    # (`reset_b`: the link error's script runs a scene - its field frames are compared too)
+    if sc.get('reset_b') is not None:
+        meta['field'] = True
+        # (... with the options block 0x03001914: the text speed its box types at)
+        meta['options'] = list(a.read(0x03001914, 4))
     rows = [dict(keys=f['keys'], lf=f['lf'], snd=f['snd'], h=f['h'], **({'up': f['up']} if sc.get('up') else {}),
                  **({'flags': f['flags'], 'fd': f['fd']} if 'flags' in f else {}))
             for f in c.frames]

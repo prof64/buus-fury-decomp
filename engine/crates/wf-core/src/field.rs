@@ -994,6 +994,8 @@ pub fn load_area_with(
     // header): what a script set before is gone (rkb_168 14-1: the Kid Buu scene's BG0 priority 3 / blend targets,
     // the game's registers back to the map's after the next load)
     w.scene.screen.layers = crate::scene::Layers::default();
+    // (a link page left on screen under the link error's script - `menu::link::lost` - goes with its scene's load)
+    w.under = None;
     // the load's main-loop iteration follows this logic frame (`Session::lag_step`)
     if w.opts.sim_lag {
         w.g.load_pending = true;

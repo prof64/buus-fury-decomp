@@ -769,6 +769,10 @@ fn render_view_with(w: &World, link: Option<&LinkDraw>, out: &mut RenderView) {
         out.palette_fade = Some(wf_view::PaletteFade { level, target: 0 });
     }
     out.menu = crate::menu::view(w);
+    // (the link's page under the link error's script: `World::under`)
+    if out.menu.is_none() {
+        out.menu = w.under.as_deref().cloned();
+    }
     // the world map: script prop visibility against the content's flags, the mini-map box (spawn_box); the BG
     // camera and the flyer come from `Presenter` / the renderer
     if let (Some(f), Some(_)) = (w.field.as_ref(), mode7.as_ref()) {
@@ -1722,6 +1726,12 @@ fn render_view_with(w: &World, link: Option<&LinkDraw>, out: &mut RenderView) {
                     ((b.x0 + b.x1) >> 1, b.y0 + p.a.z - 4)
                 }),
             });
+        }
+    }
+    // the link's page under the link error's fade_out: its palette scaled as the scene's
+    if w.under.is_some() && !crate::menu::active(w) {
+        if let Some(m) = out.menu.as_mut() {
+            m.fade = out.palette_scale.or(out.palette_fade);
         }
     }
     obj_shake_baked(w, link.map_or(0, |l| l.local), out);
