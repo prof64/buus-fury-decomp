@@ -335,18 +335,20 @@ network options, `--net-name`, `--net-key` apply); B (Cancel) leaves as in the g
   "You Lose!!" / "Draw!!" and "Grab your prize!" / "Go back to training!". The result and any prize
   (`DojoRules.prize`, None = the ROM: no item) come from the **confirmed** inputs only (`DojoMatch::settle`, once),
   into the save's slot file and the running title's slot.
-* **Trading Post**: "Your Trade:" (the save's tradable supplies, unworn equipment, Zenie; A opens "How many to
-  trade?", up / down by 1, L / R by 100 for zenie) and "Friend's Trade:"; **Propose Trade** sends the offer,
-  **Accept** accepts the friend's current offer with ours ("You have accepted trade"; a new offer from either side
-  voids it), **Decline** withdraws. Both accepted -> the two-phase commit on `saves/slotN.sav` (`FileStore`) ->
-  "TRADE COMPLETE!"; the running title's slot is updated (the shell persists it). The trade names peers by a stable
-  **link id** (`<data>/link_id`), so a reconnection with a new transport id resumes a pending trade (the friend's
-  connection is the one with its link id that is *talking*: a friend whose network died stays listed until the
-  lobby notices, and the restarted one comes in on a new connection). A list longer than its five rows scrolls with
-  the cursor, the game's UP / DOWN prompts beside it (greyed at either end; the Inventory's button pictures).
-  **TRADE COMPLETE! keeps answering**: the trade's connection stays up on that page until the record is Done (the
-  friend committed too), the friend is gone, or 10 s passed - only then does a key leave (a side that left at once
-  could leave its friend Prepared, in doubt until the next link: found by the two-process test below).
+* **Trading Post**: the game's own pages (wf-core `menu::link::trade`, gated frame by frame against two linked
+  emulators: menu_parity `link_trade_*`): the picker ("Your Trade:", the list with its arrows, "How many to
+  trade?"), R **Propose Trade** -> "Waiting for a friend..." until the friend's proposal -> the proposal ("Your
+  Trade:" / "Friend's Trade:", ACCEPT / DECLINE) -> "Waiting for a friend..." until its answer -> both ACCEPT:
+  "TRADE COMPLETE!" and back to the Multiplayer page by itself; a DECLINE on either side brings both back to the
+  picker. Under the pages (`wf_app::link`: the page's actions in, the friend's proposal / answer out) the
+  two-phase commit on `saves/slotN.sav` (`FileStore`): a proposal is `TradePeer::propose` (`Snap.proposed`: an
+  offer still being put together is not one), ACCEPT `accept`, DECLINE `decline`, a withdrawn proposal / answer
+  `withdraw` / `unaccept`; the running title's slot is updated (the shell persists it). The trade names peers by a
+  stable **link id** (`<data>/link_id`), so a reconnection with a new transport id resumes a pending trade (the
+  friend's connection is the one with its link id that is *talking*). **TRADE COMPLETE! keeps answering**: after
+  the page went back to the Multiplayer page the trade's connection stays up until the record is Done on both
+  sides, the friend is gone, or 10 s passed (a side that left at once could leave its friend in doubt until the
+  next link: found by the two-process test below).
 * A drop at any point after the friend came: "**Disconnected**" (93); in a match: the ending is Disconnected, no
   prize; in a trade before both accepted: nothing applied; with a trade Prepared: "Disconnected - finishing when
   your friend is back" (the slot stays locked; the journal finishes it at the next Trading Post link with that
