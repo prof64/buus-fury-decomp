@@ -87,20 +87,27 @@ fn background(s: &mut Surface, x: i32, y: i32, w: i32, rows: i32) {
 fn panel(s: &mut Surface, x0: i32, y0: i32, x1: i32, y1: i32) {
     let w = x1 - x0;
     let h = y1 - y0;
-    let left = [0x1D, 0x6E, 0x3F, 0x01, 0x01, 0x30];
-    let right = [0x30, 0x01, 0x1D, 0x6E, 0x3F];
+    // the sides are word / halfword stores: at an unaligned x the hardware stores at the aligned address (the
+    // surfaces' rows start word-aligned; the Dojo character pick's frame at x0 = 10: menu_parity link_chars)
+    let word = |s: &mut Surface, x: i32, y: i32, b: [u8; 4]| {
+        for (i, &c) in b.iter().enumerate() {
+            s.set((x & !3) + i as i32, y, c);
+        }
+    };
+    let half = |s: &mut Surface, x: i32, y: i32, b: [u8; 2]| {
+        s.set(x & !1, y, b[0]);
+        s.set((x & !1) + 1, y, b[1]);
+    };
     for r in 0..h {
         let y = y0 + r;
-        for (i, &c) in left.iter().enumerate() {
-            s.set(x0 + i as i32, y, c);
-        }
-        for (i, &c) in right.iter().enumerate() {
-            s.set(x0 + w - 5 + i as i32, y, c);
-        }
+        let rx = x0 + w - 5;
+        word(s, x0, y, [0x1D, 0x6E, 0x3F, 0x01]);
+        half(s, x0 + 4, y, [0x01, 0x30]);
+        s.set(rx, y, 0x30);
+        word(s, rx + 1, y, [0x01, 0x1D, 0x6E, 0x3F]);
         if r >= 3 {
-            s.set(x0 + w, y, 0x01);
-            s.set(x0 + w + 1, y, 0x01);
-            s.set(x0 + w + 2, y, 0x01);
+            half(s, rx + 5, y, [0x01, 0x01]);
+            s.set(rx + 7, y, 0x01);
         }
     }
     let row = |r: i32| y0 + r;

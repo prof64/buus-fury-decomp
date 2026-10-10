@@ -10,6 +10,12 @@ TO_SAVES_DOJO = [('-', '-', 1100), ('A', 'A', 7), ('-', '-', 40), ('DOWN', 'DOWN
 TO_SAVES_TRADE = TO_SAVES_DOJO[:-2] + [('DOWN', 'DOWN', 7), ('-', '-', 30), ('A', 'A', 7), ('-', '-', 120)]
 # game 1 on both -> the Dojo's setup page (the host's) / the trade's picker
 TO_SETUP = TO_SAVES_DOJO + [('A', 'A', 7), ('-', '-', 120)]
+# the setup's START FIGHT (both have picked their saves): the character pick on both sides
+TO_CHARS = TO_SETUP + [('A', '-', 7), ('-', '-', 150)]
+# the host sets In-Game Mode (UP UP RIGHT A, DOWN DOWN to START FIGHT) and starts: the character pick on both sides
+TO_CHARS_INGAME = TO_SETUP + [(k, '-', 7) if i % 2 == 0 else ('-', '-', 30) for i, k in
+                              enumerate(sum([[k, '-'] for k in ('UP', 'UP', 'RIGHT', 'A', 'DOWN', 'DOWN')], []))] + \
+    [('A', '-', 7), ('-', '-', 150)]
 TO_TRADE = TO_SAVES_TRADE + [('A', 'A', 7), ('-', '-', 240)]
 
 
@@ -39,6 +45,37 @@ def list_sel(e, o):
     figs(e, o)
 
 
+def setup_probe(e, o):
+    """the Dojo setup page (vt 0x0804A3BC): the selected control (+0x10C), the cursor's blink, the boxes' colours
+    (+0x114.. -> box +0x38) and the link config (`[0x0872C34C + 4]`: byte 0 = Balanced, +4 the rounds code)"""
+    m = e.r32(0x03000F90)
+    if e.r32(m) == 0x0804B550:
+        # (the wait box is up: its parent, the page under it, is the previous mode)
+        o['wait'] = True
+    o['sel'] = e.r32(m + 0x10C)
+    cursor_t(e, o)
+    cfg = e.r32(0x0872C34C + 4)
+    o['balanced'] = e.r8(cfg) != 0
+    o['rounds'] = e.r32(cfg + 4)
+
+
+def chars_probe(e, o):
+    """the character pick (vt 0x0804CAA8): the selection (+0x11C), the mode (config byte 0) and the five figures
+    (+0x12C..: character objects - walk (anim pointer = the sprite's anim 1), cel +0x11, tick +0x12)"""
+    m = e.r32(0x03000F90)
+    o['sel'] = e.r32(m + 0x11C)
+    o['balanced'] = e.r8(0x03002F58) != 0
+    figs = []
+    for k in range(5):
+        ob = e.r32(m + 0x12C + 4 * k)
+        if not ob:
+            figs.append(None)
+            continue
+        d = e.r32(ob + 0x58)
+        figs.append([int(e.r32(ob + 0x50) == e.r32(d + 0x58)), e.r8(ob + 0x11), e.r16(ob + 0x12)])
+    o['figs'] = figs
+
+
 def keys(*seq, gap=12):
     out = []
     for k in seq:
@@ -56,7 +93,33 @@ LINK = {
     # the Dojo's setup page, host: Character Mode (Balanced / In-Game), Rounds (1 / 3 / 5), Start Fight
     'link_setup': dict(flow=TO_SETUP, keys=['-:20'] + keys('UP', 'UP', 'RIGHT', 'LEFT', 'A', 'DOWN', 'RIGHT', 'RIGHT',
                                                            'LEFT', 'A', 'DOWN', 'UP') + ['-:30'],
-                       open={'kind': 'link_setup', 'host': True}),
+                       open={'kind': 'link_setup', 'host': True}, probe0=setup_probe),
+    # the host's setup before the guest has picked its save: START FIGHT -> "Waiting for a friend..." over the page,
+    # B cancels it, START FIGHT again; the guest picks its save: the box ends, the character pick
+    'link_setup_wait': dict(flow=TO_SAVES_DOJO + [('A', '-', 7), ('-', '-', 120)],
+                            keys=['-:10', 'A:2', '-:40', 'B:2', '-:30', 'A:2', '-:100'],
+                            keys_b=['-:120', 'A:2'], open={'kind': 'link_setup', 'host': True},
+                            probe0=setup_probe),
+    # B on the setup page: back to Select Saved Game, A: the setup again
+    'link_setup_back': dict(flow=TO_SETUP, keys=['-:10', 'B:2', '-:60', 'A:2', '-:60'],
+                            open={'kind': 'link_setup', 'host': True}, probe0=setup_probe),
+    # the character pick, host, Balanced: RIGHT / LEFT through the roster (the figures scroll), A -> the wait box; the
+    # guest picks: the fight starts (the fade out). (The moves come while the walker shows cel 0 or 1: a move at its
+    # cel 2 / 3 draws the idled figure with a cel past the idle animation's - a read past its cel table, not
+    # reproduced; engine/docs/accuracy-log.md)
+    'link_chars': dict(flow=TO_CHARS, keys=['-:14'] + keys('RIGHT', 'RIGHT', 'RIGHT', 'LEFT', gap=40) + ['-:20', 'A:2', '-:120'],
+                       keys_b=['-:280', 'A:2'], open={'kind': 'link_chars', 'host': True}, probe0=chars_probe),
+    # the character pick, guest, In-Game (the save's party: Goku, Vegeta): RIGHT, then B back to Select Saved Game
+    'link_chars_ingame': dict(flow=TO_CHARS_INGAME, subject='b', keys=['-:14', 'RIGHT:2', '-:40', 'B:2', '-:60'],
+                              open={'kind': 'link_chars'}, probe0=chars_probe),
+    # the character pick, host: A (the pick's wait box), B in it (the row made again), B: back to the setup page
+    'link_chars_back': dict(flow=TO_CHARS, keys=['-:14', 'A:2', '-:40', 'B:2', '-:60', 'B:2', '-:40'],
+                            open={'kind': 'link_chars', 'host': True}, probe0=chars_probe),
+    # the guest's Select Saved Game while the host sets up: A -> the wait box over the list, B cancels it, A again;
+    # the host's START FIGHT ends it (the character pick)
+    'link_guest_wait': dict(flow=TO_SAVES_DOJO + [('A', '-', 7), ('-', '-', 60)], subject='b',
+                            keys=['-:10', 'A:2', '-:40', 'B:2', '-:30', 'A:2', '-:100'], keys_b=['-:110', 'A:2'],
+                            open={'kind': 'link_saves', 'trade': False}, probe0=list_sel),
     # the trade's picker: down the list, an item onto "Your Trade:", zenie's count box (RIGHT up, LEFT down), cancel
     'link_trade_list': dict(flow=TO_TRADE, keys=['-:20'] + keys('DOWN', 'DOWN', 'UP', 'A', 'DOWN', 'DOWN', 'DOWN', 'A',
                                                                  'RIGHT', 'RIGHT', 'LEFT', 'A') + ['-:30'],
