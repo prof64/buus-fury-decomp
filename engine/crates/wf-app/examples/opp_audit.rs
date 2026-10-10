@@ -996,6 +996,10 @@ fn audit(path: &std::path::Path, packs: &wf_app::wf_content::Packs, out_dir: &st
         let Some(g) = game.get(f) else { continue };
         let (ours, boxes) = render(&mut renderer, v, f, tile_off);
         if &ours == g {
+            // (`OA_PNGAT` frames are saved even when equal: a reference to look at)
+            if std::env::var("OA_PNGAT").ok().is_some_and(|v| v.split(',').any(|x| x.trim().parse() == Ok(f))) {
+                save_png(&out_dir.join(format!("{name}_f{f:03}.png")), &[g, &ours, &ours]);
+            }
             continue;
         }
         // (`OA_NODN`: pixels around our damage numbers are not counted - the digits' drawing is audited apart)

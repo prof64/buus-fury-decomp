@@ -59,6 +59,9 @@ static void _entered(struct mDebuggerModule* module, enum mDebuggerEntryReason r
 		h->oldValue = info->type.wp.oldValue;
 		h->newValue = info->type.wp.newValue;
 		h->accessType = info->type.wp.accessType;
+	} else {
+		// a breakpoint's `old`: the scanline it ran on (VCOUNT; 160.. = VBlank) - when in the frame an update ran
+		h->oldValue = ((struct GBA*) emu->core->board)->video.vcount;
 	}
 	h->frame = emu->core->frameCounter(emu->core);
 	struct ARMCore* cpu = emu->core->cpu;

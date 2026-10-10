@@ -104,6 +104,9 @@ fn draw_key(w: &World, i: usize) -> (i32, i32, u32) {
             // (and his stretch arm 0x0804CDD4: the player's halo over its fist - oa_t74_idle f77)
             // (the candy beam fired down is in front again, over his legs - oa_t74_above f92: its OAM before his body)
             let ki = ki || matches!(&s.kind, ShotKind::StretchArm { .. }) || (s.dir != 0 && matches!(&s.kind, ShotKind::CandyBeam { .. }));
+            // (the robots' flame 0x080246B4 too: behind the player it burns - opponent audit oa_t01_left f7 ..: the
+            // first flame hidden behind Goku's head, then his red hit flash over the flames)
+            let ki = ki || matches!(&s.kind, ShotKind::Flame { .. });
             (
                 if matches!(s.kind, ShotKind::DarkSphere { .. }) {
                     2
@@ -815,8 +818,12 @@ pub fn render_view(w: &World, out: &mut RenderView) {
             Body::Player(p) => {
                 // Majin Buu's candy: the def is 0x36 (sprite 45, the sweets); eaten: not in the world
                 let mut a = std::borrow::Cow::Borrowed(&p.a);
+                // (in its own colours: the candy beam's accepted hit starts the hit flash, but the candy def's tiles are
+                // not drawn through the flash map - opponent audit oa_t74_above f105 .. f115, a cyan candy that ours
+                // drew through the red ramp)
                 if p.candy_def {
                     a.to_mut().sprite = Some(45);
+                    a.to_mut().flash_map = -1;
                 }
                 // the defuse's tint (s503 `tint`: `ui/hit_flash.json` maps[3 + preset]) unless a hit flash shows
                 if let Some(k) = p.defuse.and_then(|d| crate::player::defuse_tint(d.0 + 1)).filter(|_| p.a.flash_map < 0) {
@@ -887,7 +894,14 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                         }
                         _ => "beam_kamehameha_1".to_string(),
                     };
-                    if let (Some(a), Some((run, ci))) = (a, w.data.beams.get(&name).and_then(|b| b.charge.clone())) {
+                    // (none on tick 4, the step from the small record to the large: the object's update streams the
+                    // large one's tiles into its sprite memory while the OAM still has the small shape - the game shows
+                    // no sparkle that frame; skill audit, every beam skill: sa_f02_skill15_* f9 / f110, the press at f6)
+                    let charge = w.data.beams.get(&name).and_then(|b| b.charge.clone());
+                    // (the Kamehameha family; the Banshee Blast shows its large record whole on that tick -
+                    // sa_f39_skill1_* f9)
+                    let reshape = *t == 4 && !name.contains("banshee");
+                    if let (Some(a), Some((run, ci)), false) = (a, charge, reshape) {
                         let r = if *t < 4 { ci } else { ci + 1 + ((t >> 2) & 1) };
                         let (ox, oy) = off[(a.facing & 3) as usize];
                         // the run's record r (12-byte records from the run's address; the reference draws the run's
@@ -1254,7 +1268,7 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                         const OFF: [(i32, i32); 4] = [(8, -2), (12, -2), (12, -2), (4, -2)];
                         let a = w.actor_by_id(s.owner);
                         if let (Some(a), Some((run, ci))) = (a, w.data.beams.get(&k.set).and_then(|b| b.charge.clone())) {
-                            let r = if t < 4 { ci } else { ci + 1 + ((t >> 2) & 1) };
+                            let r = if t < 4 { ci } else { ci + 1 + (((t + 1) >> 2) & 1) };
                             let (ox, oy) = OFF[(a.facing & 3) as usize];
                             if let Ok(base) = u32::from_str_radix(run.trim_start_matches("fx_"), 16) {
                                 if w.data.record_frames.contains_key(&(base + 12 * r.max(0) as u32)) {
@@ -1269,7 +1283,8 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                         // f41 .. (every 4th frame) with t)
                         let by_enemy = w.find(s.owner).is_some_and(|o| matches!(w.ents[o].body, Body::Enemy(_)));
                         let vt = if by_enemy { k.vt + 1 } else { k.vt };
-                        beam(w, id, &k.set, d, x, y, k.len, vt, !k.done, k.stopped, out)
+                        let stopped = if by_enemy { crate::shots::kame_stops_next(w, id) } else { k.stopped };
+                        beam(w, id, &k.set, d, x, y, k.len, vt, !k.done, stopped, out)
                     }
                     // the Final Flash (class 0x08036FA2; tables 0x0875FE2C / 0x08760A8C / 0x087616EC): start record
                     // 2 * dir at the visible origin, body 2 * dir + 1 every 32 px from 16 while < len - 1; growing /
@@ -1571,7 +1586,13 @@ fn obj_shake_baked(w: &World, out: &mut RenderView) {
     for s in out.sprites.iter_mut() {
         // (the generic effect objects - Fx::Anim / Loop, class 0x0802A81C - draw from the camera's unshaken rect:
         // the puffs, explosions; board 105 frames fewer px, 17 more - sc_janemba / rj_049 / sb_041 / rkb_168)
-        let effect = w.find(s.entity).is_some_and(|k| matches!(&w.ents[k].body, Body::Fx(f) if matches!(f.as_ref(), crate::fx::Fx::Anim { .. } | crate::fx::Fx::Loop { .. })));
+        // (a mummy bandage stuck on the player too: its draw places it from the player's unshaken position plus its
+        // offset - opponent audit oa_t81_punch f295 .. f308, the bandages on Goku held still while he shook)
+        let effect = w.find(s.entity).is_some_and(|k| match &w.ents[k].body {
+            Body::Fx(f) => matches!(f.as_ref(), crate::fx::Fx::Anim { .. } | crate::fx::Fx::Loop { .. }),
+            Body::Shot(sh) => matches!(&sh.kind, ShotKind::Wrap(m) if m.stuck),
+            _ => false,
+        });
         if !effect {
             s.x -= dx;
             s.y -= dy;
@@ -1739,7 +1760,23 @@ impl Presenter {
             out.title = title.clone();
             out.markers = marks.clone();
             // (damage numbers too: dr4_009 15-9 f316, made at f315)
-            out.damage_numbers = nums.clone();
+            // (but a number already shown takes a later hit's sum at once: the hit redraws its digit tiles in sprite
+            // memory, the OAM is unchanged - opponent audit oa_t01_left f8 .., the Annihilator's flame: the game's
+            // 15 / 22 / 30 a frame before ours)
+            let now = std::mem::take(&mut out.damage_numbers);
+            out.damage_numbers = nums
+                .iter()
+                .map(|n| {
+                    let mut n = n.clone();
+                    if let Some(c) = now.iter().find(|c| {
+                        c.x == n.x && (c.y - n.y).abs() <= 1 && c.heal == n.heal && c.enemy == n.enemy && c.value > n.value
+                    }) {
+                        n.value = c.value;
+                        n.crit = c.crit;
+                    }
+                    n
+                })
+                .collect();
             // (and their shake offset: the frame before's - sc_janemba f5130, the active shake's (-4, 1) against
             // the OBJs' previous (-4, 0))
             // (the sprites carry their own shake from their build: `obj_shake_baked`)

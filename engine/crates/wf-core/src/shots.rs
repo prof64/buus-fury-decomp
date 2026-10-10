@@ -2624,6 +2624,26 @@ pub fn kame_beam_enemy(
         })),
     )
 }
+/// the head's next update stops it (a projectile wall, or an accepted head message) - tried on a copy of the world. An
+/// enemy's beam object streams its pieces' tiles into its own sprite memory in its update, so the picture shows the
+/// next update's head (the impact) while the OAM is still this frame's: opponent audit oa_t3c_above f35, Kid Buu's
+/// Kamehameha shows its impact a frame before the hit (`view::render_view`)
+pub fn kame_stops_next(w: &World, id: EntityId) -> bool {
+    let Some(i) = w.find(id) else { return false };
+    let ShotKind::Kame(b) = &w.shot_ref(i).kind else { return false };
+    if b.done || b.charging || b.stopped {
+        return b.stopped;
+    }
+    let (b_a, b_mult, len) = (b.a, b.mult, b.len);
+    let (hx, hy) = kame_head(w.shot_ref(i), len);
+    let hr = Rect::new(hx - 8, hy - 8, hx + 8, hy + 8);
+    if in_wall(w, i, &hr) {
+        return true;
+    }
+    let mut c = w.clone();
+    c.frame += 1;
+    hit(&mut c, i, hr, b_a, b_mult, false)
+}
 fn kame_head(s: &Shot, len: i32) -> (i32, i32) {
     let (dx, dy) = DIR_VEC[s.dir as usize];
     (s.px() + dx * len, s.py() + dy * len)
