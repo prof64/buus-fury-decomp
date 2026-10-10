@@ -238,8 +238,8 @@ impl Run {
                 for p in [&self.a, &self.b] {
                     if let Some(s) = p.sim.dojo() {
                         eprintln!("{} f{} c{} {:?} r{}", p.sim.frame(), s.frame(), s.confirmed(), s.game.st.phase, s.game.st.round);
-                    } else if let Some(c) = p.sim.trade_cursor() {
-                        eprintln!("{} trade {:?} {:?} {:?}", p.sim.frame(), c, p.sim.trade_state(), p.sim.trade_rows());
+                    } else if p.sim.trade_page().is_some() {
+                        eprintln!("{} trade {:?} {}", p.sim.frame(), p.sim.trade_state(), p.sim.report_json());
                     } else {
                         eprintln!("{} {}", p.sim.frame(), p.sim.phase());
                     }
@@ -362,58 +362,7 @@ fn trade_disconnect_before_commit() {
     assert_eq!(r.b.slot(), sb, "nothing applied");
 }
 
-/// the arrow prompts the trade list shows (picture, frame) in a player's current view
-fn arrows(p: &Player) -> Vec<(String, u16)> {
-    let mut v = wf_view::RenderView::default();
-    p.sim.view(&mut v);
-    let mut out = Vec::new();
-    for l in v.menu.iter().flat_map(|m| m.layers.iter()) {
-        for op in &l.ops {
-            if let wf_view::MenuOp::Image { path, frame, .. } = op {
-                if path.ends_with("buttons/up.png") || path.ends_with("buttons/down.png") {
-                    out.push((path.rsplit('/').next().unwrap_or("").to_string(), *frame));
-                }
-            }
-        }
-    }
-    out.sort();
-    out
-}
 
-#[test]
-fn trade_list_scrolls_with_arrows() {
-    let Some(dir) = content_dir() else { return };
-    let d = wf_app::battle::load_data(&packs(&dir)).unwrap();
-    // eight supplies + zenie: nine rows, five shown
-    let many: Vec<(usize, u8)> = (0..8).map(|i| (i, 3)).collect();
-    let sa = save(&d, &[(0, 20)], &many, 500);
-    let sb = save(&d, &[(4, 20)], &[(1, 4)], 100);
-    let Some(mut r) = run("trade-scroll", LinkKind::Trade, &sa, &sb, 21) else { return };
-    r.until(6000, "the trade screens", |r| r.a.sim.phase() == "trade" && r.b.sim.phase() == "trade");
-    let n = r.a.sim.trade_cursor().unwrap().3.len();
-    assert!(n > 5, "a long list ({n} rows)");
-    // at the top: up greyed, down live
-    assert_eq!(arrows(&r.a), vec![("down.png".into(), 0), ("up.png".into(), 2)], "top of the list");
-    // the scripted player walks down to the zenie row (the last): the list has scrolled
-    r.until(3000, "the last row", |r| r.a.sim.trade_cursor().is_some_and(|c| c.0 == n - 1));
-    assert_eq!(arrows(&r.a), vec![("down.png".into(), 2), ("up.png".into(), 0)], "bottom of the list");
-    // drawn: the prompts' pixels at their place (the layer at (8, 8) + (98, 44) / (98, 94))
-    let mut v = wf_view::RenderView::default();
-    r.a.sim.view(&mut v);
-    let px = r.renderer.render(&r.packs, &v, 0, 240, 160).to_vec();
-    for (x0, y0) in [(106usize, 52usize), (106, 102)] {
-        let colours: std::collections::BTreeSet<u32> =
-            (0..16).flat_map(|dy| (0..16).map(move |dx| (dx, dy))).map(|(dx, dy)| px[(y0 + dy) * 240 + x0 + dx]).collect();
-        assert!(colours.len() > 2, "an arrow drawn at ({x0}, {y0})");
-    }
-    // a short list shows none (the guest: two rows)
-    assert!(arrows(&r.b).is_empty(), "no arrows on a short list");
-    // and the trade still completes
-    r.until(6000, "TRADE COMPLETE on both", |r| {
-        let ok = |p: &Player| p.sim.phase() == "complete" || (p.started() && p.sim.last.as_deref() == Some("complete"));
-        ok(&r.a) && ok(&r.b)
-    });
-}
 
 /// the trade journal's records next to a player's slot: (id, state)
 fn journal(dir: &Path) -> Vec<(String, String)> {

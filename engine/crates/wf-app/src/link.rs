@@ -31,9 +31,10 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use wf_core::content::GameData;
-use wf_core::input::{A, B, DOWN, L, LEFT, R, RIGHT, UP};
+use wf_core::input::{A, B, DOWN, LEFT, RIGHT, UP};
 use wf_core::menu::save::{SaveData, SLOTS};
 use wf_core::menu::text::{units, Canvas, Pen, TextData};
+use wf_core::menu::link::trade::{TradeEntry, KIND_EQUIP, KIND_SUPPLY, KIND_ZENIE};
 use wf_core::menu::link::LinkAction;
 use wf_core::menu::MenuData;
 use wf_net::dojo::{balanced_roster, fighter_setup, DojoChar, DojoGame, DojoHello, DojoMatch, DojoMode, DojoRules, DojoSave, DojoSetup, Ending, Phase as DPhase};
@@ -160,15 +161,6 @@ impl Transport for Port {
 }
 
 /// one row of "Your Trade:"
-#[derive(Clone, Debug, PartialEq)]
-enum Row {
-    /// supply index, count in the save
-    Supply(u16, u32),
-    /// equipment item id, unworn copies
-    Equip(i32, u32),
-    /// zenie in the save
-    Zenie(u32),
-}
 
 struct TradeUi {
     peer: TradePeer,
@@ -176,14 +168,6 @@ struct TradeUi {
     port: Port,
     friend_tid: String,
     friend_lid: String,
-    rows: Vec<Row>,
-    counts: Vec<u32>,
-    /// the cursor: a row, or the buttons below (rows.len())
-    sel: usize,
-    /// "How many to trade?" open on `sel`
-    picking: bool,
-    /// the button under the cursor: 0 Propose Trade, 1 Accept, 2 Decline
-    btn: usize,
     accepted: bool,
     friend_accepted: bool,
     /// a status line (the game's strings where it has one)
@@ -192,6 +176,9 @@ struct TradeUi {
     away: Option<bool>,
     /// the committed trade's id (TRADE COMPLETE) and the frames its page has shown
     done: Option<(String, u32)>,
+    /// the friend's proposal revision given to the page (`Friend::offer`) and its answer not yet given
+    friend_given: Option<u32>,
+    friend_answer: Option<bool>,
 }
 
 struct Match {
@@ -220,9 +207,6 @@ enum Phase {
     Match(Box<Match>),
     Result(Ending),
     Trade(Box<TradeUi>),
-    /// "TRADE COMPLETE!": the trade's connection keeps answering (the friend may still have to commit) until the
-    /// record is Done or the friend is gone - only then does a key leave (None: nothing left to answer)
-    Complete(Option<Box<TradeUi>>),
     /// a message (string) ended the flow; any key goes back
     Message(Vec<u16>),
 }
@@ -348,6 +332,42 @@ impl Flow {
 
     /// what the local player did on a wf-core link page (`menu::link`)
     fn link_action(&mut self, a: LinkAction, now: f64, ev: &mut Vec<SimEvent>) -> Out {
+        if let Phase::Trade(u) = &mut self.phase {
+            match a {
+                LinkAction::Propose(e) => {
+                    u.accepted = false;
+                    u.peer.propose(offer_from(&e));
+                }
+                LinkAction::CancelPropose | LinkAction::LeaveProposal => {
+                    u.accepted = false;
+                    u.peer.withdraw();
+                }
+                LinkAction::Answer(true) => match u.peer.accept(&u.store) {
+                    Ok(()) => u.accepted = true,
+                    Err(e) => {
+                        // (our side cannot take it - a limit: as a decline)
+                        u.note = units(&e);
+                        u.peer.decline();
+                    }
+                },
+                LinkAction::Answer(false) => {
+                    u.accepted = false;
+                    u.peer.decline();
+                }
+                LinkAction::CancelAnswer => {
+                    u.accepted = false;
+                    u.peer.unaccept();
+                }
+                // B on the picker: back to Select Saved Game (the page shows it), the trade's connection dropped
+                LinkAction::Unpick => {
+                    let sel = self.slot;
+                    self.set_phase(Phase::Saves { sel });
+                }
+                // (TRADE COMPLETE! on the page: the commit runs on its own - `TradeEvent::Complete`)
+                _ => {}
+            }
+            return Out::None;
+        }
         match (&self.phase, a) {
             (Phase::Saves { .. }, LinkAction::Back) => Out::Done,
             (Phase::Saves { .. }, LinkAction::Save(s)) if self.usable(s) => {
@@ -369,6 +389,7 @@ impl Flow {
     fn page(&self) -> Option<&'static str> {
         match self.phase {
             Phase::Saves { .. } => Some("saves"),
+            Phase::Trade(_) => Some("trade"),
             _ => None,
         }
     }
@@ -377,7 +398,7 @@ impl Flow {
     fn step(&mut self, now: f64, clock: &Clock, held: u16, pressed: u16, ev: &mut Vec<SimEvent>) -> Out {
         self.t = self.t.wrapping_add(1);
         if let Some(r) = self.net.lobby.rejected.clone() {
-            if !matches!(self.phase, Phase::Message(_) | Phase::Match(_) | Phase::Result(_) | Phase::Complete(_) | Phase::Trade(_)) {
+            if !matches!(self.phase, Phase::Message(_) | Phase::Match(_) | Phase::Result(_) | Phase::Trade(_)) {
                 self.set_phase(Phase::Message(units(&r)));
             }
         }
@@ -388,9 +409,6 @@ impl Flow {
         if matches!(self.phase, Phase::Trade(_)) {
             return self.step_trade(now, pressed, ev);
         }
-        if matches!(self.phase, Phase::Complete(Some(_))) {
-            return self.step_complete(now, pressed, ev);
-        }
         let _ = self.net.pump(now);
         if self.friend.is_none() {
             self.friend = self.net.friend();
@@ -399,7 +417,7 @@ impl Flow {
             self.friend = Some(f);
         }
         let lost = self.friend_gone() || self.net.t.closed();
-        if lost && !matches!(self.phase, Phase::Waiting | Phase::Message(_) | Phase::Result(_) | Phase::Complete(_)) {
+        if lost && !matches!(self.phase, Phase::Waiting | Phase::Message(_) | Phase::Result(_)) {
             self.set_phase(Phase::Message(Vec::new()));
             return Out::None;
         }
@@ -419,7 +437,7 @@ impl Flow {
         match &mut self.phase {
             // (the title's box: once the friend is there it counts its 10 updates and ends - `linked`)
             Phase::Waiting => Out::None,
-            Phase::NoSaves | Phase::Message(_) | Phase::Result(_) | Phase::Complete(_) => {
+            Phase::NoSaves | Phase::Message(_) | Phase::Result(_) => {
                 if pressed & (A | B) != 0 {
                     sfx(ev, SFX_MENU);
                     return Out::Done;
@@ -657,53 +675,51 @@ impl Flow {
             }
         };
         let Some(sd) = store.save().or_else(|| self.saves[self.slot].clone()) else { return Out::None };
-        let rows = trade_rows(&sd, &story_flags(&self.data));
         let nonce = (self.t as u64) ^ ((self.slot as u64) << 32) ^ (self.net.lobby.settings.secret.len() as u64);
         let peer = TradePeer::new(&self.link_id, &h.link_id, nonce ^ u64::from(self.net.t.local_id().unwrap_or_default().len() as u32), &store);
-        let n = rows.len();
+        let _ = sd;
         self.set_phase(Phase::Trade(Box::new(TradeUi {
             peer,
             store,
             port: Port { me: self.link_id.clone(), ..Default::default() },
             friend_tid: tid,
             friend_lid: h.link_id,
-            rows,
-            counts: vec![0; n],
-            sel: 0,
-            picking: false,
-            btn: 0,
             accepted: false,
             friend_accepted: false,
             note: Vec::new(),
             away: None,
             done: None,
+            friend_given: None,
+            friend_answer: None,
         })));
         Out::None
     }
 
-    /// "TRADE COMPLETE!": the trade keeps answering the friend; a key leaves once the trade is Done on BOTH sides
-    /// (mine Done and the friend's Done heard - `TradePeer::settled`: leaving on my own Done alone could take with it
-    /// the snapshot the friend still needed to see my commit, leaving the friend Committed until the next link), the
-    /// friend is gone, or after 10 s (the friend then finishes at the next link: the journal)
-    fn step_complete(&mut self, now: f64, pressed: u16, ev: &mut Vec<SimEvent>) -> Out {
-        let Phase::Complete(Some(u)) = &mut self.phase else { return Out::None };
-        trade_io(&mut self.net, u, now);
-        for e in u.peer.events() {
-            match e {
-                TradeEvent::Disconnected { in_doubt } => u.away = Some(in_doubt),
-                TradeEvent::Reconnected => u.away = None,
-                _ => {}
-            }
+    /// the picked save as the trade's store has it
+    fn trade_save(&self) -> Option<SaveData> {
+        match &self.phase {
+            Phase::Trade(u) => u.store.save(),
+            _ => None,
         }
-        let Some((id, shown)) = u.done.as_mut() else { return Out::None };
-        *shown += 1;
-        let settled = u.peer.settled(id, &u.store);
-        let gone = u.away.is_some() || self.net.t.closed();
-        if pressed & (A | B) != 0 && (settled || gone || *shown > 600) {
-            sfx(ev, SFX_MENU);
-            return Out::Done;
+    }
+
+    /// what the page's friend should know now (taken once): the friend's proposal (its offer as the page's entries)
+    /// and its answer
+    fn trade_friend(&mut self) -> (Option<Vec<TradeEntry>>, Option<bool>) {
+        let Phase::Trade(u) = &mut self.phase else { return (None, None) };
+        let mut offer = None;
+        if u.peer.friend_proposed() && u.peer.friend_rev() != u.friend_given {
+            u.friend_given = u.peer.friend_rev();
+            offer = u.peer.friend_offer().map(entries_of);
         }
-        Out::None
+        (offer, u.friend_answer.take())
+    }
+
+    /// TRADE COMPLETE! and the trade settled on both sides (or the friend gone, or 10 s): the flow can end
+    fn trade_settled(&self) -> bool {
+        let Phase::Trade(u) = &self.phase else { return true };
+        let Some((id, shown)) = u.done.as_ref() else { return false };
+        u.peer.settled(id, &u.store) || u.away.is_some() || self.net.t.closed() || *shown > 600
     }
 
     fn step_trade(&mut self, now: f64, pressed: u16, ev: &mut Vec<SimEvent>) -> Out {
@@ -712,127 +728,46 @@ impl Flow {
         let mut done = None;
         for e in u.peer.events() {
             match e {
-                TradeEvent::FriendOffer(_) => {
-                    // (a new offer from the friend voids both acceptances)
-                    u.friend_accepted = false;
-                    u.accepted = false;
+                // (the page takes the friend's proposal from the peer: `trade_friend`)
+                TradeEvent::FriendOffer(_) => {}
+                TradeEvent::FriendAccepted => {
+                    u.friend_accepted = true;
+                    u.friend_answer = Some(true);
                 }
-                TradeEvent::FriendAccepted => u.friend_accepted = true,
                 TradeEvent::Declined => {
                     u.friend_accepted = false;
                     u.accepted = false;
-                    u.note = units("Your friend declined");
+                    u.friend_answer = Some(false);
                 }
-                TradeEvent::Agreed(_) => u.note = units("..."),
+                TradeEvent::Agreed(_) => {}
                 TradeEvent::Complete(id) => {
                     u.done = Some((id, 0));
                     done = Some(true);
                 }
+                // (our side refused the agreed trade - its check failed: as a decline)
                 TradeEvent::Aborted(_, why) => {
-                    u.accepted = false;
-                    u.friend_accepted = false;
                     u.note = units(&why);
+                    u.friend_answer = Some(false);
                 }
                 TradeEvent::Disconnected { in_doubt } => u.away = Some(in_doubt),
                 TradeEvent::Reconnected => u.away = None,
             }
         }
+        if let Some((_, shown)) = u.done.as_mut() {
+            *shown += 1;
+        }
         if done == Some(true) {
-            sfx(ev, SFX_ACCEPT);
-            let sd = u.store.save();
-            if let Phase::Trade(u) = std::mem::replace(&mut self.phase, Phase::Complete(None)) {
-                self.set_phase(Phase::Complete(Some(u)));
-            }
-            if let Some(sd) = sd {
+            if let Some(sd) = u.store.save() {
                 self.saves[self.slot] = Some(sd.clone());
                 return Out::Slot(self.slot, sd);
             }
             return Out::None;
         }
-        // input
-        if let Some(in_doubt) = u.away {
-            // "Disconnected": with a trade in doubt the save stays locked until the friend is back; any key leaves
-            // (the journal finishes it at the next link with this friend)
-            let _ = in_doubt;
-            if pressed & (A | B) != 0 {
-                sfx(ev, SFX_MENU);
-                return Out::Done;
-            }
-            return Out::None;
-        }
-        let n = u.rows.len();
-        let locked = u.accepted;
-        if u.picking {
-            let k = u.sel;
-            let max = match u.rows[k] {
-                Row::Supply(_, c) | Row::Equip(_, c) => c,
-                Row::Zenie(z) => z,
-            };
-            let step = if matches!(u.rows[k], Row::Zenie(_)) { if pressed & (L | R) != 0 { 100 } else { 1 } } else { 1 };
-            let c = &mut u.counts[k];
-            if pressed & (UP | R) != 0 {
-                *c = (*c + step).min(max);
-                sfx(ev, SFX_CURSOR);
-            }
-            if pressed & (DOWN | L) != 0 {
-                *c = c.saturating_sub(step);
-                sfx(ev, SFX_CURSOR);
-            }
-            if pressed & (A | B) != 0 {
-                sfx(ev, SFX_MENU);
-                u.picking = false;
-            }
-            return Out::None;
-        }
-        if pressed & UP != 0 && u.sel > 0 {
-            u.sel -= 1;
-            sfx(ev, SFX_CURSOR);
-        }
-        if pressed & DOWN != 0 && u.sel < n {
-            u.sel += 1;
-            sfx(ev, SFX_CURSOR);
-        }
-        if u.sel == n && pressed & (LEFT | RIGHT) != 0 {
-            u.btn = if pressed & RIGHT != 0 { (u.btn + 1) % 3 } else { (u.btn + 2) % 3 };
-            sfx(ev, SFX_CURSOR);
-        }
-        if pressed & B != 0 {
+        // "Disconnected" with nothing done: any key leaves (a trade in doubt stays locked until the friend is back;
+        // the journal finishes it at the next link with this friend)
+        if u.away.is_some() && u.done.is_none() && pressed & (A | B) != 0 {
             sfx(ev, SFX_MENU);
-            if u.accepted {
-                u.peer.decline();
-                u.accepted = false;
-                return Out::None;
-            }
             return Out::Done;
-        }
-        if pressed & A != 0 {
-            sfx(ev, SFX_MENU);
-            if u.sel < n {
-                if !locked {
-                    u.picking = true;
-                }
-            } else {
-                match u.btn {
-                    0 => {
-                        // "Propose Trade": the offer as picked
-                        let o = offer_of(&u.rows, &u.counts);
-                        u.peer.set_offer(o);
-                        u.accepted = false;
-                        u.note = Vec::new();
-                    }
-                    1 => match u.peer.accept(&u.store) {
-                        Ok(()) => {
-                            u.accepted = true;
-                            u.note = Vec::new();
-                        }
-                        Err(e) => u.note = units(&e),
-                    },
-                    _ => {
-                        u.peer.decline();
-                        u.accepted = false;
-                    }
-                }
-            }
         }
         Out::None
     }
@@ -957,81 +892,8 @@ impl Flow {
                     centre(&mut cv, 86, t.s(b), MenuFont::Menu, 2);
                 }
             }
-            Phase::Complete(_) => {
-                head(&mut cv, t.s(79));
-                centre(&mut cv, 62, t.s(88), MenuFont::Bold, 6);
-                centre(&mut cv, 80, t.s(89), MenuFont::Bold, 6);
-            }
-            Phase::Trade(u) => {
-                head(&mut cv, t.s(79));
-                line(&mut cv, 16, 36, t.s(80), 2);
-                line(&mut cv, 116, 36, t.s(81), 2);
-                // your side: rows with the counts picked
-                let first = u.sel.saturating_sub(4).min(u.rows.len().saturating_sub(5));
-                for (k, (r, &c)) in u.rows.iter().zip(u.counts.iter()).enumerate().skip(first).take(5) {
-                    let y = 50 + (k - first) as i32 * 13;
-                    let mut s = row_name(d, t, r);
-                    s.extend(units(&format!(" {c}")));
-                    line(&mut cv, 24, y, &s, if u.sel == k { 6 } else { 2 });
-                    if u.sel == k {
-                        cursor(&mut cv, 22, y - 4);
-                    }
-                }
-                // a list longer than its five rows scrolls with the cursor: the game's UP / DOWN prompts (the
-                // Inventory's long list, button table `0x086B77A4`) beside its first and last row, greyed (frame 2)
-                // at either end (INFERRED placement: the link pages were never recorded)
-                if u.rows.len() > 5 {
-                    let more_up = first > 0;
-                    let more_down = first + 5 < u.rows.len();
-                    let (_, bw, bh, up) = wf_core::menu::kit::BUTTONS[wf_core::menu::kit::BTN_UP as usize];
-                    let (_, _, _, down) = wf_core::menu::kit::BUTTONS[wf_core::menu::kit::BTN_DOWN as usize];
-                    cv.image(up, if more_up { 0 } else { 2 }, bw, bh, 98, 44);
-                    cv.image(down, if more_down { 0 } else { 2 }, bw, bh, 98, 94);
-                }
-                // the friend's offer
-                if let Some(o) = u.peer.friend_offer() {
-                    let mut y = 50;
-                    for (&i, &n) in &o.supplies {
-                        let mut s = d.inv.name.get(i as usize).cloned().unwrap_or_default();
-                        s.extend(units(&format!(" {n}")));
-                        line(&mut cv, 120, y, &s, 2);
-                        y += 13;
-                    }
-                    for &id in &o.equipment {
-                        line(&mut cv, 120, y, &equip_name(d, id), 2);
-                        y += 13;
-                    }
-                    if o.zenie > 0 {
-                        let mut s = t.s(82).to_vec();
-                        s.extend(units(&format!(" {}", o.zenie)));
-                        line(&mut cv, 120, y, &s, 2);
-                    }
-                }
-                // the buttons
-                let by = 122;
-                for (k, sid) in [84usize, 85, 86].into_iter().enumerate() {
-                    let x = [20, 112, 164][k];
-                    line(&mut cv, x, by, t.s(sid), if u.sel == u.rows.len() && u.btn == k { 6 } else { 2 });
-                    if u.sel == u.rows.len() && u.btn == k {
-                        cursor(&mut cv, x - 2, by - 4);
-                    }
-                }
-                if u.picking {
-                    line(&mut cv, 16, 112, t.s(83), 3);
-                } else if let Some(in_doubt) = u.away {
-                    let mut s = t.s(93).to_vec();
-                    if in_doubt {
-                        s.extend(units(" - finishing when your friend is back"));
-                    }
-                    line(&mut cv, 16, 112, &s, 3);
-                } else if u.accepted {
-                    line(&mut cv, 16, 112, t.s(87), 3);
-                } else if !u.note.is_empty() {
-                    line(&mut cv, 16, 112, &u.note, 3);
-                } else if u.friend_accepted {
-                    line(&mut cv, 16, 112, &units("Your friend accepted"), 3);
-                }
-            }
+            // (the Trading Post's pages are wf-core's link screen: `LinkSim.page`)
+            Phase::Trade(_) => {}
             Phase::Match(_) => {}
         }
         v.layers.push(MenuLayer { w: w as u16, h: h as u16, x: 8, y: 8, priority: 0, ops: cv.ops });
@@ -1067,68 +929,32 @@ fn char_name(t: &TextData, c: &DojoChar) -> Vec<u16> {
     (116..=139).map(|i| t.s(i)).find(|s| *s == n.as_slice()).map(|s| s.to_vec()).unwrap_or(n)
 }
 
-fn equip_name(d: &MenuData, id: i32) -> Vec<u16> {
-    d.items.equipment.get(id as usize).map(|e| e.name.clone()).unwrap_or_else(|| units(&format!("#{id}")))
-}
 
-fn row_name(d: &MenuData, t: &TextData, r: &Row) -> Vec<u16> {
-    match r {
-        Row::Supply(i, have) => {
-            let mut s = d.inv.name.get(*i as usize).cloned().unwrap_or_default();
-            s.extend(units(&format!(" ({have})")));
-            s
-        }
-        Row::Equip(id, have) => {
-            let mut s = equip_name(d, *id);
-            s.extend(units(&format!(" ({have})")));
-            s
-        }
-        Row::Zenie(z) => {
-            let mut s = t.s(82).to_vec();
-            s.extend(units(&format!(" ({z})")));
-            s
-        }
-    }
-}
 
-/// what the save can trade: supplies (not story items) in the save, unworn equipment, zenie
-fn trade_rows(sd: &SaveData, story: &[bool]) -> Vec<Row> {
-    let inv = crate::trade::inventory_of(sd, story);
-    let mut rows = Vec::new();
-    for (i, &n) in inv.supplies.iter().enumerate() {
-        if n > 0 && !inv.story.get(i).copied().unwrap_or(false) {
-            rows.push(Row::Supply(i as u16, n));
-        }
-    }
-    let mut eq: std::collections::BTreeMap<i32, u32> = Default::default();
-    for &(id, worn) in &inv.equipment {
-        if !worn {
-            *eq.entry(id).or_default() += 1;
-        }
-    }
-    for (id, n) in eq {
-        rows.push(Row::Equip(id, n));
-    }
-    rows.push(Row::Zenie(inv.zenie));
-    rows
-}
 
-fn offer_of(rows: &[Row], counts: &[u32]) -> Offer {
+/// the page's offer entries as the trade's offer
+fn offer_from(e: &[TradeEntry]) -> Offer {
     let mut o = Offer::default();
-    for (r, &c) in rows.iter().zip(counts) {
-        if c == 0 {
-            continue;
-        }
-        match r {
-            Row::Supply(i, _) => {
-                o.supplies.insert(*i, c);
-            }
-            Row::Equip(id, _) => o.equipment.extend(std::iter::repeat_n(*id, c as usize)),
-            Row::Zenie(_) => o.zenie = c,
+    for x in e {
+        match x.kind {
+            KIND_EQUIP => o.equipment.extend(std::iter::repeat_n(x.id as i32, x.amount.max(1) as usize)),
+            KIND_SUPPLY => *o.supplies.entry(x.id as u16).or_default() += x.amount,
+            _ => o.zenie += x.amount,
         }
     }
     o
 }
+
+/// the trade's offer as the page's entries (equipment one entry per copy, the supplies by index, zenie last)
+fn entries_of(o: &Offer) -> Vec<TradeEntry> {
+    let mut v: Vec<TradeEntry> = o.equipment.iter().map(|&id| TradeEntry { amount: 1, kind: KIND_EQUIP, id: id as u8 }).collect();
+    v.extend(o.supplies.iter().filter(|(_, &n)| n > 0).map(|(&i, &n)| TradeEntry { amount: n, kind: KIND_SUPPLY, id: i as u8 }));
+    if o.zenie > 0 {
+        v.push(TradeEntry { amount: o.zenie, kind: KIND_ZENIE, id: 0 });
+    }
+    v
+}
+
 
 thread_local! {
     static INFO: std::cell::RefCell<Option<serde_json::Value>> = const { std::cell::RefCell::new(None) };
@@ -1260,8 +1086,9 @@ impl LinkSim {
             Some(Phase::Setup { .. }) => "setup",
             Some(Phase::Match(_)) => "match",
             Some(Phase::Result(_)) => "result",
+            // (TRADE COMPLETE! shown, the trade settling)
+            Some(Phase::Trade(u)) if u.done.is_some() => "complete",
             Some(Phase::Trade(_)) => "trade",
-            Some(Phase::Complete(_)) => "complete",
             Some(Phase::Message(_)) => "message",
         }
     }
@@ -1286,17 +1113,13 @@ impl LinkSim {
             _ => None,
         }
     }
-    /// the trade rows' labels (tests / tools)
-    pub fn trade_rows(&self) -> Vec<String> {
-        match self.flow.as_ref().map(|f| &f.phase) {
-            Some(Phase::Trade(u)) => u.rows.iter().map(|r| format!("{r:?}")).collect(),
-            _ => Vec::new(),
-        }
-    }
-    /// the cursor's place on the trade screen / the picked counts (tests)
-    pub fn trade_cursor(&self) -> Option<(usize, bool, usize, Vec<u32>)> {
-        match self.flow.as_ref().map(|f| &f.phase) {
-            Some(Phase::Trade(u)) => Some((u.sel, u.picking, u.btn, u.counts.clone())),
+    /// the Trading Post's page (the wf-core link screen on the title app) while it shows
+    pub fn trade_page(&self) -> Option<&wf_core::menu::link::trade::Trade> {
+        match self.inner.session.world.menu.stack.last() {
+            Some(wf_core::menu::Screen::Link(l)) => match &l.page {
+                wf_core::menu::link::LinkPage::Trade(t) => Some(t),
+                _ => None,
+            },
             _ => None,
         }
     }
@@ -1312,6 +1135,8 @@ impl LinkSim {
     /// the trade screen's "Disconnected" (Some(in doubt): the friend is gone; a trade in doubt keeps the save locked)
     pub fn trade_away(&self) -> Option<bool> {
         match self.flow.as_ref().map(|f| &f.phase) {
+            // (a trade completed is not in doubt any more)
+            Some(Phase::Trade(u)) if u.done.is_some() => None,
             Some(Phase::Trade(u)) => u.away,
             _ => None,
         }
@@ -1377,7 +1202,7 @@ impl LinkSim {
         let setup = self.setup_state().map(|(row, picked, s)| {
             serde_json::json!({ "row": if row == usize::MAX { -1 } else { row as i64 }, "picked": picked, "mode": format!("{:?}", s.mode), "rounds": s.rounds })
         });
-        let cursor = self.trade_cursor().map(|(sel, picking, btn, counts)| serde_json::json!({ "sel": sel, "picking": picking, "btn": btn, "counts": counts }));
+        let cursor = self.trade_page().map(|t| serde_json::json!({ "side": t.pick.side, "row": t.pick.first + t.pick.row, "mine": t.pick.mine.len(), "proposal": t.prop.is_some(), "box": t.boxed.is_some() }));
         let trade = self.trade_state().map(|(acc, facc, friend)| {
             serde_json::json!({ "accepted": acc, "friend_accepted": facc, "friend_offer": friend.map(|o| !o.is_empty()) })
         });
@@ -1525,10 +1350,29 @@ impl LinkSim {
                         let saved = self.page.take().map(|p| p.0).unwrap_or_else(|| Box::new(self.inner.save_mem()));
                         let w = &mut self.inner.session.world;
                         let trade = flow.kind == LinkKind::Trade;
-                        let l = match name {
-                            _ => wf_core::menu::link::Link::saves(w, trade),
+                        let shown = match w.menu.stack.last() {
+                            Some(wf_core::menu::Screen::Link(l)) => match l.page {
+                                wf_core::menu::link::LinkPage::Saves(_) => Some("saves"),
+                                wf_core::menu::link::LinkPage::Trade(_) => Some("trade"),
+                            },
+                            _ => None,
                         };
-                        wf_core::menu::link::open(w, l);
+                        // (a page that went on by itself - the picker's B shows Select Saved Game - is kept)
+                        if shown != Some(name) {
+                            match name {
+                                // the Trading Post's picker is built from the picked save (the story it loads)
+                                "trade" => {
+                                    if let Some(sd) = flow.trade_save() {
+                                        w.story = sd.story;
+                                    }
+                                    wf_core::menu::link::open_trade(w);
+                                }
+                                _ => {
+                                    let l = wf_core::menu::link::Link::saves(w, trade);
+                                    wf_core::menu::link::open(w, l);
+                                }
+                            }
+                        }
                         self.page = Some((saved, name));
                     }
                     None => {
@@ -1539,6 +1383,16 @@ impl LinkSim {
                 }
             }
             if self.page.is_some() {
+                // the friend's moves the page shows (its proposal, its answer)
+                let (offer, answer) = flow.trade_friend();
+                if let Some(wf_core::menu::Screen::Link(l)) = self.inner.session.world.menu.stack.last_mut() {
+                    if offer.is_some() {
+                        l.friend.offer = offer;
+                    }
+                    if answer.is_some() {
+                        l.friend.answer = answer;
+                    }
+                }
                 self.inner.step(inputs, events);
                 let acts = match self.inner.session.world.menu.stack.last_mut() {
                     Some(wf_core::menu::Screen::Link(l)) => std::mem::take(&mut l.actions),
@@ -1550,6 +1404,16 @@ impl LinkSim {
                     if !matches!(out, Out::None) {
                         break;
                     }
+                }
+                // TRADE COMPLETE! went back to the title's Multiplayer page by itself: the flow ends once the trade has
+                // settled on both sides (its connection kept answering meanwhile) - the title stays as it is now
+                let on_title = matches!(self.inner.session.world.menu.stack.last(), Some(wf_core::menu::Screen::Title(_)));
+                if on_title && matches!(flow.phase, Phase::Trade(_)) && flow.trade_settled() {
+                    self.flow = None;
+                    self.page = None;
+                    self.wait_seen = false;
+                    self.last = Some("complete".into());
+                    return;
                 }
             }
         }
@@ -1567,7 +1431,6 @@ impl LinkSim {
                     Phase::Message(m) if !m.is_empty() => String::from_utf16_lossy(m),
                     Phase::Message(_) => "disconnected".into(),
                     Phase::Result(e) => format!("{e:?}"),
-                    Phase::Complete(_) => "complete".into(),
                     _ => "left".into(),
                 });
                 self.flow = None;
@@ -1650,6 +1513,8 @@ pub struct LinkBot {
     pub zenie: u32,
     /// the trade: accept the friend's offer (else only propose)
     pub accept: bool,
+    /// the proposal answered (ACCEPT pressed)
+    answered: bool,
     /// back at the title after a flow: go into the page again (a test's friend coming back to finish a trade)
     pub repeat: bool,
     downs: u32,
@@ -1675,6 +1540,7 @@ impl LinkBot {
             repeat: false,
             downs: 0,
             proposed: false,
+            answered: false,
             in_phase: 0,
             last_page: None,
             last_phase: "",
@@ -1807,39 +1673,65 @@ impl LinkBot {
                     Some(false) => return if self.in_phase > 40 { A } else { 0 },
                     None => {}
                 }
-                let Some((sel, picking, btn, counts)) = sim.trade_cursor() else { return 0 };
-                let Some((accepted, _, friend)) = sim.trade_state() else { return 0 };
-                let n = counts.len();
-                let (first, zenie) = (self.first, self.zenie);
-                let target = |k: usize| if k == 0 { first } else if k == n - 1 { zenie } else { 0 };
-                if let Some(k) = (0..n).find(|&k| counts[k] != target(k)) {
-                    if picking && sel == k {
-                        return if counts[k] < target(k) { UP } else { DOWN };
-                    }
-                    if picking {
+                use wf_core::menu::link::trade::TBox;
+                let Some(t) = sim.trade_page() else { return 0 };
+                // "How many to trade?": up / down to the count wanted, A
+                if let Some(TBox::Count(b)) = &t.boxed {
+                    let want = if b.e.kind == KIND_ZENIE { self.zenie } else { self.first };
+                    return if b.count < want {
+                        RIGHT
+                    } else if b.count > want {
+                        LEFT
+                    } else {
+                        A
+                    };
+                }
+                if t.boxed.is_some() {
+                    return 0;
+                }
+                // the proposal: ACCEPT (the cursor's first place) once
+                if t.prop.is_some() {
+                    if self.accept && !self.answered {
+                        self.answered = true;
                         return A;
                     }
-                    return if sel == k { A } else if sel < k { DOWN } else { UP };
+                    return 0;
                 }
-                if picking {
-                    return A;
+                // the picker: the list's first entry (`first` of it) and zenie onto "Your Trade:", then Propose
+                let p = &t.pick;
+                let mut want: Vec<usize> = Vec::new();
+                if self.first > 0 && !p.list.is_empty() {
+                    want.push(0);
                 }
-                if sel < n {
-                    return DOWN;
+                if self.zenie > 0 {
+                    if let Some(k) = p.list.iter().position(|e| e.kind == KIND_ZENIE) {
+                        want.push(k);
+                    }
                 }
-                if !self.proposed {
-                    if btn != 0 {
+                let have = |k: usize| p.mine.iter().any(|m| m.kind == p.list[k].kind && m.id == p.list[k].id);
+                if let Some(&k) = want.iter().find(|&&k| k < p.list.len() && !have(k)) {
+                    if p.side != 0 {
                         return LEFT;
                     }
-                    self.proposed = true;
-                    return A;
+                    let cur = (p.first + p.row).max(0) as usize;
+                    return if cur < k {
+                        DOWN
+                    } else if cur > k {
+                        UP
+                    } else {
+                        A
+                    };
                 }
-                if self.accept && friend.is_some_and(|o| !o.is_empty()) && !accepted {
-                    return if btn != 1 { RIGHT } else { A };
+                if !self.proposed {
+                    self.proposed = true;
+                    return wf_core::input::R;
                 }
                 0
             }
-            // the result / TRADE COMPLETE / Disconnected: shown a while, then A
+            // TRADE COMPLETE!: the page goes back to the title's Multiplayer page by itself (a key there would open
+            // the link box again)
+            "complete" if self.kind == LinkKind::Trade => 0,
+            // the result / Disconnected: shown a while, then A
             "result" | "complete" | "message" | "nosaves" => {
                 if self.in_phase > 40 {
                     A

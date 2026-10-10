@@ -220,6 +220,9 @@ pub struct Snap {
     pub accept: Option<(u32, u32)>,
     /// bumped by each Decline (the friend sees it once)
     pub declines: u32,
+    /// the offer is proposed ("Propose Trade", R on the game's picker) - an offer still being put together is not
+    #[serde(default)]
+    pub proposed: bool,
     /// trade records with the receiver: (id, state)
     pub records: Vec<(String, TState)>,
 }
@@ -269,6 +272,8 @@ pub struct TradePeer {
     /// my acceptance: (their rev, my rev)
     accepted: Option<(u32, u32)>,
     declines: u32,
+    proposed: bool,
+    their_proposed: bool,
     their: Option<(u64, u32, Offer)>,
     their_accept: Option<(u32, u32)>,
     their_declines: u32,
@@ -309,6 +314,8 @@ impl TradePeer {
             offer: Offer::default(),
             accepted: None,
             declines: 0,
+            proposed: false,
+            their_proposed: false,
             their: None,
             their_accept: None,
             their_declines: 0,
@@ -344,6 +351,35 @@ impl TradePeer {
     }
     pub fn offer(&self) -> &Offer {
         &self.offer
+    }
+    /// "Propose Trade": `o` on the table as a proposal (a new revision even when the same offer: the friend sees a
+    /// new proposal - an empty one too)
+    pub fn propose(&mut self, o: Offer) {
+        self.offer = o;
+        self.rev += 1;
+        self.proposed = true;
+        self.accepted = None;
+        self.agreed = None;
+    }
+    /// the proposal withdrawn (back to the picker): not proposed, acceptances void
+    pub fn withdraw(&mut self) {
+        self.proposed = false;
+        self.rev += 1;
+        self.accepted = None;
+        self.agreed = None;
+    }
+    /// my acceptance withdrawn without declining (the game's B in the box after ACCEPT)
+    pub fn unaccept(&mut self) {
+        self.accepted = None;
+        self.agreed = None;
+    }
+    /// the friend's offer is a proposal (its Propose Trade)
+    pub fn friend_proposed(&self) -> bool {
+        self.their.is_some() && self.their_proposed
+    }
+    /// the friend's offer revision (a new proposal = a new revision)
+    pub fn friend_rev(&self) -> Option<u32> {
+        self.their.as_ref().map(|t| t.1)
     }
     /// "Friend's Trade:"
     pub fn friend_offer(&self) -> Option<&Offer> {
@@ -393,7 +429,7 @@ impl TradePeer {
             .filter(|r| r.peer == self.peer)
             .map(|r| (r.id, r.state))
             .collect();
-        Snap { nonce: self.nonce, rev: self.rev, offer: self.offer.clone(), accept: self.accepted, declines: self.declines, records }
+        Snap { nonce: self.nonce, rev: self.rev, offer: self.offer.clone(), accept: self.accepted, declines: self.declines, proposed: self.proposed, records }
     }
 
     /// one step: read the transport, react, send the snapshot when due
@@ -445,6 +481,7 @@ impl TradePeer {
 
     fn on_snap(&mut self, s: Snap, store: &mut dyn TradeStore) {
         // the negotiation (soft state)
+        self.their_proposed = s.proposed;
         let changed = self.their.as_ref().is_none_or(|t| t.0 != s.nonce || t.1 != s.rev);
         if changed {
             self.their = Some((s.nonce, s.rev, s.offer.clone()));
