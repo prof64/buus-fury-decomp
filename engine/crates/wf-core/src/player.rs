@@ -1433,7 +1433,18 @@ pub fn lose_ep(w: &mut World, i: usize, n: i32) {
     let pl = p(w, i);
     pl.rec.ep = 0.max(pl.rec.ep - n);
 }
+/// a kill's XP: the enemy's amount times the current record's XP factor (+0x58, weighted clothing; the death effect's
+/// constructor 0x0800F81C: (exp * factor + 255) >> 8, nothing at 0), then the XP routine
 pub fn gain_xp(w: &mut World, i: usize, exp: i64) {
+    let g = xp_gain(exp, pr(w, i).eff.xp_mult as i64);
+    gain_xp_raw(w, i, g);
+}
+
+/// the XP routine 0x08013914 with the amount as it is: a kill's after its factor, a script's `give_xp` (0xC2 ->
+/// 0x080043D8) straight - the native called in the emulator with the Kiloton Boots worn (factor 512): 7 XP = +7
+/// (re/buu/xp_routine.py)
+pub fn gain_xp_raw(w: &mut World, i: usize, g: i64) {
+    let exp = g;
     if !w.opts.xp || exp == 0 {
         return;
     }
@@ -1443,7 +1454,6 @@ pub fn gain_xp(w: &mut World, i: usize, exp: i64) {
     if pr(w, i).rec.hp == 0 || pr(w, i).form_ref(w).flags & 0x10 == 0 {
         return;
     }
-    let g = xp_gain(exp, pr(w, i).eff.xp_mult as i64);
     // field: a fusion's experience goes to its two components' records, each the whole gain (sc_janemba: Gogeta's
     // Super Janemba KO adds 20,500 to Goku's and to Vegeta's XP, Gogeta's stays)
     if w.field.is_some() {
@@ -1567,9 +1577,14 @@ pub fn fusion_levelup_done(w: &mut World) {
 fn component_xp(w: &mut World, c: i32, g: i64) -> bool {
     let growth = w.data.chars.iter().find(|x| x.index == c).map(|x| x.growth);
     let xt = Arc::clone(&w.data);
+    // (the routine itself on the component's record: nothing at 0 HP, nor for a form without the XP flag)
+    let flag = w.story.chars.get(c as usize).and_then(|cs| xt.form(cs.form)).map_or(true, |f| f.flags & 0x10 != 0);
     let Some(cs) = w.story.chars.get_mut(c as usize) else {
         return false;
     };
+    if cs.rec.hp == 0 || !flag {
+        return false;
+    }
     cs.rec.xp += g;
     let nl = level_of(cs.rec.xp, &xt.xp_table);
     if nl <= cs.rec.level {
@@ -1604,7 +1619,7 @@ pub fn gain_xp_levels(w: &mut World, i: usize, exp: i64) -> bool {
         f.host = false;
     }
     let n = w.events.len();
-    gain_xp(w, i, exp);
+    gain_xp_raw(w, i, exp);
     if let (Some(f), Some(h)) = (w.field.as_mut(), host) {
         f.host = h;
     }
