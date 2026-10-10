@@ -121,6 +121,11 @@ pub struct HostState {
     /// no leader object exists (a cutscene map): `boost` holds the count; the leader made after it takes it
     #[serde(default)]
     pub boost_orphan: bool,
+    /// the running script runs in the field mode's enter, not its update: the event a new field mode starts with
+    /// (New Game's prologue and what it goes on to; 0x08006E24 -> 0x080124F8). The frame it ends in is not the rest
+    /// of a field update: the field's timers (0x0800425C, the update's last call) do not count it
+    #[serde(default)]
+    pub enter_event: bool,
     /// Switch Character's chosen leader was rebuilt at the screen's close (the world restore), not again at the end
     #[serde(default)]
     pub charsel_rebuilt: bool,

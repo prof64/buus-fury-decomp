@@ -61,3 +61,5 @@ One line per fix against the original game (emulator / recordings), newest last.
 * 2026-10-10 After a game over the title comes up on the game's frame with its cursor blinking in step, as after a lost link (measured by replaying a recorded death on the emulator: title_gameover exact; the app was two steps late).
 * 2026-10-10 Link pages: a friend whose network dies silently is noticed after 3 seconds, as the game's link error (the app waited forever on the page); found by a new test.
 * 2026-10-10 New two-app tests for the link paths that had none: no saved game, the link lost on a page, the friend leaving the Trading Post with B.
+* 2026-10-10 Holy Water's count: the frame the opening's cutscene ends in is not counted (the story's first scene runs before the field's first update), and the frames a breakable's callback holds the other objects are not counted either; with these the count matches the game on all 550 recorded segments (824,679 frames), none left as known.
+* 2026-10-10 The Airship countdown follows the same two rules (the game counts both in one routine); on every recorded countdown frame the two already counted alike.

@@ -850,6 +850,10 @@ impl StoryHost {
             return;
         }
         self.frame += 1;
+        // (the timed boost's count: what holds at the frame's start - below)
+        let pass0 = sess.world.frame;
+        let busy0 = sess.world.field.as_ref().is_some_and(|f| f.busy);
+        let script0 = self.running || !self.outer.is_empty();
         // the frame's start (deferred calls: drop scripts, kill XP): their scripts run before the objects' update
         sess.step_begin(inputs);
         let pre: Vec<Event> = sess.world.events.clone();
@@ -915,7 +919,40 @@ impl StoryHost {
         // - not while Instant Transmission's target is chosen (a mode of its own: rclose_067_071 rows 62 .. 64)
         let w = &sess.world;
         let choosing = w.player_idx(0).is_some_and(|i| w.pl_ref(i).it_sel.is_some());
-        let counted = !menu_hold && !choosing && wf_script_core::field_free(w);
+        let mut counted = !menu_hold && !choosing && wf_script_core::field_free(w);
+        // The routine is the field mode's update's last call (0x08006E3C: the objects 0x08011A1E, the scripts
+        // 0x080126D4, then 0x0800425C). An event runs nested in that update - an exit's or a script's area load and
+        // arrival too (db5_002_12-3 rows 738 .. 745: the stack keeps 0x08006E53 through the load) -, so the frame it
+        // ends in is the rest of the update and counts. But the event a new field mode starts with runs in the
+        // mode's enter (0x08006E24 -> 0x080124F8: New Game's prologue and what it goes on to; the stack at
+        // ow_ev_1_1's cut: .. 0x08012563, 0x08006E37, 0x08006BCB, 0x08007063): the frame it ends in has no field
+        // update, the first one is the next frame's (ow_ev_1_1 row 2,104: s038's end)
+        let script1 = self.running || !self.outer.is_empty();
+        let mut unnested = false;
+        if new_game && script1 {
+            self.hs.enter_event = true;
+        }
+        if !script1 {
+            if script0 && self.hs.enter_event {
+                counted = false;
+                unnested = true;
+            }
+            self.hs.enter_event = false;
+        }
+        // ... and an inline callback that holds the object pass without holding the field (a nested loop inside the
+        // objects' update: the stack 0x08011A5F, 0x08006E47 over rj_back1_000_18_10's rows 202 / 203,
+        // inline_0x0808C728) keeps the update open over its frames: they do not count, the frame the pass completes in
+        // does (an event's last frame, its pass not run either, is the rest of its update and counts: earth_7_3_1
+        // row 468)
+        if w.field.is_some() && w.frame == pass0 && !busy0 {
+            counted = false;
+            unnested = true;
+        }
+        // (the countdown is counted by the same routine, just before the boost: where the two rules above hold the
+        // boost's count they hold the countdown's - in every recorded countdown frame, ~27,000, the two count alike)
+        if unnested && sess.world.scene.timers.countdown_on && cd0 > 1 && sess.world.scene.timers.countdown == cd0 - 1 {
+            sess.world.scene.timers.countdown = cd0;
+        }
         // (the boost is the game's - GameData -, not the player object's: with no leader object, a cutscene map, the
         // host state holds it and the leader made afterwards takes it: sb_000_18_12's last row)
         match sess.world.player_idx(0) {
