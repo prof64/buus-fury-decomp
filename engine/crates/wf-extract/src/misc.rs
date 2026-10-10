@@ -3,7 +3,9 @@
 //! * Portraits: table `0x086F395C`, 155 × webfoot-LZ 64×64 linear 8bpp (OBJ palette, index 0 transparent) →
 //!   `portraits/<id>.png`.
 //! * Supplies `0x083BD2F8` (83 × 52 B, +4 u16 name id), equipment `0x086F82EC` (162 × 44 B, +0 u16 name id):
-//!   the first webfoot-LZ blob pointer in the record is a 16×16 linear 8bpp icon → `icons/{supply,equipment}/NNN.png`.
+//!   the first webfoot-LZ blob pointer in the record is a 16×16 (41 supplies: 32×32) linear 8bpp icon →
+//!   `icons/{supply,equipment}/NNN.png`; a supply whose second picture (+0x28, 16×16) is another graphic also gets
+//!   `icons/supply/NNN_small.png` (the inventory list's).
 //! * Skills `0x0871DAF8` + 0x18·id (ids 1..23): +4 / +8 raw 8bpp 4×2-tile OBJ icons (normal / alternate) →
 //!   `icons/skills/skill_NN.png`, `skill_NN_alt.png`.
 
@@ -93,8 +95,25 @@ pub fn item_icons(rom: &Rom, out: &mut Content) {
             let Some((im, p)) = icon else { continue };
             let path = format!("icons/{kind}/{i:03}.png");
             out.put(&path, im.to_png());
-            index.push(json!({"kind": kind, "index": i, "name": name, "slug": format!("{kind}_{i:03}_{}", slugify(&name)),
-                              "png": path, "rom": {"record": hx(r), "gfx": hx(p)}}));
+            let mut e = json!({"kind": kind, "index": i, "name": name, "slug": format!("{kind}_{i:03}_{}", slugify(&name)),
+                              "png": path, "rom": {"record": hx(r), "gfx": hx(p)}});
+            // a supply's second picture (def +0x1C: w, h, attributes, graphic at +0x28), 16x16: the inventory list's
+            // and the field's - its own drawing where the first (the Use dialog's) is 32x32 (the Large Fish, the
+            // exhibit crates)
+            if kind == "supply" {
+                let p2 = rom.u32(r + 0x28);
+                if p2 != p && valid_blob(rom, p2) {
+                    if let Ok(d) = rom.lz(p2).map(|d| d.to_vec()) {
+                        if d.len() == 256 {
+                            let small = format!("icons/{kind}/{i:03}_small.png");
+                            out.put(&small, linear_image(&d, 16, 16, &pal, false).to_png());
+                            e["small"] = json!(small);
+                            e["rom"]["gfx_small"] = json!(hx(p2));
+                        }
+                    }
+                }
+            }
+            index.push(e);
         }
     }
     // skill icons

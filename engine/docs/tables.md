@@ -29,7 +29,7 @@ Each directory has an `index.json` listing its ids in game order (plus the share
 | `moves.json` | melee hitboxes, block / energy block / dash, hit struct, ki blast, beam level defs, Big Bang | `0x083C344C`, `0x08719C40`, `0x0871DA68`, `0x0871E148`, `0x0871DDBC` |
 | `skills/<id>.json` | skill record, EP cost rule + per-level costs, measured runs; `detail` = state class (vtable fns), cost, measured trials | `0x0871DAF8`, costs `0x0871DA98`, vtables |
 | `attacks/<id>.json` | attack type by sub id: `type` (moves view) / `detail` (attacks view), `name` | `0x086B8088` |
-| `items/<id>.json` | supply / story item, price, use script disassembly + effect, `icon` = `icons/supply/NNN.png` | `0x083BD2F8` (83 x 52 B), scripts |
+| `items/<id>.json` | supply / story item, price, use script disassembly + effect, `icon` = `icons/supply/NNN.png` (def +0xC: w, h, attributes, graphic - the Use dialog's picture, 32x32 for the Large Fish and the 40 exhibit crates); those 41 also have `icons/supply/NNN_small.png` (def +0x1C.., the second picture, 16x16: the inventory list's and the field's) | `0x083BD2F8` (83 x 52 B), scripts |
 | `equipment/<id>.json` | slot, required level, stat modifiers, XP bonus, price, effect script + effects, `icon` = `icons/equipment/NNN.png` | `0x086F82EC` (162 x 44 B) |
 | `enemies/<id>.json` | stats, database entries, gfx defs, spawn points, drops + simulated loot, `ai_tree` (initial state, reachable states, summary), `death` node, `boss` link | `0x08711274`, `0x0874D380`, areas `0x0808E2E0`, scripts |
 | `ai/<state>.json` | decoded behaviour tree (`tree` + `text`), on-hit tree (`aux`), reaction-state tree (`reaction`) | state table `0x0870F514` |

@@ -4,6 +4,7 @@
   "index": 56,
   "name": "Tien",
   "char_index": 10,
+  "flags": 16,
   "character": "tien",
   "transform_up": 255,
   "transform_down": 255,

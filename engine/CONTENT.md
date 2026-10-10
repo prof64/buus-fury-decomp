@@ -38,7 +38,7 @@ content/
     sprites/<id>/sheet.png + sprite.json, sprites/index.json
     effects/<id>/sheet.png + effect.json, effects/index.json
     portraits/<id>.png, portraits/index.json
-    icons/supply/NNN.png, icons/equipment/NNN.png, icons/skills/skill_NN[_alt].png, icons/index.json
+    icons/supply/NNN.png (+ NNN_small.png where the list's 16x16 picture is another drawing), icons/equipment/NNN.png, icons/skills/skill_NN[_alt].png, icons/index.json
     areas.json, maps/index.json, maps/<id>/{map.json (Tiled), bgN.png, composite.png, collision.json},
     maps/tilesets/<hash>.{png,json}   (Tiled tilesets incl. tile animations, shared between maps)
     maps/<id>/objects.json     placed objects per area (enemies, NPCs, triggers, exits, save points, breakables,

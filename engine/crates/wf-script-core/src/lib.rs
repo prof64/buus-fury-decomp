@@ -118,6 +118,9 @@ pub struct HostState {
     pub area_override: Option<(i32, i32, i32)>,
     /// timed stat boost (GD+0x4DC..0x4F0): frames, str, pow, end, spd, special
     pub boost: [i32; 6],
+    /// no leader object exists (a cutscene map): `boost` holds the count; the leader made after it takes it
+    #[serde(default)]
+    pub boost_orphan: bool,
     /// Switch Character's chosen leader was rebuilt at the screen's close (the world restore), not again at the end
     #[serde(default)]
     pub charsel_rebuilt: bool,
@@ -517,12 +520,19 @@ pub fn countdown_counts(w: &World) -> bool {
     self_field_free(w).unwrap_or(true)
 }
 
+/// the field runs free now: no event holds it, no item-get pose, no transition (true outside the field)
+pub fn field_free(w: &World) -> bool {
+    w.field.as_ref().is_none_or(|f| !f.busy && f.item_get.is_none() && matches!(f.mode, wf_core::field::Mode::Normal))
+}
+
 fn self_field_free(w: &World) -> Option<bool> {
     let f = w.field.as_ref()?;
     // (the walk-in's last frame counts: the fade-in ends in this frame's post step)
     let free_mode = match f.mode {
         wf_core::field::Mode::Normal => true,
-        wf_core::field::Mode::FadeIn { k } => k + 1 >= wf_core::field::FADE && !wf_core::fieldworld::flying(w),
+        // (not a script's warp_fade arrival, 64 frames with the player under control: none of them counts -
+        // wf-import tests/holy_timer.rs, rfat_010_011 rows 1,618 .. 1,703)
+        wf_core::field::Mode::FadeIn { k } => k + 1 >= wf_core::field::FADE && !wf_core::fieldworld::flying(w) && !f.script_fade_in,
         _ => false,
     };
     Some(!f.busy && f.item_get.is_none() && free_mode)
@@ -533,13 +543,20 @@ fn self_field_free(w: &World) -> Option<bool> {
 /// Airship's self destruct - white fade, HP 0) in that frame (MEASURED 12-22: GD+0x4D4 15 on the cut's f1702, `run 9`
 /// on f1717).
 pub fn tick_timers(w: &mut World, s: &mut HostState) {
+    tick_timers_held(w, s, false)
+}
+
+/// [`tick_timers`]; `menu`: a menu was open over the field at the frame's start (the pause menu's pages are a mode
+/// of their own: the field's update, and its timers with it, does not run - the frame START opens it still counts,
+/// the frame it closes does not; wf-import tests/holy_timer.rs, db5_006 / earth_3_3_4's menu visits)
+pub fn tick_timers_held(w: &mut World, s: &mut HostState, menu: bool) {
     // the count of a frame whose field is free at this point; the host settles the frames where our order differs
     // from the game's (an event ending at the frame's top counts, a hold the post step starts does not)
     let fresh = std::mem::take(&mut w.scene.timers.fresh);
     if self_field_free(w).unwrap_or(true) {
         s.timer_event = false;
     }
-    if w.scene.timers.countdown_on && w.scene.timers.countdown > 0 && self_field_free(w).unwrap_or(true) {
+    if w.scene.timers.countdown_on && w.scene.timers.countdown > 0 && !menu && self_field_free(w).unwrap_or(true) {
         // (the frame an event that set it ends in counts through the host's late tick: `StoryHost::step_inputs`;
         // `Timers.fresh` is kept for old snapshots only)
         let _ = fresh;
@@ -568,9 +585,7 @@ pub fn poll(w: &mut World, s: &mut HostState) -> Option<Option<i32>> {
     if w.scene.timers.stopwatch_on {
         w.scene.timers.stopwatch += 1;
     }
-    if s.boost[0] > 0 {
-        s.boost[0] -= 1;
-    }
+    // (the timed boost is counted by the host with the field's timers: wf-import host.rs)
     s.from_wait = false;
     s.from_scroll = false;
     if matches!(s.pending, Some(Pending::Phases { .. })) {

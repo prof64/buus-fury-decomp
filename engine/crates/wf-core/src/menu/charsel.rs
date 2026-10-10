@@ -225,6 +225,13 @@ impl Page for CharSelect {
                             }
                         }
                         w.story.current = f.ch;
+                        // the choice clears the timed boost's count (GD+0x4DC := 0 at 0x0802ED4C), the same
+                        // character chosen again too - the stats follow at their next recalculation
+                        for e in w.ents.iter_mut() {
+                            if let crate::world::Body::Player(pl) = &mut e.body {
+                                pl.holy_left = 0;
+                            }
+                        }
                     }
                     (true, Some(Action::Pop(2)))
                 }

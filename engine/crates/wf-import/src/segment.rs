@@ -406,6 +406,17 @@ pub fn start(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Value
     let mut host = StoryHost::new(data, files)?;
     let mut imp = import_emulator_state(data, &ram, &mut host).map_err(|e| e.to_string())?;
     host.prev_held = imp.prev_keys;
+    // the timed boost (GameData +0x4DC frames left, +0x4E0.. the four bonuses, +0x4F0 the timed special): the game's,
+    // kept by the host while no leader object carries it
+    {
+        let gd = ram.read(0x0300_1068 + 0x4DC, 24);
+        if gd.len() == 24 {
+            for k in 0..6 {
+                host.hs.boost[k] = i32::from_le_bytes(gd[4 * k..4 * k + 4].try_into().unwrap());
+            }
+            host.hs.boost_orphan = imp.world.player_idx(0).is_none();
+        }
+    }
     // the cartridge's EEPROM at the cut (`init.eeprom`, base64(zlib); tools/wholerun/resync.py): the save slots
     if let Some(s) = doc["init"]["eeprom"].as_str() {
         let ee = crate::ram::b64(s).and_then(|z| miniz_oxide::inflate::decompress_to_vec_zlib(&z).map_err(|e| format!("eeprom: inflate {e:?}")))?;

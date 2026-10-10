@@ -7,7 +7,7 @@ the character menu or `set_character(10)`).
 | file | what |
 |---|---|
 | `characters/tien.json` | character 10: new-game record, skills `[8, 7]` (Energy Punch, Energy Blast), `equip`, `in_party: false`, growth (`raw_u32`, more HP / less EP than Goku), forms `[56]` |
-| `forms/56_tien.json` | `$extends` the game's Tien form (51) with `char_index` 10 and its own bonus: the game's Tien sprite (255) |
+| `forms/56_tien.json` | `$extends` the game's Tien form (51) with `char_index` 10, `flags` 16 (the XP bit, which the game's side-character forms lack) and its own bonus: the game's Tien sprite (255) |
 | `world/areas/8-3+tien.json` | the NPC (script sprite id 264 = sprite 255 + 9), placed until flag 1110 is set |
 | `scripts/events/s920.rhai` | the talk: `join_party(10)`, flag 1110, a Yes / No choice → `set_character(10)`; portrait box 135 (Tien, portrait 127) |
 

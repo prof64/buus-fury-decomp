@@ -13,6 +13,11 @@ def hp(n, ep=None):
 ITEMS = {0: 1, 1: 3, 2: 5, 3: 1, 4: 2, 10: 1, 17: 12, 21: 2, 24: 1, 26: 1, 40: 1, 33: 1}
 G = ['-:12']
 
+
+def W(keys, wait=45):
+    """each key held 2 frames, then `wait` idle frames (a use's redraw takes up to 40)"""
+    return [x for k in keys for x in (k + ':2', '-:%d' % wait)]
+
 SCENARIOS = {
     # Status -> R: the inventory with nothing in it, the story items tab, back
     'inventory_empty': ('buu_snakeway_start.ss', None, ['-:2'],
@@ -47,4 +52,22 @@ SCENARIOS = {
     # Holy Water (30 s of +25 STR / POW / END / SPD), then L to the Status page: the boosted stats
     'inventory_use_holy': ('buu_snakeway_start.ss', chain(setup_supplies({20: 1}), hp(60, 30)), ['-:2'],
                            ['START:1', '-:40', 'R:2', '-:20', 'A:2', '-:20', 'A:2', '-:30', 'L:2', '-:60', 'START:1', '-:40']),
+    # at full HP and EP: a Turkey, a Milk, a Senzu Bean (each is eaten all the same), the Status page and back
+    'inventory_use_limits': ('buu_snakeway_start.ss', chain(setup_supplies({10: 2, 21: 2, 6: 3, 24: 2, 22: 1, 23: 1}),
+                                                            lambda e: (e.w16(rec(0) + 0x16, e.r16(rec(0) + 0x18)), e.w16(rec(0) + 0x1A, e.r16(rec(0) + 0x1C)))), ['-:2'],
+                             ['START:1', '-:40', 'R:2', '-:30'] + W(['A', 'A', 'DOWN', 'A', 'A', 'DOWN', 'A', 'A', 'L', 'R']) + ['START:1', '-:40']),
+    # HP 60 / EP 30: a Turkey (over the maximum), a Milk, a Senzu Bean, a Cookie, then the Lazarus Crystal and the
+    # Capsule (no use script: A, A, then B closes the dialog)
+    'inventory_use_each': ('buu_snakeway_start.ss', chain(setup_supplies({10: 2, 21: 2, 6: 3, 24: 2, 22: 1, 23: 1}), hp(60, 30)), ['-:2'],
+                           ['START:1', '-:40', 'R:2', '-:30'] + W(['A', 'A', 'DOWN', 'A', 'A', 'DOWN', 'A', 'A', 'DOWN', 'DOWN', 'DOWN', 'A', 'A',
+                                                                  'UP', 'A', 'A', 'B', 'UP', 'A', 'A', 'B', 'L']) + ['START:1', '-:40']),
+    # two Holy Waters one after the other (the second while the first runs), then the Status page
+    'inventory_use_holy_twice': ('buu_snakeway_start.ss', chain(setup_supplies({20: 3}), hp(60, 30)), ['-:2'],
+                                 ['START:1', '-:40', 'R:2', '-:20', 'A:2', '-:20', 'A:2', '-:30', 'A:2', '-:20', 'A:2', '-:30', 'L:2', '-:60', 'START:1', '-:40']),
+    # the story items tab: A, A on a Dragon Ball, the Potara Earring, a key, an exhibit crate (no use: B closes the dialog)
+    'inventory_story_use': ('buu_snakeway_start.ss', chain(setup_supplies({1: 1, 26: 1, 38: 1, 43: 2, 33: 1}), hp(60, 30)), ['-:2'],
+                            ['START:1', '-:40', 'R:2', '-:30', 'RIGHT:2', '-:20'] + W(['A', 'A', 'B', 'DOWN'] * 4) + ['START:1', '-:40']),
+    # a Rice Ball with the Majestic Chopsticks owned but not worn: the plain 40
+    'inventory_use_chop_owned': ('buu_snakeway_start.ss', chain(setup_supplies({1: 2}), setup_equipment([119]), hp(60, 30)), ['-:2'],
+                                 ['START:1', '-:40', 'R:2', '-:20', 'A:2', '-:20', 'A:2', '-:30', 'L:2', '-:40', 'START:1', '-:40']),
 }

@@ -139,6 +139,15 @@ Holy Water bonus); 12 not needed (host state is plain data next to the snapshot)
 10. `Event::SfxStopAll`, `Event::SongStop`.
 11. Timed stat boost values (`boost_stats(seconds, str, pow, end, spd)`): `EffStats` applies a fixed +25 Holy
     Water bonus; scripts pass arbitrary values.
+    **Its count** (GameData +0x4DC, 60 a second) is the field update's, in the routine that counts the countdown and
+    the stopwatch (`0x0800425C`): the host counts it (`StoryHost::step_inputs`, the leader's `holy_left`; the host
+    state's `boost` holds it while no leader object exists) in every frame that ends with the field free - no event,
+    no item-get pose, no exit / arrival fade (the frame such a hold ends in counts, the one it starts in does not) -,
+    not under a menu (the frame START opens it counts, the frame its close ends in does not) nor while Instant
+    Transmission's target is chosen. `set_character` (0x95) and the Switch Character screen's choice clear it (the
+    same character chosen again too). Gate: wf-import `tests/holy_timer.rs` - the game's count along 550 segments
+    replayed on the emulator with the count poked in (`tools/segments/holy.py` -> `data/segments/timers/holy.json`),
+    824,000 rows, all but two segments exact (the file's `known`). The countdown follows the menu rule too.
 12. Optional: `Snapshot.ext: Vec<u8>` for byte snapshots of the layers above core.
 13. `docs/core.md` (referenced by `wf-core/src/lib.rs`) does not exist yet.
 

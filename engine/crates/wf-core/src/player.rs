@@ -823,7 +823,7 @@ pub fn link_made(w: &mut World, i: usize) {
     p(w, i).link_plain = true;
     refresh(w, i);
 }
-fn refresh(w: &mut World, i: usize) {
+pub fn refresh(w: &mut World, i: usize) {
     let mut pl = pr(w, i).clone();
     pl.refresh_stats(w);
     *p(w, i) = pl;
@@ -1435,6 +1435,12 @@ pub fn lose_ep(w: &mut World, i: usize, n: i32) {
 }
 pub fn gain_xp(w: &mut World, i: usize, exp: i64) {
     if !w.opts.xp || exp == 0 {
+        return;
+    }
+    // 0x08013914's first checks: a record at 0 HP gains nothing (a kill landing after the player's own knockout), nor
+    // a form without the XP flag (form table +0 bit 4: clear on the nine "other" forms 45..53) - the routine called
+    // in the emulator on Goku's record: HP 0 + 100,000 XP = no change; form 47 the same
+    if pr(w, i).rec.hp == 0 || pr(w, i).form_ref(w).flags & 0x10 == 0 {
         return;
     }
     let g = xp_gain(exp, pr(w, i).eff.xp_mult as i64);
@@ -2543,7 +2549,9 @@ fn passive(w: &mut World, i: usize) {
             r.hp = r.max_hp.min(r.hp + ((r.max_hp * 0xccd) >> 16));
         }
     }
-    if pr(w, i).holy_left > 0 {
+    // (the timed boost's count: in a hosted field the host counts it with the field's timers - the game's routine
+    // 0x0800425C, wf-import host.rs)
+    if pr(w, i).holy_left > 0 && !w.field.as_ref().is_some_and(|f| f.host) {
         p(w, i).holy_left -= 1;
         if pr(w, i).holy_left == 0 {
             refresh(w, i);
