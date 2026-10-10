@@ -2270,7 +2270,7 @@ pub fn shell_in_flight(owner: crate::world::EntityId, dir: crate::geom::Dir, x: 
             sfx_hit: 48,
             fragile: true,
             name: shots::SName::Shell,
-            trail: Some(shots::Trail { fx: shots::FxId::Fx0871e630, rec: 4, n: 3, rate: 0x2aaa }),
+            trail: Some(shots::Trail { fx: shots::FxId::Fx0871e630, rec: 4, n: 3, rate: 0x2aaa, pre: false }),
             spawned: true,
             ..Default::default()
         })),
@@ -2391,6 +2391,7 @@ pub fn shot(w: &mut World, i: usize, kind: ShotType) {
                     rec: 4,
                     n: 3,
                     rate: 0x2aaa,
+                    pre: true,
                 }),
                 ..base
             },
@@ -2416,6 +2417,7 @@ pub fn shot(w: &mut World, i: usize, kind: ShotType) {
                     rec: 4,
                     n: 3,
                     rate: 0x2aaa,
+                    pre: false,
                 }),
                 ..base
             },

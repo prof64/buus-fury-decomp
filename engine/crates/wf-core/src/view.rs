@@ -88,7 +88,10 @@ fn draw_key(w: &World, i: usize) -> (i32, i32, u32) {
                     && matches!(&s.kind, ShotKind::Straight(o) if (o.name == SName::KiBlast && s.dir != 1) || (o.name == SName::Burning && s.dir != 0)))
                 // (the ninja star 0x0804BAA0: layer 0x38, depth its y - behind a ninja throwing it down at an equal
                 // depth; opponent audit oa_t4e_above f128)
-                || matches!(&s.kind, ShotKind::Straight(o) if o.name == SName::Star);
+                || matches!(&s.kind, ShotKind::Straight(o) if o.name == SName::Star)
+                // (the Mercenary's rifle bullet too: the new bullet behind him at its muzzle - opponent audit
+                // oa_t4b_idle f61, OAM 16x16 after his body)
+                || matches!(&s.kind, ShotKind::Straight(o) if o.name == SName::Rifle);
             // a Kamikaze ghost is an actor object (layer 0x38, depth y + 4 like an actor: skill audit sa_f31_skill13,
             // Gotenks' fist in front of the shadow of a ghost above him)
             let ghost = matches!(&s.kind, ShotKind::Ghost(_));
@@ -99,7 +102,8 @@ fn draw_key(w: &World, i: usize) -> (i32, i32, u32) {
             // Majin Buu's candy beam 0x0804B3AC: layer 0x38, depth its y - behind Super Buu's antenna it comes from
             // (opponent audit oa_t73_idle f22)
             // (and his stretch arm 0x0804CDD4: the player's halo over its fist - oa_t74_idle f77)
-            let ki = ki || matches!(&s.kind, ShotKind::CandyBeam { .. } | ShotKind::StretchArm { .. });
+            // (the candy beam fired down is in front again, over his legs - oa_t74_above f92: its OAM before his body)
+            let ki = ki || matches!(&s.kind, ShotKind::StretchArm { .. }) || (s.dir != 0 && matches!(&s.kind, ShotKind::CandyBeam { .. }));
             (
                 if matches!(s.kind, ShotKind::DarkSphere { .. }) {
                     2
@@ -121,9 +125,12 @@ fn draw_key(w: &World, i: usize) -> (i32, i32, u32) {
         Body::Fx(f) => match f.as_ref() {
             // the explosion cloud (run 0x08712FDC) sorts with the actors by its y (skill audit sa_f31_skill13: a
             // ghost's cloud above Gotenks behind him, in every facing)
-            Fx::Anim { id: 0x0871_2fdc, y, sorted: true, .. } => (0, *y - 4),
+            // (the rifle's smoke puffs too: `shots::Trail::pre`)
+            Fx::Anim { y, sorted: true, .. } => (0, *y - 4),
             Fx::Anim { y, .. } | Fx::Loop { y, .. } => (1, *y),
-            Fx::Debris { y, .. } => (1, (y >> 8) + 8),
+            // a bomb's chips (0x0800C454: layer 0x38, depth their y) sort with the actors - behind Goku when the
+            // Grenadier's grenade bursts at his feet (opponent audit oa_t2b_idle f123)
+            Fx::Debris { y, .. } => (0, (y >> 8) - 4),
             Fx::ItMarkers { .. } => (3, 0),
             // Big Bang Kamehameha's flare: in front of the beam's start piece (skill audit sa_f41_skill3)
             Fx::BbkFlare { y, .. } => (1, *y),
@@ -304,12 +311,35 @@ fn actor_draw(
                 flip: false,
             },
             // (offset by the header's shadow dx / dy: Super Janemba's at (8, 8) - OAM, real route 18-14)
-            x: a.px() + sp.shadow_off.0,
-            y: a.py() + sp.shadow_off.1,
+            x: a.px() + shadow_at(w, id, sp).0,
+            y: a.py() + shadow_at(w, id, sp).1,
             priority: 3,
             mirror: false,
-            effect: SpriteEffect::None,
+            // an enemy's shadow going up off the screen is dropped while fewer than 5 of its OBJ's rows are on screen
+            // (the emulator, opponent audit oa_t4e_above f170 .. f182: a ninja walking up off the screen shows its 16x8
+            // shadow at tops -1 .. -3, none at -4 .. -7 while its feet still show; oa_t30 / oa_t2c / oa_t6c above the
+            // same; pixel gate shipr_338_8-16 f4230: Super Buu's 32x16 one at -9 shows); the player's and an NPC's
+            // are not cut so (pixel gate db6_019 13-50 ..) - judged by the camera the picture is drawn with (the
+            // presenter's OBJ delay: pixel gate rsbi_010_21_11 f120)
+            effect: if w.find(id).is_some_and(|k| matches!(w.ents[k].body, Body::Enemy(_))) {
+                SpriteEffect::TopCull { h: if sh.as_str() == "shadow_24x10" { 16 } else { 8 } }
+            } else {
+                SpriteEffect::None
+            },
         });
+    }
+}
+
+/// The shadow's offset from the sprite header's dx / dy bytes: an enemy's shadow object takes them signed (Dabura
+/// fought in a battle: his at (-8, -4) under his feet - opponent audit oa_t12_idle; Yamu's dy 0xF8 8 px up -
+/// oa_t94), every other actor's (players, scene NPCs) unsigned - the story's Dabura (an NPC) shows none: dx 248 puts
+/// it off screen (pixel gate shipr_238_8-16 f5040 .., his dy 0xFC). Only these two sprites have a byte >= 0x80.
+fn shadow_at(w: &World, id: u32, sp: &crate::content::Sprite) -> (i32, i32) {
+    let enemy = w.find(id).is_some_and(|k| matches!(w.ents[k].body, Body::Enemy(_)));
+    if enemy {
+        (sp.shadow_off.0 as u8 as i8 as i32, sp.shadow_off.1 as u8 as i8 as i32)
+    } else {
+        sp.shadow_off
     }
 }
 
@@ -334,8 +364,8 @@ fn record(w: &World, id: u32, addr: u32, x: i32, y: i32, out: &mut RenderView) {
 /// retracts), the head (the impact piece once a hit / wall stopped it) at position + dir * len, then the body pieces
 /// from the position: 32-px ones while `len + 7 - step > o`, one 16 while `len - 9 > o`, one 8 while `len - 1 > o`.
 /// Piece variants: phase = t >> 2; mode 2: phase & 3 (3 -> 1), else phase & 1; the body's: mode 1 phase & 3.
-/// The reference paints the pieces in this order, the later on top (its drawing matches the game's screen): pushed
-/// here in the reverse order (the first OAM entry on top).
+/// Stacking (the skill audit against the game, every facing): the body pieces at the back, the start / tail piece over
+/// them, the head / impact in front - pushed here in the reverse order (the first OAM entry on top).
 #[allow(clippy::too_many_arguments)]
 fn beam(w: &World, id: u32, set: &str, dir: i32, x: i32, y: i32, len: i32, t: i32, firing: bool, stopped: bool, out: &mut RenderView) {
     let Some(b) = w.data.beams.get(set) else { return };
@@ -366,29 +396,35 @@ fn beam(w: &World, id: u32, set: &str, dir: i32, x: i32, y: i32, len: i32, t: i3
             effect: SpriteEffect::None,
         });
     };
-    if firing {
-        piece("start", k, x, y);
-        if b.flags & 1 != 0 {
-            piece("start2", k, x, y);
+    let mut start = |piece: &mut dyn FnMut(&str, i32, i32, i32)| {
+        if firing {
+            piece("start", k, x, y);
+            if b.flags & 1 != 0 {
+                piece("start2", k, x, y);
+            }
+        } else {
+            piece("tail", k, x, y);
+            if b.flags & 2 != 0 {
+                piece("tail2", k, x, y);
+            }
         }
-    } else {
-        piece("tail", k, x, y);
-        if b.flags & 2 != 0 {
-            piece("tail2", k, x, y);
-        }
-    }
+    };
     let (hx, hy) = (x + dx * len, y + dy * len);
-    if stopped {
-        piece("impact", k & 1, hx, hy);
-        if b.flags & 8 != 0 {
-            piece("impact2", k & 1, hx, hy);
+    // the head (or the impact) over the body pieces: pushed after them (skill audit sa_f02_skill15 / sa_f10_skill6 /
+    // sa_f19_skill16 f132 ..: the body's last 8 / 16 piece showed over the head's back while the beam grew)
+    let mut head = |piece: &mut dyn FnMut(&str, i32, i32, i32)| {
+        if stopped {
+            piece("impact", k & 1, hx, hy);
+            if b.flags & 8 != 0 {
+                piece("impact2", k & 1, hx, hy);
+            }
+        } else {
+            piece("head", k, hx, hy);
+            if b.flags & 4 != 0 {
+                piece("head2", k, hx, hy);
+            }
         }
-    } else {
-        piece("head", k, hx, hy);
-        if b.flags & 4 != 0 {
-            piece("head2", k, hx, hy);
-        }
-    }
+    };
     let step = match b.step[d >> 1] {
         0 => 32,
         s => s,
@@ -405,6 +441,10 @@ fn beam(w: &World, id: u32, set: &str, dir: i32, x: i32, y: i32, len: i32, t: i3
     if len - 1 > o {
         piece("body8", body_v, x + dx * o, y + dy * o);
     }
+    // the body under the start / tail piece, the head over both (skill audit: facing up the start's ring over the
+    // body's stripes, sa_f02_skill15_up f131 ..)
+    start(&mut piece);
+    head(&mut piece);
     out.sprites.extend(ps.into_iter().rev());
 }
 
@@ -723,6 +763,13 @@ pub fn render_view(w: &World, out: &mut RenderView) {
             .into_iter()
             .map(|(k, l, d)| ((l, d, 0), None, k)),
     );
+    // (the game sorts the frame's draw array with an unstable quicksort - 0x080115B0 / 0x080531A4, median of three,
+    // comparator 0x08052EE0 - over the drawable world-list objects from the list's last to its first; an equal key
+    // comes out where the partitions leave it, which depends on every object in the array: the emulator's arrays
+    // (work/ub/l2/arr.py) reproduce exactly with it, but the array holds objects whose sort keys are never set - the
+    // HUD's stat-points mark read (56, 329) in 13-45 and (255, 141541984) in 2-11: heap leftovers - so the tie order
+    // cannot be derived in general. Kept: at an equal key the later list object in front, which all locked pixel-gate
+    // segments show)
     order.sort_by_key(|o| (o.0, o.2));
     // Dragon Fist Explosion: the chain builder 0x08038AD8 makes six objects, each placed among the others by its own
     // depth (Gogeta in front of a segment above him, behind one below), but among themselves in a fixed order: the
@@ -770,6 +817,10 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                 let mut a = std::borrow::Cow::Borrowed(&p.a);
                 if p.candy_def {
                     a.to_mut().sprite = Some(45);
+                }
+                // the defuse's tint (s503 `tint`: `ui/hit_flash.json` maps[3 + preset]) unless a hit flash shows
+                if let Some(k) = p.defuse.and_then(|d| crate::player::defuse_tint(d.0 + 1)).filter(|_| p.a.flash_map < 0) {
+                    a.to_mut().flash_map = (3 + k) as i8;
                 }
                 let step = actor_cel(w, i);
                 if p.a.alpha > 0 && !p.gone {
@@ -1212,7 +1263,14 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                             }
                         }
                     }
-                    ShotKind::Kame(k) if !k.charging => beam(w, id, &k.set, d, x, y, k.len, k.vt, !k.done, k.stopped, out),
+                    ShotKind::Kame(k) if !k.charging => {
+                        // (an enemy's beam object (Kid Buu's, class 0x0804AEF8): its counter +0x18 runs a frame ahead of
+                        // the shot's t - the head / start cels flip a frame earlier; opponent audit oa_t3c_above f37,
+                        // f41 .. (every 4th frame) with t)
+                        let by_enemy = w.find(s.owner).is_some_and(|o| matches!(w.ents[o].body, Body::Enemy(_)));
+                        let vt = if by_enemy { k.vt + 1 } else { k.vt };
+                        beam(w, id, &k.set, d, x, y, k.len, vt, !k.done, k.stopped, out)
+                    }
                     // the Final Flash (class 0x08036FA2; tables 0x0875FE2C / 0x08760A8C / 0x087616EC): start record
                     // 2 * dir at the visible origin, body 2 * dir + 1 every 32 px from 16 while < len - 1; growing /
                     // shrinking (scale < 0x100) as affine OBJs: inv = 0x10000 / scale, (pa, pd) down (inv, -0x80), up
@@ -1352,7 +1410,7 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                             // its shadow (the sprite header's, after the body like an actor's; skill audit
                             // sa_f31_skill13: every ghost has one in the game)
                             if let Some(sp) = w.data.sprite(crate::shots::GHOST_SPRITE) {
-                                if let Some(sh) = sp.shadow.as_ref().filter(|sh| sh.as_str() != "shadow_0x0") {
+                                if let Some(sh) = sp.shadow.as_ref().filter(|sh| sh.as_str() != "shadow_0x0" ) {
                                     out.sprites.push(SpriteDraw {
                                         entity: id,
                                         sheet: format!("effects/{sh}"),
@@ -1372,7 +1430,12 @@ pub fn render_view(w: &World, out: &mut RenderView) {
             }
             Body::Npc(n) => {
                 let step = actor_cel(w, i);
-                actor_draw(w, id, &n.a, step, out);
+                // a script `tint` (presets of 0x08752EEC: `ui/hit_flash.json` maps[3 + preset])
+                let mut a = std::borrow::Cow::Borrowed(&n.a);
+                if let Some(k) = n.tint.filter(|_| n.a.flash_map < 0) {
+                    a.to_mut().flash_map = (3 + k) as i8;
+                }
+                actor_draw(w, id, &a, step, out);
             }
             Body::Pickup(p) => crate::fieldview::pickup(w, id, p, out),
             Body::MapSprite(m) => crate::fieldview::map_sprite(w, id, m, out),
@@ -1440,6 +1503,26 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                 .copied()
                 .filter(|_| w.hud_bars_at == w.frame && w.hud_end.get(s) == Some(&now))
                 .unwrap_or(now);
+            // (the skill icon's grey and the SS / SS3 gauges: read there too - `World::more_values`)
+            // the skill icon (grey: not usable) and the EP bar's SS / SS3 gauge parts are tiles the HUD rebuilds from its
+            // read (`0x0800B99C`: skill def +0x10's check, then the 12-byte summary): the icon as the frame leaves it
+            // (skill audit sa_f26_skill2 f5 / f106: greyed in the press's frame; Masenko Lv3 f5), the gauges as read at
+            // the HUD's place in the pass (`World::hud_sample`: the form controller's drain and a punch's gain show a
+            // frame later - pixel gate earth_2_8_1 f3630), but a form change in the pass (a revert's end, a transform's)
+            // at once (skill audit sa_f02_skill20 f330, sa_f40_skill20 f69)
+            let alt = !crate::player::can_use_skill(w, pi, skill) || w.field.as_ref().is_some_and(|f| !f.combat);
+            let gauge_now = (p.ss_gauge, (p.ss3_gauge >> 16) as i32);
+            let gauge = w
+                .hud_more
+                .get(s)
+                .copied()
+                .filter(|_| {
+                    w.hud_bars_at == w.frame
+                        && w.hud_more_end.get(s).is_some_and(|e| (e.1, e.2) == gauge_now)
+                        && w.hud_form.get(s) == Some(&p.form)
+                })
+                .map(|m| (m.1, m.2))
+                .unwrap_or(gauge_now);
             out.hud.push(HudView {
                 name,
                 level: lv.max(0) as u32,
@@ -1447,14 +1530,13 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                 hp_max: bars.1,
                 ep: bars.2,
                 ep_max: bars.3,
-                ss: p.ss_gauge,
-                ss3: (p.ss3_gauge >> 16) as i32,
+                ss: gauge.0,
+                ss3: gauge.1,
                 ss_cooldown: p.ss_cooldown,
                 xp72,
                 skill: (skill > 0).then_some(skill as u8),
                 // areas without combat (towns, offices) grey the icon out (emulator HUD)
-                skill_alt: !crate::player::can_use_skill(w, pi, skill)
-                    || w.field.as_ref().is_some_and(|f| !f.combat),
+                skill_alt: alt,
                 // (a HUD object a text box's purge suspended is out of the world list: not drawn - real route rkb_168
                 // 14-1 f1,622 .. 1,685: show_hud's new HUD, then s-script's text box on the world map)
                 // (a hidden HUD still sliding out is drawn: `Scene::hud_y`)
@@ -1668,14 +1750,19 @@ impl Presenter {
             // (and the HP / EP bars: their tiles are drawn in the HUD's update, from what it read at its place in the
             // pass - `World::hud_sample`; opponent audit oa_t44_left f115: down by the enemy's hit in the hit's frame,
             // the damage number a frame later)
-            let cds: Vec<(i32, i32, i32, i32, i32, i32, i32)> =
-                out.hud.iter().map(|h| (h.ss_cooldown, h.ss, h.ss3, h.hp, h.hp_max, h.ep, h.ep_max)).collect();
+            let cds: Vec<(i32, i32, i32, i32, i32, i32, i32, bool)> = out
+                .hud
+                .iter()
+                .map(|h| (h.ss_cooldown, h.ss, h.ss3, h.hp, h.hp_max, h.ep, h.ep_max, h.skill_alt))
+                .collect();
             out.hud = hud.clone();
             for (h, c) in out.hud.iter_mut().zip(cds) {
                 h.ss_cooldown = c.0;
-                // (the SS / SS3 gauges stay a frame late with the HUD: carrying them broke the pixel gate's
-                // earth_2_8_1 f3630 for the skill audit's 3-px gauge step on sa_f40_skill20)
-                let _ = (c.1, c.2);
+                // (the SS / SS3 gauge parts and the skill icon's grey: tiles drawn in the HUD's update from its read
+                // - `World::more_values`; skill audit sa_f26_skill2 f5 / f106, sa_f40_skill20 the gauge steps)
+                h.ss = c.1;
+                h.ss3 = c.2;
+                h.skill_alt = c.7;
                 h.hp = c.3;
                 h.hp_max = c.4;
                 h.ep = c.5;

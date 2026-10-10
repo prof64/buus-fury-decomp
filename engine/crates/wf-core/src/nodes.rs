@@ -1626,6 +1626,8 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         // frames: the update below; opponent audit oa_t91_summon)
         K::Hop => {
             r.d[0] = 0;
+            r.d[1] = 0;
+            r.d[2] = 0;
             let h = w.data.anim.hold;
             set_anim_r(w, i, &[an(14)], true, h);
         }
@@ -3327,6 +3329,40 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             if kind(c, n) == K::Hop {
                 // (the Mini-Yakon's controller 0x0803522C: cel 0 on the ground, 1 rising, 2 falling)
                 w.en(i).ea.pos.frame = if c0 < 0x80 { 0 } else if c0 - 0x80 < 0x40 { 1 } else { 2 };
+                // the update 0x08035274, at each hop's start (tick 0): the footprint centres' difference; aligned
+                // within 8 px on the minor axis -> SetAnim(0), face the player along the major one, done; else a
+                // 1.5 px step (velocity +-0x180) along the minor axis, facing that way. The step: tick > 0x80, a
+                // footprint test, no sliding (opponent audit oa_t91_summon f84 ..)
+                let t = ph;
+                if t == 0 {
+                    r.d[1] = 0;
+                    r.d[2] = 0;
+                    let Some(pi) = en::player(w, i) else { return false };
+                    let (px, py) = w.pl_ref(pi).a.fc();
+                    let (mx, my) = w.en_ref(i).a.fc();
+                    let (dx, dy) = (px - mx, py - my);
+                    if dx.abs() > dy.abs() {
+                        if dy.abs() < 8 {
+                            set_anim(w, i, &[nm("idle")], true, Some(true));
+                            w.en(i).a.facing = if dx > 0 { 3 } else { 2 };
+                            return true;
+                        }
+                        w.en(i).a.facing = if dy > 0 { 0 } else { 1 };
+                        r.d[2] = if dy > 0 { 0x180 } else { -0x180 };
+                    } else {
+                        if dx.abs() < 8 {
+                            set_anim(w, i, &[nm("idle")], true, Some(true));
+                            w.en(i).a.facing = if dy > 0 { 0 } else { 1 };
+                            return true;
+                        }
+                        w.en(i).a.facing = if dx > 0 { 3 } else { 2 };
+                        r.d[1] = if dx > 0 { 0x180 } else { -0x180 };
+                    }
+                }
+                if t > 0x80 {
+                    let (vx, vy) = (r.d[1], r.d[2]);
+                    en::try_move(w, i, vx, vy, 0, 0);
+                }
                 return false;
             }
             if ph == 0 {

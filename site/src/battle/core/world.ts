@@ -134,6 +134,8 @@ export class World {
         }
       }
       if (e && (!this.modal || this.modal.includes(e))) e.update(this)
+      // (the death script's loop from KO + 200: an enemy's state tick only - Enemy.koStateTick; wf-core world.rs)
+      else if (e) (e as unknown as { koStateTick?: (w: World) => void }).koStateTick?.(this)
       c--
     }
     this.entities = this.entities.filter((e) => !e.removed)

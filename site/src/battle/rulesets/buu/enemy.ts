@@ -172,6 +172,17 @@ export class Enemy extends Actor implements EnemyLike {
   smashDust() {
     for (let k = -1; k <= 1; k++) this.ctx.puffRng(this.w, this.center()[0] + k * 12, this.py + 4)
   }
+  /** The death script's loop (KO + 199 on) updates no object but the player; from KO + 200 its caller (0x0800F5E0)
+   *  still runs every enemy's state tick - the animation runs on, no AI (emulator, opponent audit oa_t28_idle f509 ..;
+   *  wf-core player::ko_battle_ticks) */
+  koStateTick(w: World) {
+    const koAt = this.ctx.player?.koAt ?? -1
+    if (koAt >= 0 && w.frame - koAt > 199) {
+      this.w = w
+      this.tickAnim()
+    }
+  }
+
   update(w: World) {
     this.w = w
     if (this.beamStopDue > 0 && --this.beamStopDue === 0) {
@@ -1213,7 +1224,7 @@ export class Enemy extends Actor implements EnemyLike {
         // rifle bullet 0x080276A8: record dir, smoke trail records 4-6 (rate 0x2AAA) every 4 ticks; box = the
         // record's (0x0874E614 + 12 * dir: x - b0, y - b1, b2 x b3); an accepted hit plays 48 + rand(2), the destroy
         // 0x0802770C sound 46 (lockstep f02_vs_enemy_t2e)
-        mk(f, ...at, dx * 448, dy * 448, RIFLE_BOX[f], { sfxSpawn: 28, rngHit: [2], sfxHit: 48, sfxEnd: 46, fragile: true, color: ['#e0ffe0', '#40c040'], fx: { id: 'fx_0874e614', frame: (d) => d }, trail: { id: 'fx_0874e614', rec: 4, n: 3, rate: 0x2aaa } })
+        mk(f, ...at, dx * 448, dy * 448, RIFLE_BOX[f], { sfxSpawn: 28, rngHit: [2], sfxHit: 48, sfxEnd: 46, fragile: true, color: ['#e0ffe0', '#40c040'], fx: { id: 'fx_0874e614', frame: (d) => d }, trail: { id: 'fx_0874e614', rec: 4, n: 3, rate: 0x2aaa, pre: true } })
         break
       case 'shell':
         // tank shell 0x0801C900: record dir, smoke trail records 4-6 (rate 0x2AAA) every 4 ticks; from the tank

@@ -63,6 +63,17 @@ export abstract class Shot implements Entity, Receiver {
   offCamera(w: World) {
     return !overlaps(this.rect(), w.camera)
   }
+  /** past the camera edge on the side the shot flies to (0x08019B7C) */
+  pastEdge(w: World) {
+    const r = this.rect()
+    const c = w.camera
+    switch (this.dir) {
+      case 0: return !(r.y0 < c.y1)
+      case 1: return !(r.y1 > c.y0)
+      case 2: return !(r.x1 > c.x0)
+      default: return !(r.x0 < c.x1)
+    }
+  }
   /** wall test of every shot update: 0x08009324(box, map +0xAC) = any 8x8 tile under the box blocked on the map's
    *  projectile grid (or the box outside 0..2048). Arenas without collision data: the arena rectangle + a margin. */
   inWall(w: World, r: Rect = this.rect()) {
@@ -126,7 +137,7 @@ export interface StraightOpts {
   fxDraw?: (r: Renderer, s: StraightShot) => void
   /** smoke trail (rifle bullet, tank shell): every 4 ticks a generic effect of `n` records from record `rec` of run
    *  `id` (rate 0x2AAA) at the position - 8 * velocity */
-  trail?: { id: string; rec: number; n: number; rate: number }
+  trail?: { id: string; rec: number; n: number; rate: number; pre?: boolean }
   /** ticks before the shot moves / hits (velocity 0 until launched, e.g. Burning Attack held in the hands) */
   delay?: number
   /** RNG draws of the game's object at spawn / on an accepted hit (sound picks: rand(2) -> 0x0803E378) */
@@ -194,15 +205,21 @@ export class StraightShot extends Shot {
     }
     // its hit was taken by a beam's head last frame and no beam burst it: it ends now (+0x54)
     if (this.beamHit) return this.end(w, true)
+    const tr = this.o.trail
+    // (the rifle's puff before the move, at the old position - 8 v: 0x0802776E; wf-core `Trail::pre`)
+    if (tr && tr.pre && (this.t & 3) === 0) {
+      this.ctx.fxAnim(w, tr.id, (this.x - 8 * this.o.vx) >> 8, (this.y - 8 * this.o.vy) >> 8, tr.rec, tr.n, tr.rate)
+    }
     this.x += this.o.vx
     this.y += this.o.vy
-    const tr = this.o.trail
-    if (tr && (this.t & 3) === 0) {
+    if (tr && !tr.pre && (this.t & 3) === 0) {
       // smoke behind the shot (0x08027562: pool room >= 0x40)
       this.ctx.fxAnim(w, tr.id, (this.x - 8 * this.o.vx) >> 8, (this.y - 8 * this.o.vy) >> 8, tr.rec, tr.n, tr.rate)
     }
     if (this.o.life && this.t > this.o.life) return this.end(w, false)
-    if (this.offCamera(w)) {
+    // the Energy Blast class: gone only past the camera edge it flies to (0x08019B7C; wf-core `straight_update`)
+    const kiClass = this.o.name === 'kiblast' && this.o.fxEnd?.ticks === 16 && !this.o.fragile
+    if (kiClass ? this.pastEdge(w) : this.offCamera(w)) {
       this.removed = true
       return
     }
@@ -266,6 +283,8 @@ export class StraightShot extends Shot {
       this.removed = true
       if (this.o.sfxEnd != null) audioEvent('sfx', { id: this.o.sfxEnd, vol: 64 })
       if (this.o.explode !== false) this.ctx.explosion(_w, this.px, this.py)
+      // the melee's crit slot is not written by a bullet either: alone, the punch shakes the screen (shots.rs)
+      if (!msg.raw && !msg.dmg && msg.atk.sub === 2 && msg.atk.kind === 0) msg.crit = true
       return true
     }
     return false
@@ -1768,7 +1787,8 @@ export class DarkSphere extends Shot {
       this.ctx.sphereState = 2
       this.r256 += 128
       this.alpha = Math.max(0, ((128 - this.rad) * 50) / 64 / 50)
-      if (this.alpha <= 0 || this.rad >= 128) {
+      // (gone at 127 whole pixels - Rust sphere_update, oa_t12_fight f924)
+      if (this.alpha <= 0 || this.r256 >> 8 >= 127) {
         this.ctx.sphereState = 3
         this.removed = true
         return
@@ -1785,7 +1805,8 @@ export class DarkSphere extends Shot {
       const dx = p.px - this.px
       const dy = p.py - this.py
       this.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 3 : 2) : dy > 0 ? 0 : 1
-      if (Math.floor((this.r256 * this.r256) / 65536) > d2) this.hit(w, bb, ATK[2], 1024)
+      // (the radius in whole pixels, squared - oa_t12_fight f805)
+      if ((this.r256 >> 8) ** 2 > d2) this.hit(w, bb, ATK[2], 1024)
     }
   }
   onMessage(w: World, msg: HitMsg): boolean {

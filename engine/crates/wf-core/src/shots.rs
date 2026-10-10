@@ -110,6 +110,10 @@ pub struct Trail {
     pub rec: i32,
     pub n: i32,
     pub rate: i32,
+    /// the rifle bullet's (0x0802776E): the puff made before the move, at the old position - 8 * v, and sorted with
+    /// the actors (layer 0x38, depth its y) - behind the Mercenary at his muzzle (opponent audit oa_t4b_idle f65)
+    #[serde(default)]
+    pub pre: bool,
 }
 
 /// straight-flying shot (ki blasts, bullets, rifle shots, shells, shuriken, wraps, spit, barrage, Burning Attack,
@@ -1634,12 +1638,18 @@ fn straight_update(w: &mut World, i: usize) {
     if o.beam_hit {
         return straight_end(w, i, true);
     }
+    if let Some(tr) = o.trail.filter(|tr| tr.pre && t & 3 == 0) {
+        let s = w.shot_ref(i);
+        let (x, y) = ((s.x - 8 * o.vx) >> 8, (s.y - 8 * o.vy) >> 8);
+        let e = fx::fx_anim_sized(w, tr.fx.addr(), x, y, tr.rec, tr.n, tr.rate, 0x40);
+        fx::set_sorted(w, e);
+    }
     {
         let s = w.shot(i);
         s.x += o.vx;
         s.y += o.vy;
     }
-    if let Some(tr) = o.trail {
+    if let Some(tr) = o.trail.filter(|tr| !tr.pre) {
         if t & 3 == 0 {
             let s = w.shot_ref(i);
             let (x, y) = ((s.x - 8 * o.vx) >> 8, (s.y - 8 * o.vy) >> 8);
@@ -1649,7 +1659,26 @@ fn straight_update(w: &mut World, i: usize) {
     if o.life != 0 && t > o.life as i64 {
         return straight_end(w, i, false);
     }
-    if off_camera(w, i) {
+    // the Energy Blast class (0x0804B454, update 0x08019888) is gone only once past the camera edge on the side it
+    // flies to (0x08019B7C) - a blast fired from beyond the screen's edge flies in (opponent audit oa_t76_idle f219:
+    // Super Buu's blast from 11 px right of the screen); the other shots when off every camera
+    let gone = if o.name == SName::KiBlast && o.fx_end == 16 && !o.fragile {
+        let r = rect(w, i);
+        let d = w.shot_ref(i).dir;
+        let n = w.players.len().clamp(1, crate::world::MAX_PLAYERS);
+        !(0..n).any(|k| {
+            let c = &w.cameras[k].rect;
+            match d {
+                0 => r.y0 < c.y1,
+                1 => r.y1 > c.y0,
+                2 => r.x1 > c.x0,
+                _ => r.x0 < c.x1,
+            }
+        })
+    } else {
+        off_camera(w, i)
+    };
+    if gone {
         w.ents[i].removed = true;
         return;
     }
@@ -2658,7 +2687,9 @@ fn kame_update(w: &mut World, i: usize) {
             let ex = hx + dx * 4 + w.rng.rand(32) - 16;
             let ey = hy + dy * 4 + w.rng.rand(32) - 16;
             let rate = 0x1000 + w.rng.rand(0x4000);
-            fx::explosion(w, ex, ey, rate);
+            // (the hit's cloud is a generic effect object 0x0804CF3C at layer 0x38: sorted with the actors, behind
+            // the beam (0x37) - opponent audit oa_t3c_above f41 .. f62, Kid Buu's Kamehameha on the player)
+            fx::explosion_sorted(w, ex, ey, rate);
         }
     } else if overlaps(&hr, &w.camera(owner_slot(w, owner))) {
         if let ShotKind::Kame(k) = &mut w.shot(i).kind {
@@ -3152,7 +3183,8 @@ fn bomb_update(w: &mut World, i: usize) {
         }
         let (px, py) = (w.shot_ref(i).px(), w.shot_ref(i).py());
         let rate = 0x1000 + w.rng.rand(0x1000);
-        fx::explosion(w, px, py, rate);
+        // (the blast 0x0801952C with layer 0x38 - 0x0801C7E4: sorted with the actors, oa_t2b_idle f123)
+        fx::explosion_sorted(w, px, py, rate);
         w.sfx(24, 64);
     }
 }
@@ -3352,7 +3384,9 @@ fn sphere_update(w: &mut World, i: usize) {
     } else if matches!(w.g.sphere_state, 0 | 2) {
         w.g.sphere_state = 2;
         r256 += 128;
-        if r256 >= 128 * 256 {
+        // (gone at 127 whole pixels: opponent audit oa_t12_fight f924 - Dabura's IfSphereDestroyed / GotoState 0x7a
+        // and his descent a frame before a 128 px end)
+        if r256 >> 8 >= 127 {
             w.g.sphere_state = 3;
             w.ents[i].removed = true;
             w.shot(i).kind = ShotKind::DarkSphere { r256, drawn };
@@ -3378,7 +3412,9 @@ fn sphere_update(w: &mut World, i: usize) {
             } else {
                 1
             };
-            if ((r256 as i64) * (r256 as i64)) >> 16 > d2 {
+            // (the radius in whole pixels, squared: opponent audit oa_t12_fight f805 - the expansion's hit a frame
+            // after the r * r >> 16 test, and no further hit while the player is knocked away)
+            if ((r256 >> 8) as i64).pow(2) > d2 {
                 hit(w, i, bb, atk(2), 1024, true);
             }
         }
@@ -3493,6 +3529,12 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
                 if explode {
                     let (px, py) = (w.shot_ref(i).px(), w.shot_ref(i).py());
                     fx::explosion(w, px, py, 0x2000);
+                }
+                // (the melee's crit slot is not written by a bullet either: alone, the punch shakes the screen as a
+                // crit - opponent audit oa_t02_punch f174, the shake task's draws 0x080079F2 / 0x08007A04)
+                // (the punch's message only: attack 2, the melee 0x08012A24)
+                if msg.raw == 0 && msg.dmg == 0 && msg.atk.sub == 2 && msg.atk.kind == 0 {
+                    msg.crit = true;
                 }
                 return true;
             }

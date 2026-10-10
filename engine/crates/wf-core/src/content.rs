@@ -1248,11 +1248,9 @@ fn parse_sprite(s: &Value, index: i32, timing: Option<&Value>) -> Sprite {
         })
         .unwrap_or((0, 0));
     let w12 = h["word12"].as_u64().unwrap_or(0) as u32;
-    // (the game adds the bytes unsigned to the OAM position: x is 9 bits - Dabura's dx 0xF8 puts his shadow 248 px
-    // right, off screen, as the game shows none (pixel gate shipr_238_8-16 f5040 .., his dy 0xFC); y is 8 bits - Yamu's
-    // dy 0xF8 wraps to 8 px up (opponent audit oa_t94: the shadow under his feet). Only these two sprites have a
-    // byte >= 0x80; an off-screen actor shows no shadow at all: `view::actor_draw`)
-    let shadow_off = ((w12 & 0xFF) as i32, ((w12 >> 8) & 0xFF) as u8 as i8 as i32);
+    // (the raw bytes 0 .. 255: an enemy's shadow takes them signed, every other actor's unsigned -
+    // `view::shadow_at`)
+    let shadow_off = ((w12 & 0xFF) as i32, ((w12 >> 8) & 0xFF) as i32);
     let halo = anims.iter().any(|a| {
         a.dirs
             .iter()

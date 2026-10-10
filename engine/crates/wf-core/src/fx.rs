@@ -280,6 +280,11 @@ pub fn explosion(w: &mut World, x: i32, y: i32, rate: i32) -> EntityId {
 /// [`explosion`] sorted with the actors by its y (a Kamikaze ghost's)
 pub fn explosion_sorted(w: &mut World, x: i32, y: i32, rate: i32) -> EntityId {
     let e = explosion(w, x, y, rate);
+    set_sorted(w, e);
+    e
+}
+/// an animation effect sorted with the actors by its y (layer 0x38) instead of in front of them
+pub fn set_sorted(w: &mut World, e: EntityId) {
     if let Some(k) = w.find(e) {
         if let crate::world::Body::Fx(f) = &mut w.ents[k].body {
             if let Fx::Anim { sorted, .. } = f.as_mut() {
@@ -287,7 +292,6 @@ pub fn explosion_sorted(w: &mut World, x: i32, y: i32, rate: i32) -> EntityId {
             }
         }
     }
-    e
 }
 pub fn beam_charge(w: &mut World, owner: EntityId, off: [(i32, i32); 4], set: BeamSet) -> EntityId {
     add(

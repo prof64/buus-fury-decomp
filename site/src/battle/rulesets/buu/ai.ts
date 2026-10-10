@@ -2488,12 +2488,45 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       // on the ground, 1 rising, 2 falling (Rust nodes.rs)
       return new Act(n, c, (a) => {
         a.data.ph = 0
+        a.data.vx = 0
+        a.data.vy = 0
         e.setAnim(14, true, true, { rule: 'hold' })
       }, (_f, a) => {
         const c0 = a.data.ph
         hopHeight(e, c0)
         a.data.ph = (a.data.ph + 8) & 0xff
         e.ea.pos.frame = c0 < 0x80 ? 0 : c0 - 0x80 < 0x40 ? 1 : 2
+        // the update 0x08035274 (Rust nodes.rs K::Hop): at each hop's start the footprint centres' difference;
+        // within 8 px on the minor axis -> SetAnim(0), face the player along the major one, done; else a 1.5 px step
+        // along the minor axis while tick > 0x80 (footprint test, no sliding)
+        const t = a.data.ph
+        if (t === 0) {
+          a.data.vx = 0
+          a.data.vy = 0
+          const p = e.player
+          if (!p) return false
+          const [px, py] = p.footCenter()
+          const [mx, my] = e.footCenter()
+          const [dx, dy] = [px - mx, py - my]
+          if (Math.abs(dx) > Math.abs(dy)) {
+            if (Math.abs(dy) < 8) {
+              e.setAnim('idle', true, true)
+              e.facing = dx > 0 ? 3 : 2
+              return true
+            }
+            e.facing = dy > 0 ? 0 : 1
+            a.data.vy = dy > 0 ? 0x180 : -0x180
+          } else {
+            if (Math.abs(dx) < 8) {
+              e.setAnim('idle', true, true)
+              e.facing = dy > 0 ? 0 : 1
+              return true
+            }
+            e.facing = dx > 0 ? 3 : 2
+            a.data.vx = dx > 0 ? 0x180 : -0x180
+          }
+        }
+        if (t > 0x80) e.tryMove(a.data.vx, a.data.vy, 0, 0)
         return false
       })
     case 'SummonMiniYakons':

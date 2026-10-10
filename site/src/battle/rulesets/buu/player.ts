@@ -1937,7 +1937,8 @@ export class Player extends Actor implements PlayerLike {
    *  current form is SS) */
   private updTransform(_w: World) {
     if (this.gs !== 'skill20' && this.gs !== 'ss_up') return
-    const v = Math.floor((this.maxEp * this.ap.tick) / (this.animN() * 16 || 1)) & 0xffff
+    // (the tick after this frame's animation step - skill audit sa_f40_skill20_transform f267: tick 1, gauge 5 of 900)
+    const v = Math.floor((this.maxEp * Math.min(this.ap.tick + 1, this.animN() * 16 || 1)) / (this.animN() * 16 || 1)) & 0xffff
     if (this.form.ss) this.ss3Gauge = v * 65536
     else this.ssGauge = v
   }

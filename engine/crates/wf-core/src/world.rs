@@ -606,6 +606,12 @@ pub struct World {
     pub hud_bars_at: u32,
     /// the values at the pass's end (changed since - a script's, a menu's: the bars show the current values)
     pub hud_end: Vec<(i32, i32, i32, i32)>,
+    /// the skill icon's grey and the EP bar's SS / SS3 gauge parts at the HUD's read (the gauges show these - a drain
+    /// or a gain later in the pass a frame late: `view::render_view`'s HUD) - and at the pass's end
+    pub hud_more: Vec<(bool, i32, i32)>,
+    pub hud_more_end: Vec<(bool, i32, i32)>,
+    /// the leader's form at that read (a form change since: the gauges show the current values)
+    pub hud_form: Vec<i32>,
     pub g: Globals,
     pub col: Option<Collision>,
     pub arena: ArenaRt,
@@ -774,6 +780,9 @@ impl World {
             hud_bars: Vec::new(),
             hud_bars_at: u32::MAX,
             hud_end: Vec::new(),
+            hud_more: Vec::new(),
+            hud_more_end: Vec::new(),
+            hud_form: Vec::new(),
             g: Globals {
                 last_beep: -1000,
                 ..Default::default()
@@ -996,6 +1005,10 @@ impl World {
                     // (the damage numbers' place in the pass: `vram::damage_number_shown`)
                     self.battle.pass_at = self.ents[i].id;
                     self.update_entity(i);
+                } else if matches!(self.ents[i].body, Body::Enemy(_)) && crate::player::ko_battle_ticks(self) {
+                    // (the death script's loop from KO + 200: an enemy's state tick only - `player::ko_battle_ticks`;
+                    // the field's: `enemy::ko_state_ticks`)
+                    crate::enemy::tick_anim(self, i);
                 }
             }
             c -= 1;
@@ -1006,6 +1019,7 @@ impl World {
             b.3 = p.3;
         }
         self.hud_end = self.bar_values();
+        self.hud_more_end = self.more_values();
         self.battle.pass_at = 0;
         crate::vram::reap(self);
         self.ents.retain(|e| !e.removed);
@@ -1030,6 +1044,24 @@ impl World {
     pub fn hud_sample(&mut self) {
         self.hud_bars_at = self.frame;
         self.hud_bars = self.bar_values();
+        self.hud_more = self.more_values();
+        self.hud_form = (0..self.players.len())
+            .map(|s| self.player_idx(s).map(|pi| self.pl_ref(pi).form).unwrap_or(-1))
+            .collect();
+    }
+    /// the HUD's skill icon grey and the SS / SS3 gauges now, per player slot (`view::render_view`'s HUD)
+    pub fn more_values(&self) -> Vec<(bool, i32, i32)> {
+        (0..self.players.len())
+            .map(|s| match self.player_idx(s) {
+                Some(pi) => {
+                    let p = self.pl_ref(pi);
+                    let alt = !crate::player::can_use_skill(self, pi, p.skill())
+                        || self.field.as_ref().is_some_and(|f| !f.combat);
+                    (alt, p.ss_gauge, (p.ss3_gauge >> 16) as i32)
+                }
+                None => (false, 0, 0),
+            })
+            .collect()
     }
     /// the bars' values now, per player slot
     pub fn bar_values(&self) -> Vec<(i32, i32, i32, i32)> {
@@ -1216,6 +1248,7 @@ impl World {
             self.hud_sample();
         }
         self.hud_end = self.bar_values();
+        self.hud_more_end = self.more_values();
         // the HUD (an early object of the area's list: updated after the actors)
         // (a cut's interrupted pass: the HUD is a later list object here, its update was done - `finish_pass_from`)
         if from.is_none() {

@@ -154,11 +154,17 @@ pub fn extract(rom: &Rom, out: &mut Content) -> wf_rom::Result<()> {
             (r as u32) << 16 | (g as u32) << 8 | b as u32
         })
         .collect();
-    let maps: Vec<Vec<u8>> = (0..3u32).map(|k| rom.bytes(rom.u32(0x0807_25AC + 4 * k), 256).to_vec()).collect();
+    let mut maps: Vec<Vec<u8>> = (0..3u32).map(|k| rom.bytes(rom.u32(0x0807_25AC + 4 * k), 256).to_vec()).collect();
+    // the script tints (`tint`, table 0x08752EEC: 20 entries {RGBA key, map}) after them: maps[3 + preset], the
+    // identity for a preset without a map (it restores the sprite's own colours)
+    for k in 0..20u32 {
+        let m = rom.u32(0x0875_2EEC + 8 * k + 4);
+        maps.push(if m != 0 { rom.bytes(m, 256).to_vec() } else { (0..=255u8).collect() });
+    }
     out.put_json(
         "ui/hit_flash.json",
         &json!({"obj_palette": obj_pal, "maps": maps, "counter": 12,
-                "rule": "counter 12 at the hit, -1 per tick; drawn through maps[counter >> 2] while > 0",
+                "rule": "counter 12 at the hit, -1 per tick; drawn through maps[counter >> 2] while > 0; maps[3 + k]: tint preset k (0x08752EEC)",
                 "rom": {"object": "0x0800E8E6", "tick": "0x0800DE28", "maps": "0x080725AC", "obj_palette": "0x0805652C"}}),
     );
 

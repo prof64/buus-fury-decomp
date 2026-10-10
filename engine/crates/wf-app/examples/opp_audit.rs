@@ -754,6 +754,24 @@ fn audit(path: &std::path::Path, packs: &wf_app::wf_content::Packs, out_dir: &st
             })
             .unwrap_or_default()
     };
+    // (and the solid ones block the grids as the field's breakables do - `fieldobj` 0x0800C858: Southwest Forest 8-3's
+    // stumps; oa_t50_idle f580, the Ninja Boss's align step into prop 0's hit box blocked, the node ends and he throws)
+    {
+        let w = &mut s.world;
+        let mid = w.arena.map.split_once('-').and_then(|(a, b)| Some(format!("area_{:02}_{:03}", a.parse::<u32>().ok()?, b.parse::<u32>().ok()?))).unwrap_or_default();
+        let boxes: Vec<[i32; 4]> = w
+            .data
+            .field
+            .as_ref()
+            .and_then(|d| d.maps.get(&mid))
+            .map(|md| md.props.iter().filter(|p| p.tile >> 24 != 0).filter_map(|p| p.hit_box).collect())
+            .unwrap_or_default();
+        if let Some(c) = w.col.as_mut() {
+            for b in boxes {
+                c.mark_both(b, 0);
+            }
+        }
+    }
     // our presented view of each frame (rendered after the sim pass, once the tile clock is fitted)
     let snap = |w: &World, presenter: &wf_core::view::Presenter| -> wf_view::RenderView {
         let mut view = wf_view::RenderView::default();
@@ -846,6 +864,8 @@ fn audit(path: &std::path::Path, packs: &wf_app::wf_content::Packs, out_dir: &st
                         let (x, y, det) = (e.a.px(), e.a.py(), e.detached);
                         let fx = wf_core::enemy::fits(&mut s.world, k, x + 1, y);
                         eprintln!("f{fi} enemy ({x}, {y}) detached {det} fits(x+1) {fx} rng {} {} calls {}", s.world.rng.a, s.world.rng.b, s.world.rng.calls);
+                        let e = s.world.en_ref(k);
+                        eprintln!("f{fi} enemy ea rule {} pos {:?} t {} done {} anim {:?} ai {:?}", e.ea.rule, (e.ea.pos.raw, e.ea.pos.frame, e.ea.pos.tick), e.ea.t, e.ea.done, e.a.anim, e.ai.stack.iter().map(|r| r.state).collect::<Vec<_>>());
                     }
                     for e in s.world.ents.iter().filter(|e| !e.removed) {
                         if let Body::Shot(sh) = &e.body {

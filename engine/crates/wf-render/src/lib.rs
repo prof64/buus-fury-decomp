@@ -701,6 +701,14 @@ impl Renderer {
                     // on: Gotenks' cut-short crit shake leaves (3, -3); the actors drawn 3 px off without it). The
                     // screen-space OBJs (HUD, boss bar, numbers' screen items) stay put
                     let (shx, shy) = view.obj_shake.or(map.as_ref().map(|m| m.2)).unwrap_or((0, 0));
+                    // (`SpriteEffect::TopCull`: its OAM y - the camera-relative top as a byte - >= 160 with fewer than 5 of
+                    // its rows wrapped in at the top: none)
+                    if let SpriteEffect::TopCull { h } = s.effect {
+                        let y8 = (s.y - cy - shy) & 0xFF;
+                        if y8 >= 160 && y8 + h as i32 - 256 < 5 {
+                            continue;
+                        }
+                    }
                     self.ghost_on = view.see_through.contains(&s.entity);
                     self.draw_obj(sheet, *fi, *flip, s.x - vx - shx, s.y - vy - shy, s.effect);
                     self.ghost_on = false;

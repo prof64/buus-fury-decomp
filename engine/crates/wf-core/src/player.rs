@@ -419,6 +419,9 @@ pub struct Player {
     pub fus_cnt: i32,
     /// the defuse script: (frames since, start x px)
     pub defuse: Option<(i32, i32)>,
+    /// the defuse's other half (s503's `spawn_actor(p(1))`, walked off by s014 and removed)
+    #[serde(default)]
+    pub defuse_npc: Option<EntityId>,
     pub partner: Option<Partner>,
 }
 
@@ -502,6 +505,7 @@ impl Player {
             story_cnt: 0,
             fus_cnt: 300,
             defuse: None,
+            defuse_npc: None,
             partner: None,
         };
         p.apply_form(w, init.form);
@@ -2013,7 +2017,41 @@ pub fn levelup_hook_done(w: &mut World) {
         }
     }
 }
-/// the cutscene fusions' defuse (script s014, run by the form object when its countdown goes negative)
+/// the defuse's `tint` preset (table 0x08752EEC, `ui/hit_flash.json` maps[3 + k]) at script frame `t` (s503; skill
+/// audit sa_defuse_f42_idle, every frame fitted against the game's): the fusion whitens in 8 steps of 7 frames
+/// (31 .. 217 -> presets 9 .. 13) from t 12; both halves full white (255 -> 14) from the swap; after the glide one
+/// step a frame (248 .. 31) back to their own colours at t 184
+pub fn defuse_tint(t: i32) -> Option<u8> {
+    match t {
+        12..=18 => Some(9),
+        19..=25 => Some(10),
+        26..=32 => Some(11),
+        33..=46 => Some(12),
+        47..=84 => Some(13),
+        85..=176 => Some(14),
+        177..=178 => Some(13),
+        179..=180 => Some(12),
+        181 => Some(11),
+        182 => Some(10),
+        183 => Some(9),
+        _ => None,
+    }
+}
+/// the defuse partner's script sprite id: the fusion's other half (Gogeta: Goku 115 / Vegeta 279; Gotenks: Goten
+/// 123 / Trunks 269), the one the player did not become
+fn defuse_partner_sprite(w: &World, i: usize) -> i32 {
+    match pr(w, i).form_ref(w).char_ {
+        0 => 279,
+        4 => 115,
+        3 => 123,
+        2 => 269,
+        _ => 279,
+    }
+}
+/// the cutscene fusions' defuse (script s014, run by the form object when its countdown goes negative; its s503 does
+/// the split): the fusion whitens (`defuse_tint`), flash_white(10), fade_out_white(5), the swap and the partner made
+/// at the fusion's place, fade_in_white(5), both glide 16 px apart, their colours back; then the partner walks off
+/// (160, -150) at speed 200 and is removed (skill audit sa_defuse_f42_idle / f32: the game's rows and frames)
 fn defuse_step(w: &mut World, i: usize) {
     let (t, x0) = {
         let d = p(w, i).defuse.as_mut().unwrap();
@@ -2025,9 +2063,20 @@ fn defuse_step(w: &mut World, i: usize) {
     if t == 2 {
         p(w, i).a.facing = 0;
     }
+    // the screen: flash_white(10) after the whitening, fade_out_white(5), and fade_in_white(5) after the swap
+    match t {
+        61 => crate::scene::start_fade(w, crate::scene::FadeKind::Flash, true, 10),
+        81 => crate::scene::start_fade(w, crate::scene::FadeKind::White, true, 5),
+        90 => crate::scene::start_fade(w, crate::scene::FadeKind::White, false, 5),
+        _ => {}
+    }
     if t == 85 {
         swap_to_partner(w, i);
-        w.rng.rand(255);
+        // the partner (spawn_actor: facing down, idle, the constructor's random tick)
+        let sprite = defuse_partner_sprite(w, i);
+        let (px, py) = (pr(w, i).a.px(), pr(w, i).a.py());
+        let id = crate::scene::spawn_npc(w, sprite, px, py, 0);
+        p(w, i).defuse_npc = Some(id);
     } else if !(90..=94).contains(&t) {
         anim_tick(w, i);
     }
@@ -2037,7 +2086,46 @@ fn defuse_step(w: &mut World, i: usize) {
     if t == 175 {
         p(w, i).a.x = (x0 - 16) << 8;
     }
-    if t == 295 {
+    // the partner: the glide the other way, then s014's walk_to(+160, -150, 200) (state 0xF, step math 0x080192CE,
+    // 110 steps; snapped and idle at the end: the idle state's random tick), removed the frame after
+    if let Some(k) = pr(w, i).defuse_npc.and_then(|id| w.find(id)) {
+        let tint = defuse_tint(t + 1);
+        if let Body::Npc(n) = &mut w.ents[k].body {
+            n.tint = tint;
+            if (95..=174).contains(&t) {
+                n.a.x += 50;
+            }
+            if t == 175 {
+                n.a.x = (x0 + 16) << 8;
+            }
+        }
+        if t == 185 {
+            if let Body::Npc(n) = &mut w.ents[k].body {
+                n.a.facing = crate::geom::facing_toward(160, -150);
+            }
+            crate::scene::set_state(w, k, 0xF);
+        }
+        if (186..=294).contains(&t) {
+            let (_, sx, sy) = crate::scene::step_math(160, -150, 200, 8);
+            if let Body::Npc(n) = &mut w.ents[k].body {
+                n.a.x += sx;
+                n.a.y += sy;
+            }
+        }
+        if t == 295 {
+            let y0 = pr(w, i).a.py();
+            if let Body::Npc(n) = &mut w.ents[k].body {
+                n.a.x = (x0 + 16 + 160) << 8;
+                n.a.y = (y0 - 150) << 8;
+            }
+            crate::scene::set_state(w, k, 0);
+        }
+        if t == 296 {
+            crate::vram::entity_gone(w, k);
+            w.ents[k].removed = true;
+            p(w, i).defuse_npc = None;
+        }
+    } else if t == 295 {
         w.rng.rand(255);
     }
     if t >= 297 {
@@ -2054,7 +2142,32 @@ fn swap_to_partner(w: &mut World, i: usize) {
     form_exit(w, i);
     let ch = pr(w, i).form_ref(w).char_;
     let pr0 = pr(w, i).clone();
-    let partner = pr0.partner.clone().unwrap_or(Partner {
+    // without a battle's partner record: the story's record of the half the player becomes (s503
+    // `set_character`: Goku for Gogeta, Trunks for Gotenks - its HP / EP / stats; skill audit sa_defuse_f42_idle,
+    // the game's HP 135 after the swap, not the fusion's)
+    let story_rec = w
+        .story
+        .chars
+        .get(if ch == 7 { 0 } else { 3 })
+        .filter(|c| c.rec.max_hp > 0)
+        .map(|c| (c.rec.clone(), c.ss_gauge, c.ss3_gauge as i64, c.ss_cooldown, c.skills.clone(), c.sel));
+    let partner = pr0.partner.clone().or_else(|| {
+        story_rec.map(|(r, ss, ss3, cd, sk, sel)| Partner {
+            form: if ch == 7 { 2 } else { 21 },
+            hp: r.hp,
+            max_hp: r.max_hp,
+            ep: r.ep,
+            max_ep: r.max_ep,
+            base: [r.str_, r.pow, r.end, r.spd],
+            // (its own skill list and selection: the HUD's icon after the swap)
+            skills: if sk.is_empty() { pr0.skills.clone() } else { sk },
+            slot: sel.max(0) as usize,
+            level0: 0,
+            ss_gauge: ss,
+            ss3_gauge: ss3,
+            cooldown: cd,
+        })
+    }).unwrap_or(Partner {
         form: if ch == 7 { 2 } else { 21 },
         hp: pr0.rec.hp,
         max_hp: pr0.rec.max_hp,
@@ -3769,7 +3882,9 @@ fn upd_transform(w: &mut World, i: usize) {
     let n = pr(w, i).anim_n(w);
     let den = (n * 16).max(1) as i64;
     let max_ep = pr(w, i).rec.max_ep as i64;
-    let tick = pr(w, i).ap.tick as i64;
+    // (the tick after this frame's animation step: the game's gauge at the frame's end is max EP * that tick / (n *
+    // 16) - skill audit sa_f40_skill20_transform f267: tick 1, gauge 5 of 900 (n = 11); ours used the tick before)
+    let tick = (pr(w, i).ap.tick as i64 + 1).min(den);
     let v = (max_ep * tick).div_euclid(if n * 16 == 0 { 1 } else { den }) & 0xffff;
     let ss = pr(w, i).form_ref(w).ss;
     let pl = p(w, i);
@@ -4606,6 +4721,16 @@ pub(crate) fn mod_fits(w: &World, i: usize, x: i32, y: i32) -> bool {
 /// field: the death script's loop starts at KO + 199 before the object pass (0x08799D0C): only the player is updated
 /// from here on, every enemy gets message 0xF (`enemy::stop_msg`)
 /// the leader's death script runs (KO + 199 passed: `ko_freeze`'s modal)
+/// A battle's death script loop (KO + 199 on, one player; not under Battle mode's arena rules) updates no object but
+/// the player - from KO + 200 its caller (0x0800F5E0) still runs every enemy's state tick: the animation runs on, no AI
+/// (emulator, opponent audit oa_t28_idle f509 ..: Gotenks' idle tick 183, 184 .. after the KO at 308 - the battle sim
+/// had frozen it; the field's is `enemy::ko_state_ticks`)
+pub fn ko_battle_ticks(w: &World) -> bool {
+    !w.opts.arena
+        && w.players.len() == 1
+        && w.player_idx(0).is_some_and(|i| pr(w, i).ko_at >= 0 && w.frame as i64 - pr(w, i).ko_at > 199)
+}
+
 pub fn ko_modal(w: &World) -> bool {
     w.field.is_some()
         && w.players.len() == 1
