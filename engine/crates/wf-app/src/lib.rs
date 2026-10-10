@@ -65,6 +65,8 @@ pub struct App {
     acc: f64,
     events: Vec<SimEvent>,
     audio_out: Vec<AudioEvent>,
+    /// `audio_out`'s length at the end of each step since the last take (`take_audio_frames`)
+    audio_marks: Vec<usize>,
     /// Timing of the last render (ms) / steps, for the perf overlay.
     pub stats: Stats,
     /// "Original pacing" (Settings, off by default): after a step the sim reports as a GBA lag (`Sim::lag_hint`:
@@ -99,6 +101,7 @@ impl App {
             acc: 0.0,
             events: Vec::new(),
             audio_out: Vec::new(),
+            audio_marks: Vec::new(),
             stats: Stats::default(),
             original_pacing: false,
             hold: 0,
@@ -137,6 +140,7 @@ impl App {
         if self.original_pacing && self.hold > 0 {
             // the GBA's dropped frames: the picture and the sim hold, the audio driver keeps playing
             self.hold -= 1;
+            self.audio_marks.push(self.audio_out.len());
             return;
         }
         self.sim.step(&self.inputs, &mut self.events);
@@ -148,6 +152,7 @@ impl App {
                 self.audio_out.push(*a);
             }
         }
+        self.audio_marks.push(self.audio_out.len());
         self.stats.steps += 1;
     }
 
@@ -220,7 +225,25 @@ impl App {
     }
 
     pub fn take_audio(&mut self) -> Vec<AudioEvent> {
+        self.audio_marks.clear();
         std::mem::take(&mut self.audio_out)
+    }
+
+    /// The audio requests since the last take, one group per step (the requests made outside a step - a sim swap,
+    /// a menu's sound - join the next step's group, or form the last group): for `audio::AudioEngine::push_frame`.
+    pub fn take_audio_frames(&mut self) -> Vec<Vec<AudioEvent>> {
+        let all = std::mem::take(&mut self.audio_out);
+        let mut out = Vec::with_capacity(self.audio_marks.len() + 1);
+        let mut from = 0;
+        for m in self.audio_marks.drain(..) {
+            let m = m.min(all.len());
+            out.push(all[from..m].to_vec());
+            from = m;
+        }
+        if from < all.len() {
+            out.push(all[from..].to_vec());
+        }
+        out
     }
 }
 

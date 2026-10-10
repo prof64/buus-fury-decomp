@@ -140,6 +140,13 @@ the default extraction (`extract_rendered`).
 
 ## 7. Deviations / limits
 
+* The app's audio engine (`wf-app` `audio.rs`) takes each game frame's requests at its own driver update, as the game
+  does (`App::take_audio_frames` -> `AudioEngine::push_frame`; native: one channel message per frame, web: a frame
+  word, kind 7, after each frame's requests). Before 2026-10-10 every request of a device callback (2-5 frames) was
+  applied at the callback's first update: sounds asked for a frame or two apart started together and a frame early
+  (`tests/audio_frames.rs`). The host steps at 60 Hz against the GBA's 59.73: while more than `MAX_BACKLOG` (6)
+  frames wait, an update takes two.
+
 * `hq` (float, interpolated) is intentionally not bit-exact; use `Driver::render` for the reference sound.
 * State carry-over between songs is reproduced only if the caller keeps one `Driver` across songs (as the game
   does); a new `Driver` per song = fresh boot.

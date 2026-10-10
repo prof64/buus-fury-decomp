@@ -19,6 +19,9 @@ pub enum Resample {
     Linear,
 }
 
+/// Game frames of requests that may wait for the driver before two are taken per update (`push_frame`).
+pub const MAX_BACKLOG: usize = 6;
+
 pub struct AudioEngine {
     driver: Driver<'static>,
     step: f64,
@@ -27,6 +30,8 @@ pub struct AudioEngine {
     chunk: Vec<(i8, i8)>,
     frame_acc: f64,
     pending: VecDeque<AudioEvent>,
+    /// game frames' requests not yet played, one group per frame (`push_frame`)
+    frames: VecDeque<Vec<AudioEvent>>,
     pub gain: f32,
     pub resample: Resample,
     pub muted: bool,
@@ -43,6 +48,7 @@ impl AudioEngine {
             chunk: Vec::new(),
             frame_acc: 0.0,
             pending: VecDeque::new(),
+            frames: VecDeque::new(),
             gain: 1.0,
             resample: Resample::Linear,
             muted: false,
@@ -53,8 +59,18 @@ impl AudioEngine {
         self.step = MIX_RATE / out_rate.max(1) as f64;
     }
 
+    /// A request with no frame of its own: it takes effect at the next driver update.
     pub fn push(&mut self, e: AudioEvent) {
         self.pending.push_back(e);
+    }
+
+    /// One game frame's requests (empty for a frame without any). The game's driver takes each frame's requests at
+    /// its own update, ~267 samples after the frame before's: two sounds asked for a frame apart start a frame of
+    /// samples apart. The host's audio callback runs in bursts of several frames, so without the grouping every
+    /// request of a burst started in the same update. While more than [`MAX_BACKLOG`] frames wait (the host steps a
+    /// little faster than the GBA's 59.73 Hz, or the device stalled) two are taken in one update.
+    pub fn push_frame(&mut self, evs: Vec<AudioEvent>) {
+        self.frames.push_back(evs);
     }
 
     fn apply(&mut self, e: AudioEvent) {
@@ -81,6 +97,14 @@ impl AudioEngine {
     fn update(&mut self) {
         while let Some(e) = self.pending.pop_front() {
             self.apply(e);
+        }
+        let take = if self.frames.len() > MAX_BACKLOG { 2 } else { 1 };
+        for _ in 0..take {
+            if let Some(g) = self.frames.pop_front() {
+                for e in g {
+                    self.apply(e);
+                }
+            }
         }
         self.frame_acc += MIX_RATE / GBA_FPS;
         let n = self.frame_acc as usize;
@@ -120,3 +144,4 @@ impl AudioEngine {
         self.driver.busy_voices()
     }
 }
+

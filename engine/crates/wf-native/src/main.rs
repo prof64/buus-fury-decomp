@@ -551,14 +551,15 @@ fn load_packs(a: &Args) -> wf_app::wf_content::Result<Packs> {
     Ok(packs)
 }
 
-fn start_audio(packs: &Packs, gain: f32) -> Result<(cpal::Stream, mpsc::Sender<AudioEvent>), String> {
+fn start_audio(packs: &Packs, gain: f32) -> Result<(cpal::Stream, mpsc::Sender<Vec<AudioEvent>>), String> {
     let bank = wf_app::wf_content::audio::load_bank(packs).map_err(|e| e.to_string())?;
     let bank: &'static _ = Box::leak(Box::new(bank));
     let dev = cpal::default_host().default_output_device().ok_or("no audio output device")?;
     let cfg = dev.default_output_config().map_err(|e| e.to_string())?;
     let rate = cfg.sample_rate().0;
     let ch = cfg.channels() as usize;
-    let (tx, rx) = mpsc::channel::<AudioEvent>();
+    // (one message per game frame: the driver takes each frame's requests at its own update - `push_frame`)
+    let (tx, rx) = mpsc::channel::<Vec<AudioEvent>>();
     let mut eng = AudioEngine::new(bank, rate);
     VOLUME.store(gain.to_bits(), std::sync::atomic::Ordering::Relaxed);
     let base = eng.gain;
@@ -567,8 +568,8 @@ fn start_audio(packs: &Packs, gain: f32) -> Result<(cpal::Stream, mpsc::Sender<A
         .build_output_stream(
             &cfg.into(),
             move |out: &mut [f32], _| {
-                while let Ok(e) = rx.try_recv() {
-                    eng.push(e);
+                while let Ok(g) = rx.try_recv() {
+                    eng.push_frame(g);
                 }
                 eng.gain = base * f32::from_bits(VOLUME.load(std::sync::atomic::Ordering::Relaxed));
                 let frames = out.len() / ch.max(1);
@@ -593,7 +594,7 @@ struct Running {
     keys: KeyState,
     bindings: Bindings,
     gilrs: Option<gilrs::Gilrs>,
-    audio: Option<(cpal::Stream, mpsc::Sender<AudioEvent>)>,
+    audio: Option<(cpal::Stream, mpsc::Sender<Vec<AudioEvent>>)>,
     /// `--mute`: the driver still runs (no device), clocked by the frame loop
     muted: Option<AudioEngine>,
     stats: bool,
@@ -1221,12 +1222,12 @@ impl Shell {
                 }
                 persist_saves(&self.args.data, &r.app, &mut r.saves_gen);
                 if let Some((_, tx)) = &r.audio {
-                    for e in r.app.take_audio() {
-                        let _ = tx.send(e);
+                    for g in r.app.take_audio_frames() {
+                        let _ = tx.send(g);
                     }
                 } else if let Some(m) = &mut r.muted {
-                    for e in r.app.take_audio() {
-                        m.push(e);
+                    for g in r.app.take_audio_frames() {
+                        m.push_frame(g);
                     }
                     // (the samples go nowhere: one buffer kept for the process, no allocation per frame)
                     thread_local!(static SINK: std::cell::RefCell<Vec<f32>> = const { std::cell::RefCell::new(Vec::new()) });

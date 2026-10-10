@@ -6606,7 +6606,17 @@ plus the one computed warp: s512, the Other World map's fixed list), and every n
   383 / 399, the game's at 387 / 403). **0-52** (Rogue Submarine: the world map's five submarine patrols, enemy 141
   with graphics def 0x086B43FC, flags 393 .. 397, each entered once - on-defeat s509; any time on the map, post-game
   too): tour `world_sub` (new `tools/segments/tour_goals_world.py`, goal `sub`; state work/side/pg_start.ss) - the
-  treasure-ship outcome (s509's 75% branch), **1,596 / 1,596 exact**; s509's enemy-group branch (25%) not recorded.
+  treasure-ship outcome (s509's 75% branch), **1,596 / 1,596 exact**; s509's enemy-group branch (25%): recorded
+  2026-10-10 (accuracy agent) from pg_start.ss with its RNG words (0x03004A5C / 60) rewritten - a real game state the
+  route never reached, `work/side/pg_start_rng<N>.ss` - seeds 1 .. 6 (`/tmp`-free copies of seed 1 and 3 kept):
+  gates `tour_world_sub_fight` (seed 1: the enemy group, five kills, their coins; exact to f1,041 of 1,696) and
+  `tour_world_sub_rng3` (seed 3, 2,009 / 2,009); seeds 2, 4, 5 exact too. **Open (f1,041):** after the group's last
+  kill (s506's prop_show from the on-defeat callback, `StoryState::defeat_job`'s +1 frame) the game's trigger check
+  is skipped in the drop's frame and the next one and runs in the third, collecting the second big coin at its
+  previous position (box x0 378, the player's x 359); ours runs the check in the drop's frame (before the hold
+  starts), holds one frame longer, and the coin has made a third move (x0 379) - no coin collected, the game's sound
+  44 missing. Without the defeat_job frame the coin is collected a frame early. The hold's start inside the frame
+  (death effects vs the trigger check) is the thing to model.
 * **Reachable, not recorded:** **0-95** (Thieves Den 9-11's Z-Mart): its door opens with flag 82 (set on taking off
   from 9-1 after flag 112, the monkey's theft of the Bandana) and its guard (s355) wants the Bandana (126) equipped -
   a second one, from the Airship Bandits of encounter 0-55 (25%, only for a leader of level <= 70, flag 76). None of

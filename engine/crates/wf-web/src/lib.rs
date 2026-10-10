@@ -359,8 +359,13 @@ pub extern "C" fn wf_app_frame(win_w: u32, win_h: u32, player: u32) -> u32 {
         if steps > 0 || g.app.paused {
             g.keys.iter_mut().for_each(|k| k.consumed());
         }
-        for e in g.app.take_audio() {
-            g.audio.extend_from_slice(&e.encode());
+        // (each game frame's requests closed by a frame word, kind 7: the worklet's driver takes one frame per update -
+        // `AudioEngine::push_frame`)
+        for grp in g.app.take_audio_frames() {
+            for e in grp {
+                g.audio.extend_from_slice(&e.encode());
+            }
+            g.audio.extend_from_slice(&[AUDIO_FRAME_END, 0, 0, 0]);
         }
         let key = (win_w, win_h, g.app.mode, g.app.sim.frame(), g.input_gen);
         if steps == 0 && !g.app.paused && g.shown == Some(key) {
@@ -515,14 +520,26 @@ pub extern "C" fn wf_audio_init(out_rate: u32) -> u32 {
     0
 }
 
+/// the audio word that ends a game frame's requests (`wf_audio_event`)
+const AUDIO_FRAME_END: i32 = 7;
+thread_local! {
+    /// the requests of the game frame being received (`wf_audio_event`), handed over at its frame word
+    static AUDIO_GROUP: RefCell<Vec<AudioEvent>> = const { RefCell::new(Vec::new()) };
+}
+
 #[no_mangle]
 pub extern "C" fn wf_audio_event(kind: i32, a: i32, b: i32, c: i32) {
-    if let Some(e) = AudioEvent::decode([kind, a, b, c]) {
+    if kind == AUDIO_FRAME_END {
+        let g = AUDIO_GROUP.with(|g| std::mem::take(&mut *g.borrow_mut()));
         AUDIO.with(|x| {
             if let Some(eng) = x.borrow_mut().as_mut() {
-                eng.push(e)
+                eng.push_frame(g)
             }
         });
+        return;
+    }
+    if let Some(e) = AudioEvent::decode([kind, a, b, c]) {
+        AUDIO_GROUP.with(|g| g.borrow_mut().push(e));
     }
 }
 
