@@ -127,12 +127,18 @@ def step(a, b):
 
 
 TRACE = None
+SHOTS = None
 
 
 def main():
     global TRACE
     name = sys.argv[1]
     # (`--trace F0-F1`: the host's generator calls in those frames, by caller - the comparison's diagnostics)
+    global SHOTS
+    if '--shots' in sys.argv:
+        k = sys.argv.index('--shots')
+        SHOTS = (sys.argv[k + 1], int(sys.argv[k + 2]))
+        Path(SHOTS[0]).mkdir(parents=True, exist_ok=True)
     if '--trace' in sys.argv:
         TRACE = [int(x) for x in sys.argv[sys.argv.index('--trace') + 1].split('-')]
     sav = (ROOT / 'work' / 'run2' / 'end.sav').read_bytes()
@@ -177,6 +183,10 @@ def main():
                 b.set_keys(mb)
                 step(a, b)
                 keys_log.append([ma, mb])
+                if SHOTS and len(keys_log) % SHOTS[1] == 0:
+                    # (`--shots DIR EVERY`: both screens every EVERY video frames, for the link screens' layouts)
+                    a.screenshot(Path(SHOTS[0]) / f'{len(keys_log):06d}_a.png', 1)
+                    b.screenshot(Path(SHOTS[0]) / f'{len(keys_log):06d}_b.png', 1)
                 lf = a.r32(0x03000F94)
                 if TRACE and TRACE[0] - 2 <= lf <= TRACE[1]:
                     hs = [h for h in a.hits() if h['kind'] == 'break']

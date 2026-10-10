@@ -21,6 +21,7 @@ pub mod gameover;
 pub mod inventory;
 pub mod journal;
 pub mod kit;
+pub mod link;
 pub mod mapscreen;
 pub mod minigame;
 pub mod options;
@@ -261,6 +262,7 @@ screens! {
     Credits(credits::Credits),
     Minigame(minigame::Minigame),
     MapScreen(mapscreen::MapScreen),
+    Link(link::Link),
 }
 
 impl Screen {
@@ -296,7 +298,7 @@ impl Screen {
 /// Open a screen described by JSON (test harnesses: `menu_parity.rs` opens script-started screens the frame the
 /// emulator's script did): `{"kind": "...", ...}`, handled by the screen modules' `open_json`.
 pub fn open_from_json(w: &mut World, v: &serde_json::Value) -> bool {
-    let tries: [fn(&World, &serde_json::Value) -> Option<(Screen, Transition, bool)>; 13] = [
+    let tries: [fn(&World, &serde_json::Value) -> Option<(Screen, Transition, bool)>; 14] = [
         inventory::open_json,
         equip::open_json,
         options::open_json,
@@ -310,6 +312,7 @@ pub fn open_from_json(w: &mut World, v: &serde_json::Value) -> bool {
         credits::open_json,
         minigame::open_json,
         mapscreen::open_json,
+        link::open_json,
     ];
     for f in tries {
         if let Some((sc, tr, scripted)) = f(w, v) {

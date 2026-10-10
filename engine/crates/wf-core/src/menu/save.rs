@@ -283,6 +283,10 @@ pub struct GameList {
     /// rows change; their animation runs in the mode's update) and the key they were made for
     #[serde(default)]
     pub figs: Vec<Fig>,
+    /// `0x08005E9A`'s marks around the selected slot's chosen character (the title's and the save point's list; the
+    /// link's Select Saved Game shows none: menu_parity link_saves)
+    #[serde(default = "yes")]
+    pub corners: bool,
     #[serde(default)]
     pub figs_key: Option<(i32, Vec<i32>, Vec<bool>)>,
     /// generator draws the last figure build owes the world: each figure is made under the idle state
@@ -330,6 +334,10 @@ pub fn form_sprite(w: &World, form: i32) -> Option<i32> {
     (0..=3)
         .map(|k| f.gfx - 9 - k)
         .find(|&s| w.data.sprite(s).is_some())
+}
+
+fn yes() -> bool {
+    true
 }
 
 impl GameList {
@@ -468,7 +476,7 @@ impl GameList {
         if let Some(s) = self
             .summaries
             .get(self.sel.max(0) as usize)
-            .filter(|s| s.exists && self.figs.iter().any(|f| f.live))
+            .filter(|s| self.corners && s.exists && self.figs.iter().any(|f| f.live))
         {
             if let Some(k) = s.ids.iter().position(|&c| c == s.chosen) {
                 let (bx, by) = (16 * k as i32 + 0x12, 0x34 * (self.sel - self.first) + 0x2C);
@@ -536,6 +544,7 @@ impl GameList {
             up,
             down,
             figs: Vec::new(),
+            corners: true,
             figs_key: None,
             rng_owed: 0,
             fig_vram: Vec::new(),
