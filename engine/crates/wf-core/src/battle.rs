@@ -157,6 +157,9 @@ pub const FIGHTERS: &[(&str, i32, Option<(i32, i32)>, &[i32], i32)] = &[
     ),
     ("vegito", 6, Some((0, 4)), &[39, 40], 39),
     ("gogeta", 7, Some((0, 4)), &[41, 42, 43, 44], 41),
+    // (form 45: the plain record every Balanced link fighter has - no name, no sprite of its own, no bonus; the
+    // fighter's sprite is the roster's, `FighterSetup::sprite`)
+    ("f45", 8, None, &[45], 45),
     ("f46", 8, None, &[46], 46),
     ("f47", 8, None, &[47], 47),
     ("f48", 8, None, &[48], 48),
@@ -209,6 +212,11 @@ pub struct FighterSetup {
     /// a record given as is (link play's Dojo): replaces what the level / growth / points give (`FixedRecord`)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed: Option<FixedRecord>,
+    /// the fighter's sprite (the ROM's sprite id) instead of its form's: link play's Balanced roster makes every
+    /// fighter with the plain form 45 and the roster record's sprite (`0x0872BFCC` +0) - Piccolo, Broly, the Buus and
+    /// Uub have no form of their own (link recordings dojo_r1 .. r4: the record's form byte 45)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sprite: Option<i32>,
 }
 
 /// A fighter record given as is - the link Dojo's fighters (ROM: the Dojo fight's record builders, `0x0801339C` from
@@ -268,6 +276,7 @@ impl Default for FighterSetup {
             skills: None,
             engage: false,
             fixed: None,
+            sprite: None,
         }
     }
 }
@@ -620,6 +629,9 @@ pub fn create(data: Arc<GameData>, cfg: &BattleConfig) -> World {
             } else if ss {
                 pl.ss_gauge = pl.rec.max_ep;
             }
+        }
+        if let Some(spr) = f.sprite.filter(|&g| data.sprite(g - 9).is_some()) {
+            pl.a.set_sprite(&data, Some(spr - 9));
         }
         if let Some(fx) = &f.fixed {
             if fx.sel < pl.skills.len() {

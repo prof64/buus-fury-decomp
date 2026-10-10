@@ -209,7 +209,7 @@ seconds), fight context `0x0872A6B4`.
 | Arena area 0-90, fighters at (102, 220) / (202, 220) | `movs #0x5A` at `0x08008E8C` | MEASURED | `dojo` arena |
 | Prize: the match-deciding knockdown runs loot script s498 with the fallen fighter's level (from its XP, `0x080135D2`) at its footprint's centre: 1 + rand(100) -> 1..8 rolls, each chance(85) or a coin roll before -> a coin (s500), else a level-band supply (s499) - in effect only the first roll can be a supply. Coins are collected by touch from their age 60, a supply with A (61 updates' hold: the clocks and the coins' age stopped, their flight going on); the zenie goes into the RAM game data, no save write (the only one of the link code is the trade's) | `0x0801088A`, scripts 498..500, `0x080231AE` | MEASURED (link recordings) | `player::link_prize`, `fieldobj::link_interact`; `prize` None |
 | Character Mode byte: 1 = Balanced, 0 = In-Game | `0x0802195A`, `0x0802311A` | MEASURED | `DojoMode` |
-| Balanced roster: a fixed 24 (strings 116..139: Goku, SS Goku, SS3 Goku, Teen Gohan, SS Teen Gohan, Mystic Gohan, Great Saiyaman, Gohan, SS Gohan, Trunks, SS Trunks, Vegeta, SS Vegeta, Goten, SS Goten, Gotenks, SS Gotenks, SS3 Gotenks, Vegito, SS Vegito, SS Gogeta, Hercule, Videl, Pikkon), the same for both players | list builder `0x08023120` | MEASURED | `BALANCED_ROSTER` / `balanced_roster()` (was: the save's party) |
+| Balanced roster: a fixed 32 (strings 116..147: Goku, SS Goku, SS3 Goku, Teen Gohan, SS Teen Gohan, Mystic Gohan, Great Saiyaman, Gohan, SS Gohan, Trunks, SS Trunks, Vegeta, SS Vegeta, Goten, SS Goten, Gotenks, SS Gotenks, SS3 Gotenks, Vegito, SS Vegito, SS Gogeta, Hercule, Videl, Pikkon, Piccolo, Broly, Majin Buu, Super Buu, Super Buu 2, Super Buu 3, Kid Buu, Uub), the same for both players; every Balanced fighter's record has the plain form 45 and takes its sprite from the table (the last 8 have no form of their own: `FighterSetup::sprite`; Broly and Majin Buu .. Super Buu 3 are END 30 / SPD 45) | list builder `0x08023120` | MEASURED | `BALANCED_ROSTER` / `balanced_roster()` (was: the save's party) |
 | Balanced record: HP 15000, EP 100, STR 67, POW 67, END 25, SPD 50 (Hercule STR 60, POW 74); one skill, 7 Energy Blast; XP 0 (level 50) | table `0x0872BFCC` (28 bytes: sprite, HP, EP, STR, POW, END, SPD), template `0x08022904`, applied by `0x0801339C` | MEASURED | `FighterSetup::fixed` (was: level 100, average growth, even points) |
 | In-Game: the save's party (12-byte list at page +0x584, names string 0x9E + id), each character's whole record packed and unpacked (level, form, skills + levels, max HP / EP as current, STR..SPD, equipment) | pack `0x08022934`, unpack `0x080229B0` | MEASURED | `fixed` from the save's record (was: level + approximated points) |
 | The host's mode / rounds apply to both | config over the link (`0x03002FB0`) not fully traced | INFERRED | host's `DojoSetup` |
@@ -226,7 +226,7 @@ build the same match; Balanced / In-Game levels), then the match over loopback, 
 on both, the winner's prize exactly once (settle called three times + a late drop), nothing for the loser / a draw;
 `dojo_disconnect_mid_match` - a peer drops mid-round: both end "Disconnected", no prize, saves untouched;
 `dojo_synctest` - 4000 frames of 5-round matches with an 8-frame rollback every frame (Balanced, In-Game);
-`dojo_rom_rules` - the decoded defaults, the 24 Balanced records, In-Game = the save's record. (The match tests
+`dojo_rom_rules` - the decoded defaults, the 32 Balanced records, In-Game = the save's record. (The match tests
 shorten rounds, lower Balanced HP, cap rounds at 5 and set a prize, to stay quick and check the prize-once path.)
 Playable in the app: "Link play: playing it" below (the screens and the match on one connection).
 
@@ -329,7 +329,7 @@ network options, `--net-name`, `--net-key` apply); B (Cancel) leaves as in the g
 * **Select Saved Game** (the slots; "No Saved Games" when none can be used) ->
 * **Dojo**: the setup page: the host changes "Character Mode:" Balanced / In-Game and "Rounds:" 1 / 3 / 5
   (left / right), the guest sees them live; **Start Fight** -> "Choose your character!" (Balanced: the game's
-  roster - the page lists 32, strings 116..147; the fight has the first 24 so far; In-Game: the save's party at its level); the guest's pick confirms the host's
+  roster of 32, strings 116..147 - Piccolo, Broly, the Buus and Uub too, recordings dojo_r1 .. r4; In-Game: the save's party at its level); the guest's pick confirms the host's
   setup (a changed setup sends it back to the setup page) -> the match: `DojoGame` in a rollback
   `P2PSession` on the same connection (lobby packets still handled). The fight's picture is the game's own for this
   side (`DojoGame::view(slot)`: its camera, its HUD and the friend's bar, "Round N", the timer, "You Win!!" /

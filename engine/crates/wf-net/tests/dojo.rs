@@ -292,7 +292,7 @@ fn dojo_synctest() {
 }
 
 /// the ROM's rules (engine/docs/netcode.md "Link play: Dojo"): 180 s rounds, 300 updates between, no round cap, no
-/// prize; Balanced = the 24-fighter roster of 0x0872BFCC; In-Game = the save's record as is
+/// prize; Balanced = the 32-fighter roster of 0x0872BFCC; In-Game = the save's record as is
 #[test]
 fn dojo_rom_rules() {
     use wf_net::dojo::{balanced_roster, BALANCED_ROSTER};
@@ -300,13 +300,18 @@ fn dojo_rom_rules() {
     let r = DojoRules::default();
     assert_eq!(r, DojoRules { round_frames: 10800, between_frames: 63, start_frames: 125, balanced_hp: 15000, max_rounds: 0, prize: None });
     let roster = balanced_roster();
-    assert_eq!(roster.len(), 24);
+    assert_eq!(roster.len(), 32);
     for c in &roster {
         let f = fighter_setup(c, DojoMode::Balanced, &r, &fd);
         let fx = f.fixed.expect("fixed");
         assert_eq!((f.fighter.as_str(), f.form), (c.fighter.as_str(), c.form), "{}", c.name);
         assert_eq!((fx.hp, fx.ep, fx.skills), (15000, 100, Some(vec![7])), "{}", c.name);
-        let want = if c.name == "Hercule" { [60, 74, 25, 50] } else { [67, 67, 25, 50] };
+        let want = match c.name.as_str() {
+            "Hercule" => [60, 74, 25, 50],
+            "Broly" | "Majin Buu" | "Super Buu" | "Super Buu 2" | "Super Buu 3" => [67, 67, 30, 45],
+            _ => [67, 67, 25, 50],
+        };
+        assert_eq!(f.sprite.is_some(), c.fighter == "f45", "{}", c.name);
         assert_eq!(fx.stats, want, "{}", c.name);
     }
     assert_eq!(BALANCED_ROSTER[0].0, "Goku");

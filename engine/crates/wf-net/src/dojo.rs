@@ -34,8 +34,8 @@
 //!   fighter's level (`player::link_prize`): coins (s500) and at most a first-roll supply (s499), picked up as in the
 //!   field (coins by touch once landed, a supply with A and its 61-update hold) - the zenie goes into the game data in
 //!   RAM; the only save write of the link code is the Trading Post's (0x080231AE). Character Mode: Balanced (the option page's
-//!   mode byte 1) = a fixed roster of 24 fighters (strings 116..139: Goku .. Pikkon, list 0x08023120) with the table
-//!   0x0872BFCC's records - HP 15000, EP 100, STR 67, POW 67, END 25, SPD 50 (Hercule STR 60 / POW 74), one skill
+//!   mode byte 1) = a fixed roster of 32 fighters (strings 116..147: Goku .. Uub, list 0x08023120) with the table
+//!   0x0872BFCC's records - HP 15000, EP 100, STR 67, POW 67, END 25, SPD 50 (Hercule STR 60 / POW 74; Broly and Majin Buu .. Super Buu 3 END 30 / SPD 45), one skill
 //!   (7, Energy Blast) - built by 0x08022904 / 0x0801339C; In-Game (mode byte 0) = the save's party (the 12-byte list
 //!   at +0x584, names 158+) with each character's own record packed whole (0x08022934 -> 0x080229B0: level, form,
 //!   skills and skill levels, max HP / EP as current, STR..SPD, equipment, the selected skill). A fighter as made has
@@ -229,10 +229,10 @@ pub fn place_fighters(s: &mut Session) {
     }
 }
 
-/// The Balanced roster (ROM: strings 116..139, records 0x0872BFCC 28 bytes each: sprite id, HP 15000, EP 100, STR,
+/// The Balanced roster (ROM: strings 116..147, records 0x0872BFCC 28 bytes each: sprite id, HP 15000, EP 100, STR,
 /// POW, END, SPD): (name, our fighter, our form, STR, POW, END, SPD); the form is the one whose gfx id is the record's
 /// sprite (the lowest when two share it).
-pub const BALANCED_ROSTER: [(&str, &str, i32, [i32; 4]); 24] = [
+pub const BALANCED_ROSTER: [(&str, &str, i32, [i32; 4]); 32] = [
     ("Goku", "goku", 0, [67, 67, 25, 50]),
     ("SS Goku", "goku", 3, [67, 67, 25, 50]),
     ("SS3 Goku", "goku", 5, [67, 67, 25, 50]),
@@ -257,12 +257,24 @@ pub const BALANCED_ROSTER: [(&str, &str, i32, [i32; 4]); 24] = [
     ("Hercule", "f47", 47, [60, 74, 25, 50]),
     ("Videl", "f52", 52, [67, 67, 25, 50]),
     ("Pikkon", "f50", 50, [67, 67, 25, 50]),
+    // (no form has their sprite: the plain form 45 - what the game gives every Balanced fighter - with the record's
+    // sprite, `BALANCED_SPRITES`)
+    ("Piccolo", "f45", 45, [67, 67, 25, 50]),
+    ("Broly", "f45", 45, [67, 67, 30, 45]),
+    ("Majin Buu", "f45", 45, [67, 67, 30, 45]),
+    ("Super Buu", "f45", 45, [67, 67, 30, 45]),
+    ("Super Buu 2", "f45", 45, [67, 67, 30, 45]),
+    ("Super Buu 3", "f45", 45, [67, 67, 30, 45]),
+    ("Kid Buu", "f45", 45, [67, 67, 25, 50]),
+    ("Uub", "f45", 45, [67, 67, 25, 50]),
 ];
+/// the roster records' sprite ids (ROM) of the entries from 24 on (Piccolo .. Uub)
+pub const BALANCED_SPRITES: [i32; 8] = [222, 38, 43, 49, 51, 52, 47, 273];
 /// Balanced Mode's EP and its one skill (ROM: 100, skill 7 Energy Blast)
 pub const BALANCED_EP: i32 = 100;
 pub const BALANCED_SKILLS: [i32; 1] = [7];
 
-/// The Balanced roster as Dojo characters ("Choose your character!" in Balanced Mode: the same 24 for every save).
+/// The Balanced roster as Dojo characters ("Choose your character!" in Balanced Mode: the same 32 for every save).
 pub fn balanced_roster() -> Vec<DojoChar> {
     BALANCED_ROSTER
         .iter()
@@ -289,12 +301,15 @@ pub fn balanced_roster() -> Vec<DojoChar> {
 pub fn fighter_setup(c: &DojoChar, mode: DojoMode, rules: &DojoRules, d: &GameData) -> FighterSetup {
     match mode {
         DojoMode::Balanced => {
-            let e = BALANCED_ROSTER
+            let k = BALANCED_ROSTER
                 .iter()
-                .find(|e| e.1 == c.fighter && e.2 == c.form)
-                .or_else(|| BALANCED_ROSTER.iter().find(|e| e.1 == c.fighter))
-                .unwrap_or(&BALANCED_ROSTER[0]);
+                .position(|e| e.1 == c.fighter && e.2 == c.form && e.0 == c.name)
+                .or_else(|| BALANCED_ROSTER.iter().position(|e| e.1 == c.fighter && e.2 == c.form))
+                .or_else(|| BALANCED_ROSTER.iter().position(|e| e.1 == c.fighter))
+                .unwrap_or(0);
+            let e = &BALANCED_ROSTER[k];
             FighterSetup {
+                sprite: k.checked_sub(24).and_then(|j| BALANCED_SPRITES.get(j).copied()),
                 fighter: e.1.into(),
                 form: e.2,
                 level: 50,
