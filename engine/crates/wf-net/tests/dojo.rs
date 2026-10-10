@@ -58,7 +58,7 @@ fn lobby(d: &Arc<GameData>, setup: DojoSetup, seed: u64) -> (StartInfo, StartInf
         assert_ne!(c.name, c.fighter, "raw fighter id as the shown name");
         assert!(c.name.chars().next().is_some_and(|ch| ch.is_uppercase()), "shown name {:?}", c.name);
     }
-    let host_hello = DojoHello { save: host_save.clone(), pick: 0, setup: Some(setup) };
+    let host_hello = DojoHello { save: host_save.clone(), pick: 0, setup: Some(setup), ..Default::default() };
     let guest_pick = 0; // Vegeta (the first party member in record order is Trunks 3 - pick by name below)
     let guest_pick = guest_save.party.iter().position(|c| c.fighter == "vegeta").unwrap_or(guest_pick);
     let mk = |role: Role, name: &str, extra: &DojoHello| LobbySettings {
@@ -76,7 +76,7 @@ fn lobby(d: &Arc<GameData>, setup: DojoSetup, seed: u64) -> (StartInfo, StartInf
     let mut host = NetLobby::new(Box::new(net.endpoint("host")), mk(Role::Host, "host", &host_hello), "DOJO1", clock.clone());
     host.lobby.set_fighter(fighter_setup(&host_save.party[0], setup.mode, &rules(), &fd));
     host.lobby.set_start_extra(serde_json::to_value(setup).unwrap());
-    let guest_hello = DojoHello { save: guest_save.clone(), pick: guest_pick, setup: None };
+    let guest_hello = DojoHello { save: guest_save.clone(), pick: guest_pick, setup: None, ..Default::default() };
     let mut guest = NetLobby::new(Box::new(net.endpoint("guest")), mk(Role::Player, "guest", &guest_hello), "DOJO1", clock.clone());
     guest.lobby.set_ready(false);
     // a battle-room peer that ended up in the same room is refused

@@ -167,6 +167,12 @@ pub struct DojoHello {
     pub pick: usize,
     /// host: its choices; guest: the host's choices it saw (the confirm step)
     pub setup: Option<DojoSetup>,
+    /// the character is picked (A on "Choose your character!"), and the pick as the game's page counts it (Balanced:
+    /// the roster index; In-Game: the character id) - what the friend's page takes
+    #[serde(default)]
+    pub picked: bool,
+    #[serde(default)]
+    pub page_pick: i32,
 }
 
 /// The rule constants - the defaults are the ROM's (module doc); tests shorten them.
@@ -604,7 +610,7 @@ mod tests {
     fn setups() {
         assert!(DojoSetup { mode: DojoMode::InGame, rounds: 5 }.valid());
         assert!(!DojoSetup { mode: DojoMode::InGame, rounds: 2 }.valid());
-        let h = DojoHello { save: DojoSave::default(), pick: 0, setup: Some(DojoSetup::default()) };
+        let h = DojoHello { save: DojoSave::default(), pick: 0, setup: Some(DojoSetup::default()), ..Default::default() };
         let j = serde_json::to_value(&h).unwrap();
         assert_eq!(serde_json::from_value::<DojoHello>(j).unwrap(), h);
     }

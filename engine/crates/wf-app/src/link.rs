@@ -33,7 +33,7 @@ use serde::{Deserialize, Serialize};
 use wf_core::content::GameData;
 use wf_core::input::{A, B, DOWN, LEFT, RIGHT, UP};
 use wf_core::menu::save::{SaveData, SLOTS};
-use wf_core::menu::text::{units, Canvas, Pen, TextData};
+use wf_core::menu::text::{units, Canvas, Pen};
 use wf_core::menu::link::trade::{TradeEntry, KIND_EQUIP, KIND_SUPPLY, KIND_ZENIE};
 use wf_core::menu::link::LinkAction;
 use wf_core::menu::MenuData;
@@ -87,9 +87,7 @@ pub struct LinkHello {
     pub dojo: Option<DojoHello>,
 }
 
-const SFX_CURSOR: u8 = 39;
 const SFX_MENU: u8 = 40;
-const SFX_ACCEPT: u8 = 41;
 
 /// the connection: the transport, the room's lobby, outgoing packets
 struct Net {
@@ -194,6 +192,7 @@ struct Match {
     audio_at: i32,
 }
 
+#[allow(dead_code)] // (the cursor fields of the pages wf-core draws now)
 enum Phase {
     /// the title's own "Waiting for a friend..." box over the lobby
     Waiting,
@@ -238,6 +237,13 @@ struct Flow {
     rules: DojoRules,
     saves_dir: Option<PathBuf>,
     record: Option<MatchRecord>,
+    /// the Dojo pages (wf-core `menu::link`): the character is picked (and its index as the page counts it); the
+    /// friend's answer / pick already given to the page; START FIGHT pressed (host); the page's fade to the fight done
+    picked: Option<i32>,
+    answered_given: bool,
+    picked_given: bool,
+    started: bool,
+    fight: bool,
 }
 
 /// a finished Dojo match as this peer confirmed it (the tests compare both peers')
@@ -305,6 +311,11 @@ impl Flow {
             rules: cfg.rules,
             saves_dir: cfg.saves_dir.clone(),
             record: None,
+            picked: None,
+            answered_given: false,
+            picked_given: false,
+            started: false,
+            fight: false,
         })
     }
 
@@ -368,6 +379,98 @@ impl Flow {
             }
             return Out::None;
         }
+        if self.kind == LinkKind::Dojo {
+            let host = self.host();
+            match a {
+                LinkAction::Back => return Out::Done,
+                // the save: the host goes on to its setup page, the guest waits for the host's setup
+                LinkAction::Save(s) => {
+                    self.slot = s;
+                    self.dsave = self.saves.get(s).and_then(|x| x.as_ref()).and_then(|sd| DojoSave::from_save(s, sd, &self.data));
+                    self.set_phase(Phase::Setup { row: 0 });
+                    self.send_dojo_hello(None);
+                }
+                LinkAction::StartFight { balanced, rounds } => {
+                    self.setup = DojoSetup { mode: if balanced { DojoMode::Balanced } else { DojoMode::InGame }, rounds };
+                    self.started = true;
+                    self.send_dojo_hello(Some(self.setup));
+                }
+                // B: the save pick / START FIGHT / the character pick undone
+                LinkAction::SetupBack => {
+                    self.dsave = None;
+                    self.started = false;
+                    self.answered_given = false;
+                    let sel = self.slot;
+                    self.set_phase(Phase::Saves { sel });
+                    self.send_dojo_hello(None);
+                }
+                LinkAction::WaitCancel => {
+                    if self.picked.take().is_some() {
+                        if !host {
+                            self.net.lobby.set_ready(false);
+                        }
+                        if let Phase::Chars { confirmed, .. } = &mut self.phase {
+                            *confirmed = false;
+                        }
+                        let s = self.setup;
+                        self.send_dojo_hello(Some(s));
+                    } else if host {
+                        self.started = false;
+                        self.send_dojo_hello(None);
+                    } else {
+                        self.dsave = None;
+                        let sel = self.slot;
+                        self.set_phase(Phase::Saves { sel });
+                        self.send_dojo_hello(None);
+                    }
+                    self.answered_given = false;
+                }
+                LinkAction::Chars => {
+                    self.picked_given = false;
+                    self.set_phase(Phase::Chars { sel: 0, confirmed: false });
+                }
+                LinkAction::CharsBack => {
+                    self.started = false;
+                    self.answered_given = false;
+                    self.picked = None;
+                    if host {
+                        self.set_phase(Phase::Setup { row: 0 });
+                    } else {
+                        self.dsave = None;
+                        let sel = self.slot;
+                        self.set_phase(Phase::Saves { sel });
+                    }
+                    self.send_dojo_hello(None);
+                }
+                // the pick (Balanced: the roster index; In-Game: the character id)
+                LinkAction::Pick(i) => {
+                    let list = self.char_list();
+                    let k = match self.setup.mode {
+                        DojoMode::Balanced => (i.max(0) as usize).min(list.len().saturating_sub(1)),
+                        DojoMode::InGame => list.iter().position(|c| c.character == i).unwrap_or(0),
+                    };
+                    if let Some(c) = list.get(k) {
+                        self.pick = k;
+                        self.picked = Some(i);
+                        self.net.lobby.set_fighter(fighter_setup(c, self.setup.mode, &self.rules, &self.data));
+                        if host {
+                            self.net.lobby.set_start_extra(serde_json::to_value(self.setup).unwrap_or_default());
+                        } else {
+                            self.net.lobby.set_ready(true);
+                        }
+                        if let Phase::Chars { confirmed, .. } = &mut self.phase {
+                            *confirmed = true;
+                        }
+                        // (the guest's hello with the setup = its confirm of that setup)
+                        let s = self.setup;
+                        self.send_dojo_hello(Some(s));
+                    }
+                }
+                LinkAction::Fight => self.fight = true,
+                _ => {}
+            }
+            return Out::None;
+        }
         match (&self.phase, a) {
             (Phase::Saves { .. }, LinkAction::Back) => Out::Done,
             (Phase::Saves { .. }, LinkAction::Save(s)) if self.usable(s) => {
@@ -385,10 +488,42 @@ impl Flow {
         }
     }
 
+    /// what the friend's side did that the Dojo pages wait for (each given once): its answer to the save / setup
+    /// exchange (with the host's Character Mode for the guest), its character pick
+    fn dojo_friend(&mut self) -> (bool, Option<bool>, Option<i32>) {
+        if self.kind != LinkKind::Dojo {
+            return (false, None, None);
+        }
+        let fd = self.friend.as_ref().and_then(|(_, h)| h.dojo.clone());
+        let (mut answered, mut setup, mut picked) = (false, None, None);
+        if !self.answered_given && matches!(self.phase, Phase::Setup { .. }) && self.dsave.is_some() {
+            if self.host() {
+                // the guest has its save and echoes this setup
+                if self.started && fd.as_ref().is_some_and(|d| d.setup == Some(self.setup)) {
+                    answered = true;
+                }
+            } else if let Some(s) = fd.as_ref().and_then(|d| d.setup) {
+                // the host's setup arrived: taken, and echoed (the confirm)
+                self.setup = s;
+                self.send_dojo_hello(Some(s));
+                setup = Some(s.mode == DojoMode::Balanced);
+                answered = true;
+            }
+            self.answered_given = answered;
+        }
+        if !self.picked_given && matches!(self.phase, Phase::Chars { .. }) {
+            if let Some(d) = fd.as_ref().filter(|d| d.picked) {
+                picked = Some(d.page_pick);
+                self.picked_given = true;
+            }
+        }
+        (answered, setup, picked)
+    }
+
     /// the wf-core link page this phase shows (None: drawn by the flow itself)
     fn page(&self) -> Option<&'static str> {
         match self.phase {
-            Phase::Saves { .. } => Some("saves"),
+            Phase::Saves { .. } | Phase::Setup { .. } | Phase::Chars { .. } => Some("saves"),
             Phase::Trade(_) => Some("trade"),
             _ => None,
         }
@@ -421,19 +556,6 @@ impl Flow {
             self.set_phase(Phase::Message(Vec::new()));
             return Out::None;
         }
-        // the guest shows the host's setup; a change sends it back to the setup page (its pick void)
-        if !self.host() && matches!(self.phase, Phase::Setup { .. } | Phase::Chars { .. }) {
-            if let Some(s) = self.host_setup() {
-                if s != self.setup {
-                    self.setup = s;
-                    if matches!(self.phase, Phase::Chars { .. }) {
-                        self.net.lobby.set_ready(false);
-                        self.send_dojo_hello(None);
-                        self.set_phase(Phase::Setup { row: 2 });
-                    }
-                }
-            }
-        }
         match &mut self.phase {
             // (the title's box: once the friend is there it counts its 10 updates and ends - `linked`)
             Phase::Waiting => Out::None,
@@ -447,94 +569,16 @@ impl Flow {
             // (the page itself is wf-core's `menu::link` screen on the title app: `LinkSim` steps it, its actions
             // come in through `link_action`)
             Phase::Saves { .. } => Out::None,
-            Phase::Setup { row } => {
-                let host = self.role == Role::Host;
-                let mut r = *row;
-                if host && pressed & (UP | DOWN) != 0 {
-                    r = if pressed & UP != 0 { (r + 2) % 3 } else { (r + 1) % 3 };
-                    sfx(ev, SFX_CURSOR);
-                }
-                if host && pressed & (LEFT | RIGHT) != 0 && r < 2 {
-                    let right = pressed & RIGHT != 0;
-                    if r == 0 {
-                        self.setup.mode = if self.setup.mode == DojoMode::Balanced { DojoMode::InGame } else { DojoMode::Balanced };
-                    } else {
-                        let order = [1u8, 3, 5];
-                        let k = order.iter().position(|&x| x == self.setup.rounds).unwrap_or(1);
-                        self.setup.rounds = order[if right { (k + 1) % 3 } else { (k + 2) % 3 }];
-                    }
-                    sfx(ev, SFX_CURSOR);
-                    self.send_dojo_hello(Some(self.setup));
-                }
-                if let Phase::Setup { row } = &mut self.phase {
-                    *row = r;
-                }
-                if pressed & B != 0 {
-                    sfx(ev, SFX_MENU);
-                    let sel = self.slot;
-                    self.set_phase(Phase::Saves { sel });
-                    return Out::None;
-                }
-                // Start Fight: on to the character (the guest once the host's setup shows)
-                if pressed & A != 0 && r == 2 && (host || self.host_setup().is_some()) {
-                    sfx(ev, SFX_MENU);
-                    if host {
-                        self.send_dojo_hello(Some(self.setup));
-                    }
-                    self.set_phase(Phase::Chars { sel: 0, confirmed: false });
-                }
-                Out::None
-            }
-            Phase::Chars { sel, confirmed } => {
-                let host = self.role == Role::Host;
-                let (mut k, mut c) = (*sel, *confirmed);
-                let list = self.char_list();
-                let n = list.len().max(1);
-                if !c {
-                    if pressed & UP != 0 {
-                        k = (k + n - 1) % n;
-                        sfx(ev, SFX_CURSOR);
-                    }
-                    if pressed & DOWN != 0 {
-                        k = (k + 1) % n;
-                        sfx(ev, SFX_CURSOR);
-                    }
-                    if pressed & B != 0 {
-                        sfx(ev, SFX_MENU);
-                        self.set_phase(Phase::Setup { row: 2 });
-                        return Out::None;
-                    }
-                    if pressed & A != 0 && !list.is_empty() {
-                        sfx(ev, SFX_ACCEPT);
-                        c = true;
-                        self.pick = k;
-                        self.net.lobby.set_fighter(fighter_setup(&list[k], self.setup.mode, &self.rules, &self.data));
-                        if host {
-                            self.net.lobby.set_start_extra(serde_json::to_value(self.setup).unwrap_or_default());
-                        } else {
-                            self.net.lobby.set_ready(true);
-                        }
-                        // (the guest's hello with the setup = its confirm of that setup)
-                        self.send_dojo_hello(Some(self.setup));
-                    }
-                } else if pressed & B != 0 {
-                    // withdraw the pick
-                    sfx(ev, SFX_MENU);
-                    c = false;
-                    if !host {
-                        self.net.lobby.set_ready(false);
-                        self.send_dojo_hello(None);
-                    }
-                }
-                if let Phase::Chars { sel, confirmed } = &mut self.phase {
-                    *sel = k;
-                    *confirmed = c;
-                }
-                // the host starts once the guest confirmed this very setup
-                if host && c && self.friend.as_ref().and_then(|(_, h)| h.dojo.as_ref()).is_some_and(|d| d.setup == Some(self.setup)) {
+            // (the pages are wf-core's link screen: their actions come in through `link_action`)
+            Phase::Setup { .. } => Out::None,
+            Phase::Chars { confirmed, .. } => {
+                let (host, c) = (self.role == Role::Host, *confirmed);
+                // the host starts once the guest confirmed this very setup with its pick
+                if host && c && self.friend.as_ref().and_then(|(_, h)| h.dojo.as_ref()).is_some_and(|d| d.picked && d.setup == Some(self.setup)) {
                     self.net.lobby.request_start();
                 }
-                if self.net.lobby.start.is_some() {
+                // (the page's fade to the fight first)
+                if self.net.lobby.start.is_some() && self.fight {
                     return self.start_match(now, ev);
                 }
                 Out::None
@@ -543,10 +587,6 @@ impl Flow {
         }
     }
 
-    /// the host's setup as its hello shows it (the guest's view)
-    fn host_setup(&self) -> Option<DojoSetup> {
-        self.friend.as_ref().and_then(|(_, h)| h.dojo.as_ref()).and_then(|d| d.setup)
-    }
 
     /// the characters to choose from: In-Game the save's party, Balanced the game's fixed roster (strings 116..139)
     fn char_list(&self) -> Vec<DojoChar> {
@@ -557,7 +597,7 @@ impl Flow {
     }
 
     fn send_dojo_hello(&mut self, setup: Option<DojoSetup>) {
-        let d = DojoHello { save: self.dsave.clone().unwrap_or_default(), pick: self.pick, setup };
+        let d = DojoHello { save: self.dsave.clone().unwrap_or_default(), pick: self.pick, setup, picked: self.picked.is_some(), page_pick: self.picked.unwrap_or(0) };
         let h = LinkHello { link_id: self.link_id.clone(), dojo: Some(d) };
         self.net.set_hello(&h);
     }
@@ -781,7 +821,6 @@ impl Flow {
         bg.ops.push(MenuOp::Image { path: "ui/images/screen_title.png".into(), frame: 0, fw: 240, fh: 160, x: 0, y: 0, key0: false });
         let mut v = wf_core::menu::surface_view(bg);
         v.layers[0].priority = 3;
-        let blink = self.t & 8 == 0;
         let (w, h) = (224, 144);
         let mut cv = Canvas::new();
         cv.background(12, 4, w - 24, h - 16);
@@ -790,18 +829,9 @@ impl Flow {
             let mut p = Pen::new(MenuFont::Bold, w / 2, 20, 1, 3, Some(1));
             cv.text(t, &mut p, s);
         };
-        let line = |cv: &mut Canvas, x: i32, y: i32, s: &[u16], col: u8| {
-            let mut p = Pen::new(MenuFont::Menu, x, y, 0, col, Some(1));
-            cv.text(t, &mut p, s);
-        };
         let centre = |cv: &mut Canvas, y: i32, s: &[u16], font: MenuFont, col: u8| {
             let mut p = Pen::new(font, w / 2, y, 1, col, Some(1));
             cv.text(t, &mut p, s);
-        };
-        let cursor = |cv: &mut Canvas, x: i32, y: i32| {
-            if blink {
-                cv.image("ui/images/cursor.png", 0, 16, 16, x - 16, y - 8);
-            }
         };
         match &self.phase {
             Phase::Waiting => {}
@@ -816,69 +846,8 @@ impl Flow {
                     centre(&mut cv, 84, m, MenuFont::Menu, 2);
                 }
             }
-            Phase::Saves { sel } => {
-                head(&mut cv, t.s(94));
-                centre(&mut cv, 40, t.s(92), MenuFont::Menu, 2);
-                for i in 0..SLOTS {
-                    let y = 62 + i as i32 * 18;
-                    let s = match self.saves.get(i).and_then(|s| s.as_ref()) {
-                        Some(sd) => units(&crate::launcher::slot_summary(&crate::trade::slot_bytes(sd), &self.data).unwrap_or_default()),
-                        None => units("-"),
-                    };
-                    let col = if i == *sel { 6 } else if self.usable(i) { 2 } else { 0x75 };
-                    line(&mut cv, 40, y, &s, col);
-                    if i == *sel {
-                        cursor(&mut cv, 36, y - 4);
-                    }
-                }
-            }
-            Phase::Chars { sel, confirmed } => {
-                head(&mut cv, t.s(95));
-                centre(&mut cv, 36, t.s(105), MenuFont::Menu, 2);
-                let list = self.char_list();
-                let balanced = self.setup.mode == DojoMode::Balanced;
-                // (6 rows at a time)
-                let first = sel.saturating_sub(5).min(list.len().saturating_sub(6));
-                for (i, c) in list.iter().enumerate().skip(first).take(6) {
-                    let y = 54 + (i - first) as i32 * 12;
-                    let mut name = if balanced { t.s(116 + i).to_vec() } else { char_name(t, c) };
-                    if !balanced {
-                        name.extend(units(&format!("  Lv{}", c.level)));
-                    }
-                    line(&mut cv, 56, y, &name, if i == *sel { 6 } else { 2 });
-                    if i == *sel && !confirmed {
-                        cursor(&mut cv, 52, y - 4);
-                    }
-                }
-                if *confirmed {
-                    centre(&mut cv, 128, t.s(90), MenuFont::Menu, 2);
-                }
-            }
-            Phase::Setup { row } => {
-                head(&mut cv, t.s(95));
-                centre(&mut cv, 36, t.s(104), MenuFont::Menu, 2);
-                let mode = t.s(if self.setup.mode == DojoMode::Balanced { 97 } else { 98 });
-                let rounds = t.s(match self.setup.rounds {
-                    1 => 101,
-                    5 => 103,
-                    _ => 102,
-                });
-                let rows: [(&[u16], &[u16]); 2] = [(t.s(99), mode), (t.s(100), rounds)];
-                for (i, (l, val)) in rows.iter().enumerate() {
-                    let y = 60 + i as i32 * 18;
-                    line(&mut cv, 36, y, l, 2);
-                    line(&mut cv, 130, y, val, if *row == i { 6 } else { 2 });
-                    if *row == i && self.host() {
-                        cursor(&mut cv, 32, y - 4);
-                    }
-                }
-                let y = 104;
-                let ready = self.host() || self.host_setup().is_some();
-                centre(&mut cv, y, t.s(96), MenuFont::Bold, if !ready { 0x75 } else if *row == 2 { 6 } else { 2 });
-                if *row == 2 {
-                    cursor(&mut cv, 72, y - 4);
-                }
-            }
+            // (Select Saved Game and the Dojo's pages are wf-core's link screen: `LinkSim.page`)
+            Phase::Saves { .. } | Phase::Chars { .. } | Phase::Setup { .. } => {}
             Phase::Result(e) => {
                 head(&mut cv, t.s(95));
                 let (a, b): (usize, Option<usize>) = match e {
@@ -923,11 +892,6 @@ impl Flow {
     }
 }
 
-fn char_name(t: &TextData, c: &DojoChar) -> Vec<u16> {
-    // the game's character list (strings 116..139) where the name is there
-    let n = units(&c.name);
-    (116..=139).map(|i| t.s(i)).find(|s| *s == n.as_slice()).map(|s| s.to_vec()).unwrap_or(n)
-}
 
 
 
@@ -1110,6 +1074,13 @@ impl LinkSim {
     pub fn trade_state(&self) -> Option<(bool, bool, Option<Offer>)> {
         match self.flow.as_ref().map(|f| &f.phase) {
             Some(Phase::Trade(u)) => Some((u.accepted, u.friend_accepted, u.peer.friend_offer().cloned())),
+            _ => None,
+        }
+    }
+    /// the link screen (wf-core `menu::link`) on the title app while a page of it shows
+    pub fn link_screen(&self) -> Option<&wf_core::menu::link::Link> {
+        match self.inner.session.world.menu.stack.last() {
+            Some(wf_core::menu::Screen::Link(l)) => Some(l),
             _ => None,
         }
     }
@@ -1326,6 +1297,9 @@ impl LinkSim {
                     Some(sel) => {
                         flow.set_phase(Phase::Saves { sel });
                         wf_core::menu::link::open_saves(&mut self.inner.session.world, flow.kind == LinkKind::Trade);
+                        if let Some(wf_core::menu::Screen::Link(l)) = self.inner.session.world.menu.stack.last_mut() {
+                            l.host = flow.role == Role::Host;
+                        }
                         self.page = Some((saved, "saves"));
                     }
                     None => flow.set_phase(Phase::NoSaves),
@@ -1352,10 +1326,9 @@ impl LinkSim {
                         let trade = flow.kind == LinkKind::Trade;
                         let shown = match w.menu.stack.last() {
                             Some(wf_core::menu::Screen::Link(l)) => match l.page {
-                                wf_core::menu::link::LinkPage::Saves(_) => Some("saves"),
                                 wf_core::menu::link::LinkPage::Trade(_) => Some("trade"),
-                                wf_core::menu::link::LinkPage::Setup(_) => Some("setup"),
-                                wf_core::menu::link::LinkPage::Chars(_) => Some("chars"),
+                                // (Select Saved Game and the Dojo's pages: one flow of the screen's own)
+                                _ => Some("saves"),
                             },
                             _ => None,
                         };
@@ -1370,7 +1343,8 @@ impl LinkSim {
                                     wf_core::menu::link::open_trade(w);
                                 }
                                 _ => {
-                                    let l = wf_core::menu::link::Link::saves(w, trade);
+                                    let mut l = wf_core::menu::link::Link::saves(w, trade);
+                                    l.host = flow.role == Role::Host;
                                     wf_core::menu::link::open(w, l);
                                 }
                             }
@@ -1385,7 +1359,21 @@ impl LinkSim {
                 }
             }
             if self.page.is_some() {
-                // the friend's moves the page shows (its proposal, its answer)
+                // the friend's moves the page shows (the Dojo: its answer / setup / pick; the trade: its proposal, its
+                // answer)
+                let (answered, setup, picked) = flow.dojo_friend();
+                {
+                    let w = &mut self.inner.session.world;
+                    if let Some(b) = setup {
+                        wf_core::menu::link::friend_setup(w, b);
+                    }
+                    if answered {
+                        wf_core::menu::link::friend_answered(w);
+                    }
+                    if let Some(i) = picked {
+                        wf_core::menu::link::friend_picked(w, i);
+                    }
+                }
                 let (offer, answer) = flow.trade_friend();
                 if let Some(wf_core::menu::Screen::Link(l)) = self.inner.session.world.menu.stack.last_mut() {
                     if offer.is_some() {
@@ -1631,40 +1619,65 @@ impl LinkBot {
                 self.started = true;
                 0
             }
-            "saves" => A,
-            "chars" => {
-                let picked = sim.setup_state().map(|s| s.1).unwrap_or(true);
-                if picked {
-                    0
-                } else {
-                    A
+            // the Dojo's pages (wf-core's link screen): nothing while "Waiting for a friend..." is up
+            "saves" | "setup" | "chars" => {
+                use wf_core::menu::link::LinkPage;
+                let Some(l) = sim.link_screen() else { return 0 };
+                if l.wait.is_some() {
+                    return 0;
                 }
-            }
-            "setup" => {
-                let Some((row, _, s)) = sim.setup_state() else { return 0 };
-                if self.host {
-                    // the mode, the rounds, then Start Fight
-                    if row == 0 && s.mode != self.mode {
-                        RIGHT
-                    } else if row == 0 {
-                        DOWN
-                    } else if row == 1 && s.rounds != self.rounds {
-                        // (1 / 3 / 5: LEFT down, RIGHT up)
-                        if s.rounds > self.rounds {
-                            LEFT
+                match &l.page {
+                    LinkPage::Saves(_) => A,
+                    // the host: the mode, the rounds, then START FIGHT (boxes: 0 Balanced, 1 In-Game; 2 / 4 / 6 =
+                    // 1 / 3 / 5 rounds; 9 START FIGHT - the cursor is the selected box)
+                    LinkPage::Setup(p) => {
+                        let rounds = match p.rounds_code {
+                            0 => 1,
+                            4 => 5,
+                            _ => 3,
+                        };
+                        let target = if p.balanced != (self.mode == DojoMode::Balanced) {
+                            if self.mode == DojoMode::Balanced {
+                                0
+                            } else {
+                                1
+                            }
+                        } else if rounds != self.rounds {
+                            match self.rounds {
+                                1 => 2,
+                                5 => 6,
+                                _ => 4,
+                            }
                         } else {
+                            9
+                        };
+                        let row = |id: i32| match id {
+                            0 | 1 => 0,
+                            9 => 2,
+                            _ => 1,
+                        };
+                        let cur = p.c.sel;
+                        if cur == target {
+                            A
+                        } else if row(cur) < row(target) {
+                            DOWN
+                        } else if row(cur) > row(target) {
+                            UP
+                        } else if cur < target {
                             RIGHT
+                        } else {
+                            LEFT
                         }
-                    } else if row == 1 {
-                        DOWN
-                    } else {
-                        A
                     }
-                } else if s.rounds == self.rounds && s.mode == self.mode {
-                    // the guest goes on once the host's setup shows
-                    A
-                } else {
-                    0
+                    // the first character
+                    LinkPage::Chars(_) => {
+                        if sim.setup_state().is_some_and(|s| s.1) {
+                            0
+                        } else {
+                            A
+                        }
+                    }
+                    _ => 0,
                 }
             }
             "trade" => {
