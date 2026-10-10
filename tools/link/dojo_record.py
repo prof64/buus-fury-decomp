@@ -1,0 +1,148 @@
+"""dojo_record.py NAME [--frames N]: record a Dojo link fight from two linked emulators (tools/emu shim: `emu_link`,
+mGBA's lockstep coordinator, one process, headless and muted).
+
+Both games boot with run 2's in-game saves (work/run2/end.sav), go title -> Multiplayer -> Dojo, the host (emulator A,
+player 0, the left fighter) picks Balanced Mode / 1 round / Start Fight, both pick the first character (Goku), then the
+fight runs on SCRIPT's keys (per side). Per logic frame of A (the link game runs a logic frame every second video
+frame): the frame counter, the keys each fighter's update read (0x03002DA4 / 0x03002DAE: the link's applied input,
+the remote side's arrives some frames late), the generator, the round timer (0x03002BFC +4), and both fighters (A's
+objects: vt 0x0804DB18 = the local one, the left; 0x0804DD94 = the remote, the right): x / y (24.8), facing, animation
+raw / frame / tick, HP / EP (the fighter's own record at +0x240), the form controller's EP regen accumulator. Writes data/link/dojo_NAME.json (no ROM data)."""
+import json
+import sys
+import ctypes
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+for d in ('tools/superbuu', 'tools/story_playthrough', 'tools/field', 're/buu', 'tools/emu', 'tools/battle/lockstep'):
+    sys.path.insert(0, str(ROOT / d))
+import sbemu  # noqa: E402  (the save-capable library; it has the link functions too)
+from route import emu as mkemu, soft_reset  # noqa: E402
+from emu import KEY  # noqa: E402
+from emu_lockstep import anim_raw  # noqa: E402
+
+L = sbemu._load_sb()
+L.emu_link.argtypes = [ctypes.c_void_p, ctypes.c_int]
+L.emu_link_run_frames.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int]
+L.emu_link_run_frames.restype = ctypes.c_int
+
+OBJW = 0x03001C4C
+LOCAL, REMOTE = 0x0804DB18, 0x0804DD94
+MENU = [('-', '-', 1100), ('A', 'A', 7), ('-', '-', 40), ('DOWN', 'DOWN', 7), ('-', '-', 30), ('A', 'A', 7),
+        ('-', '-', 300), ('A', 'A', 7), ('-', '-', 120), ('A', 'A', 7), ('-', '-', 120), ('A', 'A', 7), ('-', '-', 120),
+        ('A', 'A', 7), ('-', '-', 200), ('A', 'A', 7)]
+# the fight's keys (video frames): walk in, punches, blocks, Energy Blasts, steps up / down, a chase
+SCRIPT = [('-', '-', 200), ('RIGHT', 'LEFT', 50), ('A', '-', 4), ('-', '-', 20), ('-', 'A', 4), ('-', '-', 20),
+          ('A', 'R', 4), ('A', 'R', 30), ('-', '-', 20), ('B', '-', 6), ('-', '-', 40), ('-', 'B', 6), ('-', '-', 40),
+          ('UP', 'DOWN', 30), ('RIGHT', '-', 30), ('-', 'LEFT', 30), ('A', 'A', 4), ('-', '-', 10), ('A', 'A', 4),
+          ('-', '-', 10), ('A', 'A', 4), ('-', '-', 30), ('LEFT', 'RIGHT', 60), ('B', 'B', 8), ('-', '-', 120),
+          ('RIGHT', 'LEFT', 80), ('A', '-', 4), ('-', '-', 8), ('A', '-', 4), ('-', '-', 8), ('A', '-', 4), ('-', '-', 60)]
+
+
+def brain(e, t, seed):
+    """closed-loop keys for both fighters from A's view (a fight, not a walk past): close in on the row, then a
+    seeded mix of punches, blocks, Energy Blasts, side steps and waits"""
+    import random
+    p0, p1 = fighters(e)
+    if not (p0 and p1):
+        return 0, 0
+    f = [fighter(e, p0), fighter(e, p1)]
+    out = []
+    for me, other, k in ((f[0], f[1], 0), (f[1], f[0], 1)):
+        r = random.Random(seed * 1000003 + t * 2 + k)
+        dx, dy = (other[0] - me[0]) >> 8, (other[1] - me[1]) >> 8
+        if abs(dy) > 6:
+            m = KEY.DOWN if dy > 0 else KEY.UP
+        elif abs(dx) > 28:
+            m = KEY.RIGHT if dx > 0 else KEY.LEFT
+        else:
+            m = r.choice([KEY.A, KEY.A, KEY.A, 0, 0, KEY.R, KEY.B, KEY.RIGHT if dx > 0 else KEY.LEFT,
+                          KEY.LEFT if dx > 0 else KEY.RIGHT, KEY.UP, KEY.DOWN])
+        out.append(m)
+    return out[0], out[1]
+
+
+def keyof(s):
+    m = 0
+    for k in s.split('+'):
+        if k and k != '-':
+            m |= getattr(KEY, k)
+    return m
+
+
+def fighter(e, o):
+    ctl = e.r32(o + 0x22C)
+    return [e.r32(o + 0x1A0), e.r32(o + 0x1A4), e.r8(o + 0x10), anim_raw(e, o), e.r8(o + 0x11), e.r16(o + 0x12),
+            e.r16(o + 0x240 + 0x16), e.r16(o + 0x240 + 0x1A), e.r32(ctl + 0xC) if ctl else -1]
+
+
+def fighters(e):
+    n = min(e.r32(OBJW + 4), 256)
+    by = {}
+    for k in range(n):
+        o = e.r32(OBJW + 8 + 4 * k)
+        if e.r32(o) in (LOCAL, REMOTE):
+            by[e.r32(o)] = o
+    return by.get(LOCAL), by.get(REMOTE)
+
+
+def step(a, b):
+    """one video frame of A (B kept within a frame of it: a core waiting on the other sleeps)"""
+    f0 = L.emu_frame(a.h)
+    while L.emu_frame(a.h) == f0:
+        if L.emu_link_run_frames(a.h, b.h, 1) < 0:
+            raise RuntimeError('link: both emulators asleep')
+
+
+def main():
+    name = sys.argv[1]
+    sav = (ROOT / 'work' / 'run2' / 'end.sav').read_bytes()
+    a, b = mkemu('buu_menus.ss'), mkemu('buu_menus.ss')
+    for e in (a, b):
+        sbemu.sd_write(e, sav)
+        e.run(3)
+        soft_reset(e)
+    L.emu_link(a.h, 0)
+    L.emu_link(b.h, 1)
+    rows = []
+    lf_prev = None
+    menu_len = sum(n for _, _, n in MENU)
+    keys_log = []
+    frames = int(sys.argv[sys.argv.index('--frames') + 1]) if '--frames' in sys.argv else 2400
+    seed = int(sys.argv[sys.argv.index('--seed') + 1]) if '--seed' in sys.argv else 1
+    fight = [('brain', None, frames)]
+    if '--banner' in sys.argv:
+        # keys from the round's banner on: does the game read them before the timer starts?
+        fight = [('RIGHT', 'A', 200), ('-', '-', 60)]
+    held = (0, 0, 0)
+    for phase, seq in (('menu', MENU), ('fight', fight)):
+        for ka, kb, n in seq:
+            for t in range(n):
+                if ka == 'brain':
+                    # (a new decision every 6 frames, held between: presses register as presses)
+                    if t % 6 == 0:
+                        held = brain(a, t // 6, seed) + (0,)
+                    ma, mb = (held[0], held[1]) if t % 6 < 4 else (0, 0)
+                else:
+                    ma, mb = keyof(ka), keyof(kb)
+                a.set_keys(ma)
+                b.set_keys(mb)
+                step(a, b)
+                keys_log.append([ma, mb])
+                lf = a.r32(0x03000F94)
+                p0, p1 = fighters(a)
+                # (from the setup screen's last press - the fight's start: the generator zeroed, the fighters made)
+                if lf != lf_prev and (phase == 'fight' or (p0 and p1) or len(keys_log) > menu_len - 8):
+                    rows.append({'lf': lf, 'video': len(keys_log), 'keys': [a.r16(0x03002DA4), a.r16(0x03002DAE)],
+                                 'rng': [a.r32(0x03004A5C), a.r32(0x03004A60)], 'timer': a.r8(0x03002BFC + 4),
+                                 'wins': [a.r8(0x03002BFC), a.r8(0x03002BFD)],
+                                 'p': [fighter(a, p0), fighter(a, p1)] if p0 and p1 else []})
+                lf_prev = lf
+    out = ROOT / 'data' / 'link' / f'dojo_{name}.json'
+    out.write_text(json.dumps({'name': name, 'about': __doc__.split('\n')[0], 'video_keys': keys_log, 'rows': rows},
+                              separators=(',', ':')))
+    print(out, len(rows), 'logic frames')
+
+
+if __name__ == '__main__':
+    main()

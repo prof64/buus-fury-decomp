@@ -172,8 +172,22 @@ The game's Dojo ("Battle with your friends in the Dojo!") as a `dojo` room + one
    the winner's save, once. `DojoMatch::disconnected()` before that = "Disconnected": no result, no prize, the save
    untouched.
 
-**The game's rules, decoded** (static disassembly of the link code; the emulator has no link cable, so nothing here
-is recorded from play). Fight function `0x0802193A`, state block `0x03002BFC` (+0 / +1 round wins, +4 the timer's
+**Recorded from the real game (2026-10-10).** Two emulators wired by the link cable in one process (tools/emu shim
+`emu_link` / `emu_link_run_frames`: mGBA's lockstep coordinator, both cores' run loops interleaved; headless, muted):
+`tools/link/dojo_record.py NAME [--frames N] [--seed S]` boots both with run 2's saves, goes title -> Multiplayer ->
+Dojo -> Balanced / 1 round / Start Fight / Goku vs Goku, and fights on seeded closed-loop keys; per logic frame of the
+host it writes `data/link/dojo_NAME.json` (the keys each fighter's update read - `0x03002DA4` / `0x03002DAE`, the
+remote side's arrive 6 frames late, nothing is read while "Round N" shows -, the generator, the round timer, both
+fighters' position / facing / animation / HP / EP / regeneration count). `wf-net/tests/dojo_link.rs` advances the
+app's `DojoGame` with those keys from the fighters' creation: `dojo_fight1` 2,529 / 2,529 and `dojo_fight2` 5,535 /
+5,535 (to the round's result) frames exact - both fighters, the generator, the timer, the wins. Fixed on the way: the
+round starts as the game's (generator 0, per fighter rand(255) then its idle tick rand(255), at (102, 220) /
+(202, 220) facing down; "Round N" 125 updates with the fighters idling, `DojoRules::start_frames`); a landed punch
+gives no EP; the result comes 300 updates after a knockdown (`KO_FRAMES`; the timer runs on; the knocked-down
+fighter's regeneration too, no death script) - `Options::link`. Not recorded yet: later rounds, In-Game Mode, the
+Trading Post.
+
+**The game's rules, decoded** (static disassembly of the link code). Fight function `0x0802193A`, state block `0x03002BFC` (+0 / +1 round wins, +4 the timer's
 seconds), fight context `0x0872A6B4`.
 
 | Rule | ROM | Status | Here |

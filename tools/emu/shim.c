@@ -12,6 +12,8 @@
 #include <mgba-util/vfs.h>
 #include <mgba-util/audio-buffer.h>
 #include <mgba/internal/gba/gba.h>
+#include <mgba/internal/gba/sio/lockstep.h>
+#include <mgba/gba/interface.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -38,7 +40,29 @@ struct Emu {
 	struct Hit hits[MAX_HITS];
 	uint32_t nHits;
 	uint32_t dropped;
+	// the link cable (two emulators in one process: `emu_link`, `emu_link_run_frames`)
+	struct GBASIOLockstepDriver link;
+	struct mLockstepUser user;
+	int linkId;
+	volatile int asleep;
+	bool linked;
 };
+
+static struct GBASIOLockstepCoordinator coordinator;
+static bool coordinatorReady = false;
+
+static void _linkSleep(struct mLockstepUser* u) {
+	struct Emu* emu = (struct Emu*) ((char*) u - offsetof(struct Emu, user));
+	emu->asleep = 1;
+}
+static void _linkWake(struct mLockstepUser* u) {
+	struct Emu* emu = (struct Emu*) ((char*) u - offsetof(struct Emu, user));
+	emu->asleep = 0;
+}
+static int _linkRequestedId(struct mLockstepUser* u) {
+	struct Emu* emu = (struct Emu*) ((char*) u - offsetof(struct Emu, user));
+	return emu->linkId;
+}
 
 static void _entered(struct mDebuggerModule* module, enum mDebuggerEntryReason reason, struct mDebuggerEntryInfo* info) {
 	struct Emu* emu = (struct Emu*) ((char*) module - offsetof(struct Emu, module));
@@ -210,3 +234,48 @@ void emu_close(struct Emu* emu) {
 
 // global CPU cycle count (16.78 MHz clock) since power-on
 uint64_t emu_cycles(struct Emu* emu) { return mTimingGlobalTime(emu->core->timing); }
+
+// ---- the link cable: emulators wired together through mGBA's lockstep coordinator (multiplayer mode), run in one
+// thread - each core runs its loop until its next event while it is awake (a core that ran ahead of the cycle budget
+// sleeps until the others catch up)
+void emu_link(struct Emu* emu, int id) {
+	if (!coordinatorReady) {
+		GBASIOLockstepCoordinatorInit(&coordinator);
+		coordinatorReady = true;
+	}
+	memset(&emu->user, 0, sizeof(emu->user));
+	emu->user.sleep = _linkSleep;
+	emu->user.wake = _linkWake;
+	emu->user.requestedId = _linkRequestedId;
+	emu->linkId = id;
+	emu->asleep = 0;
+	GBASIOLockstepDriverCreate(&emu->link, &emu->user);
+	GBASIOLockstepCoordinatorAttach(&coordinator, &emu->link);
+	emu->core->setPeripheral(emu->core, mPERIPH_GBA_LINK_PORT, &emu->link.d);
+	emu->linked = true;
+}
+
+int emu_link_asleep(struct Emu* emu) { return emu->asleep; }
+
+// run `n` frames of `a` (the primary: player 0) with `b` linked, interleaving their run loops; returns 0, or -1 when
+// both cores sleep (no progress possible)
+int emu_link_run_frames(struct Emu* a, struct Emu* b, int n) {
+	uint32_t target = a->core->frameCounter(a->core) + n;
+	uint32_t btarget = b->core->frameCounter(b->core) + n;
+	while (a->core->frameCounter(a->core) < target || b->core->frameCounter(b->core) < btarget) {
+		bool ran = false;
+		if (!a->asleep && a->core->frameCounter(a->core) < target) {
+			a->core->runLoop(a->core);
+			ran = true;
+		}
+		if (!b->asleep && b->core->frameCounter(b->core) < btarget) {
+			b->core->runLoop(b->core);
+			ran = true;
+		}
+		if (!ran) {
+			// both asleep, or the awake one is at its frame target while the other waits for it
+			return a->asleep && b->asleep ? -1 : 1;
+		}
+	}
+	return 0;
+}

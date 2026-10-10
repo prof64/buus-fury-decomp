@@ -670,6 +670,10 @@ pub struct Options {
     /// the arena rules' even match (`battle::arena_scale`): damage to the enemies, to the players, in 1/256
     #[serde(default)]
     pub arena_scale: [i32; 2],
+    /// the Dojo's link fight (`wf_net::dojo`): its fighters are the link classes 0x0804DB18 / 0x0804DD94 - a landed
+    /// punch gives no EP (tools/link recording dojo_fight1 f425)
+    #[serde(default)]
+    pub link: bool,
 }
 impl Hash for Options {
     fn hash<H: Hasher>(&self, h: &mut H) {
@@ -693,6 +697,9 @@ impl Hash for Options {
         if self.arena {
             self.arena.hash(h);
             self.arena_scale.hash(h);
+        }
+        if self.link {
+            self.link.hash(h);
         }
     }
 }

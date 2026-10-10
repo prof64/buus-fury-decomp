@@ -39,7 +39,7 @@ fn rules() -> DojoRules {
     // shorter rounds than the game's 180 s and a round cap keep the test quick (the ROM has no cap: draws repeat the
     // round), Balanced HP a KO fits in, and a prize (the ROM gives none) to check it is written exactly once
     // (`dojo_rom_rules`: the ROM's values)
-    DojoRules { round_frames: 1500, between_frames: 60, balanced_hp: 300, max_rounds: 5, prize: Some(21) }
+    DojoRules { round_frames: 1500, between_frames: 60, start_frames: 125, balanced_hp: 300, max_rounds: 5, prize: Some(21) }
 }
 
 /// the lobby part: host (Goku's save, its setup) + guest (Vegeta's save) + a peer from a battle room (refused);
@@ -173,7 +173,7 @@ fn dojo_match_over_a_bad_network() {
             ps[0].script = Some(Box::new(|t: u64| if t % 12 < 2 { b::A } else { b::RIGHT }));
             ps[1].script = Some(Box::new(|_| 0));
         }
-        let total = (rules().between_frames + rules().round_frames + 10) as i32 * rules().max_rounds as i32;
+        let total = (rules().between_frames + rules().start_frames + rules().round_frames + 10) as i32 * rules().max_rounds as i32;
         let r = testnet::run(&net, &mut ps, &mut [], total, 3_000_000.0);
         assert!(r.done, "not finished");
         for p in &ps {
@@ -298,7 +298,7 @@ fn dojo_rom_rules() {
     use wf_net::dojo::{balanced_roster, BALANCED_ROSTER};
     let fd = common::field_data();
     let r = DojoRules::default();
-    assert_eq!(r, DojoRules { round_frames: 10800, between_frames: 300, balanced_hp: 15000, max_rounds: 0, prize: None });
+    assert_eq!(r, DojoRules { round_frames: 10800, between_frames: 300, start_frames: 125, balanced_hp: 15000, max_rounds: 0, prize: None });
     let roster = balanced_roster();
     assert_eq!(roster.len(), 24);
     for c in &roster {

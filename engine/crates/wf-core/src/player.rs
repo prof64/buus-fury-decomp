@@ -1609,7 +1609,8 @@ pub fn update(w: &mut World, i: usize) {
     // the death script (KO + 199) blocks the player update for a frame; the story forms' controllers run at HP 0
     let ko = pr(w, i).ko_at;
     let since_ko = if ko >= 0 { w.frame as i64 - ko } else { -1 };
-    if since_ko == 199 {
+    // (a link fight has no death script: the knocked-down fighter's update goes on - dojo_fight2)
+    if since_ko == 199 && !w.opts.link {
         // the death script's loop runs from here on (the original's one player): no other object is updated any
         // more, and every actor gets message 0xF (0x0800F44A: the walk state's vfunc +0x10 SetAnim(0)s)
         // (field: before the object pass, `ko_freeze`)
@@ -1646,7 +1647,9 @@ pub fn update(w: &mut World, i: usize) {
             && !w.scene.ai_wait.is_empty()
             && !script_anim_done(w, i);
     p(w, i).passive_held = false;
-    if since_ko < 199 && (!pr(w, i).dead || pr(w, i).story_form(w)) {
+    // (a link fight's fighter keeps its form controller down: its EP regeneration runs on through the knockdown -
+    // tools/link recording dojo_fight2 f6,757 ..)
+    if (since_ko < 199 || w.opts.link) && (!pr(w, i).dead || pr(w, i).story_form(w) || w.opts.link) {
         if !held {
             passive(w, i);
         } else if w
@@ -2804,7 +2807,8 @@ pub fn on_dealt(w: &mut World, i: usize, msg: &HitMsg, dmg: i64) {
     let me = w.ents[i].id;
     let pl = p(w, i);
     pl.dealt_before += 1;
-    if msg.source == me && msg.atk.kind == 0 {
+    if msg.source == me && msg.atk.kind == 0 && !w.opts.link {
+        let pl = p(w, i);
         if pl.eff.melee_hp_instead {
             pl.rec.hp = pl.rec.max_hp.min(pl.rec.hp + 1);
         } else {

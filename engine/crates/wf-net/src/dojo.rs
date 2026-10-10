@@ -164,6 +164,11 @@ pub struct DojoRules {
     pub round_frames: u32,
     /// frames between rounds (ROM: the result shows 300 updates)
     pub between_frames: u32,
+    /// a round's start: its fighters stand while "Round N" shows, before the timer runs and the keys count (their idle
+    /// animations and EP regeneration go on) - 125 updates from their creation, measured from the link recording
+    /// (tools/link/dojo_record.py, data/link/dojo_fight1: made at frame 1,521, the timer at 180 from 1,646)
+    #[serde(default = "d_start_frames")]
+    pub start_frames: u32,
     /// Balanced Mode's HP (ROM: 15000)
     pub balanced_hp: i32,
     /// most rounds before the match ends with equal wins as Draw!! - 0 = no limit (the ROM: only a majority ends it)
@@ -172,9 +177,32 @@ pub struct DojoRules {
     pub prize: Option<usize>,
 }
 
+fn d_start_frames() -> u32 {
+    125
+}
+
 impl Default for DojoRules {
     fn default() -> Self {
-        DojoRules { round_frames: 180 * 60, between_frames: 300, balanced_hp: 15000, max_rounds: 0, prize: None }
+        DojoRules { round_frames: 180 * 60, between_frames: 300, start_frames: d_start_frames(), balanced_hp: 15000, max_rounds: 0, prize: None }
+    }
+}
+
+/// where the fighters stand when a round starts (24.8; both facing down): measured from the link recording
+pub const SPAWN: [(i32, i32); 2] = [(102 << 8, 220 << 8), (202 << 8, 220 << 8)];
+
+/// a round's fighters as the game makes them (link recording dojo_fight1, exact from the generator's zero): each in
+/// slot order draws rand(255) (unused here) and its idle tick rand(255), stands at `SPAWN` facing down
+pub fn place_fighters(s: &mut Session) {
+    let ids = s.world.players.clone();
+    for (slot, id) in ids.into_iter().enumerate().take(2) {
+        let Some(i) = s.world.find(id) else { continue };
+        s.world.rng.rand(255);
+        let t = s.world.rng.rand(255);
+        let p = s.world.pl(i);
+        p.a.x = SPAWN[slot].0;
+        p.a.y = SPAWN[slot].1;
+        p.a.facing = 0;
+        p.ap.tick = t;
     }
 }
 
@@ -322,7 +350,14 @@ pub struct DojoState {
     pub over_at: Option<i32>,
     /// state index (frames simulated)
     pub frame: i32,
+    /// updates since a fighter went down this round (0: none): the round's result comes `KO_FRAMES` after it (the
+    /// timer runs on)
+    #[serde(default)]
+    pub down_for: u32,
 }
+
+/// a knockdown to the round's result (link recording dojo_fight2: HP 0 at frame 6,757, the win at 7,056)
+pub const KO_FRAMES: u32 = 300;
 
 /// The whole Dojo match as one rollback game.
 pub struct DojoGame {
@@ -342,7 +377,7 @@ impl DojoGame {
             cfg,
             setup,
             rules,
-            st: DojoState { round: 0, phase: Phase::Between { left: rules.between_frames }, t: 0, wins: [0; 2], results: Vec::new(), over_at: None, frame: 0 },
+            st: DojoState { round: 0, phase: Phase::Between { left: rules.start_frames.max(1) }, t: 0, wins: [0; 2], results: Vec::new(), over_at: None, frame: 0, down_for: 0 },
             s,
         }
     }
@@ -353,7 +388,10 @@ impl DojoGame {
         if let Some([a, b]) = rng {
             c.battle.rng = RngInit::State(a, b);
         }
-        c.session(data.clone())
+        let mut s = c.session(data.clone());
+        s.world.opts.link = true;
+        place_fighters(&mut s);
+        s
     }
     /// the match result once over
     pub fn result(&self) -> Option<DojoResult> {
@@ -371,16 +409,22 @@ impl DojoGame {
     }
     /// the round's end, if it ended this update (ROM 0x08021CC0): a fighter's HP at 0 - one down: the other wins,
     /// both: Draw!!; the timer at 0 with both standing: Draw!!
-    fn round_end(&self) -> Option<RoundResult> {
+    fn downs(&self) -> (bool, bool) {
         let w = &self.s.world;
         let down = |slot: usize| w.players.get(slot).and_then(|&id| w.find(id)).is_none_or(|i| w.pl_ref(i).dead || w.pl_ref(i).rec.hp <= 0);
-        match (down(0), down(1)) {
-            (false, true) => return Some(RoundResult::Win(0)),
-            (true, false) => return Some(RoundResult::Win(1)),
-            (true, true) => return Some(RoundResult::Draw),
-            _ => {}
+        (down(0), down(1))
+    }
+    /// the round's result, if it comes this update: `KO_FRAMES` after a knockdown - who is down then (one: the other
+    /// wins, both: Draw!!); the timer at 0 with both standing: Draw!!
+    fn round_end(&self) -> Option<RoundResult> {
+        if self.st.down_for >= KO_FRAMES {
+            return match self.downs() {
+                (false, true) => Some(RoundResult::Win(0)),
+                (true, false) => Some(RoundResult::Win(1)),
+                _ => Some(RoundResult::Draw),
+            };
         }
-        (self.st.t >= self.rules.round_frames).then_some(RoundResult::Draw)
+        (self.st.down_for == 0 && self.st.t >= self.rules.round_frames).then_some(RoundResult::Draw)
     }
 }
 
@@ -398,6 +442,10 @@ impl Game for DojoGame {
         match self.st.phase {
             Phase::Over => {}
             Phase::Between { left } => {
+                // (the round's fighters exist for its last `start_frames`: they stand and idle, no keys)
+                if left <= self.rules.start_frames {
+                    self.s.step(&[0, 0]);
+                }
                 if left <= 1 {
                     self.st.phase = Phase::Fight;
                     self.st.t = 0;
@@ -409,7 +457,11 @@ impl Game for DojoGame {
                 let k = inputs.iter().map(|&v| v & crate::core_game::BUTTONS_MASK).collect::<Vec<_>>();
                 self.s.step(&k);
                 self.st.t += 1;
+                if self.st.down_for > 0 || self.downs() != (false, false) {
+                    self.st.down_for += 1;
+                }
                 if let Some(r) = self.round_end() {
+                    self.st.down_for = 0;
                     self.st.results.push(r);
                     if let RoundResult::Win(x) = r {
                         self.st.wins[x as usize] += 1;
@@ -423,7 +475,9 @@ impl Game for DojoGame {
                         self.st.round = self.st.round.saturating_add(1);
                         let rng = self.s.world.rng.state();
                         self.s = Self::round_session(&self.data, &self.cfg, Some(rng));
-                        self.st.phase = Phase::Between { left: self.rules.between_frames };
+                        // (the result banner, then the next round's start - INFERRED: only the first round's start is
+                        // recorded)
+                        self.st.phase = Phase::Between { left: self.rules.between_frames + self.rules.start_frames };
                     }
                 }
             }
