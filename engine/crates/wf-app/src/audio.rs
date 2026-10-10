@@ -1,7 +1,7 @@
 //! The game's sound driver as an output device: commands in (from [`wf_view::AudioEvent`]s), float PCM out at the
 //! device rate. Runs on the audio thread (cpal callback natively, an AudioWorklet on the web).
 //!
-//! Like the game, the driver is updated once per video frame (≈267.5 samples at 15 978.3 Hz) and commands take
+//! Like the game, the driver is updated once per video frame (256 or 272 samples, 267.5 on average, at 15 978.3 Hz) and commands take
 //! effect at the start of the next update (SFX voices start on update boundaries; a request when all 16 SFX voices
 //! are busy is dropped by the driver itself). The exact 8-bit FIFO stream is then resampled to the device rate.
 
@@ -17,6 +17,14 @@ pub enum Resample {
     Hold,
     /// Linear interpolation between FIFO samples (default).
     Linear,
+}
+
+/// The samples of one driver update: the whole 16-sample blocks of the time accumulated (`acc`, in samples; the rest
+/// stays in it) - the game counts the played samples 16 at a time.
+pub fn update_samples(acc: &mut f64) -> usize {
+    let n = (*acc as usize) & !15;
+    *acc -= n as f64;
+    n
 }
 
 /// Game frames of requests that may wait for the driver before two are taken per update (`push_frame`).
@@ -106,9 +114,11 @@ impl AudioEngine {
                 }
             }
         }
+        // (the game's update mixes what the DMA has played since the last one, counted by the timer interrupt in
+        // blocks of 16 samples - 0x03000AE0: a frame's update is 256 or 272 samples, never 267 or 268; the running
+        // game's updates, wf-audio re/fifo_live.py)
         self.frame_acc += MIX_RATE / GBA_FPS;
-        let n = self.frame_acc as usize;
-        self.frame_acc -= n as f64;
+        let n = update_samples(&mut self.frame_acc);
         self.chunk.clear();
         self.driver.render_into(&mut self.chunk, n);
         self.src.extend(self.chunk.iter().copied());
