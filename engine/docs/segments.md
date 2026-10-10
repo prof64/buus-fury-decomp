@@ -6609,14 +6609,18 @@ plus the one computed warp: s512, the Other World map's fixed list), and every n
   treasure-ship outcome (s509's 75% branch), **1,596 / 1,596 exact**; s509's enemy-group branch (25%): recorded
   2026-10-10 (accuracy agent) from pg_start.ss with its RNG words (0x03004A5C / 60) rewritten - a real game state the
   route never reached, `work/side/pg_start_rng<N>.ss` - seeds 1 .. 6 (`/tmp`-free copies of seed 1 and 3 kept):
-  gates `tour_world_sub_fight` (seed 1: the enemy group, five kills, their coins; exact to f1,041 of 1,696) and
-  `tour_world_sub_rng3` (seed 3, 2,009 / 2,009); seeds 2, 4, 5 exact too. **Open (f1,041):** after the group's last
-  kill (s506's prop_show from the on-defeat callback, `StoryState::defeat_job`'s +1 frame) the game's trigger check
-  is skipped in the drop's frame and the next one and runs in the third, collecting the second big coin at its
-  previous position (box x0 378, the player's x 359); ours runs the check in the drop's frame (before the hold
-  starts), holds one frame longer, and the coin has made a third move (x0 379) - no coin collected, the game's sound
-  44 missing. Without the defeat_job frame the coin is collected a frame early. The hold's start inside the frame
-  (death effects vs the trigger check) is the thing to model.
+  gates `tour_world_sub_fight` (seed 1: the enemy group, five kills, their coins; 1,696 / 1,696) and
+  `tour_world_sub_rng3` (seed 3, 2,009 / 2,009); seeds 2, 4, 5, 6 exact too. Fixed on the way (f1,041, the group's
+  last kill: its drop and s506's prop_show from the on-defeat callback start the death effect's nested loop at the
+  frame's start). The game's frames, measured with breakpoints (trigger check 0x080126D4, the list pass 0x080115B0,
+  the coin's move 0x0801809E): the drop frame runs the drops, then a pass in which the new coins (newer than the
+  death effect) move and the player stays; the next frame's pass ticks the player's animation and moves the coins, no
+  trigger check; in the third the loop returns at the top - the interrupted pass completes for the older objects
+  (the player's second tick), then the trigger check (a big coin collected where it was the frame before), then the
+  pass. Ours runs that frame as a held pass, then the completed pass and the check: a coin's held move of that
+  frame is taken back in the completed pass and replaced by its normal update (`Pickup::held`, `Field::completing`
+  - only when the hold ended with its event, `Field::resume_event`, not for callbacks that started none), so it
+  moves once, its age counts the frame (earth_3_3_4's coins), and the check sees it where it was.
 * **Reachable, not recorded:** **0-95** (Thieves Den 9-11's Z-Mart): its door opens with flag 82 (set on taking off
   from 9-1 after flag 112, the monkey's theft of the Bandana) and its guard (s355) wants the Bandana (126) equipped -
   a second one, from the Airship Bandits of encounter 0-55 (25%, only for a leader of level <= 70, flag 76). None of

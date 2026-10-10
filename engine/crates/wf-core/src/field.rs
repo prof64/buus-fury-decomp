@@ -340,6 +340,14 @@ pub struct Field {
     /// the frame it ends (story playthrough: the fighters move in the frame the level-up popup closes)
     pub held_event: bool,
     pub resume_held: bool,
+    /// the interrupted pass is completing (`resume_held`): the coins the held frames dropped were updated before the
+    /// hook in the game's list (newer than the death effect that ran it) - not again (`fieldobj::pickup_update`)
+    #[serde(default)]
+    pub completing: bool,
+    /// the held update completes because its event ended (`set_busy(false)`), not because the callbacks ran without
+    /// starting one (`release_unstarted_hold`)
+    #[serde(default)]
+    pub resume_event: bool,
     /// the object pass a held event interrupted completed in this frame (`World.frame` after it): a flight
     /// state reset later in the frame comes before that pass's flyer update in the game
     #[serde(default)]
@@ -680,6 +688,8 @@ fn new_field() -> Field {
         held: false,
         held_event: false,
         resume_held: false,
+        completing: false,
+        resume_event: false,
         resumed_at: None,
         once_pending: None,
         raw_input: None,
@@ -2089,7 +2099,14 @@ pub fn post_step(w: &mut World) {
         // the task list (screen shakes) already ran in this frame's held pass (session.rs): the completed pass is
         // only the objects after the hook (13-45: a crit shake draws once in the frame s393 ends)
         let shakes = std::mem::take(&mut w.g.shakes);
+        if let Some(f) = w.field.as_mut() {
+            f.completing = f.resume_event;
+            f.resume_event = false;
+        }
         w.step_entities();
+        if let Some(f) = w.field.as_mut() {
+            f.completing = false;
+        }
         let new = std::mem::replace(&mut w.g.shakes, shakes);
         w.g.shakes.extend(new);
         let frame = w.frame;
@@ -3298,6 +3315,7 @@ pub fn set_busy(w: &mut World, busy: bool) {
             if f.held_event {
                 f.held_event = false;
                 f.resume_held = true;
+                f.resume_event = true;
             }
         }
         f.busy = busy;
@@ -3340,6 +3358,7 @@ pub fn release_unstarted_hold(w: &mut World) {
     {
         f.held_event = false;
         f.resume_held = true;
+        f.resume_event = false;
     }
 }
 

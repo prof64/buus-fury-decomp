@@ -2937,6 +2937,7 @@ fn import_coins(w: &mut World, ram: &GbaRam) {
             bx: [ram.s32(o + 0x14), ram.s32(o + 0x18), ram.s32(o + 0x1C), ram.s32(o + 0x20)],
             solid: None,
             spawn: None,
+            held: None,
         };
         w.add(Body::Pickup(Box::new(p)));
     }

@@ -1081,6 +1081,7 @@ fn drop(w: &mut World, index: i32, item: i32) -> bool {
         bx: [cx - 8, cy - 16, cx + 8, cy],
         solid: None,
         spawn: None,
+        held: None,
     };
     w.add(crate::world::Body::Pickup(Box::new(p)));
     true

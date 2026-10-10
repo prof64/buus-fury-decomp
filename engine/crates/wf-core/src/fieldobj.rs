@@ -55,6 +55,10 @@ pub struct Pickup {
     /// playthrough).
     #[serde(default)]
     pub spawn: Option<(u32, [i32; 4])>,
+    /// a held frame's move (`coin_move`, World.frame then): where it was before it (x, y, box, z, vz) - the frame's
+    /// completed pass (`Field::completing`) gives the coin its normal update instead
+    #[serde(default)]
+    pub held: Option<(u32, i32, i32, [i32; 4], i32, i32)>,
 }
 
 impl Pickup {
@@ -243,6 +247,7 @@ pub fn spawn_map_item(w: &mut World, o: &crate::fieldcontent::ObjDef) -> Option<
         bx: [*x, *y, x + 16, y + 16],
         solid: Some(solid),
         spawn: None,
+        held: None,
     })));
     // its icon's tiles (ctor `0x0800DCDC`, vt 0x0804A314 +0xC: 4 blocks (0x100 bytes), no shadow; exit-fade cuts
     // 8-56 -> 8-57 / 4-24 -> 4-30: the block right after the props', before the player's)
@@ -498,6 +503,7 @@ pub fn drop_zenie(w: &mut World, size: i32) -> Option<EntityId> {
         bx: [x0, y0, x0 + bw, y0 + bh],
         solid: None,
         spawn: None,
+        held: None,
     };
     if w.field.as_ref().is_some_and(|f| f.pre_update) {
         p.spawn = Some((w.frame + 1, p.coin_rect()));
@@ -541,6 +547,7 @@ pub fn drop_item(w: &mut World, item: i32) -> Option<EntityId> {
         bx: [lx - 8, ly - 16, lx + 8, ly],
         solid: None,
         spawn: None,
+        held: None,
     };
     let id = w.add(Body::Pickup(Box::new(p)));
     // its icon's tiles (the item's icon size, 0x100 for most: real run 4-1 tile r002_006+11,000 f104, block (135, 4);
@@ -597,6 +604,7 @@ fn coin_move(w: &mut World, i: usize) {
     }
     let mut p = (**p).clone();
     p.mv += 1;
+    p.held = Some((w.frame, p.x, p.y, p.bx, p.z, p.vz));
     coin_fly(w, &mut p);
     if let Body::Pickup(q) = &mut w.ents[i].body {
         **q = p;
@@ -616,6 +624,23 @@ pub fn held_moves(w: &mut World) {
 }
 
 pub fn pickup_update(w: &mut World, i: usize) {
+    // the pass a held event interrupted completes in the frame the event ends (`Field::completing`): the game's
+    // event returned at the top of that frame, so the coins' move of the frame is their normal update - not the held
+    // pass's move and another one (segment tour_world_sub_fight f1,041: the group's last kill, s506's prop_show from the
+    // on-defeat callback - a big coin collected where it was the frame before; earth_3_3_4's coins: their age)
+    if w.field.as_ref().is_some_and(|f| f.completing) {
+        if let Body::Pickup(p) = &mut w.ents[i].body {
+            if let Some((_, x, y, bx, z, vz)) = p.held.take().filter(|h| h.0 + 1 == w.frame) {
+                p.x = x;
+                p.y = y;
+                p.bx = bx;
+                p.z = z;
+                p.vz = vz;
+                p.mv -= 1;
+                p.landed = false;
+            }
+        }
+    }
     // an event holding the field stops the pickups (story playthrough: a coin's age does not run during the level-up
     // popup, so it outlives the 600-frame limit by the popup's length) - but not a coin's flight: its sixty moves
     // (counter +0x2C) run in every frame, the age (+0x24) only in the objects' own pass (Diablo Desert Express
