@@ -10,3 +10,4 @@ One line per fix against the original game (emulator / recordings), newest last.
 * 2026-10-10 Mummy bandages stuck on the player hold still while the screen shakes, as in the game (Pharaoh Totenhotep punch scenario: bandage pixels now exact).
 * 2026-10-10 The robots' flames (Annihilator, Death Machine, Destroyer) sort behind the player they burn, so his red hit flash shows over them, as in the game (was the open "flame colour" item).
 * 2026-10-10 A damage number that is already on screen shows a new hit's total in that same frame, as in the game (ours lagged a frame on every multi-hit total: flames, beams).
+* 2026-10-10 SS gauge edge step a frame late: explained as the same mid-frame tear as the HP bar (the HUD's copy ran at scanline 26-27 on those frames, 215 otherwise); left unmodelled.

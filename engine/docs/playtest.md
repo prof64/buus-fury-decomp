@@ -438,6 +438,12 @@ the story pixel gate covers hits).
 | Vegito | 13965 / 14344 (was 11271) | Energy Sword charge a frame early, slash records follow the player's frame; Banshee Blast body phase (beam tick from the press) | charge tile-upload tears; colour flicker at the screen top |
 | Gogeta + extras | Dragon Fist steer 214 / 215 (was 37) | Dragon Fist drawn before the frame's push, fixed head -> root order, depth by Gogeta's footprint, dying head timing, body easing after the launch; Big Bang Kamehameha flare timing / order, ball lifetime; defuse facing | f42 / f43 defuse visuals (not the game's s014 / s503 scripts); equal-depth explosion stacking |
 
+HUD gauge steps a frame late (2026-10-10: the SS gauge's edge step every 30 frames in each transform segment,
+sa_f03_skill20 f288 / f318 .., and the 1-5 frame HUD blips): a tear, not a timing difference. The HUD's update copies
+its tiles straight into sprite memory (0x0800BCBC); on the frames that differ that copy ran at scanline 26-27, after
+the screen had drawn the gauge's rows (15-17), against scanline 215 (VBlank) on the others (emulator breakpoint,
+`tools/emu/shim.c` reports VCOUNT). Not modelled (CPU timing).
+
 Round 4 items: the Energy Blast sound depends on tap (21) vs hold (20), the same in every facing, as in the game; four
 fast punches landing two hits is the game's (presses 1 and 3 damage a dummy); Kamikaze Ghost's cast and the SS
 revert are silent in the game too (only the aura loop 54 stops); the red "0" on a trade with a double swing sound was
