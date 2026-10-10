@@ -45,14 +45,22 @@ shows the same screen (the state is in `World`, so rollback re-simulates menu fr
 START / SELECT do nothing (a per-player pause would let one player's world time diverge from another's in a shared
 world). Story state the menus change (stats, items, equipment, party) is shared, as in co-op generally.
 
-**Link play screens** (`wf_app::link`, not in wf-core: the title's own screens stay exact). After Multiplayer ->
-Dojo / Trading Post and the game's "Waiting for a friend..." box (title.rs, the lobby under it), `LinkSim` draws:
-Select Saved Game (94; "No Saved Games" 91), Dojo (95): the setup page (104, "Character Mode:" 99 Balanced /
-In-Game 97 / 98, "Rounds:" 100 with 101..103, "Start Fight" 96), "Choose your character!" (105; Balanced: the
-roster 116..139, In-Game: the save's party), the match's
-"Round N" (106..110) and "You Win!!" / "You Lose!!" / "Draw!!" (111..113) banners over the battle, "Grab your
-prize!" / "Go back to training!" (114 / 115), "Disconnected" (93). engine/docs/netcode.md "Link play: playing
-it".
+**Link play screens.** The Dojo's pages are the game's own, in wf-core (`menu::link::dojo` / `chars`, [`Link`]
+pages `LinkPage::Setup` / `Chars` and the nested wait box `Link::wait`), layouts measured and gated pixel for pixel
+against two linked emulators (`re/buu/menu/scenarios_link.py`, `link_setup*`, `link_guest_wait`, `link_chars*`, all
+exact; the guest's screen recorded with `subject: 'b'`): Select Saved Game's A sends the host (player 1) to the
+setup page - "Dojo" (95), "Character Mode:" (99) over the BALANCED MODE / IN-GAME MODE boxes (97 / 98, green =
+chosen), "Rounds:" (100) over 1 / 3 / 5 (101..103), START FIGHT (96) where the cursor starts, A Select / B Cancel; the
+arrows move, A chooses (no sound), B goes back to Select Saved Game (no sound) - and the guest into "Waiting for a
+friend..." (90) over its list; START FIGHT runs the same box over the setup page; the boxes end 11 steps after the
+friend's answer (`Friend::answered`) and both go on to the character pick: "Battle with your friends in the Dojo!"
+(104), the selected character's name (Balanced: the 32 of strings 116..147 - Piccolo, Broly, Majin Buu, Super Buu
+1..3, Kid Buu and Uub too; In-Game: the picked save's characters with flag bits 0 and 1, names 158 + id), the
+figures in a row of five with the selected one walking in a frame (BG0), LEFT / RIGHT prompts (auto-repeat, sound
+39), "Choose your character!" (105); A (sound 40) runs the pick's wait box (31 steps after the friend's pick), then
+the 16-step fade to the fight; B (sound 40) goes back to the setup page (host) / Select Saved Game (guest). The
+match's banners and the prize (106..115) and "Disconnected" (93) are still `wf_app::link`'s own drawing.
+engine/docs/netcode.md "Link play: playing it".
 
 The **Trading Post's pages are the game's own, in wf-core** (`menu::link::trade`, a [`Link`] page
 `LinkPage::Trade`), gated pixel for pixel against two linked emulators (`re/buu/menu/scenarios_trade.py`, the

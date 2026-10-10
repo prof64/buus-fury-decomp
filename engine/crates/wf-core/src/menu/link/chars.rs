@@ -84,6 +84,9 @@ pub struct Chars {
     pub rng_after: Option<Rng>,
     /// both have picked: the fight starts (the app takes over after the fade)
     pub fight: bool,
+    /// the pick's wait box ended with B (`wait_cancelled`)
+    #[serde(default)]
+    pub unpress: bool,
     /// the fade to the fight (`0x0804BBA4`, 16 per step)
     #[serde(default)]
     pub fade: u16,
@@ -100,7 +103,7 @@ pub enum CharsEv {
 
 impl Chars {
     /// enter `0x08022B6C` (+ `0x08022AF6`: state 1, the row made at the first redraw)
-    pub fn new(w: &World, t: &TextData, balanced: bool) -> Chars {
+    pub fn new(w: &World, t: &TextData, balanced: bool, slot: usize) -> Chars {
         let mut c = Container::default();
         let label = |s: usize, y: i32| {
             Widget::Label(Label { x: 0x78, y, text: t.s(s).to_vec(), colour: 0x75, align: 1, font: Font::Menu })
@@ -114,10 +117,12 @@ impl Chars {
         c.add(Widget::Label(Label { x: bx + 0x10, y: 0x90, text: t.s(26).to_vec(), colour: 5, align: 0, font: Font::Menu }));
         let left = c.add(Widget::Button(Button::new(BTN_LEFT, 0xB, 0x56, 4, true, true)));
         let right = c.add(Widget::Button(Button::new(BTN_RIGHT, 0xD6, 0x56, 5, true, true)));
-        // In-Game: the picked save's characters with flag bits 0 and 1 (the GameData the Select Game page loaded)
+        // In-Game: the picked save's characters with flag bits 0 and 1 (the GameData the Select Game page loaded,
+        // kept by the enter at +0x5F4 before it resets the live one)
+        let story = w.saves.slot(slot).map(|d| &d.story).unwrap_or(&w.story);
         let party = (0..9)
             .filter_map(|k| {
-                let cs = w.story.chars.get(k)?;
+                let cs = story.chars.get(k)?;
                 (cs.flags & 3 == 3).then(|| (k as i32, super::super::save::form_sprite(w, cs.form).unwrap_or(0)))
             })
             .collect();
@@ -136,6 +141,7 @@ impl Chars {
             shown: true,
             rng_after: None,
             fight: false,
+            unpress: false,
             fade: 0,
         }
     }
@@ -327,9 +333,20 @@ impl Chars {
 
     /// the pick's wait box ended with B (`0x08022AF6`): the frame back, the row made anew at the next redraw
     pub fn wait_cancelled(&mut self) {
-        self.shown = true;
-        self.state = 1;
+        // (the box goes at once; the page's picture - the A prompt pressed, BG0 cleared - stays until its redraw in
+        // the next iteration, which makes the row anew: menu_parity link_chars_back lf 1,549 / 1,550)
+        self.unpress = true;
         self.c.drawn = false;
+    }
+
+    /// the iteration after a cancelled pick: the redraw with the frame, the row made anew
+    pub fn after_cancel(&mut self) {
+        if std::mem::take(&mut self.unpress) {
+            self.c.focus = None;
+            self.c.drawn = false;
+            self.shown = true;
+            self.state = 1;
+        }
     }
 
     /// the figures' object tiles go with the page

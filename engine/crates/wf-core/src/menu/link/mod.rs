@@ -142,6 +142,9 @@ pub struct Link {
     pub walk_from_idle: bool,
     #[serde(default)]
     pub walk_jump: bool,
+    /// the save slot this side picked (its party is the In-Game roster)
+    #[serde(default)]
+    pub slot: usize,
 }
 
 /// the pages' sounds: the list's A (0x08020054: sound 40), the cursor (39)
@@ -159,7 +162,7 @@ impl Link {
     }
     /// a page with nothing pending
     pub fn new(page: LinkPage, trade: bool) -> Link {
-        Link { page, trade, actions: Vec::new(), friend: Friend::default(), figs_shown: None, host: false, wait: None, stub: false, walk_from_idle: false, walk_jump: false }
+        Link { page, trade, actions: Vec::new(), friend: Friend::default(), figs_shown: None, host: false, wait: None, stub: false, walk_from_idle: false, walk_jump: false, slot: 0 }
     }
     /// the actions since the last call (the app's link flow)
     pub fn take_actions(&mut self) -> Vec<LinkAction> {
@@ -256,7 +259,7 @@ impl Link {
                         LinkPage::Setup(s) => s.balanced,
                         _ => self.friend.balanced.unwrap_or(true),
                     };
-                    self.page = LinkPage::Chars(chars::Chars::new(w, t, balanced));
+                    self.page = LinkPage::Chars(chars::Chars::new(w, t, balanced, self.slot));
                     self.figs_shown = None;
                     self.actions.push(LinkAction::Chars);
                 }
@@ -285,6 +288,7 @@ impl Link {
                         let sel = l.sel.max(0) as usize;
                         if w.saves.slot(sel).is_some() {
                             p.actions.push(LinkAction::Save(sel));
+                            p.slot = sel;
                             if !p.trade {
                                 dojo::save_picked(p, w);
                             }
@@ -348,6 +352,7 @@ impl Link {
                         let mut l = Link::saves(w, p.trade);
                         l.host = p.host;
                         l.friend = p.friend.clone();
+                        l.slot = p.slot;
                         l.walk_from_idle = true;
                         *p = l;
                         (true, None)
@@ -367,6 +372,7 @@ impl Link {
                 c.c.drawn = false;
                 return Action::None;
             }
+            c.after_cancel();
             c.tick_objects(w);
         }
         let (_, act) = super::kit::run_step(
@@ -436,11 +442,18 @@ impl Page for Link {
             LinkPage::Saves(l) => {
                 l.tick_figs();
                 self.figs_shown = Some(l.figs.clone());
-                // (a list made by a Dojo page's B: its walker shows its first cel once, then the cel of the tick its
-                // idle enter drew - the object's cel field is computed by the first tick; menu_parity link_setup_back)
+                // (a list made by a Dojo page's B: its walker shows its first cel once, then runs on the tick its idle
+                // enter drew - the object's cel field is computed by the first tick, under the controller's rule: a cel
+                // past the walk's last starts it over; menu_parity link_setup_back, link_chars_ingame)
                 if std::mem::take(&mut self.walk_jump) {
                     for f in l.figs.iter_mut().filter(|f| !f.idle) {
-                        f.t = f.idle_t;
+                        let n = w
+                            .data
+                            .sprite(f.sprite)
+                            .and_then(|sp| sp.anim_raw(super::save::FIG_ANIM))
+                            .map(|a| a.steps(super::save::FIG_DIR).len() as i32)
+                            .unwrap_or(1);
+                        f.t = if (f.idle_t + 1) >> 3 >= n { -1 } else { f.idle_t };
                     }
                 }
             }
@@ -625,7 +638,7 @@ pub fn open_json(w: &World, v: &serde_json::Value) -> Option<(super::Screen, sup
         // null; 5]}` (the figures as the game has them)
         "link_chars" => {
             let t = &w.data.menu.as_ref()?.text;
-            let mut c = chars::Chars::new(w, t, v["balanced"].as_bool().unwrap_or(true));
+            let mut c = chars::Chars::new(w, t, v["balanced"].as_bool().unwrap_or(true), v["slot"].as_u64().unwrap_or(0) as usize);
             let figs: Vec<Option<(bool, i32, i32)>> = v["figs"]
                 .as_array()
                 .map(|a| {

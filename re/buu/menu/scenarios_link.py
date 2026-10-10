@@ -12,6 +12,10 @@ TO_SAVES_TRADE = TO_SAVES_DOJO[:-2] + [('DOWN', 'DOWN', 7), ('-', '-', 30), ('A'
 TO_SETUP = TO_SAVES_DOJO + [('A', 'A', 7), ('-', '-', 120)]
 # the setup's START FIGHT (both have picked their saves): the character pick on both sides
 TO_CHARS = TO_SETUP + [('A', '-', 7), ('-', '-', 150)]
+# the host sets In-Game Mode (UP UP RIGHT A, DOWN DOWN to START FIGHT) and starts: the character pick on both sides
+TO_CHARS_INGAME = TO_SETUP + [(k, '-', 7) if i % 2 == 0 else ('-', '-', 30) for i, k in
+                              enumerate(sum([[k, '-'] for k in ('UP', 'UP', 'RIGHT', 'A', 'DOWN', 'DOWN')], []))] + \
+    [('A', '-', 7), ('-', '-', 150)]
 TO_TRADE = TO_SAVES_TRADE + [('A', 'A', 7), ('-', '-', 240)]
 
 
@@ -105,6 +109,12 @@ LINK = {
     # reproduced; engine/docs/accuracy-log.md)
     'link_chars': dict(flow=TO_CHARS, keys=['-:14'] + keys('RIGHT', 'RIGHT', 'RIGHT', 'LEFT', gap=40) + ['-:20', 'A:2', '-:120'],
                        keys_b=['-:280', 'A:2'], open={'kind': 'link_chars', 'host': True}, probe0=chars_probe),
+    # the character pick, guest, In-Game (the save's party: Goku, Vegeta): RIGHT, then B back to Select Saved Game
+    'link_chars_ingame': dict(flow=TO_CHARS_INGAME, subject='b', keys=['-:14', 'RIGHT:2', '-:40', 'B:2', '-:60'],
+                              open={'kind': 'link_chars'}, probe0=chars_probe),
+    # the character pick, host: A (the pick's wait box), B in it (the row made again), B: back to the setup page
+    'link_chars_back': dict(flow=TO_CHARS, keys=['-:14', 'A:2', '-:40', 'B:2', '-:60', 'B:2', '-:40'],
+                            open={'kind': 'link_chars', 'host': True}, probe0=chars_probe),
     # the guest's Select Saved Game while the host sets up: A -> the wait box over the list, B cancels it, A again;
     # the host's START FIGHT ends it (the character pick)
     'link_guest_wait': dict(flow=TO_SAVES_DOJO + [('A', '-', 7), ('-', '-', 60)], subject='b',
