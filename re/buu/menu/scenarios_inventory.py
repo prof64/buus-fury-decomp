@@ -44,4 +44,7 @@ SCENARIOS = {
     'inventory_use_straw_worn': ('buu_snakeway_start.ss', chain(setup_supplies({10: 2}), setup_equipment([0x10000000 | 118]),
                                                                 lambda e: e.w32(rec(0) + 0x3C + 12, 118), hp(60, 30)), ['-:2'],
                                  ['START:1', '-:40', 'R:2', '-:20', 'A:2', '-:20', 'A:2', '-:30', 'L:2', '-:40', 'START:1', '-:40']),
+    # Holy Water (30 s of +25 STR / POW / END / SPD), then L to the Status page: the boosted stats
+    'inventory_use_holy': ('buu_snakeway_start.ss', chain(setup_supplies({20: 1}), hp(60, 30)), ['-:2'],
+                           ['START:1', '-:40', 'R:2', '-:20', 'A:2', '-:20', 'A:2', '-:30', 'L:2', '-:60', 'START:1', '-:40']),
 }

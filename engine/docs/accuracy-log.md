@@ -33,3 +33,5 @@ One line per fix against the original game (emulator / recordings), newest last.
 * 2026-10-10 Trading Post Propose Trade's "Waiting for a friend..." and the proposal page (Your Trade / Friend's Trade, ACCEPT / DECLINE) exact, cancel and leave included (link_trade_propose / empty).
 * 2026-10-10 Trading Post answers exact: ACCEPT on both = TRADE COMPLETE! then the Multiplayer page; a DECLINE on either side = both back on the picker with the offer kept (link_trade_accept / decline / declined).
 * 2026-10-10 Select Saved Game for the Trading Post (B from the picker): no walking character and the figures overlap the other way round, as in the game (link_trade_declined).
+* 2026-10-10 The Status page (and every page's stat values) shows Holy Water's +25 while it runs, as the game's RecalcStats does (ours showed the base stats).
+* 2026-10-10 Link play's Trading Post is the game's own set of pages in the app (picker, "How many to trade?", the proposal, the waiting boxes, TRADE COMPLETE!), each gated frame by frame against two linked emulators; the trade's two-phase commit runs under them.

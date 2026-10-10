@@ -568,7 +568,14 @@ pub fn effective(w: &World, cs: &crate::story::CharState) -> [i32; 4] {
         .iter()
         .map(|&e| w.data.equipment.iter().find(|q| q.id == e))
         .collect();
-    let e = crate::progression::recalc_stats(&cs.rec, &eq, false);
+    // (the timed buff - Holy Water, boost_stats - is the game data's (GD+0x4DC frames left, +0x4E0.. the bonuses),
+    // applied by RecalcStats to the record it recomputes: menu_parity inventory_use_holy, STR 27 + 25 on the Status
+    // page; ours keeps it on the live fighter)
+    let boost = w.players.iter().filter_map(|&id| w.find(id)).find_map(|i| match &w.ents[i].body {
+        crate::world::Body::Player(p) if p.holy_left > 0 => Some(p.boost),
+        _ => None,
+    });
+    let e = crate::progression::recalc_stats_with(&cs.rec, &eq, boost);
     [e.str_, e.pow, e.end, e.spd]
 }
 
