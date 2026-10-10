@@ -207,6 +207,7 @@ pub fn camera(w: &mut World) {
     face_objects(w, cam);
     let c = &mut w.cameras[0];
     c.shown = c.rect;
+    c.shown_fine = (c.x, c.y);
     let (cx, cy) = ((x >> 8) - 112, (y >> 8) - 76);
     c.x = cx << 10;
     c.y = cy << 10;

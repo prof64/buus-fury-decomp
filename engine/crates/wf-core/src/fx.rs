@@ -83,6 +83,10 @@ pub enum Fx {
         left: i32,
         rate: i32,
         acc: i32,
+        /// sorted with the actors by its y (a Kamikaze ghost's explosion: skill audit sa_f31_skill13); else in front
+        /// of them (a breakable's / an enemy's: pixel gate dr3_007_10-15 f210, sb_010_20_04 f150)
+        #[serde(default)]
+        sorted: bool,
     },
     /// looping variant (Super Saiyan aura) until `alive` fails
     Loop {
@@ -129,6 +133,8 @@ pub enum Fx {
         dir: Dir,
         dying: i32,
         t: i32,
+        /// the player control's shift of this frame (frame, v): the chain's OAM is built before it (`view`)
+        shifted: (u32, i32),
     },
     EnergySword {
         owner: EntityId,
@@ -227,13 +233,14 @@ pub fn fx_anim(w: &mut World, id: u32, x: i32, y: i32, start: i32, n: i32, rate:
             left: n,
             rate,
             acc: 0,
+            sorted: false,
         },
     )
 }
 /// [`fx_anim`] with the caller's tile size (the ctor `0x0802A81C` takes it as an argument: the shots' trail puffs
 /// 0x40 - tank shell 0x0801CA4A, rifle bullet 0x080277F4; run 3 cut 112,165, 3-14: the game's puff takes 1 unit)
 pub fn fx_anim_sized(w: &mut World, id: u32, x: i32, y: i32, start: i32, n: i32, rate: i32, bytes: i32) -> EntityId {
-    let e = w.add(Body::Fx(Box::new(Fx::Anim { id, x, y, rec: start, left: n, rate, acc: 0 })));
+    let e = w.add(Body::Fx(Box::new(Fx::Anim { id, x, y, rec: start, left: n, rate, acc: 0, sorted: false })));
     crate::vram::acquire(w, crate::vram::Owner::Ent(e), bytes);
     e
 }
@@ -269,6 +276,18 @@ pub fn puff_rng(w: &mut World, x: i32, y: i32) {
 /// explosion 0x08712FDC (4 records)
 pub fn explosion(w: &mut World, x: i32, y: i32, rate: i32) -> EntityId {
     fx_anim(w, 0x0871_2fdc, x, y, 0, 4, rate)
+}
+/// [`explosion`] sorted with the actors by its y (a Kamikaze ghost's)
+pub fn explosion_sorted(w: &mut World, x: i32, y: i32, rate: i32) -> EntityId {
+    let e = explosion(w, x, y, rate);
+    if let Some(k) = w.find(e) {
+        if let crate::world::Body::Fx(f) = &mut w.ents[k].body {
+            if let Fx::Anim { sorted, .. } = f.as_mut() {
+                *sorted = true;
+            }
+        }
+    }
+    e
 }
 pub fn beam_charge(w: &mut World, owner: EntityId, off: [(i32, i32); 4], set: BeamSet) -> EntityId {
     add(
@@ -317,6 +336,7 @@ pub fn dragon_fist(w: &World, owner_px: i32, owner_py: i32, dir: Dir, owner: Ent
         dir,
         dying: -1,
         t: 0,
+        shifted: (u32::MAX, 0),
     }
 }
 fn df_msg(w: &World, owner: EntityId, src: EntityId, rect: Rect, dir: Dir, mult: i32) -> HitMsg {
@@ -340,7 +360,9 @@ fn df_msg(w: &World, owner: EntityId, src: EntityId, rect: Rect, dir: Dir, mult:
 }
 /// 0x08038E8A (the player's control, tick < 90): root by v, each child 0x20 more along the facing
 pub fn dragon_shift(w: &mut World, i: usize, v: i32) {
-    if let Fx::DragonFist { seg, dir, .. } = fx_mut(w, i) {
+    let frame = w.frame;
+    if let Fx::DragonFist { seg, dir, shifted, .. } = fx_mut(w, i) {
+        *shifted = (frame, v);
         let (dx, dy) = DIR_VEC[*dir as usize];
         for (k, s) in seg.iter_mut().enumerate() {
             s[0] += dx * (v + 0x20 * k as i32);
@@ -582,10 +604,21 @@ fn update_one(w: &mut World, i: usize) {
         } => {
             if dying >= 0 {
                 let d = dying + 1;
+                // the body keeps easing between its neighbours after the launch (no steering, no messages): skill
+                // audit sa_f41_skill5_steer f127.., the game's segments 1 .. 4 still moving toward the head and root
+                for k in 1..5 {
+                    let (p0, c0) = (seg[k - 1], seg[k + 1]);
+                    seg[k][0] = (3 * seg[k][0] + ((p0[0] + c0[0]) >> 1)) >> 2;
+                    seg[k][1] = (3 * seg[k][1] + ((p0[1] + c0[1]) >> 1)) >> 2;
+                }
                 if let Fx::DragonFist {
-                    dying: d0, t: t0, ..
+                    seg: s0,
+                    dying: d0,
+                    t: t0,
+                    ..
                 } = fx_mut(w, i)
                 {
+                    *s0 = seg;
                     *d0 = d;
                     *t0 = t + 1;
                 }
@@ -668,7 +701,9 @@ fn update_one(w: &mut World, i: usize) {
                 if gone {
                     *ended = true;
                 }
-                if *ended && ((*t >> 2) & 3) == 0 && (*t & 3) == 0 {
+                // (removed at the flare's cycle end three ticks on: skill audit sa_f41_skill3, the game's flare to
+                // f246 - its own tick is ours + 1, `view`)
+                if *ended && (*t & 15) == 3 {
                     w.ents[i].removed = true;
                 }
             }

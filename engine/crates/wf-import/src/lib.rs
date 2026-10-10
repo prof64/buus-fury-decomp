@@ -1932,7 +1932,7 @@ fn import_super_ball(w: &mut World, ei: usize, ram: &GbaRam, o: u32, notes: &mut
     for b in ram.objects().into_iter().filter(|&b| ram.r32(b) == 0x0804_A33C && ram.r32(b + 0x1C) == o) {
         let (x, y, t, thrown) = (ram.s32(b + 0x20), ram.s32(b + 0x24), ram.s32(b + 0x40), ram.r8(b + 0x44) != 0);
         if ram.r8(b + 0x48) != 0 {
-            let f = wf_core::fx::Fx::Anim { id: 0x0872_a5dc, x: x >> 8, y: y >> 8, rec: 9 + t / 4, left: 6 - t / 4, rate: 0x4000, acc: (t % 4) << 14 };
+            let f = wf_core::fx::Fx::Anim { id: 0x0872_a5dc, x: x >> 8, y: y >> 8, rec: 9 + t / 4, left: 6 - t / 4, rate: 0x4000, acc: (t % 4) << 14, sorted: false };
             w.add(Body::Fx(Box::new(f)));
             continue;
         }
@@ -2107,7 +2107,7 @@ fn import_effects(w: &mut World, ram: &GbaRam) {
             continue;
         }
         let (first, cur) = (ram.r32(o + 0x30), ram.r32(o + 0x34));
-        let f = wf_core::fx::Fx::Anim { id: first, x: ram.s32(o + 0x10), y: ram.s32(o + 0x14), rec: (cur.wrapping_sub(first) / 12) as i32, left: ram.s32(o + 0x3C), rate: ram.s32(o + 0x40), acc: ram.s32(o + 0x38) };
+        let f = wf_core::fx::Fx::Anim { id: first, x: ram.s32(o + 0x10), y: ram.s32(o + 0x14), rec: (cur.wrapping_sub(first) / 12) as i32, left: ram.s32(o + 0x3C), rate: ram.s32(o + 0x40), acc: ram.s32(o + 0x38), sorted: false };
         w.add(Body::Fx(Box::new(f)));
     }
 }

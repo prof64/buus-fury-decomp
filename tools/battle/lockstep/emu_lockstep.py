@@ -381,8 +381,9 @@ def step(e, scn, f, hits, eo):
         e.run(1)
 
 
-def record(scn):
-    """-> trace dict (self-contained: setup values the simulator copies + per-frame expectations)"""
+def record(scn, hook=None):
+    """-> trace dict (self-contained: setup values the simulator copies + per-frame expectations); `hook(e, f, row, eo)`
+    runs after every frame (and once with f = 0 before the first) - the visual audit's per-frame capture (visual.py)"""
     e = setup(scn)
     p, rec = snapshot(e)
     init = row(e)
@@ -437,6 +438,8 @@ def record(scn):
                                'tick': e.r16(o2 + 0x12), 'mark1Age': (fc - e.r32(o2 + 0x1E8)) & 0xFFFFFFFF,
                                'mark2Age': (fc - e.r32(o2 + 0x1EC)) & 0xFFFFFFFF})
     snd = SoundLog(e, dmg=bool(eo), enemy=eo)
+    if hook:
+        hook(e, 0, None, eo)
     hits = {h['at']: h for h in scn.get('hits', [])}
     frames = []
     inputs = [[keymask(k), n] for k, n in scn['input']]
@@ -456,6 +459,8 @@ def record(scn):
                 r['sfx'] = s
             if eo:
                 r['enemy'] = erow(e, eo)
+            if hook:
+                hook(e, f, r, eo)
             frames.append(r)
     e.set_keys(0)
     return {'name': scn['name'], 'scenario': scn, 'input': inputs, 'init': init, 'frames': frames}

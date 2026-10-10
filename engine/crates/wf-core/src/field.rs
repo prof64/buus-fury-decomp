@@ -1611,6 +1611,7 @@ pub fn snap_camera(w: &mut World, slot: usize, x: i32, y: i32) {
     set_rect(w, slot.min(MAX_PLAYERS - 1));
     let c = &mut w.cameras[slot.min(MAX_PLAYERS - 1)];
     c.shown = c.rect;
+    c.shown_fine = (c.x, c.y);
 }
 
 /// the camera object (0x080077EC): eases toward the footprint centre (3/64, 9/128 per frame, 22.10), field clamp
@@ -1629,6 +1630,7 @@ pub fn camera(w: &mut World, slot: usize) {
     let shaking = w.camera_held_by_shake();
     let c = &mut w.cameras[slot];
     c.shown = c.rect;
+    c.shown_fine = (c.x, c.y);
     if !c.init {
         c.x = tx << 10;
         c.y = ty << 10;
@@ -2296,7 +2298,16 @@ pub fn post_step(w: &mut World) {
         f.cam_before = if button { before } else { None };
     }
     for s in 0..w.players.len() {
-        if s == 0 && (scripted || crate::fieldworld::flying(w)) || modal {
+        if modal && !(s == 0 && (scripted || crate::fieldworld::flying(w))) {
+            // the Instant Transmission pick holds the camera, but the screen still shows the camera of the frame before
+            // (skill audit sa_f02_skill14: the press frame's BG and the cursor ring a pixel off otherwise)
+            if let Some(c) = w.cameras.get_mut(s) {
+                c.shown = c.rect;
+                c.shown_fine = (c.x, c.y);
+            }
+            continue;
+        }
+        if s == 0 && (scripted || crate::fieldworld::flying(w)) {
             continue;
         }
         camera(w, s);

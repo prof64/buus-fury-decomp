@@ -325,9 +325,9 @@ export function buildBuuData(src: { characters: J; levels: J; moves: J; items: J
   // (Worm Body: its spawn template 0x08756A2C, +0x10 = 0x129)
   const PART_GFX: Record<number, number> = { 0x34: 0x93, 0x35: 0x94, 0x37: 0x98, 0x8f: 0x129 }
   // types with no graphics in the type / spawn tables: borrow a family member's graphics (placeholders, marked
-  // `placeholderGfx`): Mega Cyborg -> Cyborg, Super Bio Mech -> Bio Mech, Vegeta NPC -> Majin Vegeta,
-  // unnamed fighters / helpers -> Human / Majin Fighter
-  const PLACEHOLDER: Record<number, number> = { 0x4a: 72, 0x71: 31, 0x89: 282, 0x87: 36, 0x1e: 173, 0x22: 173, 0x72: 173, 0x7e: 173 }
+  // `placeholderGfx`): Vegeta NPC -> Majin Vegeta, unnamed fighters / helpers -> Human / Majin Fighter; Mega Cyborg /
+  // Super Bio Mech get the game's default graphics 173 (what the emulator draws for them)
+  const PLACEHOLDER: Record<number, number> = { 0x4a: 173, 0x71: 173, 0x89: 282, 0x87: 36, 0x1e: 173, 0x22: 173, 0x72: 173, 0x7e: 173 }
   for (const e of enemiesOut) {
     if (PART_GFX[e.type]) e.gfx = PART_GFX[e.type]
     if (e.gfx != null && e.gfx < 9) e.gfx = null

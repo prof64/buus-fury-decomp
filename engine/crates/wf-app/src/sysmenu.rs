@@ -412,6 +412,9 @@ impl SysMenu {
         let note = self.page == Page::Confirm;
         let body_h = shown.len() as i32 * row_h + if note { 24 } else { 0 };
         let y0 = ((160 - (body_h + 30)) / 2).max(2);
+        // (solid: the pause pages' striped ground under each bevelled panel - the game no longer shows through the
+        // text, playtest 44)
+        cv.background(x0, y0, x1 - x0, 23);
         cv.panel(x0, y0, x1, y0 + 22);
         if wide {
             item(&mut cv, t, MenuFont::Bold, title, x0 + 10, y0 + 17, 0, YELLOW, false, 120);
@@ -419,6 +422,7 @@ impl SysMenu {
             item(&mut cv, t, MenuFont::Bold, title, (x0 + x1) / 2, y0 + 17, 1, YELLOW, false, x1 - x0 - 8);
         }
         let by = y0 + 24;
+        cv.background(x0, by, x1 - x0, body_h + 9);
         cv.panel(x0, by, x1, by + body_h + 8);
         self.hits.clear();
         let mut y = by + 4;

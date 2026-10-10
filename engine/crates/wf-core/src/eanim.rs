@@ -22,6 +22,9 @@ pub enum RuleKind {
     Bored,
     Reverse,
     Seq,
+    /// the vampire grab's own state (vtable 0x0804C3CC, update 0x08033984): tick + 1, from 0x20 back to 0x10, frame =
+    /// tick >> 3 - frames 0..3, then 2 / 3 looping
+    TailLoop,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -72,6 +75,7 @@ impl EAnimRule {
             "bored" => RuleKind::Bored,
             "reverse" => RuleKind::Reverse,
             "seq" => RuleKind::Seq,
+            "tail_loop" => RuleKind::TailLoop,
             _ => RuleKind::Keep,
         };
         let end = v["end"].as_str().map(|e| match e {
@@ -194,6 +198,8 @@ pub struct AnimRules {
     /// the one-shot state 0x03001B38 (vtable 0x0804E0AC, shift 2): 4 ticks a cel, stops on the last one
     pub once_stop2: u32,
     pub once_hold3: u32,
+    /// the vampire grab's state 0x0804C3CC (`RuleKind::TailLoop`)
+    pub tail_loop: u32,
 }
 
 impl AnimRules {
@@ -264,7 +270,12 @@ impl AnimRules {
             EAnimRule::simple(RuleKind::OnceStop, 2, Some(End::None), false),
             &mut rules,
         );
+        let tail_loop = push(
+            EAnimRule::simple(RuleKind::TailLoop, 3, None, false),
+            &mut rules,
+        );
         AnimRules {
+            tail_loop,
             rules,
             setanim,
             generic,
@@ -381,6 +392,14 @@ impl EnemyAnim {
                     f = 0;
                 }
                 a.frame = f;
+                Tick::None
+            }
+            RuleKind::TailLoop => {
+                a.tick = (a.tick + 1) & 0xffff;
+                if a.tick >= 0x20 {
+                    a.tick = 0x10;
+                }
+                a.frame = a.tick >> 3;
                 Tick::None
             }
             RuleKind::Bored => {

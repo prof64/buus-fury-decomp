@@ -186,6 +186,12 @@ pub struct Control {
     hint_t: f64,
     /// story: the save generation last seen and the frame it changed (progress since then is unsaved)
     save_mark: Option<(u32, u64)>,
+    /// the end screen's / replay menu's title (the big font) this frame and whether its box is at the top: drawn by
+    /// Control in the view's middle with the box (`draw_title`), not at the 240x160 screen's place
+    shown_title: Option<(Vec<u16>, bool)>,
+    title_mr: Option<wf_render::menu::MenuRenderer>,
+    /// the hint was on screen last frame (its clock only runs while it shows)
+    hint_shown: bool,
 }
 
 /// seconds the "Esc: Menu" hint stays (the last one fades)
@@ -286,6 +292,9 @@ impl Control {
             sys_rebind: false,
             hint_t: HINT_SECS,
             save_mark: None,
+            shown_title: None,
+            title_mr: None,
+            hint_shown: false,
         };
         if enabled {
             c.timeline.capture(app.sim.as_ref());
@@ -468,7 +477,7 @@ impl Control {
 
     /// The hint's clock where no [`Control::advance`] runs (headless stepping).
     pub fn tick_hint(&mut self, dt: f64) {
-        if !self.sys.open {
+        if !self.sys.open && self.hint_shown {
             self.hint_t = (self.hint_t - dt).max(0.0);
         }
     }
@@ -561,13 +570,49 @@ impl Control {
         }
     }
 
+    /// the end screen's title, centred in the view over its choice box (box at the bottom: the title above it; box at
+    /// the top: under it) - playtest 45: in PC wide it sat at the 240x160 screen's place, off the box, on the fighters
+    fn draw_title(&mut self, app: &mut App, w: usize, h: usize) {
+        let Some((text, low)) = self.shown_title.clone() else { return };
+        let mr = self.title_mr.get_or_insert_with(|| wf_render::menu::MenuRenderer::load(&app.packs));
+        let (tw, px) = mr.title(&app.packs, &text);
+        if tw <= 0 || app.renderer.fb.len() < w * h {
+            return;
+        }
+        // (Classic: the places it had - centre y 44 over a bottom box, 88 under a top one)
+        // (PC wide: just over the box)
+        let top = if low { 72 } else if h <= 160 { 28 } else { h as i32 - 116 };
+        let x0 = (w as i32 - tw) / 2;
+        let fb = &mut app.renderer.fb;
+        for y in 0..32 {
+            for x in 0..tw {
+                let c = px[(y * tw + x) as usize];
+                let (fx, fy) = (x0 + x, top + y);
+                if c >> 24 != 0 && fx >= 0 && fy >= 0 && (fx as usize) < w && (fy as usize) < h {
+                    fb[fy as usize * w + fx as usize] = c;
+                }
+            }
+        }
+    }
+
     /// the system menu over the picture, or the "Esc: Menu" hint at a game's start (fading out)
     fn draw_sys(&mut self, app: &mut App, w: usize, h: usize) {
         if self.sys.open {
             self.sys.draw(&app.packs, &mut app.renderer.fb, w, h);
             return;
         }
-        if self.hint_t <= 0.0 || app.renderer.fb.len() < w * h {
+        // (hidden - its clock stopped - while the game shows its own text or fades: a menu screen (the title's
+        // copyright, Select Game's legend), a text box, the area banner, a fade; playtest 47)
+        let v = &app.view;
+        let busy = v.menu.is_some()
+            || v.dialog.is_some()
+            || v.banner.is_some()
+            || !v.title.is_empty()
+            || v.fade_black > 0
+            || v.palette_fade.is_some_and(|f| f.level > 0)
+            || v.palette_scale.is_some_and(|f| f.level > 0);
+        self.hint_shown = !busy && self.hint_t > 0.0;
+        if !self.hint_shown || app.renderer.fb.len() < w * h {
             return;
         }
         self.text.ensure(&app.packs);
@@ -597,12 +642,13 @@ impl Control {
     }
 
     /// the replay menu over the picture: its title in the big font, the choice box with its cursor
-    fn play_menu_view(&self, app: &mut App) {
+    fn play_menu_view(&mut self, app: &mut App) {
         let Some(m) = &self.play_menu else { return };
-        let Some(id) = self.play.as_ref().map(|p| p.id.clone()) else { return };
-        let _ = id;
+        if self.play.is_none() {
+            return;
+        }
         let title = if m.finished { "Replay finished" } else { "Replay paused" };
-        app.view.title = vec![wf_view::TitleView { text: wf_core::menu::text::units(title), x: 120, y: 44 }];
+        self.shown_title = Some((wf_core::menu::text::units(title), false));
         app.view.dialog = Some(wf_view::DialogView {
             text: if m.finished { "- Watch again\n- Back".into() } else { "- Resume\n- Exit to launcher".into() },
             style: 1,
@@ -780,7 +826,7 @@ impl Control {
                 self.toast = None;
             }
         }
-        if !self.sys.open {
+        if !self.sys.open && self.hint_shown {
             self.hint_t = (self.hint_t - dt).max(0.0);
         }
         self.mark_saves(app);
@@ -1283,7 +1329,8 @@ impl Control {
     }
 
     /// the end screen over the arena: the result in the game's big title font, the choice box with its cursor
-    fn end_view(&self, app: &mut App) {
+    fn end_view(&mut self, app: &mut App) {
+        self.shown_title = None;
         if !self.end_shown(app.sim.frame()) {
             return;
         }
@@ -1292,11 +1339,13 @@ impl Control {
         let won = e.outcome == Outcome::Won;
         // (clear of player 1: the title and the choice box go to the screen half the player is not in - at the
         // bottom of the screen the box covered Goku, playtest 40)
+        // (the player's place in the picture last drawn - the PC wide view's own, not the 240x160 camera's)
+        let (_, vy, _, _) = app.renderer.origin;
+        let vh = (app.renderer.h as i32).max(160);
         let low = CoreSim::of(app.sim.as_ref())
             .and_then(|s| s.world.player_idx(0).map(|i| s.world.pl_ref(i).a.py()))
-            .zip(app.view.cameras.first().map(|c| c.y))
-            .is_some_and(|(py, cy)| py - cy > 88);
-        app.view.title = vec![wf_view::TitleView { text: md.text.s(if won { 111 } else { 112 }).to_vec(), x: 120, y: if low { 88 } else { 44 } }];
+            .is_some_and(|py| py - vy > vh / 2 + 8);
+        self.shown_title = Some((md.text.s(if won { 111 } else { 112 }).to_vec(), low));
         app.view.dialog = Some(wf_view::DialogView {
             text: END_CHOICES.into(),
             style: 1,
@@ -1311,6 +1360,7 @@ impl Control {
     }
 
     fn draw_overlays(&mut self, app: &mut App, player: usize, w: usize, h: usize) {
+        self.draw_title(app, w, h);
         if self.enabled {
             self.draw_tools(app, player, w, h);
         }

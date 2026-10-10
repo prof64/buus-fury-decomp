@@ -607,7 +607,7 @@ impl Renderer {
             // damage numbers: 32x8 OBJs at their world place, priority 1 (draw 0x0800ACB6)
             for dn in &view.damage_numbers {
                 let mr = self.menu.get_or_insert_with(|| menu::MenuRenderer::load(packs));
-                screen.push((1, dn.x - vx, dn.y - vy, 32, 8, mr.damage_number(packs, dn.value, dn.crit)));
+                screen.push((1, dn.x - vx, dn.y - vy, 32, 8, mr.damage_number(packs, dn.value, dn.crit, dn.heal, dn.enemy)));
             }
             // a script's title text (`show_title_text`): OBJs at (x - w / 2, y - 16), priority 0
             for tv in &view.title {
@@ -1063,7 +1063,9 @@ impl Renderer {
                 if sy < 0 || sy >= h {
                     continue;
                 }
-                let v = ((pd as i32 * (2 * j + 1 - fh)) >> 9) + fh / 2;
+                // (the hardware's texel: matrix * (pixel - centre) >> 8 + centre, from the pixel's integer offset -
+                // skill audit sa_f26_skill10: the growing / shrinking Final Flash was 1 px off with a half-pixel centre)
+                let v = ((pd as i32 * (j - fh / 2)) >> 8) + fh / 2;
                 if v < 0 || v >= fh {
                     continue;
                 }
@@ -1072,7 +1074,7 @@ impl Renderer {
                     if sx < 0 || sx >= w {
                         continue;
                     }
-                    let u = ((pa as i32 * (2 * i + 1 - fw)) >> 9) + fw / 2;
+                    let u = ((pa as i32 * (i - fw / 2)) >> 8) + fw / 2;
                     if u < 0 || u >= fw {
                         continue;
                     }

@@ -253,6 +253,28 @@ fn main() {
     }
     let packs = Packs::new(vec![Box::new(DirSource(content.clone())) as Box<dyn FileSource>]).unwrap();
     let data = wf_app::battle::load_data(&packs).expect("data");
+    // PIX_DUMMY: the lockstep scenarios' ROM patches (tools/battle/lockstep/emu_lockstep.py, tests/lockstep.rs
+    // `patched`): the Majin Fighter never aggroes, state 0x14B's on-hit tree is the bare ApplyDamage node (a target
+    // dummy) - for the skill audit's segments recorded from those setups
+    let data = if std::env::var_os("PIX_DUMMY").is_some() {
+        let mut d = (*data).clone();
+        for t in d.states.values_mut() {
+            if t.nodes.iter().any(|n| n.addr == 0x0870_43f8) {
+                let mut nt: wf_core::ai::BehTree = (**t).clone();
+                for n in nt.nodes.iter_mut().filter(|n| n.addr == 0x0870_43f8) {
+                    n.p.set(wf_core::ai::P::R2, -1);
+                }
+                *t = std::sync::Arc::new(nt);
+            }
+        }
+        if let Some(mut n) = d.aux.values().flat_map(|t| t.nodes.iter()).find(|n| n.addr == 0x086f_da00).cloned() {
+            n.kids.clear();
+            d.aux.insert(0x14b, std::sync::Arc::new(wf_core::ai::BehTree { state: 0x14b, nodes: vec![n] }));
+        }
+        std::sync::Arc::new(d)
+    } else {
+        data
+    };
     if let Ok(f) = wf_render::ui::Font::load(&packs, "dialog") {
         wf_script_core::text::set_dialog_font((0..256u16).map(|c| f.advance(c)).collect());
     }
@@ -339,6 +361,14 @@ fn main() {
                 let Some(&i) = at.get(&k) else { return };
                 if std::env::var_os("PIX_NOSPR").is_some() {
                     view.sprites.clear();
+                }
+                // PIX_NOPROPS: without the map's prop sprites (the skill audit's warped-in start states have none)
+                if std::env::var_os("PIX_NOPROPS").is_some() {
+                    view.sprites.retain(|s| !s.sheet.starts_with("effects/props_"));
+                    // (and BG0: the Hyperbolic Time Chamber's mirror, hidden in the warped-in state)
+                    if let Some(m) = view.map.as_mut() {
+                        m.layers.get_or_insert_with(|| wf_view::BgLayers { visible: [true; 4], ..Default::default() }).visible[0] = false;
+                    }
                 }
                 if std::env::var("PIX_VIEW").ok().and_then(|v| v.parse::<usize>().ok()) == Some(k) {
                     eprintln!("{view:#?}");
@@ -518,7 +548,16 @@ fn main() {
             }
         });
         // frames past the actor-level divergence are the harness's
-        let ok_to = rep.compared;
+        // PIX_ALL: every sampled frame counts, past the harness's first divergence too (the skill audit: a state
+        // difference shows in the picture or not); the divergence is printed
+        let ok_to = if std::env::var_os("PIX_ALL").is_some() {
+            if let Some(f) = &rep.first {
+                println!("{name}: harness divergence {f:?}");
+            }
+            usize::MAX
+        } else {
+            rep.compared
+        };
         let counted: Vec<&(usize, String, usize)> = results.iter().filter(|r| r.0 < ok_to).collect();
         let exact = counted.iter().filter(|r| r.2 == 0).count();
         let mut classes: BTreeMap<&str, usize> = BTreeMap::new();

@@ -19,34 +19,131 @@ use wf_view::{
 /// the volleyball an Ultra Volleyball Attack makes of an enemy: sprite 281 (the golden orb, 0x0803C830)
 const VOLLEYBALL_SPRITE: i32 = 281;
 
+/// the Dragon Fist chain as its OAM shows it: built before the player control's shift of the frame (root by v, each
+/// child 0x20 more; skill audit sa_f41_skill5_steer: the game's OAM x is the unshifted segment's in every frame)
+fn dragon_drawn(w: &World, seg: &[[i32; 2]; 6], dir: crate::geom::Dir, shifted: (u32, i32)) -> [[i32; 2]; 6] {
+    let mut out = *seg;
+    if shifted.0 == w.frame {
+        let (dx, dy) = crate::geom::DIR_VEC[(dir & 3) as usize];
+        for (k, s) in out.iter_mut().enumerate() {
+            s[0] -= dx * (shifted.1 + 0x20 * k as i32);
+            s[1] -= dy * (shifted.1 + 0x20 * k as i32);
+        }
+    }
+    out
+}
+
+/// an actor's sort depth on the actors' y scale: the game's +4 = y + (footprint h >> 1) (the actor draw 0x080101C6:
+/// obj+0x19D; Goku's 8 -> y + 4, Spopovich's 16 -> y + 8 - his fist in front of Goku 3 px below him, opponent audit
+/// oa_t70_left f80); here less the usual 4
+fn actor_depth(a: &crate::actor::Actor) -> i32 {
+    a.py() + (a.foot_h >> 1) - 4
+}
+
 fn draw_key(w: &World, i: usize) -> (i32, i32, u32) {
     let e = &w.ents[i];
     let (layer, depth) = match &e.body {
-        Body::Player(p) => (0, p.a.py()),
+        Body::Player(p) => (0, actor_depth(&p.a)),
         Body::Enemy(n) => {
-            let d = if n.part {
+            // (Janemba's arms 0x34 / 0x35 sort by their own y - behind the body, in front of what is above them;
+            // the upper body 0x37 in front of the body: opponent audit oa_t33_idle f200, the shoulders and a bush)
+            let d = if n.part && !matches!(n.ty, 0x34 | 0x35) {
                 w.enemy_by_id(n.parent)
-                    .map(|(_, p)| p.a.py() + 1)
-                    .unwrap_or(n.a.py())
+                    .map(|(_, p)| actor_depth(&p.a) + 1)
+                    .unwrap_or(actor_depth(&n.a))
             } else {
-                n.a.py()
+                actor_depth(&n.a)
             };
             (0, d)
         }
-        Body::Hand(h) => (0, h.a.py()),
+        Body::Hand(h) => (0, actor_depth(&h.a)),
         Body::Rock { y, .. } => (0, y + 40),
-        Body::Shot(s) => (
-            if matches!(s.kind, ShotKind::DarkSphere { .. }) {
-                2
-            } else {
-                1
-            },
-            s.py(),
-        ),
+        // the game's sort keys (comparator 0x08052EE0: +8 layer byte, lower in front; +4 depth): an actor's depth is
+        // its y + 4 (layer 0x38), most shots are layer 0x37 (in front of the actors: Final Flash 0x0804AF24, Big Bang
+        // 0x0804A26C, Super Buu's ball 0x0804A33C), the Energy Blast 0x0804B454 is 0x38 with depth = its y (skill
+        // audit sa_f26_skill7: behind Vegeta at 142 / 154 facing right, up; in front of him once below 154 facing
+        // down) - here the depth relative to the actors' y: y - 4
+        Body::Shot(s) => {
+            // (Masenko facing up: the cursor 0x08021594 and the charging ball sorted with the actors by their y,
+            // behind Gohan - the cursor under his body, the ball under his hair; skill audit sa_f10_skill17_lv1_up)
+            // (once launched the ball is in front again)
+            let mz_up = s.dir == 1
+                && match &s.kind {
+                    ShotKind::MasenkoCursor(_) => true,
+                    ShotKind::MasenkoBall(b) => b.phase == crate::shots::MPhase::Charge,
+                    _ => false,
+                };
+            // (Burning Attack 0x0804BFA0 too: layer 0x38, depth its y - behind Trunks facing up / left / right; facing
+            // down its layer is 0x37, in front - skill audit sa_f21_skill4)
+            // (the player's blasts only: an enemy's Energy Blast is another object, in front of the actors - pixel
+            // gate sb_010_20_04 f150, Pui Pui's blast over the explosion clouds)
+            // (an Energy Blast fired up is in front again, over an explosion cloud - pixel gate earth_2_10_2 f690:
+            // Gohan's blast up the screen over the cloud of the one before)
+            // (an enemy's blast of the player's class 0x0804B454 - `shots::ki_blast`, the KiBlast node - is sorted the
+            // same: Pikkon's behind his arm, emulator sort node layer 0x38 depth y; opponent audit oa_t5b_idle f273)
+            let by_player = w.find(s.owner).is_some_and(|k| matches!(w.ents[k].body, Body::Player(_)))
+                || matches!(&s.kind, ShotKind::Straight(o) if o.name == SName::KiBlast && o.fx_end == 16 && !o.fragile);
+            let ki = mz_up
+                || (by_player
+                    && matches!(&s.kind, ShotKind::Straight(o) if (o.name == SName::KiBlast && s.dir != 1) || (o.name == SName::Burning && s.dir != 0)))
+                // (the ninja star 0x0804BAA0: layer 0x38, depth its y - behind a ninja throwing it down at an equal
+                // depth; opponent audit oa_t4e_above f128)
+                || matches!(&s.kind, ShotKind::Straight(o) if o.name == SName::Star);
+            // a Kamikaze ghost is an actor object (layer 0x38, depth y + 4 like an actor: skill audit sa_f31_skill13,
+            // Gotenks' fist in front of the shadow of a ghost above him)
+            let ghost = matches!(&s.kind, ShotKind::Ghost(_));
+            // the player's beam object (0x080206B8) fired up: layer 0x38 like an actor (0x37 in the other facings), its
+            // depth below the player's - Goku's hair and halo over the beam's base (skill audit sa_f02_skill15_up,
+            // the object's +8 = 56 facing up, 55 otherwise)
+            let ki = ki || (s.dir == 1 && matches!(&s.kind, ShotKind::Kame(_)));
+            // Majin Buu's candy beam 0x0804B3AC: layer 0x38, depth its y - behind Super Buu's antenna it comes from
+            // (opponent audit oa_t73_idle f22)
+            // (and his stretch arm 0x0804CDD4: the player's halo over its fist - oa_t74_idle f77)
+            let ki = ki || matches!(&s.kind, ShotKind::CandyBeam { .. } | ShotKind::StretchArm { .. });
+            (
+                if matches!(s.kind, ShotKind::DarkSphere { .. }) {
+                    2
+                } else if ki || ghost {
+                    0
+                } else {
+                    1
+                },
+                // (a star at its thrower's depth sorts behind it - the new object at an equal key: oa_t4e_above f128)
+                if matches!(&s.kind, ShotKind::Straight(o) if o.name == SName::Star) {
+                    s.py() - 5
+                } else if ki {
+                    s.py() - 4
+                } else {
+                    s.py()
+                },
+            )
+        }
         Body::Fx(f) => match f.as_ref() {
+            // the explosion cloud (run 0x08712FDC) sorts with the actors by its y (skill audit sa_f31_skill13: a
+            // ghost's cloud above Gotenks behind him, in every facing)
+            Fx::Anim { id: 0x0871_2fdc, y, sorted: true, .. } => (0, *y - 4),
             Fx::Anim { y, .. } | Fx::Loop { y, .. } => (1, *y),
             Fx::Debris { y, .. } => (1, (y >> 8) + 8),
             Fx::ItMarkers { .. } => (3, 0),
+            // Big Bang Kamehameha's flare: in front of the beam's start piece (skill audit sa_f41_skill3)
+            Fx::BbkFlare { y, .. } => (1, *y),
+            // the beam object's charge state facing up: behind the player (its y - 4 against his; skill audit
+            // sa_f19_skill16_up: the sparkle behind Goten's hands)
+            Fx::BeamCharge { owner, off, .. }
+                if w.actor_by_id(*owner).is_some_and(|a| a.facing == 1) =>
+            {
+                let a = w.actor_by_id(*owner).unwrap();
+                (0, a.py() + off[1].1 - 4)
+            }
+            // the Flame Kamehameha charge record object facing up: layer 0x38, depth its y (owner y - 2) - behind
+            // Trunks (0x37 in front in the other facings; skill audit sa_f21_skill11_up)
+            Fx::RecObj { what: crate::fx::RecWhat::FlameCharge, owner, .. }
+                if w.actor_by_id(*owner).is_some_and(|a| a.facing == 1) =>
+            {
+                (0, w.actor_by_id(*owner).unwrap().py() - 2 - 4)
+            }
+            // the dragon: each segment its own object, sorted with the actors by its own depth (`dragon_keys`)
+            Fx::DragonFist { seg, .. } => (0, seg[5][1] >> 8),
             _ => (1, 0),
         },
         Body::Injector(_) | Body::Breakable(_) => (9, 0),
@@ -64,7 +161,16 @@ fn draw_key(w: &World, i: usize) -> (i32, i32, u32) {
         Body::Npc(n) => (0, n.a.py()),
         Body::Mod(m) => (1, m.y >> 8),
     };
-    (layer, depth, e.id)
+    // (an equal key: the later object in the world list in front - Majin Buu's eat respawns the player at the list's
+    // end, shipr_338 8-16 f7050: Buu y + 8 = Vegeta y + 4, Vegeta in front)
+    // (Janemba's strike hand joins the list's head: at an equal key behind the older objects - opponent audit
+    // oa_t33_left f22, the hand rising on his row under his body)
+    let tie = match &e.body {
+        Body::Player(p) => e.id.max(p.list_seq) | 0x8000_0000,
+        Body::Hand(_) => 0x7fff_ffff - e.id.min(0x7fff_ffff),
+        _ => e.id | 0x8000_0000,
+    };
+    (layer, depth, tie)
 }
 
 /// the cel an actor's body shows (sheet frame, flip, halo attach point): what `render_view` draws and what the
@@ -84,7 +190,10 @@ pub fn actor_cel(w: &World, i: usize) -> Option<(u16, bool, Option<(i32, i32)>)>
             // ticks - the leftover puppet of an ended command does not show; real route 12-6 f54: walking)
             let (raw, frame) = (p.ap.raw, p.ap.frame);
             let s = if p.candy_def { Some(45) } else { p.a.sprite };
+            // a form whose sprite has no such animation shows no body (the shadow stays): Goku's form 1 (the NPC
+            // sprite, walk / idle only) firing an Energy Blast - skill audit sa_f01_skill7
             s.and_then(|s| w.data.sprite(s))
+                .filter(|sp| p.candy_def || sp.anim_raw(raw).is_some())
                 .and_then(|sp| pick(sp, raw, frame, p.a.facing))
         }
         Body::Npc(n) => {
@@ -103,7 +212,9 @@ pub fn actor_cel(w: &World, i: usize) -> Option<(u16, bool, Option<(i32, i32)>)>
                 } else {
                     (n.ea.pos.raw, n.ea.pos.frame)
                 });
-            n.a.sprite
+            n.drawn_sprite
+                .0
+                .or(n.a.sprite)
                 .and_then(|s| w.data.sprite(s))
                 .and_then(|sp| pick(sp, raw, frame, n.a.facing))
         }
@@ -178,7 +289,13 @@ fn actor_draw(
         });
     }
     // a 0 x 0 header shadow is no shadow (Yemma's office NPCs requested effects/shadow_0x0)
-    if let Some(sh) = sp.shadow.as_ref().filter(|sh| sh.as_str() != "shadow_0x0") {
+    // (an actor whose footprint is off every screen shows no shadow: the game makes no OAM for it, and the shadow's
+    // byte offsets (`Sprite::shadow_off`) would bring Dabura's back from 58 px left of the screen - pixel gate
+    // shipr_338_8-16 f450 - or from above it, shipr_238_8-16 f5010)
+    let fp = crate::geom::Rect::new(a.px(), a.py(), a.px() + a.foot_w, a.py() + a.foot_h);
+    let off_screen = !w.cameras.is_empty()
+        && w.cameras.iter().all(|c| fp.x1 <= c.shown.x0 || fp.x0 >= c.shown.x1 || fp.y1 <= c.shown.y0 || fp.y0 >= c.shown.y1);
+    if let Some(sh) = sp.shadow.as_ref().filter(|sh| sh.as_str() != "shadow_0x0" && !off_screen) {
         out.sprites.push(SpriteDraw {
             entity: id,
             sheet: format!("effects/{sh}"),
@@ -515,7 +632,7 @@ pub fn render_view(w: &World, out: &mut RenderView) {
     if out.sphere.is_none() {
         let dark = w.ents.iter().filter(|e| !e.removed).find_map(|e| match &e.body {
             Body::Shot(s) => match s.kind {
-                ShotKind::DarkSphere { r256 } => Some((s.px(), s.py(), r256 >> 8)),
+                ShotKind::DarkSphere { drawn, .. } => Some((s.px(), s.py(), drawn >> 8)),
                 _ => None,
             },
             _ => None,
@@ -551,7 +668,7 @@ pub fn render_view(w: &World, out: &mut RenderView) {
     }
     out.damage_numbers = crate::vram::damage_numbers(w)
         .into_iter()
-        .map(|(x, y, value, crit)| wf_view::DamageNumberView { x, y, value, crit })
+        .map(|(x, y, value, crit, heal, enemy)| wf_view::DamageNumberView { x, y, value, crit, heal, enemy })
         .collect();
     out.timer = w.scene.timer_hud.map(|k| match k {
         crate::scene::TimerHud::Countdown => w.scene.timers.countdown,
@@ -594,8 +711,11 @@ pub fn render_view(w: &World, out: &mut RenderView) {
     }
     // the draw order: the world-list objects by (layer, depth) - the actors and the field's props (each prop its own
     // object, `fieldview::prop_keys`); at an equal key a prop is behind
-    let mut order: Vec<((i32, i32, u32), Option<usize>, usize)> = (0..w.ents.len())
-        .filter(|&i| !w.ents[i].removed && !crate::vram::suspended(w, w.ents[i].id))
+    type Entry = ((i32, i32, u32), Option<usize>, usize);
+    let live = |i: usize| !w.ents[i].removed && !crate::vram::suspended(w, w.ents[i].id);
+    let is_dragon = |i: usize| matches!(&w.ents[i].body, Body::Fx(f) if matches!(f.as_ref(), Fx::DragonFist { .. }));
+    let mut order: Vec<Entry> = (0..w.ents.len())
+        .filter(|&i| live(i) && !is_dragon(i))
         .map(|i| (draw_key(w, i), Some(i), 0))
         .collect();
     order.extend(
@@ -603,7 +723,37 @@ pub fn render_view(w: &World, out: &mut RenderView) {
             .into_iter()
             .map(|(k, l, d)| ((l, d, 0), None, k)),
     );
-    order.sort_by_key(|o| o.0);
+    order.sort_by_key(|o| (o.0, o.2));
+    // Dragon Fist Explosion: the chain builder 0x08038AD8 makes six objects, each placed among the others by its own
+    // depth (Gogeta in front of a segment above him, behind one below), but among themselves in a fixed order: the
+    // head in front down to the root (facing up: the root in front) - skill audit sa_f41_skill5 in every facing and
+    // steered, the game's OAM. Merged back to front into the sorted list; the third field = 1 + k
+    for i in (0..w.ents.len()).filter(|&i| live(i) && is_dragon(i)) {
+        let Body::Fx(f) = &w.ents[i].body else { continue };
+        let Fx::DragonFist { seg, dir, shifted, .. } = f.as_ref() else { continue };
+        let seg = dragon_drawn(w, seg, *dir, *shifted);
+        let (l, _, id) = draw_key(w, i);
+        // (the actors sort by their footprint's bottom, a segment by its y: here against the actors' top, the
+        // segment's y less the owner's footprint height - sa_f41_skill5_steer f127, a segment 3 px below Gogeta's top
+        // still behind him)
+        let owner = match f.as_ref() {
+            Fx::DragonFist { owner, .. } => *owner,
+            _ => 0,
+        };
+        let fh = w.actor_by_id(owner).map(|a| a.foot_h).unwrap_or(0);
+        let seq: Vec<usize> = if *dir == 1 { vec![5, 4, 3, 2, 1, 0] } else { vec![0, 1, 2, 3, 4, 5] };
+        let mut merged: Vec<Entry> = Vec::with_capacity(order.len() + 6);
+        let mut rest = order.into_iter().peekable();
+        for k in seq {
+            let key = (l, (seg[k][1] >> 8) - fh, id);
+            while rest.peek().is_some_and(|o| o.0 <= key) {
+                merged.push(rest.next().unwrap());
+            }
+            merged.push((key, Some(i), k + 1));
+        }
+        merged.extend(rest);
+        order = merged;
+    }
     // field: the debris chips, the item-get icon (front-most), then the actors and props
     crate::fieldview::front(w, out);
     // OAM order: front-most first
@@ -653,6 +803,9 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                     let mut a = std::borrow::Cow::Borrowed(&n.a);
                     if n.ty == 0x33 && !n.part {
                         a.to_mut().z = n.z_prev;
+                    }
+                    if n.drawn_sprite.0.is_some() {
+                        a.to_mut().sprite = n.drawn_sprite.0;
                     }
                     actor_draw(w, id, &a, step, out);
                 }
@@ -720,19 +873,29 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                     effect: SpriteEffect::None,
                 }),
                 Fx::DragonFist {
-                    seg, dir, dying, ..
+                    seg, dir, dying, shifted, ..
                 } => {
+                    let seg = dragon_drawn(w, seg, *dir, *shifted);
                     // segment 5 is the head (the steered end: record dir * 4 + 1, dying 1 + (t >> 3)), 0 .. 4 the
                     // body back to the root; the head on top (facing up: the root on top) - reference skillfx.ts
                     // DragonFistFx `draw` (later on top there; first OAM entry on top here)
-                    let order: [usize; 6] = if *dir == 1 { [0, 1, 2, 3, 4, 5] } else { [5, 4, 3, 2, 1, 0] };
+                    // (one segment per draw-order entry: `prop` = 1 + k)
+                    let order: Vec<usize> = if prop > 0 {
+                        vec![prop - 1]
+                    } else if *dir == 1 {
+                        vec![0, 1, 2, 3, 4, 5]
+                    } else {
+                        vec![5, 4, 3, 2, 1, 0]
+                    };
                     for k in order {
                         let ix = if k != 5 {
                             0
                         } else if *dying < 0 {
                             1
                         } else {
-                            1 + (dying >> 3).min(2)
+                            // (the head's tiles are re-uploaded into its OAM entry: the step shows a frame ahead of
+                            // the presenter's OAM delay - skill audit sa_f41_skill5 f190 / f198)
+                            1 + ((dying + 1) >> 3).min(2)
                         };
                         record(
                             w,
@@ -796,31 +959,49 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                 // Energy Sword (table 0x0876CBD8) at the owner: charging records base + min(4, min(79, t) >> 4) (base 0,
                 // facing right 5); slashing k = (slash - 1) & 7: facing right [14,13,12,11,10,17,16,15][k], else 10 + k
                 // (reference skillfx.ts EnergySwordFx)
+                // (skill audit sa_f39_skill9, the sword object 0x0804B4AC's record +0x18: charging from its counter
+                // before this tick's increment, (t - 1) >> 4 - the step a frame after ours; slashing it follows the
+                // player's animation frame, k = frame - 2 - not a per-tick count: the slash frames last 1-2 ticks)
                 Fx::EnergySword { owner, slash, t, .. } => {
                     if let Some(a) = w.actor_by_id(*owner) {
                         let right = a.facing == 3;
-                        let rec = if *slash >= 0 {
-                            let k = ((slash - 1).max(0) & 7) as usize;
+                        let fr = w.find(*owner).and_then(|k| match &w.ents[k].body {
+                            Body::Player(pl) => Some(pl.ap.frame),
+                            _ => None,
+                        });
+                        let rec = if *slash >= 0 && fr.is_some_and(|f| f < 2) {
+                            // (the slash state's first tick: the player's frame not yet 2, the full sword still drawn)
+                            (if right { 5 } else { 0 }) + 4
+                        } else if *slash >= 0 {
+                            let k = match fr {
+                                Some(f) if f >= 2 => ((f - 2) & 7) as usize,
+                                _ => ((slash - 1).max(0) & 7) as usize,
+                            };
                             if right {
                                 [14, 13, 12, 11, 10, 17, 16, 15][k]
                             } else {
                                 10 + k as i32
                             }
                         } else {
-                            (if right { 5 } else { 0 }) + 4.min(79.min(*t) >> 4)
+                            (if right { 5 } else { 0 }) + 4.min(79.min(*t - 1).max(0) >> 4)
                         };
                         record(w, id, 0x0876_cbd8 + 12 * rec as u32, a.px(), a.py(), out);
                     }
                 }
                 // Big Bang Kamehameha flare (effects/bbk_flare): flare + mirror piece k = (t >> 2) & 3, the ball
                 // ((t >> 2) & 1) until the attack ends (reference skillfx.ts BbkFlareFx)
-                Fx::BbkFlare { x, y, dir, t, ended, .. } => {
+                Fx::BbkFlare { x, y, dir, t, ended, alive: al } => {
+                    // (the flare animates by re-uploading its tiles into a fixed OAM entry: the picture changes in the
+                    // frame of the step, a frame ahead of the presenter's OAM delay - skill audit sa_f41_skill3)
+                    let t = &(t + 1);
                     let k = ((t >> 2) & 3) as u32;
                     let mut ps = vec![("flare", 4 * k), ("mirror", 4 * k)];
-                    if !*ended {
+                    // (the ball goes with the beam's release in the same frame: sa_f41_skill3 f237)
+                    if !*ended && crate::fx::alive(w, *al) {
                         ps.push(("ball", 4 * ((t >> 2) & 1) as u32));
                     }
-                    for (anim, tt) in ps.into_iter().rev() {
+                    // (OAM order: the flare, its mirror, then the ball - the flare in front)
+                    for (anim, tt) in ps {
                         out.sprites.push(SpriteDraw {
                             entity: id,
                             sheet: "effects/bbk_flare".into(),
@@ -900,6 +1081,20 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                             ),
                             SName::Volley => (0x0876_e264, 3 * d + 2),
                         };
+                        // a ki blast's burst keeps the box of its last flight cel (0x08019B4E sets the box from the
+                        // cel record's offsets, the draw 0x08019C10 puts the OAM at its top-left; the burst sets
+                        // none): after a long cel (cels 2 / 3, from t = 16: offsets 4 x 8 across, 8 x 4 along x) the
+                        // 16 x 16 burst sits 4 px right / down (emulator, opponent audit oa_t23_ki f64: hit on cel 14)
+                        let (x, y) = match o.name {
+                            SName::KiBlast if o.dead >= 0 && (t - o.dead as i32) >> 3 >= 2 => {
+                                if d < 2 {
+                                    (x + 4, y)
+                                } else {
+                                    (x, y + 4)
+                                }
+                            }
+                            _ => (x, y),
+                        };
                         effect(w, id, run, idx, x, y, out);
                     }
                     ShotKind::Flame { .. } => {
@@ -921,53 +1116,59 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                         }
                         record(w, id, 0x0871_e984 + 12 * k as u32, x, y, out);
                     }
-                    // a flying mummy bandage (records 0x087571F4: straight 3 * (dir >> 1) + tick >> 3, diagonal + 6); stuck
-                    // ones are drawn with the player
-                    ShotKind::Wrap(m) if !m.stuck => effect(
+                    // a mummy bandage, flying or stuck on the player (records 0x087571F4 + 12 * its cel: `wrap_update`)
+                    ShotKind::Wrap(m) => effect(
                         w,
                         id,
                         0x0875_71f4,
-                        (if m.diag { 6 } else { 0 }) + 3 * (d >> 1) + (m.tick >> 3),
+                        m.cel,
                         x,
                         y,
                         out,
                     ),
                     ShotKind::SjWave => record(w, id, 0x0875_a6a8 + 12 * d as u32, x, y, out),
-                    // an energy wave (records 0x0875043C + 36 * dir: muzzle k = (t >> 2) & 1 at the origin while growing in
-                    // mode 0, body record 2 every 8 px) and Majin Buu's candy beam (0x0874ED7C + 60 * dir: muzzle while
-                    // growing, body every 8 px, head 3 + k at dir * len); pieces at position + origin (reference
-                    // projectiles.ts EnergyWave / CandyBeam)
+                    // an energy wave (records 0x0875043C + 36 * dir: muzzle k = ((t + 1) >> 2) & 1 at the origin while
+                    // growing in mode 0, body record 2 every 8 px) and Majin Buu's candy beam (0x0874ED7C + 60 * dir: below); pieces
+                    // at position + origin (reference projectiles.ts EnergyWave / CandyBeam)
                     ShotKind::EnergyWave { len, mode, .. } => {
                         let base = 0x0875_043c + 36 * d as u32;
                         let (dx, dy) = crate::geom::DIR_VEC[(d & 3) as usize];
                         let mut ps = vec![];
+                        // (the muzzle's two records swap a frame before t >> 2 would; the OAM in this order - the
+                        // muzzle in front of the body: opponent audit oa_t45_left f41 .. f45, the emulator's ring
+                        // record 1 from picture 44 and over the body's first piece)
                         if *mode == 0 && *len < 48 {
-                            ps.push((base + 12 * ((t >> 2) & 1) as u32, x, y));
+                            ps.push((base + 12 * (((t + 1) >> 2) & 1) as u32, x, y));
                         }
                         let mut k = 0;
                         while k < len - 1 {
                             ps.push((base + 24, x + dx * k, y + dy * k));
                             k += 8;
                         }
-                        for (a, px, py) in ps.into_iter().rev() {
+                        for (a, px, py) in ps {
                             record_add(w, id, a, px, py, out);
                         }
                     }
-                    ShotKind::CandyBeam { len, phase, .. } => {
+                    ShotKind::CandyBeam { len, .. } => {
+                        // (the draw 0x08028AD2: muzzle record k at the origin while len < 64 - retracting too -, head
+                        // record 3 + k at dir * len, then body record 2 from the origin out; the OAM in that order,
+                        // the head in front of the body; k = the gfx its tiles hold, every 4 frames - emulator OAM /
+                        // VRAM, opponent audit oa_t73_idle f22 ..)
                         let base = 0x0874_ed7c + 60 * d as u32;
                         let (dx, dy) = crate::geom::DIR_VEC[(d & 3) as usize];
-                        let k = ((t >> 2) & 1) as u32;
+                        let k = (((t + 1) >> 2) & 1) as u32;
                         let mut ps = vec![];
-                        if *phase == 0 && *len < 64 {
+                        if *len < 64 {
                             ps.push((base + 12 * k, x, y));
                         }
+                        ps.push((base + 12 * (3 + k), x + dx * len, y + dy * len));
                         let mut o = 0;
                         while o < len - 1 {
                             ps.push((base + 24, x + dx * o, y + dy * o));
                             o += 8;
                         }
-                        ps.push((base + 12 * (3 + k), x + dx * len, y + dy * len));
-                        for (a, px, py) in ps.into_iter().rev() {
+                        // (in OAM order, the first in front)
+                        for (a, px, py) in ps {
                             record_add(w, id, a, px, py, out);
                         }
                     }
@@ -993,6 +1194,22 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                         }
                         for (a, px, py) in ps.into_iter().rev() {
                             record_add(w, id, a, px, py, out);
+                        }
+                    }
+                    // an enemy's beam object in its charge state (Kid Buu's Kamehameha, the class 0x080206B8 state
+                    // 0) draws the charge sparkle as the player's does (`Fx::BeamCharge`: owner + its offset, record
+                    // ci, then ci + 1 + ((t >> 2) & 1)) - opponent audit oa_t3c_above f26 .., the ball over Kid Buu
+                    ShotKind::Kame(k) if k.charging => {
+                        const OFF: [(i32, i32); 4] = [(8, -2), (12, -2), (12, -2), (4, -2)];
+                        let a = w.actor_by_id(s.owner);
+                        if let (Some(a), Some((run, ci))) = (a, w.data.beams.get(&k.set).and_then(|b| b.charge.clone())) {
+                            let r = if t < 4 { ci } else { ci + 1 + ((t >> 2) & 1) };
+                            let (ox, oy) = OFF[(a.facing & 3) as usize];
+                            if let Ok(base) = u32::from_str_radix(run.trim_start_matches("fx_"), 16) {
+                                if w.data.record_frames.contains_key(&(base + 12 * r.max(0) as u32)) {
+                                    record(w, id, base + 12 * r.max(0) as u32, a.px() + ox, a.py() + oy, out);
+                                }
+                            }
                         }
                     }
                     ShotKind::Kame(k) if !k.charging => beam(w, id, &k.set, d, x, y, k.len, k.vt, !k.done, k.stopped, out),
@@ -1051,13 +1268,17 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                         let base = 0x0876_e264 + 36 * d as u32;
                         let (dx, dy) = crate::geom::DIR_VEC[(d & 3) as usize];
                         let mut ps = vec![(base, x, y)];
+                        // (the pieces span len - 8: the head 8 px short of the box's end - skill audit sa_f31_skill23)
+                        let len = &(*len - 8);
                         let mut k = 8;
                         while k < len + 8 - 9 {
                             ps.push((base + 12, x + dx * k, y + dy * k));
                             k += 8;
                         }
                         ps.push((base + 24, x + dx * len, y + dy * len));
-                        for (a, px, py) in ps.into_iter().rev() {
+                        // (OAM order: the tail first, in front - skill audit sa_f31_skill23, the tail's end over the
+                        // head on the wave's first frame)
+                        for (a, px, py) in ps.into_iter() {
                             record_add(w, id, a, px, py, out);
                         }
                     }
@@ -1112,7 +1333,7 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                     }
                     // a Kamikaze ghost: the ghost sprite (148) in its own animation state, like an actor
                     ShotKind::Ghost(g) => {
-                        let cel = w.data.sprite(crate::shots::GHOST_SPRITE).and_then(|sp| {
+                        let cel =w.data.sprite(crate::shots::GHOST_SPRITE).and_then(|sp| {
                             let an = sp.anim_raw(g.ea.pos.raw).or_else(|| sp.anim_raw(1))?;
                             let st = an.steps(g.facing);
                             st.get((g.ea.pos.frame.max(0) as usize).min(st.len().saturating_sub(1))).map(|s| (sp.id.clone(), s.frame, s.flip))
@@ -1128,6 +1349,22 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                                 mirror: false,
                                 effect: SpriteEffect::None,
                             });
+                            // its shadow (the sprite header's, after the body like an actor's; skill audit
+                            // sa_f31_skill13: every ghost has one in the game)
+                            if let Some(sp) = w.data.sprite(crate::shots::GHOST_SPRITE) {
+                                if let Some(sh) = sp.shadow.as_ref().filter(|sh| sh.as_str() != "shadow_0x0") {
+                                    out.sprites.push(SpriteDraw {
+                                        entity: id,
+                                        sheet: format!("effects/{sh}"),
+                                        frame: FrameSel::Frame { index: 0, flip: false },
+                                        x: x + sp.shadow_off.0,
+                                        y: y + sp.shadow_off.1,
+                                        priority: 3,
+                                        mirror: false,
+                                        effect: SpriteEffect::None,
+                                    });
+                                }
+                            }
                         }
                     }
                     _ => {}
@@ -1194,13 +1431,22 @@ pub fn render_view(w: &World, out: &mut RenderView) {
                 _ => 0,
             };
             let skill = p.skill();
+            // (the bars: what the HUD's update read in the frame's pass - `World::hud_sample`)
+            // (changed since the pass - a script's heal, a menu: the current values)
+            let now = (p.hp(), p.max_hp(), p.ep(), p.max_ep());
+            let bars = w
+                .hud_bars
+                .get(s)
+                .copied()
+                .filter(|_| w.hud_bars_at == w.frame && w.hud_end.get(s) == Some(&now))
+                .unwrap_or(now);
             out.hud.push(HudView {
                 name,
                 level: lv.max(0) as u32,
-                hp: p.hp(),
-                hp_max: p.max_hp(),
-                ep: p.ep(),
-                ep_max: p.max_ep(),
+                hp: bars.0,
+                hp_max: bars.1,
+                ep: bars.2,
+                ep_max: bars.3,
                 ss: p.ss_gauge,
                 ss3: (p.ss3_gauge >> 16) as i32,
                 ss_cooldown: p.ss_cooldown,
@@ -1419,10 +1665,21 @@ impl Presenter {
             out.sprites = sprites.clone();
             // (the cooldown triangle shows the frame's own value: shipr_001 7-1 f240, the record's 0x7FFF that frame
             // and an empty step-0 triangle)
-            let cds: Vec<i32> = out.hud.iter().map(|h| h.ss_cooldown).collect();
+            // (and the HP / EP bars: their tiles are drawn in the HUD's update, from what it read at its place in the
+            // pass - `World::hud_sample`; opponent audit oa_t44_left f115: down by the enemy's hit in the hit's frame,
+            // the damage number a frame later)
+            let cds: Vec<(i32, i32, i32, i32, i32, i32, i32)> =
+                out.hud.iter().map(|h| (h.ss_cooldown, h.ss, h.ss3, h.hp, h.hp_max, h.ep, h.ep_max)).collect();
             out.hud = hud.clone();
             for (h, c) in out.hud.iter_mut().zip(cds) {
-                h.ss_cooldown = c;
+                h.ss_cooldown = c.0;
+                // (the SS / SS3 gauges stay a frame late with the HUD: carrying them broke the pixel gate's
+                // earth_2_8_1 f3630 for the skill audit's 3-px gauge step on sa_f40_skill20)
+                let _ = (c.1, c.2);
+                h.hp = c.3;
+                h.hp_max = c.4;
+                h.ep = c.5;
+                h.ep_max = c.6;
             }
             out.boss_bars = boss_bars.clone();
             // (its OAM a frame late; the digits are drawn into its tiles in the draw itself: the current value)

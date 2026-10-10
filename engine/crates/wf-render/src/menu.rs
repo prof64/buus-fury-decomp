@@ -442,15 +442,19 @@ impl MenuRenderer {
     /// A damage number (`0x0800AB54`): `value` as "%d" on a 32x8 surface, centred on column 16, baseline row 7,
     /// outlined (outline colour 1, `0x0803F70C`): the small font in colour 3, or (the hit message's +0x10 flag) the
     /// digits font in colour 4; ARGB with the palette index in the top byte
-    pub fn damage_number(&mut self, packs: &Packs, value: i32, crit: bool) -> Vec<u32> {
+    pub fn damage_number(&mut self, packs: &Packs, value: i32, crit: bool, heal: bool, enemy: bool) -> Vec<u32> {
         let font = if crit { MenuFont::Digits } else { MenuFont::Small };
         let text: Vec<u16> = value.to_string().bytes().map(|b| b as u16).collect();
         let adv = |c: u16| -> i32 {
             self.fonts.get(font_slot(font)).and_then(|f| f.as_ref()).and_then(|f| f.glyphs.get(c as usize).cloned().flatten()).map(|g| g.0 as i32 + 1).unwrap_or(0)
         };
         let wsum: i32 = text.iter().map(|&c| adv(c)).sum();
-        let x = 16 - (wsum >> 1);
-        let ops = vec![MenuOp::TextOutline { font, x, y: 7, colour: if crit { 4 } else { 3 }, outline: 1, clip: [0, 0, 32, 8], text }];
+        // centred on column 16, an odd width a pixel left (opponent audit oa_t44_left f116 "18" over Goku,
+        // oa_t15_punch "101" / "113" over an enemy, oa_t61_left f295 crit "224" over Goku) - but a crit over an enemy a
+        // pixel right (pixel gate db6_007_13-43 f90, crit "854" over a sniper; the only such frame recorded: an
+        // empirical split, the reason not found)
+        let x = if crit && enemy { 16 - (wsum >> 1) } else { 16 - ((wsum + 1) >> 1) };
+        let ops = vec![MenuOp::TextOutline { font, x, y: 7, colour: if crit { 4 } else if heal { 6 } else { 3 }, outline: 1, clip: [0, 0, 32, 8], text }];
         let s = self.surface(packs, &wf_view::MenuLayer { w: 32, h: 8, x: 0, y: 0, priority: 1, ops });
         s.px.iter().map(|&c| if c == 0 { 0 } else { (c as u32) << 24 | (self.pal.get(c as usize).copied().unwrap_or(0) & 0xFF_FFFF) }).collect()
     }

@@ -475,6 +475,13 @@ function wait(n: AiNodeJ, c: AiController, frames: number, anim?: number | strin
 }
 
 /** play an animation (engine number) and finish when it ends (`hold` = never finishes) */
+/** the mini hops' height (-(-sin) >> 13 of the table 0x087B6EEC) from the controller's counter before the + 8: from 0x80
+ *  the arc, below it the last height stays (Rust nodes.rs hop_height) */
+const HOP_ARC8 = [0, 2, 4, 5, 6, 7, 8, 8, 8, 8, 8, 7, 6, 5, 4, 2]
+function hopHeight(e: { z: number }, c0: number) {
+  if (c0 >= 0x80) e.z = -HOP_ARC8[((c0 - 0x80) >> 3) & 15]
+}
+
 function playAnim(n: AiNodeJ, c: AiController, anim: number | (string | number)[], hold = false, min = 8) {
   return new Act(
     n, c,
@@ -753,7 +760,8 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       return new Act(n, c, () => undefined, () => false)
     case 'RunMotionController':
     case 'PartMirrorAnim':
-      return new Act(n, c, () => !e.moving && e.setAnim('idle', false, true), () => false)
+      // (a running walk is kept: nodes.rs - the Airship Warlord's on-hit 0x12 -> 0x16, opponent audit oa_t00_punch)
+      return new Act(n, c, () => !e.moving && !e.isAnim(1) && e.setAnim('idle', false, true), () => false)
     case 'StandStill':
       // enter 0x0804E50C: SetAnim(0) (the idle state's enter draws its start tick, rand(255)) (emulator: lockstep
       // f02_vs_enemy_melee, the aggro frame); update 0x08019240: unless IsAnim(0) (vfunc +0x34) SetAnim(0) again,
@@ -1697,7 +1705,7 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         e.x = p.x - (ox << 8)
         e.y = p.y - (oy << 8)
         e.markSelf()
-        e.setAnim(18, true, true, { rule: 'loop', shift: 3 })
+        e.setAnim(18, true, true, { rule: 'tail_loop' })
       }, (_f, a) => {
         const p = e.player
         if (!p || p.hp <= 0 || p.heldBy !== e) return true
@@ -1710,6 +1718,9 @@ export function create(n: AiNodeJ, c: AiController): RNode {
           }
         } else if (now - a.data.t > 10) a.data.n = 0
         if ((now & 15) === 0) {
+          // through the player's apply-damage 0x08010BF2: 0x0800E8E6 restarts the 12-frame hit flash (and shows the
+          // number) first
+          p.flash = 12
           p.loseHp(e.w, e.stats.POW)
           e.heal(e.stats.POW * 1024)
         }
@@ -2191,9 +2202,9 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         // the hop controller's frame (tick 0x08034630, its counter before the +8): 0 below 0x80, 1 rising, 2 falling
         const c0 = a.data.ph
         e.ea.pos.frame = c0 < 0x80 ? 0 : c0 - 0x80 < 0x40 ? 1 : 2
+        hopHeight(e, c0)
         a.data.ph = (a.data.ph + 8) & 0xff
         const air = a.data.ph > 0x80
-        e.z = a.data.ph >= 0x80 ? -Math.round(Math.sin(((a.data.ph - 0x80) / 128) * Math.PI) * 8) : 0
         if (a.data.ph === 0 && e.w.rng.chance(0x4000, 'mini re-aim')) aim()
         if (air) {
           const V = [[128, 128], [-128, -128], [-128, 128], [128, -128]]
@@ -2205,9 +2216,9 @@ export function create(n: AiNodeJ, c: AiController): RNode {
     }
     case 'MiniHopFlee':
       return new Act(n, c, (a) => (a.data.ph = 0), (_f, a) => {
+        hopHeight(e, a.data.ph)
         a.data.ph = (a.data.ph + 8) & 0xff
         const air = a.data.ph >= 0x80
-        e.z = air ? -Math.round(Math.sin(((a.data.ph - 0x80) / 128) * Math.PI) * 8) : 0
         if (a.data.ph === 0) e.facePlayer()
         if (air) {
           const [dx, dy] = e.toPlayer()
@@ -2290,8 +2301,8 @@ export function create(n: AiNodeJ, c: AiController): RNode {
         24: () => {
           const OFF = [[4, 4], [13, -24], [-8, -8], [24, -8]]
           const [ox, oy] = OFF[e.facing]
-          const b = e.bodyBox()
-          e.w.add(new SJWave(e.ctx, e, e.facing, (b.x0 + ox) << 8, (b.y0 + oy + 24) << 8))
+          // (from the object's position + the table 0x08759440: Rust nodes.rs, opponent audit oa_t7a_punch)
+          e.w.add(new SJWave(e.ctx, e, e.facing, (e.px + ox) << 8, (e.py + oy) << 8))
         },
       })
 
@@ -2371,8 +2382,40 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       // (run 2 row 1,484,953 / 1,484,966, 20-5)
       return new Act(n, c, () => e.setAnim(18, true, false, { rule: 'once_stop', shift: 2, end: 'none' }), (f) => f >= 1 && e.animDone())
     case 'PlayAnim12':
-    case 'PlayAnim12b':
+    case 'PlayAnim12b': {
+      // Dabura's rise (0x0802DE28) / descent (0x0802E300): each update SetAnimRaw(0x12) under the looping controller
+      // 0x03001B20 (4 cels of 8 ticks) unless running, then the height 1 px up to -20 / down to 0; the update that
+      // finds it there finishes (Rust nodes.rs; opponent audit oa_t12_fight)
+      const up = n.name === 'PlayAnim12'
+      return new Act(n, c, () => undefined, () => {
+        if (e.ea.pos.raw !== 19) e.setAnim(18, true, true, { rule: 'loop', shift: 3 })
+        if (up && e.z > -20) {
+          e.z--
+          return false
+        }
+        if (!up && e.z < 0) {
+          e.z++
+          return false
+        }
+        return true
+      })
+    }
     case 'PlayAnim12Yakon':
+      // Yakon's rise before the summon (0x0803A5DA): the first update SetAnimRaw(0x12) under the controller 0x030032D0
+      // (cel = tick >> 3; past the last cel SetAnimRaw(0x14) looping - the node's end), 0.5 px up each update (Rust)
+      return new Act(n, c, () => undefined, (f) => {
+        if (f === 1) e.setAnim(18, true, false, { rule: 'once_stop', shift: 3, end: 'none' })
+        e.y -= 0x80
+        const nn = e.ea.host.nframes(19) || 1
+        const t = f - 1
+        if (t >> 3 >= nn) {
+          e.setAnim(20, true, true, { rule: 'loop', shift: 3 })
+          return true
+        }
+        e.ea.pos.tick = t
+        e.ea.pos.frame = t >> 3
+        return false
+      })
     case 'PlayAnim12Yakon2':
       return playAnim(n, c, 17, false, 16)
     case 'PlayAnim13':
@@ -2432,17 +2475,25 @@ export function create(n: AiNodeJ, c: AiController): RNode {
       })
     case 'DarkSphere':
       return new Act(n, c, () => {
-        const [cx, cy] = e.center()
+        // (at the body's ground centre, no animation change: Dabura floats on in the rise's loop - Rust nodes.rs)
+        const b = e.bodyBoxGround()
+        const [cx, cy] = [(b.x0 + b.x1) >> 1, (b.y0 + b.y1) >> 1]
         e.w.add(new DarkSphere(e.ctx, e, (cx + 2) << 8, (cy - 17) << 8))
-        e.setAnim(17, true, true)
       }, () => e.ctx.sphereState === 1 || e.ctx.sphereState === 3, () => (e.hittable = true))
     case 'TauntAnim':
       // the controller's enter 0x08033D84: SetAnimRaw(0x13) (Rust nodes.rs)
       return playAnim(n, c, 19, false, 12)
     case 'Hop':
-      return new Act(n, c, (a) => (a.data.ph = 0), (_f, a) => {
+      // the Mini-Yakon's hop (enter 0x0804E834): SetAnimRaw(0x0E) (raw 15) under the hop controller 0x03003254 - cel 0
+      // on the ground, 1 rising, 2 falling (Rust nodes.rs)
+      return new Act(n, c, (a) => {
+        a.data.ph = 0
+        e.setAnim(14, true, true, { rule: 'hold' })
+      }, (_f, a) => {
+        const c0 = a.data.ph
+        hopHeight(e, c0)
         a.data.ph = (a.data.ph + 8) & 0xff
-        e.z = a.data.ph >= 0x80 ? -Math.round(Math.sin(((a.data.ph - 0x80) / 128) * Math.PI) * 8) : 0
+        e.ea.pos.frame = c0 < 0x80 ? 0 : c0 - 0x80 < 0x40 ? 1 : 2
         return false
       })
     case 'SummonMiniYakons':

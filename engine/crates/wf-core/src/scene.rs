@@ -3432,6 +3432,7 @@ pub fn set_scene_camera(w: &mut World, x: i32, y: i32) {
     cam_put(w, x << 10, y << 10);
     let c = &mut w.cameras[0];
     c.shown = c.rect;
+    c.shown_fine = (c.x, c.y);
 }
 
 fn cam_put(w: &mut World, x: i32, y: i32) {
@@ -3583,11 +3584,13 @@ pub fn camera(w: &mut World) -> bool {
         w.scene.cam.hold = false;
         let c = &mut w.cameras[0];
         c.shown = c.rect;
+        c.shown_fine = (c.x, c.y);
         return true;
     }
     if w.scene.cam.scroll.is_some() {
         let c = &mut w.cameras[0];
         c.shown = c.rect;
+        c.shown_fine = (c.x, c.y);
         scroll_step(w);
         return true;
     }
@@ -3602,6 +3605,7 @@ pub fn camera(w: &mut World) -> bool {
         CamMode::Follow(id) => {
             let c = &mut w.cameras[0];
             c.shown = c.rect;
+            c.shown_fine = (c.x, c.y);
             // a screen shake takes the mode's camera slot while it lasts (field.rs camera)
             if !w.camera_held_by_shake() {
                 follow_step(w, id);

@@ -307,3 +307,33 @@ after an area load, lag frames recorded and skipped): `rec_transitions.py` (exit
 Python spec), `rec_objects.py` (triggers, save points, breakables, drops, map items → `objects_*.json`). They are
 replayed against the Rust core by `engine/crates/wf-core/tests/field_lockstep.rs` (`cargo test -p wf-core --test
 field_lockstep`); mechanics in re/buu/notes.md §11 and the "Field: ..." sections, API in engine/docs/core.md §10.
+
+## Visual audit (opponents, frame by frame against the emulator)
+
+Every Battle-list opponent in its real AI, recorded in the emulator with the screen and every enemy object per frame,
+replayed in the battle sim on the same map (8-3, arena rules off: the faithful core) and compared frame by frame.
+
+* Scenarios: `opp_scenarios.py` - per opponent type t (`OPPONENTS`), `oa_tXX_{idle,left,above,below,punch,ki,ko}`:
+  the player (lockstep default Goku, form 2) at (390, 290) in the forest's clearing; the opponent at its archetype
+  offset / left / above / below / adjacent (A every 12 frames) / 64 px (Energy Blast every 20) / adjacent with 20 HP
+  (death). A scenario is a lockstep scenario (`vs()` of scenarios.py: `input [[keys, frames]..]`, `at`, `etype`,
+  `ehp`, `state`, `stats`, `hp`, `skills`, `partner`); add one to `SCENARIOS` for anything else.
+* Record (emulator, headless, no sound; ~6 s for 600 frames): `.venv/bin/python tools/battle/lockstep/visual.py -j 4
+  'oa_t44_*'` -> `work/ub/oa/NAME.json` (the lockstep trace + `vis`: per frame every live object of the enemy list -
+  type, 24.8 x / y, facing, anim raw / frame / tick, HP << 10, AI state, height, hittable - every other world object's
+  vtable, the camera) and `NAME.fb` (the screen after every frame, zlib'd RGB; frame 0 = before the first input).
+* Compare (headless): `cargo run --release -p wf-app --example opp_audit -- work/ub/oa/oa_t44_*.json` (`OA_TILE=259`
+  skips the map tile-clock fit for the 8-3 scenarios; `OA_OUT` the output dir, default `work/ub/oa/out`; `OA_PNG` the
+  triptychs per scenario, 6; `OA_PNGAT=f,..` those frames too; `OA_NODN` leaves the damage numbers' boxes out of the
+  pixel count; `OA_RNG=f,..` every generator call of those frames; `OA_SHOTS=f,..` our shots and draw order after
+  them; the log's `obj_box` is each frame's OBJ-difference box; our animation raw is named by its first ROM slot like
+  the recorder's). One line per scenario: the first diverging frame of each category - `player` (the
+  lockstep row: state / anim / position / HP / EP / sounds / RNG), `dmg` (ComputeDamage results), `enemy` (position /
+  facing / HP), `anim` (raw / frame / tick / height), `ai` (AI state), `others` (the other enemy objects: parts,
+  summons, Janemba's hand), `pix` (OBJ pixels: a difference within 48 px of a sprite's or the game's enemies'
+  anchors), `bg` (any other pixel: the HUD, the map) - and the count of frames with OBJ differences. `out/NAME.json`
+  lists every differing frame with both sides' values; `out/NAME_fNNN.png` = game | ours | diff (red OBJ, blue bg).
+* Not compared: frames 0 and 1 (the game's enemy waits off-screen until it is placed at frame 0 and its OBJ shows a
+  frame late), the game-over screen. Our side draws the map's props (the field's; a battle world has none) and runs
+  the map's tile clock at the fitted offset. The damage the game computes on Janemba's parts is not an event here
+  (the `dmg` category shows it as `-1:...` on the game's side only).

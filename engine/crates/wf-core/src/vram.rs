@@ -1405,12 +1405,25 @@ pub fn damage_number(w: &mut World, target: EntityId) {
 
 /// `damage_number` with what it shows: `dmg` (1/1024 HP) adds to a reused number, `crit` picks the style
 pub fn damage_number_shown(w: &mut World, target: EntityId, dmg: i64, crit: bool) {
+    number_shown(w, target, target, 0, dmg, crit);
+}
+
+/// a heal's number over an actor (`0x0800E97E`: the vampire's drain): the same number object in style 6 (green, the
+/// small font) at the body box's top - 2, with its own reuse slot (actor +0x1DC / +0x1E0)
+pub fn heal_number_shown(w: &mut World, target: EntityId, hp: i64) {
+    number_shown(w, target, target | HEAL_KEY, -2, hp, false);
+}
+/// a heal number's key bit (its reuse slot apart from the damage numbers')
+pub const HEAL_KEY: EntityId = 0x8000_0000;
+
+fn number_shown(w: &mut World, target: EntityId, key: EntityId, dy: i32, dmg: i64, crit: bool) {
     // the number's place: the target's body box, centre x and top (0x0800FE78 at 0x0800E910)
     let at = w.find(target).and_then(|k| match &w.ents[k].body {
         crate::world::Body::Enemy(e) => Some(e.a.body_box()),
         crate::world::Body::Player(p) => Some(p.a.body_box()),
         _ => None,
     });
+    let target = key;
     let now = w.frame;
     // a battle (no sprite-memory model, no limit): the same object, reused within 8 frames, 16 frames on show
     if w.field.is_none() {
@@ -1424,7 +1437,7 @@ pub fn damage_number_shown(w: &mut World, target: EntityId, dmg: i64, crit: bool
             p.5 += dmg;
             p.6 |= crit;
         } else if let Some(r) = at {
-            b.push((target, now, now + POPUP_LIFE, (((r.x0 + r.x1) >> 1) - 16) * 8, r.y0 * 8, dmg, crit, stamp));
+            b.push((target, now, now + POPUP_LIFE, (((r.x0 + r.x1) >> 1) - 16) * 8, (r.y0 + dy) * 8, dmg, crit, stamp));
         }
         return;
     }
@@ -1464,13 +1477,18 @@ pub fn damage_number_shown(w: &mut World, target: EntityId, dmg: i64, crit: bool
         v.popup_at.push((h, stamp));
         v.popup_vis.retain(|p| p.0 != h);
         if let Some(r) = at {
-            v.popup_vis.push((h, (((r.x0 + r.x1) >> 1) - 16) * 8, r.y0 * 8, now, dmg, crit));
+            v.popup_vis.push((h, (((r.x0 + r.x1) >> 1) - 16) * 8, (r.y0 + dy) * 8, now, dmg, crit));
         }
     }
 }
 
-/// the damage numbers on show: (top-left x, y, value, crit) - each update moves it up 0.5 px (y8 - 4)
-pub fn damage_numbers(w: &World) -> Vec<(i32, i32, i32, bool)> {
+/// the damage numbers on show: (top-left x, y, value, crit, heal, over an enemy) - each update moves it up 0.5 px
+/// (y8 - 4)
+pub fn damage_numbers(w: &World) -> Vec<(i32, i32, i32, bool, bool, bool)> {
+    let on_enemy = |key: EntityId| {
+        w.find(key & !HEAL_KEY)
+            .is_some_and(|k| matches!(w.ents[k].body, crate::world::Body::Enemy(_)))
+    };
     if w.field.is_none() {
         return w
             .battle
@@ -1479,7 +1497,7 @@ pub fn damage_numbers(w: &World) -> Vec<(i32, i32, i32, bool)> {
             .filter(|p| p.2 > w.frame)
             .map(|p| {
                 let y8 = p.4 - 4 * w.frame.wrapping_sub(p.1) as i32;
-                (p.3 >> 3, y8 >> 3, ((p.5 + 0x3FF) >> 10) as i32, p.6)
+                (p.3 >> 3, y8 >> 3, ((p.5 + 0x3FF) >> 10) as i32, p.6, p.0 & HEAL_KEY != 0, on_enemy(p.0))
             })
             .collect();
     }
@@ -1487,10 +1505,10 @@ pub fn damage_numbers(w: &World) -> Vec<(i32, i32, i32, bool)> {
     v.popups
         .iter()
         .filter(|p| p.3 > w.frame)
-        .filter_map(|p| v.popup_vis.iter().find(|q| q.0 == p.2))
-        .map(|q| {
+        .filter_map(|p| v.popup_vis.iter().find(|q| q.0 == p.2).map(|q| (q, p.0)))
+        .map(|(q, key)| {
             let y8 = q.2 - 4 * w.frame.wrapping_sub(q.3) as i32;
-            (q.1 >> 3, y8 >> 3, ((q.4 + 0x3FF) >> 10) as i32, q.5)
+            (q.1 >> 3, y8 >> 3, ((q.4 + 0x3FF) >> 10) as i32, q.5, key & HEAL_KEY != 0, on_enemy(key))
         })
         .collect()
 }

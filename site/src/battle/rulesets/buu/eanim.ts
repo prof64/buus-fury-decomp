@@ -10,7 +10,7 @@ import { tickBored, tickIdle, tickLoop, tickOnce, type AnimPos } from './panim'
 
 /** one enemy state rule (buu_enemy_anim.json `sim` block / the SetAnim table) */
 export interface EAnimRule {
-  rule: 'idle' | 'loop' | 'once' | 'once_stop' | 'hold' | 'keep' | 'bored' | 'reverse' | 'seq'
+  rule: 'idle' | 'loop' | 'once' | 'once_stop' | 'hold' | 'keep' | 'bored' | 'reverse' | 'seq' | 'tail_loop'
   shift?: number
   /** once: what the end callback does */
   end?: 'idle' | 'hold' | 'none'
@@ -142,6 +142,12 @@ export class EnemyAnim {
         return null
       case 'bored':
         tickBored(this.pos, n)
+        return null
+      case 'tail_loop':
+        // the vampire grab's state 0x0804C3CC (update 0x08033984): tick + 1, from 0x20 back to 0x10, frame = tick >> 3
+        this.pos.tick = (this.pos.tick + 1) & 0xffff
+        if (this.pos.tick >= 0x20) this.pos.tick = 0x10
+        this.pos.frame = this.pos.tick >> 3
         return null
       case 'reverse': {
         let t = this.pos.tick - 1

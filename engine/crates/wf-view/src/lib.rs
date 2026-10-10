@@ -499,6 +499,10 @@ pub struct DamageNumberView {
     pub value: i32,
     /// the second style (digits font, colour 4): the hit message's +0x10 flag
     pub crit: bool,
+    /// a heal's number (style 6: the small font in colour 6, green)
+    pub heal: bool,
+    /// over an enemy (the crit digits' centring: `wf-render` `MenuRenderer::damage_number`)
+    pub enemy: bool,
 }
 
 /// A script's title text (see `RenderView::title`).

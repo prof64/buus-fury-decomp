@@ -234,6 +234,8 @@ export class Enemy extends Actor implements EnemyLike {
     // 15, the throw's own) replaces it and the charge goes (wf-core enemy::set_anim_rule; the state tick's own end
     // SetAnim(0) is not this path)
     if (!this.inTick && (Array.isArray(ref) ? ref[0] : ref) !== 15) this.dropCharging()
+    // the minis' hop / roll controllers leave the height at 0 when replaced (exit 0x0804F750 / 0x0804F784; Rust)
+    if (this.type.type === 0x38 || this.type.type === 0x92) this.z = 0
     this.spitCtl = -1
     this.rollCtl = -1
     this.teleCtl = -1
@@ -800,8 +802,8 @@ export class Enemy extends Actor implements EnemyLike {
   /** CirclePlayer update 0x0802F23A (Cyborgs; vtable 0x0804B1A0): d = player footprint centre - own centre, m =
    *  max(|dx|, |dy|); face the player on the major axis; the minor component of d is negated, then pos -= trunc(d' *
    *  speed / m) like stepFromPlayer: away from the player on the major axis, toward it on the minor one (not an
-   *  orbit). Blocked -> one axis at full speed, then the other; nothing moved -> finished (1). m = 0 -> 0. Walk anim
-   *  (SetAnimRaw 1 + state 0x03003100) unless already walking. Lockstep f02_vs_enemy_t11. */
+   *  orbit). Blocked -> one axis at full speed, then the other; nothing moved -> finished (1). m = 0 -> 0. The walk
+   *  backwards (SetAnimRaw 1 + state 0x03003100) unless already in it. Lockstep f02_vs_enemy_t11. */
   circlePlayer(speed: number): boolean {
     const p = this.player
     if (!p) return true
@@ -822,7 +824,9 @@ export class Enemy extends Actor implements EnemyLike {
       dx = -dx
     }
     if (!m) return false
-    this.markMoving()
+    // 0x0802F2EE: SetAnimRaw(1) + state 0x03003100 (the walk played backwards) unless already in it
+    this.moving = true
+    if (this.ea.r.rule !== 'reverse') this.setAnim(1, true, true, { rule: 'reverse' })
     this.tryMove(-Math.trunc((dx * speed) / m), -Math.trunc((dy * speed) / m), dx >= 0 ? -speed : speed, dy >= 0 ? -speed : speed)
     return !this.stepped
   }
@@ -1985,7 +1989,8 @@ export class HandRise extends Actor {
         audioEvent('sfx', { id: 48 + w.rng.rand(2, 'hand hit sfx'), vol: 64 })
       }
     }
-    this.alpha = this.t < 12 ? this.t / 12 : this.t > 50 ? Math.max(0, (57 - this.t) / 7) : 1
+    // (no fade-in: the portal is whole from its first frame - Rust enemy.rs hand_update)
+    this.alpha = this.t > 50 ? Math.max(0, (57 - this.t) / 7) : 1
     if (this.t >= 57) this.removed = true
   }
   /** a strike hand is an enemy object (type 0x36): the player's hits reach it while its tiles are marked - a punch

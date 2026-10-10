@@ -1025,6 +1025,8 @@ export class Player extends Actor implements PlayerLike {
   private defuseStep(w: World) {
     const d = this.defuse!
     d.t++
+    // the script's turn down: two frames after the countdown went negative (skill audit sa_f42_punch_right)
+    if (d.t === 2) this.facing = 0
     if (d.t === 85) {
       this.swapToPartner(w)
       w.rng.rand(255, 'defuse npc')
@@ -1113,7 +1115,7 @@ export class Player extends Actor implements PlayerLike {
     if (this.form.controller === 0x3001b64 && --this.fusCnt < 0) {
       this.x = this.px << 8
       this.y = this.py << 8
-      this.facing = 0
+      // (the facing turns down at the script's t 2: defuseStep)
       this.defuse = { t: 0, x0: this.px }
     }
   }
@@ -1370,6 +1372,17 @@ export class Player extends Actor implements PlayerLike {
     this.state = 'skill'
     this.t = 0
     this.sk = { id, t: 0, held: true, release: -1, acc: 0, proj: null }
+    if ([15, 16, 6, 1, 3].includes(id)) {
+      // the beam object is built at the press in its charge state: the sparkle from the press, its tick counting the
+      // press frame (the engine's skill audit against the game)
+      const bg = beamGfx(this.ctx, id, lv)
+      if (bg) {
+        const cp = BEAM_POS[id === 1 ? 'banshee' : 'kame'].charge
+        const c = new BeamCharge(bg, () => [this.px + cp[this.facing][0], this.py + cp[this.facing][1]])
+        c.t = 1
+        this.sk.fx = w.add(c)
+      }
+    }
     if (SKILL_RAW[id]) {
       // the activate function's SetAnimRaw (0x0800ECDA) before the state's enter
       this.ap.raw = SKILL_RAW[id]
@@ -1411,6 +1424,7 @@ export class Player extends Actor implements PlayerLike {
       case 17:
         // Masenko beam (0x08021280, sound 3) + aim objects
         s.proj = w.add(new MasenkoCursor(this.ctx, this, this.facing, mult, lv))
+        ;(s.proj as MasenkoCursor).spawnBall(w)
         this.sfx(3)
         return
       case 5:
@@ -1994,9 +2008,15 @@ export class Player extends Actor implements PlayerLike {
       .filter((e) => overlaps(e.bodyBox(), cam))
       .slice(0, 16)
       .map((e) => ({ e: e as Actor, picked: false }))
-    const [cx, cy] = this.center()
+    // (the cursor starts at the footprint's centre x, 8 px above the position: the game's marker object +0x2C / +0x30,
+    // (168, 142) for a player at (160, 150) in every facing and form - skill audit sa_f02_skill14)
+    const cx = this.px + (this.footW >> 1)
+    const cy = this.py - 8
     const sel = (this.itSel = { n: Math.min(lv + 1, tier), cand, picks: [] as Actor[], x: cx << 8, y: cy << 8, vx: 0, vy: 0, cursor: true })
     const fx = (this.itFx = w.add(new ItMarkersFx(this.ctx, () => (sel.cursor ? [sel.x >> 8, sel.y >> 8] : null), () => sel.picks.map((e) => e.center()), () => this.itSel === sel || (!!this.it && this.it.targets === sel.picks))))
+    // (the rings' animation runs two ticks ahead of a fresh count: skill audit sa_f02_skill14, the game's +0x38 is 5
+    // four frames after the press)
+    fx.t = 2
     w.modal = [this, fx]
   }
   private itSelect(w: World) {

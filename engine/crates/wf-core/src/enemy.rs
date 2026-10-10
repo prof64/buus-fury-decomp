@@ -16,6 +16,13 @@ use crate::world::{broadcast, Body, EntityId, Event, Hand, HitMsg, Layer, World}
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+/// a value the per-frame state hash skips (what the view shows, derived from hashed state)
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ViewOnly<T>(pub T);
+impl<T> std::hash::Hash for ViewOnly<T> {
+    fn hash<H: std::hash::Hasher>(&self, _: &mut H) {}
+}
+
 #[derive(Clone, Debug, Hash, Serialize, Deserialize)]
 pub struct Enemy {
     pub a: Actor,
@@ -141,6 +148,10 @@ pub struct Enemy {
     pub anim_seq: u32,
     /// the shown graphics set when MechTransform swapped it (gfx id; -1 = the type's)
     pub gfx_now: i32,
+    /// the sprite the animation still draws from after a graphics swap (`nodes::shield_gfx`): obj+0x50 keeps the
+    /// old set's record until the next SetAnim / SetAnimRaw (None: `a.sprite`)
+    #[serde(default)]
+    pub drawn_sprite: ViewOnly<Option<i32>>,
     /// obj+0x291 set by a node (0x0800F924 from the Detach node's enter 0x0804E53C - the Ghost's first state): off
     /// the enemy grid for good (no marks, every spot fits)
     #[serde(default)]
@@ -257,6 +268,7 @@ impl Enemy {
             hover_ctl: false,
             anim_seq: 0,
             gfx_now: -1,
+            drawn_sprite: ViewOnly(None),
             detached: false,
             smash_puffs: 0,
             jitter: false,
@@ -293,6 +305,7 @@ impl Enemy {
         self.tele_ctl = -1;
         self.hover_ctl = false;
         self.hook = Hook::None;
+        self.drawn_sprite.0 = None;
         let prev = self.a.anim;
         // the sprite lacks the requested animation: the game's state object still runs (no idle state, no rand(255));
         // the idle animation is only shown (lockstep f02_vs_enemy_gun: GunShot on a sprite without raw 18)
@@ -370,6 +383,7 @@ impl Enemy {
     /// SetAnimRaw 0x0800ECDA: obj+0x50 only (the state object and its frame / tick stay)
     pub fn set_raw(&mut self, d: &crate::content::GameData, raw: i32) {
         self.ea.pos.raw = raw;
+        self.drawn_sprite.0 = None;
         if let Some(&k) = self
             .a
             .sprite
@@ -558,6 +572,11 @@ pub fn set_anim_rule(
         let id = w.ents[i].id;
         crate::shots::drop_charging_ball(w, id);
         drop_charging_kame(w, i);
+    }
+    // the minis' hop / roll controllers leave the height at 0 when another animation state replaces them (their exit
+    // 0x0804F750 / 0x0804F784) - opponent audit oa_t38_ki f38: hurt between hops
+    if matches!(w.en_ref(i).ty, 0x38 | 0x92) {
+        w.en(i).a.z = 0;
     }
     let d = Arc::clone(&w.data);
     let mut ev = std::mem::take(&mut w.events);
@@ -1639,7 +1658,13 @@ pub fn circle_player(w: &mut World, i: usize, speed: i32) -> bool {
     if m == 0 {
         return false;
     }
-    mark_moving(w, i);
+    // 0x0802F2EE: SetAnimRaw(1) + state 0x03003100 (the walk played backwards, like the back-off's) unless already
+    // in it (opponent audit, Mega Cyborg / Cyborg: the game's walk counts down from cel 3 while it backs away)
+    w.en(i).moving = true;
+    if w.en_ref(i).ea.rule != w.data.anim.reverse {
+        let rev = w.data.anim.reverse;
+        set_anim_rule(w, i, &[AnimRef::N(1)], true, Some(true), Some(rev));
+    }
     let vx = -((dx as i64 * speed as i64) / m as i64) as i32;
     let vy = -((dy as i64 * speed as i64) / m as i64) as i32;
     try_move(
@@ -2993,9 +3018,8 @@ pub fn hand_update(w: &mut World, i: usize) {
         }
     }
     if let Body::Hand(h) = &mut w.ents[i].body {
-        h.a.alpha = if t < 12 {
-            t * 256 / 12
-        } else if t > 50 {
+        // (no fade-in: the portal is whole from its first frame - opponent audit oa_t33_idle f78 ..)
+        h.a.alpha = if t > 50 {
             ((57 - t) * 256 / 7).max(0)
         } else {
             256

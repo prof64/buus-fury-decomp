@@ -376,15 +376,18 @@ export class MummyWrap extends Shot {
     if (!p) return
     const slot = this.ctx.wrapSlot
     this.ctx.wrapSlot = (slot + 1) & 7
-    this.x = p.x + 0x400
-    this.y = p.y - (WRAP_SLOT_Y[slot] << 8)
+    // (it stays where it hit for this frame: the stuck branch places it from the next update - shots.rs wrap_update)
+    const x = p.x + 0x400
+    const y = p.y - (WRAP_SLOT_Y[slot] << 8)
     this.stuck = true
-    this.offX = p.x - this.x
-    this.offY = p.y - this.y
+    this.offX = p.x - x
+    this.offY = p.y - y
   }
   onMessage(w: World, msg: HitMsg): boolean {
     if (msg.source === this || this.stuck || this.removed || !overlaps(msg.rect, this.rect())) return false
     this.burst(w)
+    // the melee's crit slot is not written by a bandage: alone, the punch shakes the screen (shots.rs on_message)
+    if (!msg.raw && !msg.dmg) msg.crit = true
     return true
   }
   draw(r: Renderer) {
@@ -647,6 +650,8 @@ export class KameBeam extends Shot {
     this.next = built
     this.sounds = !!o.sounds
     this.charging = this.sounds
+    // the player's beam: obj+0x18 one ahead at the fire (the engine's skill audit: the pieces step with the game's)
+    if (!this.sounds) this.vt = 1
     this.kind = 'beam'
   }
   /** 0x080207D2: firing (stop 3, sound 32) */
@@ -775,7 +780,8 @@ export class VolleyWave extends Shot {
     if (++this.n > 0xf0) this.done = true
   }
   draw(r: Renderer) {
-    drawVolleyPieces(r, this.ctx.data.sprites, this.dir, this.px, this.py, this.len)
+    // (the pieces span len - 8: the head 8 px short of the box's end - skill audit sa_f31_skill23)
+    drawVolleyPieces(r, this.ctx.data.sprites, this.dir, this.px, this.py, this.len - 8)
   }
 }
 
@@ -1014,6 +1020,8 @@ export class BigBangBall extends Shot {
       return
     }
     this.cap()
+    // the wall test reads the position before this tick's step (skill audit sa_f26_skill2_lv2_up)
+    const before = this.around(4)
     const [dx, dy] = DIR_VEC[this.dir]
     this.x += dx * 128
     this.y += dy * 128
@@ -1023,7 +1031,7 @@ export class BigBangBall extends Shot {
       audioEvent('sfx_stop', { id: 32 })
       return
     }
-    if (this.inWall(w, this.around(4))) return this.explode(w)
+    if (this.inWall(w, before)) return this.explode(w)
     if ((this.u & 3) === 0 && this.hit(w, this.around(BB_SIZE[this.f]), ATK[13], this.mult, false)) {
       audioEvent('sfx', { id: 48 + w.rng.rand(2, 'big bang hit sfx'), vol: 64 })
     }
@@ -1036,7 +1044,11 @@ export class BigBangBall extends Shot {
     this.hit(w, this.around(s), ATK[13], 81 * this.charge, false)
     audioEvent('sfx', { id: 23, vol: 64 })
     const [cx, cy] = this.center()
-    w.add(new BigBangBoom(this.ctx, cx - s, cy - s, s))
+    const boom = w.add(new BigBangBoom(this.ctx, cx - s, cy - s, s))
+    // the game's ball object lives on through its explosions: the skill stays unavailable until they end (skill audit
+    // sa_f26_skill2_lv2_up)
+    const o = this.owner as unknown as { bigBang?: unknown }
+    if (o.bigBang === this) o.bigBang = boom
   }
   /** an Energy Blast message (attack sub 4, another object) overlapping the box and the centre +- size * 3/4 */
   onMessage(w: World, msg: HitMsg): boolean {
@@ -1122,7 +1134,10 @@ export class MasenkoCursor extends Shot {
     return this.dir < 2 ? 70 : 100
   }
   pos(): [number, number] {
-    const [cx, cy] = this.owner.center()
+    // the footprint-rect centre (skill audit sa_f10_skill17: the game's cursor at Gohan's feet, 12 px below the body
+    // box centre)
+    const o = this.owner
+    const [cx, cy] = [(o.px * 2 + o.footW) >> 1, (o.py * 2 + o.footH) >> 1]
     const [dx, dy] = DIR_VEC[this.dir]
     return [cx + dx * this.d, cy + dy * this.d]
   }
@@ -1130,12 +1145,16 @@ export class MasenkoCursor extends Shot {
     const [x, y] = this.pos()
     return centered(x, y, 16, 16)
   }
+  /** the charging ball, built with the cursor at the press (skill audit sa_f10_skill17: the game's ball shows on the
+   *  press's frame) */
+  spawnBall(w: World) {
+    if (this.ball) return
+    const [mx, my] = MASENKO_MUZZLE[this.dir]
+    this.ball = w.add(new MasenkoBall(this.ctx, this.owner, this.dir, this, (this.owner.px + mx) << 8, (this.owner.py + my) << 8))
+  }
   update(w: World) {
     this.t++
-    if (!this.ball) {
-      const [mx, my] = MASENKO_MUZZLE[this.dir]
-      this.ball = w.add(new MasenkoBall(this.ctx, this.owner, this.dir, this, (this.owner.px + mx) << 8, (this.owner.py + my) << 8))
-    }
+    this.spawnBall(w)
     if (this.released >= 0) return
     if (this.lv < 2) {
       this.d += this.step
@@ -1275,12 +1294,15 @@ export class Ghost extends Shot {
   update(w: World) {
     this.w = w
     this.t++
+    // the appear animation as it was before this frame's tick: the easing starts the frame after the switch to raw 1
+    // (skill audit sa_f31_skill13: the game's first formation step one frame after it)
+    const appearing = this.ea.pos.raw === 19
     if (this.ea.tick() === 'idle') this.ea.enter(1, { rule: 'idle' })
     if (!this.free) {
       // formation (0x0804DC80): pos += (target - pos) / 32 toward the player + slot offset, once the appear animation
       // has ended (emulator: the ghost holds its spawn point while showing raw 19)
       this.facing = this.owner.facing
-      if (this.ea.pos.raw === 19) return
+      if (this.ea.pos.raw === 19 || appearing) return
       const o = GHOST_SLOTS[this.owner.facing][Math.min(2, this.slot)]
       const tx = (this.owner.px + o[0]) << 8
       const ty = (this.owner.py + o[1]) << 8
@@ -1295,7 +1317,9 @@ export class Ghost extends Shot {
     if (this.boom) {
       // state 0x11C SelfDestruct
       this.removed = true
-      this.ctx.explosion(w, this.px, this.py, 0x1000 + w.rng.rand(0x1000, 'ghost explosion rate'))
+      // at the centre of the ghost's frame box (skill audit sa_f31_skill13)
+      const r = this.rect()
+      this.ctx.explosion(w, (r.x0 + r.x1) >> 1, (r.y0 + r.y1) >> 1, 0x1000 + w.rng.rand(0x1000, 'ghost explosion rate'))
       return
     }
     // IfContactExplode
@@ -1714,6 +1738,7 @@ export class SJWave extends Shot {
  *  102/256 px; below 1 px it is destroyed (Dabura stunned). */
 export class DarkSphere extends Shot {
   r256 = 256
+  drawn = 256
   alpha = 1
   constructor(ctx: BuuCtx, owner: Actor, x: number, y: number) {
     super(ctx, owner, 0, 0, x, y)
@@ -1734,10 +1759,13 @@ export class DarkSphere extends Shot {
       this.removed = true
       return
     }
-    if (this.ctx.sphereState === 0) {
-      this.r256 = Math.min(64 * 256, this.r256 + 51)
-      if (this.r256 >= 64 * 256) this.ctx.sphereState = 2
-    } else if (this.ctx.sphereState === 2) {
+    // (the disc shows the radius before this update; under 64 px + 51 unclamped, from 64 px the expansion state and
+    // + 128 in the same update - Rust shots.rs sphere_update, opponent audit oa_t12_fight)
+    this.drawn = this.r256
+    if (this.ctx.sphereState === 0 && this.r256 < 64 * 256) {
+      this.r256 += 51
+    } else if (this.ctx.sphereState === 0 || this.ctx.sphereState === 2) {
+      this.ctx.sphereState = 2
       this.r256 += 128
       this.alpha = Math.max(0, ((128 - this.rad) * 50) / 64 / 50)
       if (this.alpha <= 0 || this.rad >= 128) {
@@ -1748,8 +1776,16 @@ export class DarkSphere extends Shot {
     }
     const p = this.ctx.player
     if (p && !p.dead) {
-      const [cx, cy] = p.center()
-      if ((cx - this.px) ** 2 + (cy - this.py) ** 2 <= this.rad * this.rad) this.hit(w, p.bodyBox(), ATK[2], 1024)
+      // (0x0803AF58: the circle against the body box's nearest point, r * r >> 16 above its squared distance; the
+      // direction away from the centre along the larger axis of the player's position)
+      const bb = p.bodyBox()
+      const nx = Math.min(Math.max(this.px, bb.x0), bb.x1)
+      const ny = Math.min(Math.max(this.py, bb.y0), bb.y1)
+      const d2 = (this.px - nx) ** 2 + (this.py - ny) ** 2
+      const dx = p.px - this.px
+      const dy = p.py - this.py
+      this.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 3 : 2) : dy > 0 ? 0 : 1
+      if (Math.floor((this.r256 * this.r256) / 65536) > d2) this.hit(w, bb, ATK[2], 1024)
     }
   }
   onMessage(w: World, msg: HitMsg): boolean {
@@ -1775,7 +1811,7 @@ export class DarkSphere extends Shot {
     if (fading) g.globalCompositeOperation = 'lighter'
     g.fillStyle = '#ffffff'
     g.beginPath()
-    g.arc(r.sx(this.px), r.sy(this.py), this.rad, 0, Math.PI * 2)
+    g.arc(r.sx(this.px), r.sy(this.py), this.drawn / 256, 0, Math.PI * 2)
     g.fill()
     g.restore()
   }

@@ -352,6 +352,10 @@ pub struct Player {
     pub state: PState,
     pub t: i32,
     pub sk: Option<SkillInst>,
+    /// the entity counter when Majin Buu's eat respawned this player (`candy_respawn`): the new object is the world
+    /// list's newest - the draw sort's tie order (view.rs `draw_key`)
+    #[serde(default)]
+    pub list_seq: u32,
     pub hp_acc: HpAcc,
     pub ep_acc: i32,
     pub regen_timer: i32,
@@ -445,6 +449,7 @@ impl Player {
             state: PState::Idle,
             t: 0,
             sk: None,
+            list_seq: 0,
             hp_acc: HpAcc::default(),
             ep_acc: 0,
             regen_timer: 0,
@@ -1223,6 +1228,8 @@ pub fn candy_respawn(w: &mut World, i: usize, x: i32, y: i32, ko: bool) {
         pl.a.facing = 0;
         pl.a.flash = 0;
     }
+    let seq = w.next_id;
+    p(w, i).list_seq = seq;
     w.rng.rand(255);
     w.rng.rand(255);
     p(w, i).ap.raw = 1;
@@ -2013,6 +2020,11 @@ fn defuse_step(w: &mut World, i: usize) {
         d.0 += 1;
         *d
     };
+    // the script's turn down comes two frames after the countdown went negative (skill audit sa_f42_punch_right:
+    // the form object's +0x10 is -1 after frame 28, the player's facing 0 from frame 30)
+    if t == 2 {
+        p(w, i).a.facing = 0;
+    }
     if t == 85 {
         swap_to_partner(w, i);
         w.rng.rand(255);
@@ -2406,7 +2418,7 @@ fn passive(w: &mut World, i: usize) {
             let pl = p(w, i);
             pl.a.x = pl.a.px() << 8;
             pl.a.y = pl.a.py() << 8;
-            pl.a.facing = 0;
+            // (the facing turns down at the script's t 2: `defuse_step`)
             let x0 = pl.a.px();
             pl.defuse = Some((0, x0));
         }
@@ -2830,6 +2842,22 @@ pub fn start_skill(w: &mut World, i: usize) {
             ..Default::default()
         });
     }
+    // the beam family's beam object is built at the press, in its charge state (the sparkle shows from the press:
+    // skill audit sa_f19_skill16 / sa_f02_skill15 - the game's sparkle a frame before ours when it came at tick 1)
+    if [15, 16, 6, 1, 3].contains(&id) {
+        let off = if id == 1 { BEAM_CHARGE_BANSHEE } else { BEAM_CHARGE_KAME };
+        let me = w.ents[i].id;
+        let f = fx::beam_charge(w, me, off, fx::BeamSet::Other);
+        // (its tick counts the press frame: the record steps at tick 4 / every 4 with the game's)
+        if let Some(k) = w.find(f) {
+            if let Body::Fx(b) = &mut w.ents[k].body {
+                if let fx::Fx::BeamCharge { t, .. } = b.as_mut() {
+                    *t = 1;
+                }
+            }
+        }
+        sk_mut(w, i).unwrap().fx = f;
+    }
     if let Some(raw) = skill_raw(id) {
         p(w, i).ap.raw = raw;
         let mut c = pr(w, i).clone();
@@ -2883,6 +2911,22 @@ fn skill_enter(w: &mut World, i: usize, id: i32, lv: i32, mult: i32) {
                 crate::vram::release(w, crate::vram::Owner::BeamObj(me));
                 crate::vram::acquire(w, crate::vram::Owner::BeamObj(me), 0x300);
             }
+            // the Flame Kamehameha's charge record object is made at the press, a frame before the control's first
+            // tick (skill audit sa_f21_skill11: the game's picture shows it the frame after the press, its records a
+            // frame ahead of one made at tick 1)
+            if id == 11 && sk_mut(w, i).is_some_and(|s| s.fx == 0) {
+                let serial = pr(w, i).sk.as_ref().map(|s| s.serial).unwrap_or(0);
+                let f = fx::add(
+                    w,
+                    Fx::RecObj {
+                        what: fx::RecWhat::FlameCharge,
+                        owner: me,
+                        t: 0,
+                        alive: Alive::SkillTickLt { p: me, serial, n: 24 },
+                    },
+                );
+                sk_mut(w, i).unwrap().fx = f;
+            }
         }
         2 => {
             let (bx, by) = shots::BIGBANG_POS[facing as usize];
@@ -2899,6 +2943,9 @@ fn skill_enter(w: &mut World, i: usize, id: i32, lv: i32, mult: i32) {
         }
         17 => {
             let id2 = shots::add(w, shots::masenko(me, facing, mult, lv));
+            if let Some(ci) = w.find(id2) {
+                shots::masenko_spawn_ball(w, ci);
+            }
             if let Some(s) = sk_mut(w, i) {
                 s.proj = id2;
             }
@@ -3913,7 +3960,10 @@ fn start_it(w: &mut World, i: usize, lv: i32) {
             }
         }
     }
-    let (cx, cy) = pr(w, i).a.center();
+    // the cursor starts at the footprint's centre x, 8 px above the position (the game's marker object +0x2C / +0x30:
+    // (168, 142) for a player at (160, 150) in every facing and form - skill audit sa_f02 / sa_f05_skill14; not the
+    // body box's centre, a pixel off)
+    let (cx, cy) = (pr(w, i).a.px() + (pr(w, i).a.foot_w >> 1), pr(w, i).a.py() - 8);
     let serial = w.next_serial();
     p(w, i).it_sel = Some(ItSel {
         serial,
@@ -3932,7 +3982,7 @@ fn start_it(w: &mut World, i: usize, lv: i32) {
     let f = fx::add(
         w,
         Fx::ItMarkers {
-            t: 0,
+            t: 2, // (the rings run two ticks ahead of a fresh count: skill audit sa_f02_skill14, the game's +0x38 is 5 four frames after the press)
             alive: Alive::It { p: me, serial },
         },
     );

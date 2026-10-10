@@ -92,7 +92,9 @@ pub fn round_div_sqrt(num: i64, s: i64) -> i64 {
 }
 
 /// `Math.round(sin(k * PI / 16) * 8)` for k = 0..15 (hop arcs)
-pub const HOP_ARC8: [i32; 16] = [0, 2, 3, 4, 6, 7, 7, 8, 8, 8, 7, 7, 6, 4, 3, 2];
+/// the mini hops' height: -(-sin >> 13) of the 32-bit table 0x087B6EEC at u = 0, 8 .. 0x78 (the controllers 0x0803522C
+/// / Mini Janemba's: `-(table[u]) >> 13`, rounded away from 0 - opponent audit oa_t38_idle f19 .., oa_t91_summon)
+pub const HOP_ARC8: [i32; 16] = [0, 2, 4, 5, 6, 7, 8, 8, 8, 8, 8, 7, 6, 5, 4, 2];
 
 #[cfg(test)]
 mod tests {

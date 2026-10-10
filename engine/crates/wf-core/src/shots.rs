@@ -346,6 +346,9 @@ pub struct MummyWrap {
     pub delay: i32,
     pub off_x: i32,
     pub off_y: i32,
+    /// the drawn record index (0x087571F4 + 12 * cel): the update sets it before advancing the tick (0x0802D94C)
+    #[serde(default)]
+    pub cel: i32,
 }
 
 #[derive(Clone, Debug, Hash, Serialize, Deserialize)]
@@ -413,6 +416,10 @@ pub enum ShotKind {
     /// Dabura's dark sphere 0x0803AEA8 (radius in 1/256 px)
     DarkSphere {
         r256: i32,
+        /// the radius the disc shows: the one before this frame's update (its tiles are drawn ahead of the growth -
+        /// opponent audit oa_t12_fight f484 ..)
+        #[serde(default)]
+        drawn: i32,
     },
     /// Bio Mech grapple arm 0x0804B380 (phase 0 extend, 1 retract, 2 reel the player in; (gx, gy) the grip, px)
     GrappleArm {
@@ -656,6 +663,7 @@ pub fn mummy_wrap(owner: EntityId, dir: Dir, x: i32, y: i32, diag: bool) -> Shot
             delay: 0,
             off_x: 0,
             off_y: 0,
+            cel: (if diag { 6 } else { 0 }) + 3 * (dir as i32 >> 1),
         })),
     )
 }
@@ -739,7 +747,7 @@ pub fn sj_wave(owner: EntityId, dir: Dir, x: i32, y: i32) -> Shot {
 }
 pub fn dark_sphere(w: &mut World, owner: EntityId, x: i32, y: i32) -> Shot {
     w.g.sphere_state = 0;
-    Shot::new(owner, 0, 0, x, y, ShotKind::DarkSphere { r256: 256 })
+    Shot::new(owner, 0, 0, x, y, ShotKind::DarkSphere { r256: 256, drawn: 256 })
 }
 pub fn grapple_arm(owner: EntityId, dir: Dir, x: i32, y: i32) -> Shot {
     Shot::new(
@@ -1120,7 +1128,7 @@ pub fn rect(w: &World, i: usize) -> Rect {
                 Rect::new(px - 8, py - 32, px + 56, py)
             }
         }
-        ShotKind::DarkSphere { r256 } => {
+        ShotKind::DarkSphere { r256, .. } => {
             let rr = (r256 + 128) >> 8;
             centered(px, py, rr * 2, rr * 2)
         }
@@ -1486,6 +1494,10 @@ fn wrap_update(w: &mut World, i: usize) {
         return;
     };
     let mut m = (**m).clone();
+    // the record (+0x18) = base (+0x4C) + 12 * (tick >> 3), set before the step: base 3 * (dir >> 1) (+ 6 diagonal)
+    // from the builder, record 3 once stuck (0x0802D866)
+    let d = w.shot_ref(i).dir as i32;
+    m.cel = if m.stuck { 3 } else { (if m.diag { 6 } else { 0 }) + 3 * (d >> 1) } + (m.tick >> 3);
     if m.stuck {
         if let Some(pi) = pi {
             let (px, py) = (w.pl_ref(pi).a.x, w.pl_ref(pi).a.y);
@@ -1517,9 +1529,8 @@ fn wrap_update(w: &mut World, i: usize) {
                 w.g.wrap_slot = (slot + 1) & 7;
                 let (px, py) = (w.pl_ref(pi).a.x, w.pl_ref(pi).a.y);
                 let (x, y) = (px + 0x400, py - (WRAP_SLOT_Y[slot as usize & 7] << 8));
-                let s = w.shot(i);
-                s.x = x;
-                s.y = y;
+                // (the bandage stays where it hit for this frame: the stuck branch places it from the next update -
+                // opponent audit oa_t81_idle f48, the game's first stuck frame shows it at the hit)
                 m.stuck = true;
                 m.off_x = px - x;
                 m.off_y = py - y;
@@ -1578,7 +1589,9 @@ fn wrap_gone(w: &mut World, i: usize) {
 fn wrap_burst(w: &mut World, i: usize) {
     wrap_gone(w, i);
     let (px, py) = (w.shot_ref(i).px(), w.shot_ref(i).py());
-    fx::explosion(w, px, py, 0x2000);
+    // (sorted with the actors by its y: emulator sort node layer 0x38, depth its y - behind the player's blast below
+    // it, opponent audit oa_t81_ki f30)
+    fx::explosion_sorted(w, px, py, 0x2000);
 }
 
 fn straight_update(w: &mut World, i: usize) {
@@ -1712,7 +1725,13 @@ fn straight_end(w: &mut World, i: usize, explode_fx: bool) {
     }
     if explode_fx && explode {
         let (px, py) = (w.shot_ref(i).px(), w.shot_ref(i).py());
-        fx::explosion(w, px, py, 0x2000);
+        // (a gun / rifle bullet's cloud sorts with the actors by its y: opponent audit oa_t2c_below f104, a gunman
+        // firing up in front of his bullet's cloud above him)
+        if matches!(&w.shot_ref(i).kind, ShotKind::Straight(o) if matches!(o.name, SName::Gun | SName::Rifle)) {
+            fx::explosion_sorted(w, px, py, 0x2000);
+        } else {
+            fx::explosion(w, px, py, 0x2000);
+        }
     }
     w.ents[i].removed = true;
 }
@@ -2187,11 +2206,14 @@ fn bigbang_update(w: &mut World, i: usize) {
         return;
     }
     let (dx, dy) = DIR_VEC[dir as usize];
+    if let ShotKind::BigBang(b) = &mut w.shot(i).kind {
+        bb_cap(b);
+    }
+    // the wall test reads the position before this tick's step (skill audit sa_f26_skill2_lv2_up: the game's ball
+    // at y 71.5 does not explode, at 71.0 it does - one frame after a test on the moved position)
+    let a4_before = bb_around(w, i, 4);
     {
         let s = w.shot(i);
-        if let ShotKind::BigBang(b) = &mut s.kind {
-            bb_cap(b);
-        }
         s.x += dx * 128;
         s.y += dy * 128;
         if let ShotKind::BigBang(b) = &mut s.kind {
@@ -2218,8 +2240,7 @@ fn bigbang_update(w: &mut World, i: usize) {
         w.sfx_stop(32);
         return;
     }
-    let a4 = bb_around(w, i, 4);
-    if in_wall(w, i, &a4) {
+    if in_wall(w, i, &a4_before) {
         return bigbang_explode(w, i);
     }
     let (u, f, charge) = match &w.shot_ref(i).kind {
@@ -2250,7 +2271,7 @@ fn bigbang_explode(w: &mut World, i: usize) {
     hit(w, i, around, atk(13), (81 * charge) as i32, false);
     w.sfx(23, 64);
     let (cx, cy) = around.center();
-    fx::add(
+    let boom = fx::add(
         w,
         fx::Fx::BigBangBoom {
             n: 60,
@@ -2259,6 +2280,16 @@ fn bigbang_explode(w: &mut World, i: usize) {
             s,
         },
     );
+    // the game's ball object lives on through its explosions (0x0804A26C beside the blasts 0x0804A2C0): the skill
+    // stays unavailable (the HUD icon greyed) until they end (skill audit sa_f26_skill2_lv2_up f350 ..)
+    let (owner, me) = (w.shot_ref(i).owner, w.ents[i].id);
+    if let Some(k) = w.find(owner) {
+        if let Body::Player(p) = &mut w.ents[k].body {
+            if p.big_bang == me {
+                p.big_bang = boom;
+            }
+        }
+    }
 }
 
 /// Masenko (skill 17): the cursor (ctor 0x08021594, update 0x0802163A) at the body-box centre + dir * d and the ball
@@ -2285,7 +2316,7 @@ pub fn masenko(owner: EntityId, dir: Dir, mult: i32, lv: i32) -> Shot {
     )
 }
 fn masenko_pos(w: &World, owner: EntityId, dir: Dir, d: i32) -> (i32, i32) {
-    let (cx, cy) = w.actor_by_id(owner).map(|a| a.center()).unwrap_or((0, 0));
+    let (cx, cy) = w.actor_by_id(owner).map(|a| a.fc()).unwrap_or((0, 0));
     let (dx, dy) = DIR_VEC[dir as usize];
     (cx + dx * d, cy + dy * d)
 }
@@ -2319,6 +2350,36 @@ pub fn masenko_release(w: &mut World, i: usize) {
         }
     }
 }
+/// the cursor's charging ball (class 0x08021280) at the owner's position + MASENKO_MUZZLE: built with the cursor at
+/// the press (skill audit sa_f10_skill17: the game's ball shows on the press's frame, its spark phase a frame ahead
+/// of a ball built in the cursor's first update)
+pub fn masenko_spawn_ball(w: &mut World, i: usize) {
+    let (owner, dir) = (w.shot_ref(i).owner, w.shot_ref(i).dir);
+    let lv = match &w.shot_ref(i).kind {
+        ShotKind::MasenkoCursor(c) if c.ball == 0 => c.lv,
+        _ => return,
+    };
+    // (the cursor at its start point too: the ctor places it - the game draws it at Gohan's feet on the press's
+    // frame, a tap included)
+    let (cx, cy) = masenko_pos(w, owner, dir, 0);
+    w.shot(i).x = cx << 8;
+    w.shot(i).y = cy << 8;
+    let (mx, my) = MASENKO_MUZZLE[dir as usize];
+    let (opx, opy) = w.actor_by_id(owner).map(|a| (a.px(), a.py())).unwrap_or((0, 0));
+    let me = w.ents[i].id;
+    let ball = Shot::new(
+        owner,
+        dir,
+        1,
+        (opx + mx) << 8,
+        (opy + my) << 8,
+        ShotKind::MasenkoBall(Box::new(MasenkoBall { cursor: me, lv, phase: MPhase::Charge, vx: 0, vy: 0, a: 0, b: 0, tb: 0 })),
+    );
+    let id = add(w, ball);
+    if let ShotKind::MasenkoCursor(x) = &mut w.shot(i).kind {
+        x.ball = id;
+    }
+}
 fn masenko_update(w: &mut World, i: usize) {
     w.shot(i).t += 1;
     let (owner, dir) = (w.shot_ref(i).owner, w.shot_ref(i).dir);
@@ -2327,33 +2388,7 @@ fn masenko_update(w: &mut World, i: usize) {
         _ => return,
     };
     if c.ball == 0 {
-        let (mx, my) = MASENKO_MUZZLE[dir as usize];
-        let (opx, opy) = w
-            .actor_by_id(owner)
-            .map(|a| (a.px(), a.py()))
-            .unwrap_or((0, 0));
-        let me = w.ents[i].id;
-        let ball = Shot::new(
-            owner,
-            dir,
-            1,
-            (opx + mx) << 8,
-            (opy + my) << 8,
-            ShotKind::MasenkoBall(Box::new(MasenkoBall {
-                cursor: me,
-                lv: c.lv,
-                phase: MPhase::Charge,
-                vx: 0,
-                vy: 0,
-                a: 0,
-                b: 0,
-                tb: 0,
-            })),
-        );
-        let id = add(w, ball);
-        if let ShotKind::MasenkoCursor(x) = &mut w.shot(i).kind {
-            x.ball = id;
-        }
+        masenko_spawn_ball(w, i);
     }
     if c.released >= 0 {
         return;
@@ -2515,7 +2550,11 @@ pub fn kame_beam(
             a,
             mult,
             gfx,
-            vt: 0,
+            // (obj+0x18 one ahead of the fire tick: the pieces' variants step with the game's - skill audit
+            // sa_f19_skill16 / sa_f02_skill15, 0 put them a frame late); the object is the charge's, its +0x18 counts on
+            // from the press - the fire at its 24 (sa_f39_skill1: the Banshee Blast's 4-variant body two phases off
+            // from 1; a 2-variant beam never showed it)
+            vt: 25,
             stopped: false,
             next: built,
             charging: false,
@@ -2790,6 +2829,9 @@ pub fn pvp_homing_targets(w: &World, owner: EntityId) -> Vec<usize> {
 fn ghost_update(w: &mut World, i: usize) {
     w.shot(i).t += 1;
     let d = std::sync::Arc::clone(&w.data);
+    // the appear animation (raw 19) as it was before this frame's animation tick: the formation easing starts the
+    // frame after the switch to raw 1 (skill audit sa_f31_skill13: the game's first step one frame after it)
+    let appearing = matches!(&w.shot_ref(i).kind, ShotKind::Ghost(g) if g.ea.pos.raw == 19);
     let tick = {
         let mut rng = w.rng;
         let r = if let ShotKind::Ghost(g) = &mut w.shot(i).kind {
@@ -2821,7 +2863,7 @@ fn ghost_update(w: &mut World, i: usize) {
         if let ShotKind::Ghost(x) = &mut w.shot(i).kind {
             x.facing = of;
         }
-        if g.ea.pos.raw == 19 {
+        if g.ea.pos.raw == 19 || appearing {
             return;
         }
         let o = GHOST_SLOTS[of as usize][g.slot.min(2) as usize];
@@ -2845,9 +2887,14 @@ fn ghost_update(w: &mut World, i: usize) {
     };
     if g.boom {
         w.ents[i].removed = true;
-        let (px, py) = (w.shot_ref(i).px(), w.shot_ref(i).py());
+        // the explosion at the centre of the ghost's frame box (skill audit sa_f31_skill13: the game's cloud 8 px
+        // right / up of the position)
+        let (px, py) = {
+            let r = rect(w, i);
+            ((r.x0 + r.x1) >> 1, (r.y0 + r.y1) >> 1)
+        };
         let rate = 0x1000 + w.rng.rand(0x1000);
-        fx::explosion(w, px, py, rate);
+        fx::explosion_sorted(w, px, py, rate);
         return;
     }
     let r = rect(w, i);
@@ -3262,6 +3309,7 @@ fn superball_update(w: &mut World, i: usize) {
                 left: 6,
                 rate: 0x4000,
                 acc: 0,
+                sorted: false,
             })));
             crate::vram::rekey(
                 w,
@@ -3293,31 +3341,44 @@ fn sphere_update(w: &mut World, i: usize) {
         w.ents[i].removed = true;
         return;
     }
-    let ShotKind::DarkSphere { mut r256 } = w.shot_ref(i).kind else {
+    let ShotKind::DarkSphere { mut r256, .. } = w.shot_ref(i).kind else {
         return;
     };
-    if w.g.sphere_state == 0 {
-        r256 = (64 * 256).min(r256 + 51);
-        if r256 >= 64 * 256 {
-            w.g.sphere_state = 2;
-        }
-    } else if w.g.sphere_state == 2 {
+    let drawn = r256;
+    // (0x0803B0E0: under 64 px + 51, unclamped; from 64 px the expansion state and + 128 in the same update -
+    // opponent audit oa_t12_fight f805: the second hit)
+    if w.g.sphere_state == 0 && r256 < 64 * 256 {
+        r256 += 51;
+    } else if matches!(w.g.sphere_state, 0 | 2) {
+        w.g.sphere_state = 2;
         r256 += 128;
         if r256 >= 128 * 256 {
             w.g.sphere_state = 3;
             w.ents[i].removed = true;
-            w.shot(i).kind = ShotKind::DarkSphere { r256 };
+            w.shot(i).kind = ShotKind::DarkSphere { r256, drawn };
             return;
         }
     }
-    w.shot(i).kind = ShotKind::DarkSphere { r256 };
+    w.shot(i).kind = ShotKind::DarkSphere { r256, drawn };
     if let Some(pi) = w.player_idx(0) {
         if !w.pl_ref(pi).dead {
-            let (cx, cy) = w.pl_ref(pi).a.center();
+            // (0x0803AF58: the circle against the body box - the box's point nearest the centre, r * r >> 16 above
+            // its squared distance; opponent audit oa_t12_fight f726: the player hit 47 frames before a centre test)
+            let bb = w.pl_ref(pi).a.body_box();
             let (px, py) = (w.shot_ref(i).px(), w.shot_ref(i).py());
-            let d2 = ((cx - px) as i64).pow(2) + ((cy - py) as i64).pow(2);
-            if d2 * 65536 <= (r256 as i64) * (r256 as i64) {
-                let bb = w.pl_ref(pi).a.body_box();
+            let (nx, ny) = (px.clamp(bb.x0, bb.x1), py.clamp(bb.y0, bb.y1));
+            let d2 = ((px - nx) as i64).pow(2) + ((py - ny) as i64).pow(2);
+            // (the message's direction: away from the centre along the larger axis of the player's position -
+            // 0x0803B120; opponent audit oa_t12_fight f727: knocked left)
+            let (dx, dy) = (w.pl_ref(pi).a.px() - px, w.pl_ref(pi).a.py() - py);
+            w.shot(i).dir = if dx.abs() > dy.abs() {
+                if dx > 0 { 3 } else { 2 }
+            } else if dy > 0 {
+                0
+            } else {
+                1
+            };
+            if ((r256 as i64) * (r256 as i64)) >> 16 > d2 {
                 hit(w, i, bb, atk(2), 1024, true);
             }
         }
@@ -3444,6 +3505,11 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
                 return false;
             }
             wrap_burst(w, i);
+            // (the melee's crit slot is not written by a bandage: alone, the punch shakes the screen (15, 75) like a
+            // breakable's - opponent audit oa_t81_punch f294, the punch bursting Totenhotep's flying bandage)
+            if msg.raw == 0 && msg.dmg == 0 {
+                msg.crit = true;
+            }
             true
         }
         // another object's message head-on (the player's punch or energy attack; another wave: two laser turrets
@@ -3469,7 +3535,7 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
             }
             false
         }
-        ShotKind::DarkSphere { r256 } => {
+        ShotKind::DarkSphere { r256, drawn } => {
             if msg.team != 1 || msg.atk.kind != 1 || w.g.sphere_state != 0 {
                 return false;
             }
@@ -3477,7 +3543,7 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
                 return false;
             }
             let nr = r256 - 102;
-            w.shot(i).kind = ShotKind::DarkSphere { r256: nr };
+            w.shot(i).kind = ShotKind::DarkSphere { r256: nr, drawn: *drawn };
             if nr < 256 {
                 w.g.sphere_state = 1;
                 w.ents[i].removed = true;

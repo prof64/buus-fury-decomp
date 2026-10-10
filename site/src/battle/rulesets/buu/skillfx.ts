@@ -71,6 +71,8 @@ export class DragonFistFx extends Vis {
   steer: [number, number] = [0, 0]
   /** -1 flying (sending), >= 0 launched: ticks since the launch */
   dying = -1
+  /** the player control's shift of this tick (null: none) - the OAM shows the chain before it */
+  shifted: number | null = null
   constructor(ctx: BuuCtx, owner: Actor, dir: Dir) {
     super()
     this.ctx = ctx
@@ -99,7 +101,17 @@ export class DragonFistFx extends Vis {
   }
   update(w: World) {
     this.t++
+    this.shifted = null
     if (this.dying >= 0) {
+      // the body keeps easing between its neighbours after the launch (no steering, no messages; skill audit
+      // sa_f41_skill5_steer)
+      for (let i = 1; i < 5; i++) {
+        const s = this.seg[i]
+        const p = this.seg[i - 1]
+        const c = this.seg[i + 1]
+        s[0] = (3 * s[0] + ((p[0] + c[0]) >> 1)) >> 2
+        s[1] = (3 * s[1] + ((p[1] + c[1]) >> 1)) >> 2
+      }
       if (++this.dying >= 24) this.explode(w, false)
       return
     }
@@ -135,6 +147,7 @@ export class DragonFistFx extends Vis {
   }
   /** 0x08038E8A (player control, tick < 90): root by v, each child 0x20 more along the facing */
   shift(v: number) {
+    this.shifted = v
     const [dx, dy] = DIR_VEC[this.dir]
     for (let i = 0; i < 6; i++) {
       this.seg[i][0] += dx * (v + 0x20 * i)
@@ -161,9 +174,13 @@ export class DragonFistFx extends Vis {
   draw(r: Renderer) {
     const bank = this.ctx.data.sprites
     const order = this.dir === 1 ? [5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5]
+    const [dx, dy] = DIR_VEC[this.dir]
     for (const k of order) {
-      const i = k < 5 ? 0 : this.dying < 0 ? 1 : 1 + Math.min(2, this.dying >> 3)
-      drawRecAddr(r, bank, DF_TABLE + 12 * (this.dir * 4 + i), this.seg[k][0] >> 8, this.seg[k][1] >> 8)
+      // the dying head's tiles step a frame ahead of the OAM (re-uploaded in place); the chain as built before the
+      // player control's shift of the tick (skill audit sa_f41_skill5: the game's OAM)
+      const i = k < 5 ? 0 : this.dying < 0 ? 1 : 1 + Math.min(2, (this.dying + 1) >> 3)
+      const sh = this.shifted === null ? 0 : this.shifted + 0x20 * k
+      drawRecAddr(r, bank, DF_TABLE + 12 * (this.dir * 4 + i), (this.seg[k][0] - dx * sh) >> 8, (this.seg[k][1] - dy * sh) >> 8)
     }
   }
 }
@@ -254,9 +271,12 @@ export function drawVolleyPieces(r: Renderer, bank: Bank, dir: Dir, ox: number, 
   const hx = ox + dx * L
   const hy = oy + dy * L
   const base = VOLLEY_TABLE + 36 * dir
-  drawRecAdd(r, bank, base, ox, oy)
-  for (let k = 8; k < len - 9; k += 8) drawRecAdd(r, bank, base + 12, ox + dx * k, oy + dy * k)
+  // (the tail in front, the head behind: drawn head first - skill audit sa_f31_skill23)
   drawRecAdd(r, bank, base + 24, hx, hy)
+  const ks: number[] = []
+  for (let k = 8; k < len - 9; k += 8) ks.push(k)
+  for (const k of ks.reverse()) drawRecAdd(r, bank, base + 12, ox + dx * k, oy + dy * k)
+  drawRecAdd(r, bank, base, ox, oy)
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -285,18 +305,22 @@ export class BbkFlareFx extends Vis {
   update() {
     this.t++
     if (!this.ended && !this.alive()) this.ended = true
-    if (this.ended && ((this.t >> 2) & 3) === 0 && (this.t & 3) === 0) this.removed = true
+    // (removed at the flare's cycle end three ticks on: skill audit sa_f41_skill3)
+    if (this.ended && (this.t & 15) === 3) this.removed = true
   }
   draw(r: Renderer) {
     const set = this.ctx.fx('buu_bbk_flare')
     if (!set) return
-    const k = (this.t >> 2) & 3
-    for (const name of ['flare', 'mirror']) {
-      const st = set.anims.get(name)?.dirs[this.dir][k]
+    // the tiles are re-uploaded in place: a step shows a frame ahead of the OAM (skill audit sa_f41_skill3); the ball
+    // goes with the beam's release, under the flare
+    const t = this.t + 1
+    if (!this.ended && this.alive()) {
+      const st = set.anims.get('ball')?.dirs[this.dir][(t >> 2) & 1]
       if (st) set.drawFrame(r.ctx, st.frame, r.sx(this.x), r.sy(this.y), st.flip)
     }
-    if (!this.ended) {
-      const st = set.anims.get('ball')?.dirs[this.dir][(this.t >> 2) & 1]
+    const k = (t >> 2) & 3
+    for (const name of ['mirror', 'flare']) {
+      const st = set.anims.get(name)?.dirs[this.dir][k]
       if (st) set.drawFrame(r.ctx, st.frame, r.sx(this.x), r.sy(this.y), st.flip)
     }
   }

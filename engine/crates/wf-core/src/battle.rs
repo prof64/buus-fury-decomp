@@ -853,6 +853,7 @@ pub fn camera(w: &mut World, slot: usize) {
     let shaking = w.camera_held_by_shake();
     let c = &mut w.cameras[slot];
     c.shown = if c.init { c.rect } else { Rect::default() };
+    c.shown_fine = (c.x, c.y);
     if !c.init {
         c.x = tx << 10;
         c.y = ty << 10;
@@ -874,6 +875,7 @@ pub fn camera(w: &mut World, slot: usize) {
     c.rect = Rect::new(cx, cy, cx + GBA_W, cy + GBA_H);
     if c.shown == Rect::default() {
         c.shown = c.rect;
+        c.shown_fine = (c.x, c.y);
     }
 }
 /// lockstep: copy the emulator's camera (22.10)
@@ -885,6 +887,7 @@ pub fn set_camera(w: &mut World, slot: usize, x: i32, y: i32) {
     let (cx, cy) = (x >> 10, y >> 10);
     c.rect = Rect::new(cx, cy, cx + GBA_W, cy + GBA_H);
     c.shown = c.rect;
+    c.shown_fine = (c.x, c.y);
 }
 
 fn live_primary(w: &World) -> Vec<EntityId> {

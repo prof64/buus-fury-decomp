@@ -542,14 +542,13 @@ pub fn busy_controller(w: &mut World, i: usize) {
         && w.field.is_some()
         && matches!(kind(&c, n), K::MiniHopToward | K::MiniHopFlee)
     {
-        if let Some(r) = rt(w, &c, n) {
-            r.d[0] = (r.d[0] + 8) & 0xff;
-            let ph = r.d[0];
-            w.en(i).a.z = if ph >= 0x80 {
-                -HOP_ARC8[((ph - 0x80) >> 3) as usize]
-            } else {
-                0
-            };
+        let c0 = rt(w, &c, n).map(|r| {
+            let c0 = r.d[0];
+            r.d[0] = (c0 + 8) & 0xff;
+            c0
+        });
+        if let Some(c0) = c0 {
+            hop_height(w, i, c0);
         }
         return;
     }
@@ -858,6 +857,13 @@ fn is_anim_id(w: &World, i: usize, id: usize) -> bool {
     let raw = w.en_ref(i).a.anim_raw(&w.data);
     raw.is_some() && raw == SETANIM_RAW.get(id).copied()
 }
+/// a mini hop controller's height from its counter before the + 8: from 0x80 the arc, below it the last height stays
+/// (the controller writes +0x176 only in the air - opponent audit oa_t38_idle: -2 px between hops)
+fn hop_height(w: &mut World, i: usize, c0: i32) {
+    if c0 >= 0x80 {
+        w.en(i).a.z = -HOP_ARC8[((c0 - 0x80) >> 3) as usize & 15];
+    }
+}
 fn set_anim_r(w: &mut World, i: usize, refs: &[AnimRef], looped: bool, rule: u32) {
     en::set_anim_rule(w, i, refs, true, Some(looped), Some(rule));
 }
@@ -989,11 +995,11 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         // shield soldiers: the graphics swap runs on enter (seen on the GotoState frame)
         K::RaiseShield => {
             w.en(i).shield = 1;
-            shield_gfx(w, i, &[(0xB0, 0xAF), (0x102, 0xB2), (0x56, 0xAC)]);
+            shield_gfx(w, i, &[(0xB0, 0xAF), (0x101, 0xB2), (0x56, 0xAC)]);
         }
         K::LowerShield => {
             w.en(i).shield = 0;
-            shield_gfx(w, i, &[(0xAF, 0xB0), (0xB2, 0x102), (0xAC, 0x56)]);
+            shield_gfx(w, i, &[(0xAF, 0xB0), (0xB2, 0x101), (0xAC, 0x56)]);
         }
         K::ShieldBreak => {
             w.en(i).shield = -1;
@@ -1003,7 +1009,7 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
                 &[
                     (0xB0, 0xB1),
                     (0xAF, 0xB1),
-                    (0x102, 0x100),
+                    (0x101, 0x100),
                     (0xB2, 0x100),
                     (0x56, 0x55),
                     (0xAC, 0x55),
@@ -1014,8 +1020,10 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         }
         // RunMotionController with a field patrol runner (0x080299A3): enter is a nop (fieldpatrol.rs)
         K::RunMotionController if crate::fieldpatrol::has(w, i) => {}
+        // (a walk keeps running: an on-hit GotoState through a RunMotionController state into a wait - the Airship
+        // Warlord's 0x12 -> 0x16 - leaves the chase's walk on, no idle draw; opponent audit oa_t00_punch f6)
         K::RunMotionController | K::PartMirrorAnim => {
-            if !w.en_ref(i).moving {
+            if !w.en_ref(i).moving && !w.en_ref(i).is_anim(1) {
                 set_anim(w, i, &[nm("idle")], false, Some(true));
             }
         }
@@ -1428,7 +1436,8 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             r.d[1] = w.en_ref(i).a.y;
         }
         // enter 0x0803399E: the player shows raw 10 frame 0, faces the vampire's facing ^ 1, held; the VAMPIRE moves next
-        // to the player (pos = player pos - 0x08759334[facing]); vampire SetAnimRaw(0x12) + its own loop state
+        // to the player (pos = player pos - 0x08759334[facing]); vampire SetAnimRaw(0x12) + its own state 0x0804C3CC
+        // (frames 0..3, then 2 / 3 looping: opponent audit oa_t52_below f57)
         K::VampireGrab => {
             r.d[0] = 0;
             r.d[1] = 0;
@@ -1446,7 +1455,7 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
                 a.y = py - (oy << 8);
             }
             en::mark_self(w, i);
-            let l = w.data.anim.loop3;
+            let l = w.data.anim.tail_loop;
             set_anim_r(w, i, &[an(18)], true, l);
         }
         // enter 0x080298D8: SetAnimRaw(1) + a controller that glues the enzyme to the player (not held)
@@ -1612,7 +1621,14 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             set_anim_r(w, i, &[an(18)], true, h);
             mini_aim(w, i);
         }
-        K::MiniHopFlee | K::Hop => r.d[0] = 0,
+        K::MiniHopFlee => r.d[0] = 0,
+        // the Mini-Yakon's hop (enter 0x0804E834): SetAnimRaw(0x0E) (raw 15) under the hop controller 0x03003254 (its
+        // frames: the update below; opponent audit oa_t91_summon)
+        K::Hop => {
+            r.d[0] = 0;
+            let h = w.data.anim.hold;
+            set_anim_r(w, i, &[an(14)], true, h);
+        }
         // controller 0x03003248 enter 0x08034CF8: the diagonal toward the player, velocity 0x0875947C[dir] (+-1.5 px)
         // anim 0x12 (raw 19) under the roll controller (its own frames: the update below)
         K::MiniRollAttack => {
@@ -1672,10 +1688,12 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             let rule = w.data.anim.once_stop2;
             set_anim_r(w, i, &[an(18)], false, rule);
         }
-        K::PlayAnim12
-        | K::PlayAnim12b
-        | K::PlayAnim12Yakon
-        | K::PlayAnim12Yakon2 => set_anim(w, i, &[an(17)], true, Some(false)),
+        // Dabura's rise / descent around the Dark Sphere (states 0x78 / 0x7A): the animation is set by the node's
+        // first update (below)
+        K::PlayAnim12 | K::PlayAnim12b => {}
+        // (Yakon's rise before the summon: set by the node's first update, below)
+        K::PlayAnim12Yakon => {}
+        K::PlayAnim12Yakon2 => set_anim(w, i, &[an(17)], true, Some(false)),
         // GhostAnimA / B: enters 0x0804EBC8 / 0x0804EB38 = SetAnimRaw(0x12) under the one-shot state 0x03001B30
         // the Skeleton's collapse (state 0x213's first node, def 0x08759370, singleton 0x0300320C): enter 0x0804EAA0 =
         // not hittable (obj+0x1CC = 0) + SetAnimRaw(0x11) under the one-shot state 0x03001B38; its second
@@ -1712,11 +1730,12 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             w.g.buu_pacified = 1;
         }
         K::DarkSphere => {
-            let (cx, cy) = w.en_ref(i).a.center();
+            // (at the body's ground centre: Dabura floats 20 px over it - opponent audit oa_t12_fight f484 ..)
+            let (cx, cy) = w.en_ref(i).a.body_box_ground().center();
             let id = w.ents[i].id;
             let s = shots::dark_sphere(w, id, (cx + 2) << 8, (cy - 17) << 8);
             shots::add(w, s);
-            set_anim(w, i, &[an(17)], true, Some(true));
+            // (no animation change: Dabura floats on in the rise's loop - opponent audit oa_t12_fight f478 ..)
         }
         // controller 0x0804E030 (enter 0x08033D84): anim 4, frame = tick >> 3, no swing sound; tick 0x20 -> SetAnim(0)
         // (the idle enter's rand(255))
@@ -2789,8 +2808,14 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             }
             if now & 15 == 0 {
                 let pow = w.en_ref(i).a.stats.pow;
+                // through the player's apply-damage 0x08010BF2: 0x0800E8E6 shows the number and restarts the 12-frame
+                // hit flash (opponent audit oa_t52_below f31: the red "27" and the red player); the vampire's heal
+                // (0x0800FA80) shows its own green number (0x0800E97E, style 6)
+                crate::vram::damage_number_shown(w, w.ents[pi].id, pow as i64 * 1024, false);
+                w.pl(pi).a.flash = 12;
                 player::lose_hp(w, pi, pow, 0);
                 en::heal(w, i, pow as i64 * 1024);
+                crate::vram::heal_number_shown(w, w.ents[i].id, pow as i64 * 1024);
             }
             w.pl_ref(pi).hp() <= 0
         }
@@ -3281,13 +3306,9 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             // rise (u < 0x40), 2 for the fall (real route 18-14 rj_049 f1465 ..)
             let c0 = r.d[0];
             w.en(i).ea.pos.frame = if c0 < 0x80 { 0 } else if c0 - 0x80 < 0x40 { 1 } else { 2 };
+            hop_height(w, i, c0);
             r.d[0] = (r.d[0] + 8) & 0xff;
             let ph = r.d[0];
-            w.en(i).a.z = if ph >= 0x80 {
-                -HOP_ARC8[((ph - 0x80) >> 3) as usize]
-            } else {
-                0
-            };
             if ph == 0 && w.rng.chance(0x4000) {
                 mini_aim(w, i);
             }
@@ -3299,15 +3320,13 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             false
         }
         K::MiniHopFlee | K::Hop => {
+            let c0 = r.d[0];
+            hop_height(w, i, c0);
             r.d[0] = (r.d[0] + 8) & 0xff;
             let ph = r.d[0];
-            let air = ph >= 0x80;
-            w.en(i).a.z = if air {
-                -HOP_ARC8[((ph - 0x80) >> 3) as usize]
-            } else {
-                0
-            };
             if kind(c, n) == K::Hop {
+                // (the Mini-Yakon's controller 0x0803522C: cel 0 on the ground, 1 rising, 2 falling)
+                w.en(i).ea.pos.frame = if c0 < 0x80 { 0 } else if c0 - 0x80 < 0x40 { 1 } else { 2 };
                 return false;
             }
             if ph == 0 {
@@ -3330,7 +3349,7 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
                     en::face_player(w, i);
                 }
             }
-            if air {
+            if ph >= 0x80 {
                 if kind(c, n) == K::MiniHopToward {
                     const V: [(i32, i32); 4] = [(128, 128), (-128, -128), (-128, 128), (128, -128)];
                     let (vx, vy) = V[r.d[1] as usize & 3];
@@ -3451,14 +3470,13 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
         K::SuperJanembaWave => {
             if f == 24 {
                 const OFF: [(i32, i32); 4] = [(4, 4), (13, -24), (-8, -8), (24, -8)];
+                // (controller 0x0804DBCC tick 24: from the object's position + the table 0x08759440 - opponent audit
+                // oa_t7a_punch f364: the wave was 6 px right / 12 px high from the body box)
                 let a = &w.en_ref(i).a;
                 let (ox, oy) = OFF[a.facing as usize];
-                let b = a.body_box();
                 let dir = a.facing;
-                shots::add(
-                    w,
-                    shots::sj_wave(me, dir, (b.x0 + ox) << 8, (b.y0 + oy + 24) << 8),
-                );
+                let (x, y) = (a.px() + ox, a.py() + oy);
+                shots::add(w, shots::sj_wave(me, dir, x << 8, y << 8));
             }
             timed_end(w, i, f, 40)
         }
@@ -3551,10 +3569,55 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             }
             f >= 33
         }
-        K::PlayAnim12
-        | K::PlayAnim12b
-        | K::PlayAnim12Swarm
-        | K::PlayAnim12Yakon
+        // Dabura's rise (0x0802DE28) / descent (0x0802E300): each update SetAnimRaw(0x12) under the looping
+        // controller 0x03001B20 (4 cels of 8 ticks) unless that is already running, then the height one px up to
+        // -20 / down to 0 - the update that finds it there finishes (opponent audit oa_t12_fight f457 .. f478, the
+        // Dark Sphere floats at -20, f925 the descent)
+        K::PlayAnim12 | K::PlayAnim12b => {
+            if w.en_ref(i).ea.pos.raw != 19 {
+                let h = w.data.anim.loop3;
+                set_anim_r(w, i, &[an(18)], true, h);
+            }
+            let up = matches!(kind(c, n), K::PlayAnim12);
+            let z = w.en_ref(i).a.z;
+            if up && z > -20 {
+                w.en(i).a.z = z - 1;
+                false
+            } else if !up && z < 0 {
+                w.en(i).a.z = z + 1;
+                false
+            } else {
+                true
+            }
+        }
+        // Yakon's rise before the summon (0x0803A5DA): the first update SetAnimRaw(0x12) (raw 19) under the controller
+        // 0x030032D0 (cel = tick >> 3; at the last cel + 1 SetAnimRaw(0x14), raw 21, looping 0x03001B20 - the node's
+        // end), every update 0.5 px up (opponent audit oa_t91_summon f1 .. f49)
+        K::PlayAnim12Yakon => {
+            if f == 1 {
+                let h = w.data.anim.once_stop3;
+                set_anim_r(w, i, &[an(18)], false, h);
+            }
+            w.en(i).a.y -= 0x80;
+            let n = w
+                .en_ref(i)
+                .a
+                .sprite
+                .and_then(|s| w.data.sprite(s))
+                .and_then(|s| s.anim_raw(19))
+                .map(|a| a.steps(w.en_ref(i).a.facing).len() as i32)
+                .unwrap_or(1);
+            let t = f - 1;
+            if t >> 3 >= n {
+                let h = w.data.anim.loop3;
+                set_anim_r(w, i, &[an(20)], true, h);
+                return true;
+            }
+            w.en(i).ea.pos.tick = t;
+            w.en(i).ea.pos.frame = t >> 3;
+            false
+        }
+        K::PlayAnim12Swarm
         | K::PlayAnim12Yakon2
         | K::PlayAnim13
         | K::PlayAnimOnce => {
@@ -4145,6 +4208,11 @@ fn shield_gfx(w: &mut World, i: usize, map: &[(i32, i32)]) {
     }
     let e = w.en(i);
     e.gfx_now = to;
+    // (the animation draws from the old set until the next SetAnim: opponent audit oa_t17_left, the shield up
+    // from the state after RaiseShield's - emulator obj+0x58 swapped at f15, obj+0x50 at f17)
+    if e.drawn_sprite.0.is_none() {
+        e.drawn_sprite.0 = e.a.sprite;
+    }
     e.a.set_sprite(&d, Some(idx));
 }
 

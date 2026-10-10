@@ -362,6 +362,88 @@ Nataday, HFIL and West City saves; pause menu pages; save point menu; field Inst
 -> Continue resumes there (`r3s_sv.png`); Grand Kai's Mansion -> Planet with Olibu. Web: launcher, a battle won with SS,
 F1 both ways, Quick start, the pause menu.
 
+### Round 4 (playtester): fan-level details on 71105e5 (2026-10-09)
+
+The user's play build (`engine/target-play/release/buus-fury`, commit 71105e5; frozen as
+`work/playtest/bin/buus-fury-r4`), headless + muted; the PC menus driven with `--host-keys FRAME:Code` /
+`--host-mouse FRAME:x:y:click` (mouse x / y are view pixels, not window pixels). Looked for small animation /
+mechanics / sound / UI inconsistencies; compared with the emulator (`tools/emu/emu.py`, headless, no audio out)
+where a matching save state existed. Runs `r4b_*` (battle), `r4s_*` (story / menus). No doubled sounds in any round
+2-4 audio log apart from 46.
+
+44. **Low-medium - Esc menu: the panels have no fill, the game shows through the text.** In Story the sewer grates,
+    NPCs, Gohan and the manhole sit inside the PAUSED / Settings / QUIT? boxes (`r4s_esc3/z.png`, `r4s_quit2/s.png`);
+    in Battle the fighters and a damage number (`r4s_esc4/s.png`, `r4_t1/f000150.png`). Repro: `pt.py r4s_esc3 --saves
+    seg_e_tournament --keys Enter,ArrowDown,Enter --input N500 --frames 500 --every 10 -- --host-keys 100:Escape
+    --host-mouse 130:160:107:0,160:160:107:1`. Expected: a solid panel like the game's menus. (New UI: no emulator
+    counterpart.)
+45. **Low-medium - Battle, PC wide: "You Win!!" is placed for the 240x160 screen around the player**, while the
+    Retry box is centred at the bottom of the wide view: in a corner fight the title lands on the fighters (Trunks vs
+    Broly, `r4b_cf_trunks/f001700.png`), in the open it floats to one side (`r4b_cf_goku/f001600.png`; both in
+    `r4b_cf_s.png`). Repro: `chase.py r4b_cf_trunks --battle trunks:22:t10:1::150 --view pc:0 --frames 2400 --every 1
+    --blast 3` (win at f1591). Expected: centred with the box.
+46. **Low (not compared) - a red "0" damage number over the player on a trade, and a doubled whoosh.** Gohan and Super
+    Buu hit each other on the same frame: both flash, Buu takes 3533, Gohan shows "0" (`r4b_cf_gohan/z_106_128.png`,
+    f116-f128); sound 51 plays at f115 and f116 - the only near-double in a 2,400-frame fight. Repro: `chase.py
+    r4b_cf_gohan --battle gohan:16:t116:1::150 --view gba:0 --frames 2400 --every 1 --blast 3`.
+47. **Low - the "Esc: Menu" hint is drawn over the game's own text**: the title's copyright line, Select Game's
+    Select / Cancel legend, the area-name banner; it stays full-bright through the fade to black at a door
+    (`r4s_title2/cmp.png` f190 / f272, `r4s_mart/t.png` f152-f176). Repro: `pt.py r4s_mart --view gba:0 --saves
+    seg_e_tournament --keys Enter,ArrowDown,Enter --input "N60,L8,U110,N120" --frames 400 --every 4`.
+48. **Low (not compared) - four quick punches land two hits.** Presses at f55 / 63 / 71 / 79 on a Majin Fighter: 1 and 3
+    hit (50 / 21, sounds f56 / f72), 2 and 4 visibly reach the body and do nothing (`r4b_punch/z_54_93.png`); likely
+    the enemy's post-hit invulnerability (the emulator try was muddled by a crowd: `r4b_emu/punch/s.png`). Repro:
+    `pt.py r4b_punch --view gba:0 --battle goku:0:t68:1:plateau:100 --keys ArrowDown,Enter,Enter --input
+    "N20,R30,N5,A2,N6,A2,N6,A2,N6,A2,N60" --frames 140 --every 1`.
+49. **Low (not compared) - silent casts:** Kamikaze Ghost and Gotenks turning back from Super Saiyan play no sound at
+    launch (hits do): `r4b_gt34R.sum.txt` (casts 662 / 774 silent, hits 719 / 907).
+50. **Low (not compared) - the energy blast plays sound 20 or 21 by facing / form** (Goku right: 20 then 21; up: 20
+    twice; `r4b_gk0R.sum.txt` vs `r4b_gk0U.sum.txt`) - maybe the game's random pick.
+51. **Info - the arena always gives the top skill level**, so the Kamehameha is always the big yellow level-3 beam; the
+    game's level-2 beam is thin and cyan (`r4b_emu/sb_up/kame.png` vs `r4b_gk5U150/z_770_830.png`). Faithful to level 3,
+    but fans may miss the blue one.
+52. **Info - "Quit to main menu" asks "progress will be lost?" only after 600 frames since a load / save** (before that
+    it quits at once; after, it defaults to Keep playing: `r4s_quit` vs `r4s_quit2/s.png`). Intended, noted.
+53. **Info - menus answer 2-6 frames sooner than the emulator** (START 102 vs 108, Cancel 332 vs 338, Select Game's
+    figure every 8 frames vs 10; `r4s_gk/cmp2.png`): the GBA's slowdown, dropped on purpose (no-hardware-lag).
+
+**Matched the game (emulator):** the title -> Select Game -> Continue flow frame-aligned (`r4s_title3/cont.png`);
+walking and the Start menu pages with cursor sounds (`r4s_gk/cmp1.png`); a 3-press punch combo gives two swings in both
+(`r4s_fat1/p.png` vs `r4s_emu/punch_s.png`); the Kamehameha fired up with hair / halo over the beam's base
+(`r4b_emu/sb_up/kame.png`). **Looked right:** the Esc menu by keys and mouse (hover moves the cursor, a click on
+Restart fight restarts: `r4b_esc3`; Settings, the view toggle mid-story, Controls, the quit confirm); energy blast and
+Kamehameha in four facings (from the hands, stopped by walls, layering right); Gotenks' ghosts and volleyball; the new
+Dragon Fist (head on the steered end, body trailing to Gogeta: `r4b_gg41R/z_774_900.png`; the game's only dragon in
+reach is cut short by its target, so not frame-compared); five of six closed-loop fights won with the end screen.
+
+### Skill audit (2026-10-09): every player skill against the emulator, frame by frame
+
+Method (`work/skillaudit/`): 528 scenarios from the lockstep setup (`gen.py`): every character's forms, the base
+form in all 4 facings, every skill tapped then held at every level (other forms: top level, facing right), punches /
+combo, dash, block, the steered moves (Dragon Fist, Energy Sword, Masenko, Instant Transmission, Big Bang tap), the
+transformations (SS, SS3, Saiyaman) and back. Each is recorded from the real game as a segment (`skillseg.py`, the
+Hyperbolic Time Chamber, no enemy), its every video frame dumped, and our picture compared pixel for pixel
+(`examples/pixels.rs` with `PIX_ALL` / `PIX_NOPROPS`); state and sound calls through the segment harness. Not covered:
+hits taken / knockback poses and skills landing on an enemy (a target dummy's patched AI diverges in the import;
+the story pixel gate covers hits).
+
+| Character | Exact frames (after) | Fixed | Left (small / acceptable) |
+|---|---|---|---|
+| Goku | ~97% | Energy Blast sorted with the player by depth; form 1 (NPC sprite) shows only the shadow for moves it has no animation for; Instant Transmission: camera during the pick, cursor at the footprint centre, ring timing; Kamehameha fired up behind the hair / halo | Kamehameha charge first frame, beam head f130-160, the up beam's tip; 1-5 frame HUD gauge blips |
+| Gohan | 32372 / 33722 (was 28512) | Masenko: cursor 12 px too high, ball made on the press, cursor on the press frame, cursor / ball behind Gohan facing up | Electric Kamehameha (shared beam drawing, 2-16 px); Masenko launch ball size; icon grey timing |
+| Goten | 12811 / 13774 | Kamekameha charge sparkle a frame late; beam piece variants a frame late; charge behind Goten facing up | the up beam's start piece over the hair |
+| Trunks | 17109 / 18997 (was 16325) | Energy Blast / Burning Attack depth sorting; Flame Kamehameha charge on the press, behind Trunks facing up | Flame Kamehameha up f163-236 order; forms 23 / 24 start states broken in the emulator capture |
+| Vegeta | 19292 / 19462 | Energy Blast depth; Final Flash affine sampling 1 px; Big Bang hits the wall a frame early, icon greyed until its explosions end | Final Flash down / left 1 px while scaling, its first frame; icon flicker on the press |
+| Gotenks | 21744 / 24647 (was 15843) | Kamikaze ghosts: shadow, easing a frame early, cloud 8 px off, ghost / cloud depth sorting; Ultra Volleyball wave 8 px too long, tail / head order | f32 / f33 fusion defuse visuals (script tint, flash, partner walk-off) |
+| Vegito | 13965 / 14344 (was 11271) | Energy Sword charge a frame early, slash records follow the player's frame; Banshee Blast body phase (beam tick from the press) | charge tile-upload tears; colour flicker at the screen top |
+| Gogeta + extras | Dragon Fist steer 214 / 215 (was 37) | Dragon Fist drawn before the frame's push, fixed head -> root order, depth by Gogeta's footprint, dying head timing, body easing after the launch; Big Bang Kamehameha flare timing / order, ball lifetime; defuse facing | f42 / f43 defuse visuals (not the game's s014 / s503 scripts); equal-depth explosion stacking |
+
+Round 4 items: the Energy Blast sound depends on tap (21) vs hold (20), the same in every facing, as in the game; four
+fast punches landing two hits is the game's (presses 1 and 3 damage a dummy); Kamikaze Ghost's cast and the SS
+revert are silent in the game too (only the aura loop 54 stops); the red "0" on a trade with a double swing sound was
+not reproduced (no same-frame trade scenario yet). Gohan's SS from Great Saiyaman (form 14) softlocks the real game
+(invisible in the aura); ours ignores the press - kept.
+
 ## Checked and looked right
 
 Round 1:
@@ -439,3 +521,119 @@ Round 2 (6a369e5):
 * 27 - the title's waiting box says how to play with a friend in player terms, at the top clear of the menu; the
   launcher's Story page has **Link play** (Off / Host a room / Join a room) and **Room** (0000-9999) - the title then
   starts with link play (native and web): `fix3_link_sheet.png`.
+
+## Opponent audit
+
+Every Battle-list opponent against the emulator, frame by frame from the same state (`tools/battle/lockstep/visual.py` records `oa_tXX_{idle,left,above,below,punch,ki,ko}` in the Southwest Forest 8-3 clearing - the
+emulator screen every frame plus the opponent's animation, facing, flash, AI state and owned objects;
+`examples/opp_audit.rs` replays each in the faithful core (arena rules off) and reports the first divergence per
+category and the pixel difference; usage in `tools/battle/LOCKSTEP.md` "Visual audit"). Fixes are in the shared
+core (Story and Battle) with the TS reference mirrored. Harness-only differences (the emulator player levels up
+from field XP on a kill, no field item drops, torn single emulator frames, the KO'd boss kept standing for a
+story scene) are not divergences. Shared fixes: damage-number digit centring (crit over an enemy rounds the
+other way), the HUD bars read at the HUD object's place in the update pass, the Energy Blast burst position.
+Pixel-gate fixes found on the way: shadow byte offsets added as the OAM does (dx unsigned 9-bit, dy 8-bit wrap;
+no shadow for an off-screen actor - Dabura / Yamu), an Energy Blast fired up drawn in front (earth_2_10_2 f690).
+
+| Group | Type | Opponent | Matches | Fixed | Remaining | Arena-only |
+|---|---|---|---|---|---|---|
+| G1 | 60 | Kid Buu | position, facing, HP, AI states, damage, animation raw/frame through all approaches; left/ki pictures | charge sparkle for an enemy's charging beam (view.rs, Kame charging); ki burst offset (view.rs) | beam head piece differs a few px for ~30 f after the release (above/below f33..); Kid Buu walking over the player at an equal depth drawn behind him (draw-order tie, idle f85-115 - another fork owns the sort tie rule); RNG drifts at punch f294 (one extra draw in the game during a hit chain); game-over palette fade f467 (post-KO, not opponent-specific) | ko scenario: the battle world has no defeat script (special death: we remove him with an explosion; the field keeps him for the story scene) - harness, story path unchanged |
+| G1 | 116 | Super Buu | everything in below/ki/left; position/HP/AI everywhere | stretch arm + candy beam sort as actors by their y; candy beam OAM order muzzle, head, body; muzzle/head gfx switch phase; muzzle kept while retracting (view.rs) | above f92 stretch-arm piece under the player (1 cel); punch: player's combo raw 5 vs 7 at f174 after an RNG drift (one draw); animation tick counter not modelled during his charge poses (not drawn) | ko: Idle death - battle world shows knockdown + fade, field keeps him (story scene) - harness |
+| G1 | 115 | Super Buu (Time Chamber) | ki fully; position/HP/AI/damage everywhere | as 116 | above: player HP 308 vs 307 at f347 (player-side HP rounding of the same damage 218785, not opponent-specific); tick-only anim counters | ko: as 116 |
+| G1 | 121 | Super Buu (inside Buu) | ki/above fully; position/HP/AI/damage | as 116 | below: after the player is KO'd (f321) the game draws one more rand + sfx 21 (post-KO); tick-only counters | ko: as 116 |
+| G1 | 118 | Super Buu (Gotenks absorbed) | left/ki fully; position/HP/AI/damage | as 116 | idle/below: after the player's KO (f262/f217) the game plays sfx 48 + one rand we do not (post-KO); above f193 one-frame piece | ko: as 116 |
+| G1 | 40 | Gotenks | above/left/punch/ki pixel-exact; everything else identical | ki burst (view.rs) | idle f568 the idle blink 1 tick late (his idle tick freezes after a stand-still node where the game's runs on); below f133 one frame | ko: Idle death (battle-world knockdown+fade vs field stays) - harness |
+| G1 | 35 | Gohan | above/below/left/punch/ki pixel-exact | ki burst | idle f460 blink 1 tick late (as Gotenks) | ko: as Gotenks |
+| G1 | 90 | Piccolo | above/left/punch/ki pixel-exact | ki burst | idle f460 / below f345 blink tick (as Gotenks) | ko: as Gotenks |
+| G1 | 37 | Goten | all mechanics identical | - | harness: the emulator's spawn record uses gfx 124 (SS Goten), our battle world the type's first gfx 123; the field uses the placement's sprite (field.rs) so Story is right | ko: as Gotenks |
+| G1 | 39 | Goten (Time Chamber) | above/ki/left pixel-exact; mechanics identical | ki burst | below f283 / punch f352 single frames | ko: as Gotenks |
+| G1 | 130 | Trunks | above/below/left/punch pixel-exact | ki burst | ki f92 one frame | ko: as Gotenks |
+| G1 | 70 | Majin Vegeta | below/ki pixel-exact; position/HP/AI/damage | ki burst | punch: RNG drift at f417 near the end; above f273 one piece | ko: as Gotenks |
+| G1 | 132 | Uub | above/below/left pixel-exact | ki burst | - | ki/punch/ko: the kill goes through the battle-world Idle-death path (knockdown + fade) where the game keeps him (story scene) - harness |
+| G1 | 45 | Hercule | above/below/left pixel-exact | ki burst | - | ki/punch/ko: as Uub (kill path) |
+| G2a | 51 | Janemba | idle/left/above/below/punch/ki: anim, AI, parts, hand placement, damage match; OBJ diffs 598->16 frames (idle) | view.rs draw_key (arm parts 0x34/0x35 own depth, Hand depth y-1); enemy.rs hand_update (no fade-in); TS enemy.ts HandRise alpha | damage digits (G4); part damage not logged by ours (harness); ascent anim 20 set a frame early in state only (picture matches); fight scenario diverges 342 after player level-up from field XP (harness); KO: field level-up dialog (harness) | - |
+| G2a | 18 | Dabura | idle/left/above/below/ki/punch/long all exact (0 OBJ-diff frames, see-through excluded) | nodes.rs PlayAnim12/12b (first-update SetAnimRaw 0x12 under loop3 + height -1/+1 to -20/0), DarkSphere no anim change + ground centre; shots.rs sphere: shows the pre-update radius, circle-vs-body-box test (0x0803AF58) + knockback dir, unclamped growth then +128 expansion; TS ai.ts + projectiles.ts mirrored | 2nd sphere hit 1 frame early in expansion phase (unresolved r offset); post-sphere phase (f925+) not yet aligned; KO: game freezes on hurt cel + level-up dialog vs ours knockdown (Battle has no defeat scene) | see-through players behind scenery (battle-only PC aid, excluded in harness) |
+| G2a | 122 | Super Janemba | idle/long/ki exact; left/below only damage digits/HUD | nodes.rs SuperJanembaWave: object position + table 0x08759440 (controller 0x0804DBCC tick 24); TS ai.ts mirrored | after the player is KOd (above f251) ours walks diagonally, game along x only (game-over phase); wave controller tick not mirrored in the anim tick (representation); isolated raw 18/19 frames in fight (same pose) | - |
+| G2a | 56 | Mini-Janemba | position, AI, cels; left exact, idle 156->5 OBJ-diff frames | fixed.rs HOP_ARC8 = ROM table 0x087B6EEC -(-v)>>13; nodes.rs hop_height (counter before +8, height kept on the ground) for MiniHopToward/Flee/Hop + field mini; enemy.rs set_anim_rule: minis height 0 when their hop/roll controller is replaced (exit 0x0804F750/784); TS ai.ts/enemy.ts mirrored | roll counter shown as anim tick in the game (representation); KO/fight: field level-up (harness) | - |
+| G2a | 145 | Yakon | punch exact; summon: Yakon pixel-exact through the summon (OBJ-diff 0) | nodes.rs PlayAnim12Yakon (first-update SetAnimRaw 0x12, controller cel=tick>>3, y-=0x80/update, raw 21 loop3 at the end); Hop enter SetAnimRaw(0x0E) + cels 0/1/2 + ROM hop arc; TS ai.ts Hop mirrored | Mini-Yakon Hop update steering/facing (0x08035274) not ported: minis stand where the game turns/moves them (f84); idle/left/above/below diverge only after emulator lag frames (Yakon scenes lag every ~9 f: harness); OBJ partly above the screen top differs by a few px (renderer edge, also seen with a rock prop) | - |
+| G2a | 96 | Pui Pui | idle/left/below/long: exact (HUD/top-row tear only); above: 1 HUD pixel | - | one punch / ki blast kills him in this scenario (low HP): the kill frame's knockback + RNG and the field level-up differ (kill-HP remainder: G4; level-up: harness) | Battle KO: ours removes him at the KO (his story defeat script) - the game's field leaves him standing |
+| G2a | 10 | Broly | above/ki exact; idle/left/below/punch/ko/long: 1-7 frames (damage digits, top-row tear) | - | fight: diverges after f978 (player hit sequence after the field level-up: harness); damage digits (G4) | - |
+| G2a | 142 | Worm Head | head + every segment: position, cel, facing match | - | segment overlap order (tried newer-behind: no better); harness duplicate body | - |
+| G2a | 6 | Blister | Blister, Enzymes: positions, cels, AI match through all scenarios | - | Enzyme/player sort key not resolved: a general "newer enemy behind at ties" rule broke 7 locked story segments (21-x), reverted; damage digits (G4); KO: field level-up (harness) | - |
+| G2a | 100 | Shadow Colossus | idle/above/below/left/ki/punch/long pixel-exact (0 OBJ-diff frames) | - | fight: kill at f931 (G4 kill remainder / field level-up harness) | - |
+| G2b | 0 | Airship Warlord | idle/left/below/ki/punch exact (state, anim, AI, pixels) | nodes.rs RunMotionController enter keeps a running walk | ko: kill/death -> G4; HP-bar tip 3px (HUD, all opponents) | none seen |
+| G2b | 112 | Spopovich | above/below/left/punch exact after fixes; anim raw 5/6/7 = same ROM anim (harness now canonicalises) | view.rs actor_depth (player/enemy sort by y + foot_h/2); opp_audit canon raw | ko -> G4; damage digits -> G4 (masked with OA_NODN) | none seen |
+| G2b | 148 | Yamu | all 7 exact after fixes except ko | content.rs shadow_off dy signed | ko -> G4 | none seen |
+| G2b | 91 | Pikkon | idle/left/above/below/ki/punch exact | view.rs draw_key (enemy KiBlast class sorted like the player's) | ko -> G4 | none seen |
+| G2b | 49 | Idasa | all exact except ko | (shared fixes) | ko -> G4 | none seen |
+| G2b | 85 | Olibu | idle/left/above/below/punch exact; ki exact until the kill | - | kill remainder + ko -> G4 | none seen |
+| G2b | 59 | Tournament Fighter | all exact; ki exact until the kill f361 | - | kill remainder + ko -> G4 | none seen |
+| G2b | 129 | Pharoah Totenhotep | idle/left/above/below/ki exact; punch exact in state | shots.rs wrap on_message crit=stale-true + TS projectiles.ts; shots.rs wrap stick position next frame + TS; shots.rs wrap_burst explosion_sorted | punch f295-308 / 415-425: during the screen shake the harness-drawn map props and the stuck bandages are offset differently (props = harness; stuck-bandage shake offset unverified) | none seen |
+| G2b | 80 | Ninja Boss | above/punch exact; left/below/ki exact in state (pixel diffs only at puffs / shuriken) | - | puff tie order and the f581 align end: unexplained, not fixed (tie rule differs from the actor case; align decision not reproduced) | none seen |
+| G2b | 63 | Pilaf's Guardian | all exact except ko | - | ko -> G4 | none seen |
+| G3 | 1 | Annihilator | movement, facing, AI, HP/damage, flame spawn + hit timing, death | - | flame red/late on hurt player (VRAM tile sharing with the player's hit flash, cosmetic 1-2 frames, not modelled); tick-only; damage number sums hits (G4); kill: HP remainder (G4) + level-up (battle sim has no XP: harness) | none seen |
+| G3 | 3 | Atomizer | AI cycle, beam timing/hits, HP, facing | - | tick-only; tiny overlap pixels; kill HP remainder (G4); level-up (harness) | none seen |
+| G3 | 5 | Bio Mech | everything incl. pixels (idle/left exact) | - | tick-only (cel same) | none seen |
+| G3 | 113 | Super Bio Mech | all after fix | sprite = game's default graphics 173 (wf-core content.rs resolve_enemy_gfx; TS data.ts PLACEHOLDER) | kill HP remainder (G4); level-up (harness) | none seen |
+| G3 | 131 | Ultra Bio Mech | all until player KO | - | post-loss frames (harness: battle sim ends at Lost; Story uses the field path) | none seen |
+| G3 | 8 | Bomber | bombs, blasts, AI, HP, facing | - | item drop (field-only; harness); kill HP remainder (G4) | Battle mode: no drops (intentional) |
+| G3 | 67 | Mad Bomber | all | - | level-up (harness) | none seen |
+| G3 | 17 | Cyborg | all after fix | CirclePlayer: SetAnimRaw(1)+reversed walk unless already (wf-core enemy.rs circle_player; TS enemy.ts circlePlayer) | punch f354: game shakes from an uninitialised crit byte on the punch's stack message (game bug, not modelled) | none seen |
+| G3 | 48 | Hyper Cyborg | all after fix | back-off walk (as Cyborg) | shadow at top screen edge (renderer edge case, 1 row); HUD bar drain pixels (player HUD) | none seen |
+| G3 | 74 | Mega Cyborg | all after fix | sprite 173 (content.rs / data.ts); back-off walk (as Cyborg) | game draws it invisible + VRAM garbage during its shot (sprite 173 lacks raw 0x12); ours shows the idle pose (game glitch, not replicated) | none seen |
+| G3 | 19 | Death Machine | all until player KO | - | as Annihilator; post-loss (harness) | none seen |
+| G3 | 20 | Destroyer | all | - | as Annihilator | none seen |
+| G3 | 41 | Grand Mechanoid | all until player KO | - | HUD bar (player HUD, not opponent); post-loss (harness); level-up (harness) | none seen |
+| G3 | 72 | Mechanoid | all | - | HUD bar (player HUD); kill HP remainder (G4) | none seen |
+| G3 | 94 | Power Mechandoid | all until player KO | - | post-loss (harness) | none seen |
+| G3 | 50 | Ion Cannon | all | - | as Atomizer; level-up (harness) | none seen |
+| G3 | 64 | Laser Turret | all | - | as Atomizer; level-up (harness) | none seen |
+| G3 | 62 | Knight Destroyer | all | - | kill HP remainder (G4) | none seen |
+| G3 | 76 | Metal Hulk | all | - | kill HP remainder (G4) | none seen |
+| G4 | 0x44 | Majin Fighter | left / below pixel-exact all 360 frames; above / idle 1 frame each; AI, anim, damage, positions all frames | digit centring (wf-render menu.rs); HUD bars read at the HUD's place in the update pass (world.rs hud_sample, view.rs) | above f273: one hit kind where the game's bar is the late one (unexplained, 3 px); ki / punch / ko after the kill: field XP level-up + freed object reuse (harness: battle sim has xp off) | - |
+| G4 | 0x15 | Elite Majin Fighter | above / below / left / ki pixel-exact; all logic rows | (shared fixes) | idle f123 / punch f343: torn single frames (harness); ko: level-up (harness) | - |
+| G4 | 0x7b | Super Majin Fighter | above / below / left / ki pixel-exact | - | idle anim tick at f437 (tick only, same cel); ko / punch: harness (level-up, torn frame) | - |
+| G4 | 0x45 | Majin Soldier | above / left exact; logic all frames | muzzle k = ((t+1)>>2)&1, muzzle in front of the body (view.rs EnergyWave) | below 3 frames / ki 24 frames: player-enemy draw order at equal depth (concurrent actor_depth change, not mine); ko: harness | - |
+| G4 | 0x16 | Elite Majin Soldier | above / left exact | (as 0x45) | as 0x45 | - |
+| G4 | 0x7c | Super Majin Soldier | above / left exact | (as 0x45) | idle anim tick f587 (tick only); else as 0x45 | - |
+| G4 | 0x67 | Majin Shield Soldier | left 1 frame, logic all frames | enemy.rs drawn_sprite (unhashed) + nodes.rs shield_gfx + view.rs | anim raw -1 rows = recorder can't map the old set's record (harness); punch / ko: player-vs-soldier draw order at equal depth (concurrent depth change); above f167: wave at the screen's top edge (not chased) | - |
+| G4 | 0x17 | Elite Shield Soldier | left pixel-exact | as 0x67 | as 0x67 | - |
+| G4 | 0x7d | Super Shield Soldier | left pixel-exact | nodes.rs Raise / Lower / ShieldBreak maps 0x102 -> 0x101 | as 0x67 | - |
+| G4 | 0x56 | Fighter | above / below / left exact | - | ki / punch / ko after the kill: item drop + RNG at death (field placements; harness battle world has none), level-up | - |
+| G4 | 0x24 | Goon | above / below / left exact | - | idle / ki / punch: one torn frame each (harness); ko: level-up | - |
+| G4 | 0x80 | Thug | above / below / left exact | - | as 0x56 (drop / freed slot after the kill) | - |
+| G4 | 0x2f | Hooligan | logic all frames | - | draw-order tie (concurrent actor_depth change); ki / punch: level-up | - |
+| G4 | 0x0f | Criminal | above / below / left exact | - | as 0x56 | - |
+| G4 | 0x4b | Mercenary | logic all frames | - | not chased (bullet sprite near other OBJs; time) | - |
+| G4 | 0x2c | Gunman | below exact; logic all frames | gun / rifle bullet cloud sorted by y (shots.rs straight_end) | above: bullet clipped at the screen top (47..), ki / punch / ko: kill harness | - |
+| G4 | 0x6c | Sniper | below exact | as 0x2c | as 0x2c | - |
+| G4 | 0x2b | Grenadier | above / below / ki exact | - | idle / left: grenade blast pixels (122..; not chased); ko: level-up | - |
+| G4 | 0x02 | Assassin | below / ki exact | as 0x2c | punch f174: one RNG draw differs when its bullet ends next to the punching player (real, unexplained) | - |
+| G4 | 0x0c | Bruiser | above / below / left exact | - | idle / punch anim tick only (no picture diff); torn frames | - |
+| G4 | 0x61 | Rapscallion | above / below / left / ki exact | digit centring | idle anim tick f556; ko: level-up | - |
+| G4 | (shared) | damage numbers | - | wf-render menu.rs: odd widths a pixel left, except a crit over an enemy (pixel gate db6_007 f90 - empirical split); vram.rs heal_number_shown + nodes.rs VampireGrab (green, top - 2, own reuse slot) | - | - |
+| G4 | (shared) | kill-HP remainder | - | harness only: our enemy object is gone at death, the game's stays listed at HP 0 (opp_audit.rs reports 0) | - | - |
+| G4 | (shared) | HUD HP / EP bars | - | World::hud_sample at the HUD's list place (field: its sprite-memory record; battle: HP after the pass, EP before); pixel gate earth_2_11_3 f150 / dr4_066 f390 now exact too | - | - |
+| G5 | 0x20 | Ghost | AI, anim cels, facing, positions, HP/damage, death | harness: anim raw compared by canonical slot (opp_audit.rs) | dmg digits (G4); stump vs player foot priority (prop sort, not opponent) | - |
+| G5 | 0x58 | Phantom | as Ghost | as Ghost | as Ghost | - |
+| G5 | 0x5d | Poltergeist | as Ghost | as Ghost | as Ghost | - |
+| G5 | 0x4d | Mummy | AI, anim, positions, HP/damage, bandage flight + hit timing | record set before the tick step, stuck ones drawn with record 3 (shots.rs MummyWrap.cel, view.rs); OBJ-diff frames idle 550->5, left 308->4, above/below ~230->1-4 | punch: a screen shake after punching a flying bandage comes from uninitialised stack (crit flag never set by the bandage) - not modelled | - |
+| G5 | 0x10 | Cursed One | as Mummy after fix | same fix (OBJ-diff idle 371->5) | same shake/stack quirk (punch f402) | - |
+| G5 | 0x59 | Pharoah | as Mummy after fix | same fix | same shake/stack quirk | - |
+| G5 | 0x52 | Nosferatu | AI, positions, HP drain timing | grab state 0x0804C3CC as rule tail_loop (eanim.rs, eanim.ts, nodes.rs + ai.ts VampireGrab); drain through the apply-damage path: number + 12-frame flash (nodes.rs, ai.ts) | vampire's green heal number (0x0800E97E: style 6, Small font, body centre x / top-2, own reuse slot) not drawn - G4 (number drawing) | - |
+| G5 | 0x85 | Vampire | as Nosferatu | as Nosferatu | as Nosferatu | - |
+| G5 | 0x8a | Vlad | as Nosferatu | as Nosferatu | as Nosferatu | - |
+| G5 | 0x09 | Bones | AI, cels, positions, damage, death | harness: tick ignored under seq rules | none visible | - |
+| G5 | 0x6b | Skeleton | as Bones | as Bones | none visible | - |
+| G5 | 0x41 | Lich | as Bones | as Bones | none visible | - |
+| G5 | 0x62 | Ronin | AI, cels, positions, damage, death, pixels | - | tick bookkeeping only (cel + picture identical) | - |
+| G5 | 0x63 | Samurai | as Ronin | - | as Ronin | - |
+| G5 | 0x6a | Shogun | as Ronin | - | as Ronin | - |
+| G5 | 0x21 | Ghoul | all but shared items | - | dmg digits (G4) | - |
+| G5 | 0x42 | Living Dead | all but shared items | - | dmg digits (G4) | - |
+| G5 | 0x95 | Zombie | AI, anim, damage, death | - | harness: drops come from field placements (Story has them, the lockstep battle world not); kill-HP remainder (G4) | - |
+| G5 | 0x4e | Ninja | AI, cels, positions, star flight + hit | star sorts like the ki blast: layer 0x38, depth its y (view.rs draw_key) | a shadow above the screen top: culled by the game, 1-2 rows drawn by ours (generic); 2-px star spawn detail | - |
+| G5 | 0x68 | Shinobi | as Ninja | as Ninja | harness: battle world has no field-prop collision (Story has) | - |
+| G5 | 0x65 | Shadow Warrior | as Shinobi | as Ninja | as Shinobi | - |
+| G5 | all | (every opponent) | - | - | harness artifact (battle sim XP off) | - |
+| G5 | all | (shared) | - | - | for the number owner (G4) / coordinator | - |
