@@ -9,6 +9,7 @@ the remote side's arrives some frames late), the generator, the round timer (0x0
 objects: vt 0x0804DB18 = the local one, the left; 0x0804DD94 = the remote, the right): x / y (24.8), facing, animation
 raw / frame / tick, HP / EP (the fighter's own record at +0x240), the form controller's EP regen accumulator, the record's form
 and Super Saiyan / SS3 gauges, the controller's slot. Writes data/link/dojo_NAME.json (no ROM data)."""
+import hashlib
 import json
 import sys
 import ctypes
@@ -21,6 +22,7 @@ import sbemu  # noqa: E402  (the save-capable library; it has the link functions
 from route import emu as mkemu, soft_reset  # noqa: E402
 from emu import KEY  # noqa: E402
 from emu_lockstep import anim_raw  # noqa: E402
+from PIL import Image  # noqa: E402
 
 L = sbemu._load_sb()
 L.emu_link.argtypes = [ctypes.c_void_p, ctypes.c_int]
@@ -127,11 +129,31 @@ def step(a, b):
 
 
 TRACE = None
+SHOTS = None
+VIDEO = None
+DUMP = None
+SORTP = None
 
 
 def main():
-    global TRACE
+    global TRACE, SHOTS, VIDEO, DUMP, SORTP
+    SORTP = int(sys.argv[sys.argv.index('--sortprobe') + 1]) if '--sortprobe' in sys.argv else None
     name = sys.argv[1]
+    if '--shots' in sys.argv:
+        # (`--shots DIR EVERY`: both screens every EVERY video frames, for the link screens' layouts)
+        k = sys.argv.index('--shots')
+        SHOTS = (sys.argv[k + 1], int(sys.argv[k + 2]))
+        Path(SHOTS[0]).mkdir(parents=True, exist_ok=True)
+    if '--dump' in sys.argv:
+        k = sys.argv.index('--dump')
+        DUMP = ({int(x) for x in sys.argv[k + 1].split(',')}, sys.argv[k + 2])
+        Path(DUMP[1]).mkdir(parents=True, exist_ok=True)
+    if '--video' in sys.argv:
+        # (`--video DIR`: the host's screen every video frame from the menu's last 100 on - DIR/NNNNNN.png, ROM-derived:
+        # keep it in work/ - and in the recording per video frame [video frame, logic frame counter, sha1 of the
+        # 240x160 RGB picture's first 16 hex digits]: the pixel gate's reference, wf-app tests/dojo_pixels.rs)
+        VIDEO = Path(sys.argv[sys.argv.index('--video') + 1])
+        VIDEO.mkdir(parents=True, exist_ok=True)
     # (`--trace F0-F1`: the host's generator calls in those frames, by caller - the comparison's diagnostics)
     if '--trace' in sys.argv:
         TRACE = [int(x) for x in sys.argv[sys.argv.index('--trace') + 1].split('-')]
@@ -156,6 +178,13 @@ def main():
     MENU = menu(setup, pick_a, pick_b)
     menu_len = sum(n for _, _, n in MENU)
     keys_log = []
+    video = []
+    video_b = []
+    VIDEO_B = Path(str(VIDEO) + '_b') if VIDEO and '--guest' in sys.argv else None
+    if VIDEO_B:
+        # (`--guest`: the guest's screen too, DIR_b/, `video_b` in the recording)
+        VIDEO_B.mkdir(parents=True, exist_ok=True)
+    regs = open(str(VIDEO) + '.regs', 'wb') if VIDEO else None
     frames = int(sys.argv[sys.argv.index('--frames') + 1]) if '--frames' in sys.argv else 2400
     seed = int(sys.argv[sys.argv.index('--seed') + 1]) if '--seed' in sys.argv else 1
     fight = [('brain', None, frames)]
@@ -177,7 +206,43 @@ def main():
                 b.set_keys(mb)
                 step(a, b)
                 keys_log.append([ma, mb])
+                if SHOTS and len(keys_log) % SHOTS[1] == 0:
+                    a.screenshot(Path(SHOTS[0]) / f'{len(keys_log):06d}_a.png', 1)
+                    b.screenshot(Path(SHOTS[0]) / f'{len(keys_log):06d}_b.png', 1)
                 lf = a.r32(0x03000F94)
+                if DUMP and len(keys_log) in DUMP[0]:
+                    # (`--dump V0,V1.. DIR`: the host's palette / VRAM / OAM / IO / IWRAM / EWRAM at those video frames)
+                    for nm, (ad, n) in {'pal': (0x05000000, 0x400), 'vram': (0x06000000, 0x18000), 'oam': (0x07000000, 0x400),
+                                        'io': (0x04000000, 0x400), 'iwram': (0x03000000, 0x8000), 'ewram': (0x02000000, 0x40000)}.items():
+                        (Path(DUMP[1]) / f'{len(keys_log):06d}.{nm}').write_bytes(bytes(a.read(ad, n)))
+                if SORTP and len(keys_log) == SORTP - 1:
+                    a.hits()
+                    bps = [a.breakpoint(0x080115F8), a.breakpoint(0x08052EE4)]
+                if SORTP and len(keys_log) == SORTP:
+                    # (`--sortprobe V`: the host's draw sort in video frame V - the array's size and its first
+                    # comparisons' objects by their world-list index)
+                    lst = [a.r32(OBJW + 8 + 4 * i) for i in range(a.r32(OBJW + 4))]
+                    hs = a.hits(); print('hits', len(hs))
+                    for h in hs[:14]:
+                        r = h['regs']
+                        nm = lambda o: lst.index(o) if o in lst else hex(o)
+                        print('sort', hex(h['regs'][15]), 'r0', r[0], 'slots', hex(r[0]), hex(r[1]), 'objs', nm(r[2]), nm(r[3]))
+                    for bp in bps:
+                        a.clear(bp)
+                if VIDEO and len(keys_log) > menu_len - 100:
+                    px = a.pixels()
+                    video.append([len(keys_log), lf, hashlib.sha1(px).hexdigest()[:16]])
+                    Image.frombytes('RGB', (240, 160), px).save(VIDEO / f'{len(keys_log):06d}.png')
+                    # (the OAM, the IO registers and the palette of each of those frames, for the layouts and timings)
+                    regs.write(bytes(a.read(0x07000000, 0x400)) + bytes(a.read(0x04000000, 0x60)) + bytes(a.read(0x05000000, 0x400)))
+                    if VIDEO_B:
+                        pb = b.pixels()
+                        # (+ the guest's round timer, both wins and whether its fighters exist: its frames' logic index
+                        # in the host's terms - each round's fighters made on the same logic frame on both)
+                        fb = fighters(b)
+                        video_b.append([len(keys_log), b.r32(0x03000F94), hashlib.sha1(pb).hexdigest()[:16], b.r8(0x03002BFC + 4),
+                                        b.r8(0x03002BFC) + b.r8(0x03002BFD), int(bool(fb[0] and fb[1]))])
+                        Image.frombytes('RGB', (240, 160), pb).save(VIDEO_B / f'{len(keys_log):06d}.png')
                 if TRACE and TRACE[0] - 2 <= lf <= TRACE[1]:
                     hs = [h for h in a.hits() if h['kind'] == 'break']
                     if hs:
@@ -207,7 +272,8 @@ def main():
                 lf_prev = lf
     out = ROOT / 'data' / 'link' / f'dojo_{name}.json'
     out.write_text(json.dumps({'name': name, 'about': __doc__.split('\n')[0], 'mode': mode, 'rounds': rounds, 'pick': [pick_a, pick_b],
-                               'video_keys': keys_log, 'recs': recs, 'rows': rows},
+                               'video_keys': keys_log, 'recs': recs, 'rows': rows,
+                               **({'video': video} if video else {}), **({'video_b': video_b} if video_b else {})},
                               separators=(',', ':')))
     print(out, len(rows), 'logic frames')
 

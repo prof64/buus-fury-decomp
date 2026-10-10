@@ -380,6 +380,9 @@ pub struct DojoState {
     /// the prize picked up so far (zenie: the coins the match-deciding knockdown dropped, `wf_core::player::link_prize`)
     #[serde(default)]
     pub zenie: i32,
+    /// the round's end banner's place in the world list (the next entity id when it was made: the draw order)
+    #[serde(default)]
+    pub banner_place: Option<u32>,
 }
 
 
@@ -395,6 +398,9 @@ pub struct DojoGame {
     pub rules: DojoRules,
     pub st: DojoState,
     pub s: Session,
+    /// the OBJs each side shows: its draw pass before the last update (the presenter's one-frame lag) in that side's
+    /// draw order (`wf_core::view::render_view_link`) - not rollback state, like the session's presenter
+    shown: [Option<Vec<wf_view::SpriteDraw>>; 2],
 }
 
 impl DojoGame {
@@ -405,8 +411,51 @@ impl DojoGame {
             cfg,
             setup,
             rules,
-            st: DojoState { round: 0, phase: Phase::Between { left: rules.start_frames.max(1) }, t: 0, wins: [0; 2], results: Vec::new(), over_at: None, frame: 0, down_for: 0, zenie: 0 },
+            st: DojoState { round: 0, phase: Phase::Between { left: rules.start_frames.max(1) }, t: 0, wins: [0; 2], results: Vec::new(), over_at: None, frame: 0, down_for: 0, zenie: 0, banner_place: None },
             s,
+            shown: [None, None],
+        }
+    }
+    /// the draw pass's sprites on both sides, before an update
+    fn draw_pass(&mut self) {
+        self.shown = [0u8, 1].map(|s| {
+            let mut v = wf_view::RenderView::default();
+            wf_core::view::render_view_link(&self.s.world, &self.link_draw(s), &mut v);
+            Some(v.sprites)
+        });
+    }
+    /// that side's world list beyond the props and fighters (their sort keys on our scale: layer 0x38 - the game's,
+    /// depth the game's - 4): "Round N" (a title text: layer 0, depth 0) while it shows; from the fight's start the
+    /// HUD and the boss bar (layer 16, depth 0) and the round timer (layer 0, depth 0x7FFFFFFF); the round's end
+    /// banner (a title text) from its making
+    fn link_draw(&self, slot: u8) -> wf_core::view::LinkDraw {
+        let (made, result) = (self.since_made().map(|k| k as i32), self.since_result().map(|j| j as i32));
+        let mut objs = vec![];
+        if made.is_some_and(|k| (65..125).contains(&k)) {
+            objs.push((0, (0x38, -4)));
+        }
+        let hud = matches!((made, result), (Some(k), _) if k >= 126) || result.is_some_and(|j| 9 - j >= -16);
+        let bar = matches!((made, result), (Some(k), _) if k >= 126) || result.is_some_and(|j| 9 - j >= -8);
+        if hud {
+            objs.push((0, (0x38 - 16, -4)));
+        }
+        if bar {
+            objs.push((0, (0x38 - 16, -4)));
+        }
+        if matches!(self.st.phase, Phase::Fight) && made.is_some_and(|k| k >= 126) {
+            objs.push((0, (0x38, i32::MAX - 4)));
+        }
+        if let (Some(place), true) = (self.st.banner_place, self.banner_shown()) {
+            objs.push((place, (0x38, -4)));
+        }
+        wf_core::view::LinkDraw { local: slot as usize, objs }
+    }
+    /// the round's end banner is up (0x08021D56: two updates into a knockdown, or the time up, to the result)
+    fn banner_shown(&self) -> bool {
+        match (self.st.phase, self.since_result()) {
+            (Phase::Fight, _) => self.st.down_for >= 2 || (self.st.down_for == 0 && self.st.t >= self.rules.round_frames),
+            (_, Some(0)) => true,
+            _ => false,
         }
     }
     /// a round: the match's fighters afresh; the generator goes on from where the last round left it (`rng`; the ROM
@@ -427,6 +476,11 @@ impl DojoGame {
             }
         }
         place_fighters(&mut s);
+        // the round's area load (0x08008E70 at (152, 220)) snaps each side's camera as EnterArea does: (x - 112,
+        // y - 76) - it then eases to its fighter through the fade-in (the BG scroll from (40, 144), link recordings)
+        for slot in 0..2 {
+            wf_core::battle::set_camera(&mut s.world, slot, (152 - 112) << 10, (220 - 76) << 10);
+        }
         s
     }
     /// the match result once over
@@ -468,6 +522,134 @@ impl DojoGame {
     }
 }
 
+impl DojoGame {
+    /// updates since this round's fighters were made (the fade-in, "Round N", the HUD's slide in)
+    fn since_made(&self) -> Option<u32> {
+        match self.st.phase {
+            Phase::Between { left } if left > self.rules.start_frames => None,
+            Phase::Over => None,
+            _ => Some(self.s.world.frame),
+        }
+    }
+    /// updates since the round's result (the fade-out, the HUD's slide out), while its fighters are still shown
+    fn since_result(&self) -> Option<u32> {
+        match self.st.phase {
+            Phase::Between { left } if left > self.rules.start_frames => Some(self.rules.between_frames + 1 + self.rules.start_frames - left),
+            Phase::Over => Some((self.st.frame - self.st.over_at.unwrap_or(self.st.frame)) as u32),
+            _ => None,
+        }
+    }
+    /// The match as `slot`'s screen shows it - the link fight's picture on that side's GBA (the fight 0x0802193A
+    /// and its modes; engine/docs/netcode.md "Link play: Dojo", the screen): the local fighter's camera and HUD,
+    /// the opponent's HP as the boss bar (`0x080195A8(0, remote, 0, 100)`), the round timer's seconds, "Round N"
+    /// and the knockdown's banner (title texts), the fades. Rendered as player 0 (`Renderer::render(.., 0, ..)`).
+    pub fn view(&self, slot: u8, out: &mut wf_view::RenderView) {
+        use wf_view::Sim;
+        self.s.view(out);
+        // (the game's picture: the fighters under the arena's foreground, no see-through)
+        out.see_through.clear();
+        let s = (slot as usize).min(1);
+        // the BG scroll: the camera before the update, as the story's battles - but the round's start (the fade-in
+        // mode 0x080495B4 and "Round N") shows the update's own
+        let cam = &self.s.world.cameras[s];
+        let c = if self.since_made().is_some_and(|k| k < 126) { cam.rect } else { cam.shown };
+        out.cameras = vec![wf_view::CameraView { x: c.x0, y: c.y0 }];
+        let hud = out.hud.get(s).cloned();
+        out.hud = hud.into_iter().collect();
+        // the OBJs in this side's draw order
+        if let Some(sp) = &self.shown[s] {
+            out.sprites = sp.clone();
+        }
+        // the HUD's bars as the frame leaves them (drawn from the fighters' records in the draw pass: an Energy
+        // Blast's EP in its own frame - link recording dojo_px1)
+        {
+            let w = &self.s.world;
+            if let (Some(h), Some(p)) = (out.hud.first_mut(), w.players.get(s).and_then(|&id| w.find(id)).map(|i| w.pl_ref(i))) {
+                h.hp = p.hp();
+                h.ep = p.ep();
+            }
+        }
+        out.boss_bars.clear();
+        out.title.clear();
+        out.timer = None;
+        let made = self.since_made().map(|k| k as i32);
+        let result = self.since_result().map(|j| j as i32);
+        // the fades (0x080495B4 / 0x080496CC, 4 a frame): in from the fighters' creation, out from the result
+        let level = match (made, result) {
+            (Some(k), _) => 256 - (4 * k).min(256),
+            (_, Some(j)) => (4 * j).min(256),
+            _ => 0,
+        };
+        if level > 0 {
+            out.palette_fade = Some(wf_view::PaletteFade { level: level as u16, target: 0 });
+        }
+        // the HUD and the boss bar: in from update 126 (y -16 / -8, +1 an update, to 8), out after the result
+        // (from 8, -1 an update, gone above -16 / -8)
+        let y = |lo: i32| -> Option<i32> {
+            match (made, result) {
+                (Some(k), _) if k >= 126 => Some((lo + k - 126).min(8)),
+                (_, Some(j)) if 9 - j >= lo => Some((9 - j).min(8)),
+                _ => None,
+            }
+        };
+        match (y(-16), out.hud.first_mut()) {
+            (Some(hy), Some(h)) => {
+                h.y_off = hy - 8;
+                h.hidden = false;
+            }
+            (None, Some(h)) => h.hidden = true,
+            _ => {}
+        }
+        let w = &self.s.world;
+        if let Some(by) = y(-8) {
+            let other = w.players.get(1 - s).and_then(|&id| w.find(id)).map(|i| w.pl_ref(i));
+            // the remote fighter's fill (vfunc +0x64 0x0804F898: HP * 53 / max HP)
+            let fill = other.map(|p| if p.rec.max_hp > 0 { p.rec.hp.max(0) * 53 / p.rec.max_hp } else { 0 }).unwrap_or(0);
+            out.boss_bars.push(wf_view::BossBarView { y: by, fill: fill.clamp(0, 53) as u8 });
+        }
+        let Some(md) = w.data.menu.clone() else { return };
+        let t = &md.text;
+        // "Round N" (106 + both players' wins) at (120, 80) while its mode runs (60 updates after the fade-in)
+        if made.is_some_and(|k| (65..125).contains(&k)) {
+            let n = 106 + (self.st.wins[0] as usize + self.st.wins[1] as usize).min(4);
+            out.title.push(wf_view::TitleView { text: t.s(n).to_vec(), x: 120, y: 80 });
+        }
+        // the round's end at (120, 40) (0x08021D56, from this side: one down - You Win!! / You Lose!!, the match's
+        // last - Grab your prize! / Go back to training!; both down or the time up - Draw!!)
+        if self.banner_shown() {
+            let (d0, d1) = self.downs();
+            let need = self.setup.rounds as i32 / 2 + 1;
+            let (me, them) = (self.st.wins[s] as i32, self.st.wins[1 - s] as i32);
+            let (mine, theirs) = if s == 0 { (d0, d1) } else { (d1, d0) };
+            let last = result == Some(0);
+            let id = match (mine, theirs) {
+                (true, false) => if (if last { them } else { them + 1 }) >= need { 115 } else { 112 },
+                (false, true) => if (if last { me } else { me + 1 }) >= need { 114 } else { 111 },
+                _ => 113,
+            };
+            out.title.push(wf_view::TitleView { text: t.s(id).to_vec(), x: 120, y: 40 });
+        }
+        // the round timer (object 0x0802E732): "%d" of the seconds, centred at 8 on a 32x16 OBJ at (120, 12), the
+        // menu font in colour 2 with shadow 1, priority 0 - from the fight's second update to the result's (it is
+        // deleted in that update, its OAM entry shown once more)
+        if (matches!(self.st.phase, Phase::Fight) && made.is_some_and(|k| k >= 127)) || result == Some(0) {
+            let secs = 180 - (self.st.t.min(self.rules.round_frames) / 60) as i32;
+            let mut cv = wf_core::menu::text::Canvas::new();
+            let mut pen = wf_core::menu::text::Pen::new(wf_view::MenuFont::Menu, 8, 7, 1, 2, Some(1));
+            pen.clip = [0, 0, 32, 16];
+            let digits: Vec<u16> = secs.max(0).to_string().bytes().map(|b| b as u16).collect();
+            cv.text(t, &mut pen, &digits);
+            let mut v = wf_core::menu::surface_view(cv);
+            v.layers[0].w = 32;
+            v.layers[0].h = 16;
+            v.layers[0].x = 120;
+            v.layers[0].y = 12;
+            v.overlay = true;
+            out.menu = Some(v);
+        }
+    }
+}
+
 impl Game for DojoGame {
     type State = (DojoState, Snapshot);
     fn save(&self) -> Self::State {
@@ -480,15 +662,26 @@ impl Game for DojoGame {
     fn advance(&mut self, inputs: &[u16], _first: bool) {
         self.st.frame += 1;
         match self.st.phase {
-            Phase::Over => {}
+            // the match's result: its fighters go on without keys under the fade-out, as between rounds, then the
+            // screen is black (the link's menu follows)
+            Phase::Over => {
+                if self.since_result().is_some_and(|j| j < self.rules.between_frames + 1) {
+                    self.s.presenter.before_step(&self.s.world);
+                    self.draw_pass();
+                    self.s.step(&[0, 0]);
+                }
+            }
             Phase::Between { left } => {
                 // after a round's result its fighters go on for `between_frames` without keys, then the next round's
                 // are made (an update of its own) and stand / idle for `start_frames` (link recording dojo_b3: the
                 // result at 9,932, the old fighters to 9,995, the new ones made at 9,996, the timer at 180 from 10,121)
                 if left == self.rules.start_frames + 1 {
+                    self.st.banner_place = None;
                     let rng = self.s.world.rng.state();
                     self.s = Self::round_session(&self.data, &self.cfg, Some(rng), self.setup.rounds, self.st.wins);
                 } else {
+                    self.s.presenter.before_step(&self.s.world);
+                    self.draw_pass();
                     self.s.step(&[0, 0]);
                 }
                 if left <= 1 {
@@ -501,6 +694,8 @@ impl Game for DojoGame {
             Phase::Fight => {
                 let k = inputs.iter().map(|&v| v & crate::core_game::BUTTONS_MASK).collect::<Vec<_>>();
                 let held = self.s.world.link_get.is_some();
+                self.s.presenter.before_step(&self.s.world);
+                self.draw_pass();
                 self.s.step(&k);
                 self.prize_pickup();
                 // (a supply's item-get holds the round's clocks for the 61 frames after the pick-up's - link
@@ -510,6 +705,9 @@ impl Game for DojoGame {
                     if self.st.down_for > 0 || self.downs() != (false, false) {
                         self.st.down_for += 1;
                     }
+                }
+                if self.st.banner_place.is_none() && self.banner_shown() {
+                    self.st.banner_place = Some(self.s.world.next_id);
                 }
                 if let Some(r) = self.round_end() {
                     wf_core::player::link_round_over(&mut self.s.world);
