@@ -1354,6 +1354,8 @@ impl LinkSim {
                             Some(wf_core::menu::Screen::Link(l)) => match l.page {
                                 wf_core::menu::link::LinkPage::Saves(_) => Some("saves"),
                                 wf_core::menu::link::LinkPage::Trade(_) => Some("trade"),
+                                wf_core::menu::link::LinkPage::Setup(_) => Some("setup"),
+                                wf_core::menu::link::LinkPage::Chars(_) => Some("chars"),
                             },
                             _ => None,
                         };

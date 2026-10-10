@@ -304,6 +304,9 @@ pub struct GameList {
     /// a rebuild happened since the last `built`
     #[serde(default)]
     pub rebuilt: bool,
+    /// the figures' sort depths (object +4, uninitialised heap words) when a capture gives them: their OAM order
+    #[serde(default)]
+    pub depths: Option<Vec<i32>>,
 }
 
 /// a party figure on a save slot row
@@ -457,14 +460,17 @@ impl GameList {
         let Some(d) = w.data.menu.as_ref() else {
             return out;
         };
-        // OAM order: the figures as made (the walker's list, link_saves); the list without a walker (the Trading
-        // Post's, `0x080202C8` skipped) has them the other way round - the last made in front (menu_parity
-        // link_trade_declined: the turned-away Gohan over Goku). INFERRED: the walker's re-made state restores the order
-        let mut order: Vec<&Fig> = self.figs.iter().filter(|f| f.live).collect();
-        if !self.walker {
+        // OAM order: the world's sort (`0x080115B0`: the objects by their depth +4, decreasing). A figure's depth is
+        // never set - the heap's leftover word - so it is known only from a capture (`depths`, menu_parity's link
+        // rows: link_setup_back). Without it: the figures as made (the walker's list, link_saves); the list without a
+        // walker (the Trading Post's, `0x080202C8` skipped) the other way round (menu_parity link_trade_declined)
+        let mut order: Vec<usize> = (0..self.figs.len()).collect();
+        if let Some(dp) = self.depths.as_ref().filter(|d| d.len() == self.figs.len()) {
+            order.sort_by_key(|&k| std::cmp::Reverse(dp[k]));
+        } else if !self.walker {
             order.reverse();
         }
-        for f in order {
+        for f in order.iter().map(|&k| &self.figs[k]).filter(|f| f.live) {
             let Some(sp) = w.data.sprite(f.sprite) else {
                 continue;
             };
@@ -599,6 +605,7 @@ impl GameList {
             rng_owed: 0,
             fig_vram: Vec::new(),
             rebuilt: false,
+            depths: None,
         }
     }
 

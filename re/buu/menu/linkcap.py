@@ -30,6 +30,8 @@ class LinkCap(Cap):
         super().__init__(e=a)
         self.b = b
         self.keys_b = 0
+        # (the link's flags as the subject sees them, per row: `link_rows`)
+        self.link_rows = False
 
     def step(self, keys, probe=None, keep=True):
         import hashlib
@@ -41,6 +43,15 @@ class LinkCap(Cap):
         row = dict(keys=keys, snd=self.snd(), h=hashlib.sha1(rgb.tobytes()).hexdigest()[:16])
         if probe:
             row.update(probe(self.e))
+        if self.link_rows:
+            # the friend's answer (0x03002F54: set by the link messages of the wait box / the pick) and the
+            # disconnect flag (0x03002F50)
+            row['flags'] = [self.e.r32(0x03002F54), self.e.r32(0x03002F50), self.e.r32(0x03002FB0), self.e.r32(0x03002FB4)]
+            # the character objects' sort depths (+4: never set, heap leftovers - their OAM order) in list order
+            n = min(self.e.r32(0x03001C4C + 4), 64)
+            obs = [self.e.r32(0x03001C4C + 8 + 4 * k) for k in range(n)]
+            row['fd'] = [self.e.r32(o + 4) - (1 << 32 if self.e.r32(o + 4) >> 31 else 0) for o in obs
+                         if self.e.r32(o) == 0x0804AC20]
         self.frames.append(row)
         if keep:
             self.screens.append(rgb)
@@ -61,11 +72,16 @@ def pair():
 
 def run(name, sc):
     a, b = pair()
-    c = LinkCap(a, b)
+    # `subject: 'b'`: the guest's screen is recorded (the flow's keys stay (A, B); `keys` are then B's and `keys_b`
+    # A's)
+    guest = sc.get('subject') == 'b'
+    c = LinkCap(b, a) if guest else LinkCap(a, b)
     for ka, kb, n in sc['flow']:
         for _ in range(n):
-            c.keys_b = dr.keyof(kb)
-            c.step(dr.keyof(ka), keep=False)
+            c.keys_b = dr.keyof(ka if guest else kb)
+            c.step(dr.keyof(kb if guest else ka), keep=False)
+    c.link_rows = True
+    a = c.e
     st = capture.story(a)
     # (as the title scenarios: the save slots from the game's EEPROM cache, and the running mode's fields the page
     # starts from - `sc['probe0'](e, meta_open)` fills page-specific ones)
@@ -92,8 +108,9 @@ def run(name, sc):
         f.unlink()
     for i, s in enumerate(c.screens):
         Image.fromarray(s).save(d / f'f{i:04d}.png')
-    meta = {'open': sc['open'], 'link': True, 'saves': saves}
-    rows = [dict(keys=f['keys'], lf=f['lf'], snd=f['snd'], h=f['h'], **({'up': f['up']} if sc.get('up') else {}))
+    meta = {'open': sc['open'], 'link': True, 'saves': saves, 'guest': guest}
+    rows = [dict(keys=f['keys'], lf=f['lf'], snd=f['snd'], h=f['h'], **({'up': f['up']} if sc.get('up') else {}),
+                 **({'flags': f['flags'], 'fd': f['fd']} if 'flags' in f else {}))
             for f in c.frames]
     if sc.get('post'):
         sc['post'](c.frames, rows)

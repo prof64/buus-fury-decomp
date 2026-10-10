@@ -290,6 +290,25 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
                 wf_core::menu::link::harness(&mut sim.session.world, &v);
             }
         }
+        // the link pages' friend (linkcap.py `flags` rows: [0x03002F54, 0x03002F50, 0x03002FB0, 0x03002FB4]): the
+        // friend's answer (the wait box's flag) and its character pick arrive in the frame the trace first shows them
+        // (the link message comes before the iteration's step)
+        if let Some(lk) = row["flags"].as_array() {
+            let prev = if k > 0 { rows[k - 1]["flags"].as_array() } else { None };
+            let rose = |j: usize| lk.get(j).map(i).unwrap_or(0) != 0 && prev.and_then(|p| p.get(j)).map(i).unwrap_or(0) == 0;
+            let w = &mut sim.session.world;
+            if rose(0) {
+                wf_core::menu::link::friend_answered(w);
+            }
+            if rose(3) {
+                wf_core::menu::link::friend_picked(w, lk.get(2).map(i).unwrap_or(0) as i32);
+            }
+            // the figures' sort depths (uninitialised heap words: their draw order)
+            if let Some(fd) = row["fd"].as_array().filter(|a| !a.is_empty()) {
+                let v: Vec<i32> = fd.iter().map(|x| i(x) as i32).collect();
+                wf_core::menu::link::figure_depths(w, &v);
+            }
+        }
         if logic && !opened_fade {
             sim.step(&[keys], &mut ev);
             // the box ended with the link up: the Multiplayer page's handler builds the link's Select Saved Game in the
