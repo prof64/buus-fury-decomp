@@ -106,7 +106,26 @@ impl GbaRam {
             let z = b64(s)?;
             miniz_oxide::inflate::decompress_to_vec_zlib(&z).map_err(|e| format!("ram.{k}: inflate {e:?}"))
         };
-        Ok(GbaRam::new(get("iwram")?, get("ewram")?))
+        let mut r = GbaRam::new(get("iwram")?, get("ewram")?);
+        // `"poke": [[address, u32], ..]` (or `[address, bits, "or"]`): words written over the image (a test's variant of a recorded start, as its
+        // emulator run poked them - tests/holy_timer.rs)
+        for p in v.get("poke").and_then(|x| x.as_array()).into_iter().flatten() {
+            if let (Some(a), Some(x)) = (p[0].as_u64(), p[1].as_u64()) {
+                let (a, b) = (a as u32, (x as u32).to_le_bytes());
+                let m = if a >= EWRAM && a < IWRAM { Some((&mut r.ewram, (a - EWRAM) as usize)) } else if a >= IWRAM { Some((&mut r.iwram, (a - IWRAM) as usize)) } else { None };
+                if let Some((m, o)) = m.filter(|(m, o)| o + 4 <= m.len()) {
+                    // (`[address, bits, "or"]`: set bits)
+                    if p.get(2).and_then(|x| x.as_str()) == Some("or") {
+                        for k in 0..4 {
+                            m[o + k] |= b[k];
+                        }
+                    } else {
+                        m[o..o + 4].copy_from_slice(&b);
+                    }
+                }
+            }
+        }
+        Ok(r)
     }
 
     fn slot(&self, a: u32) -> Option<&[u8]> {

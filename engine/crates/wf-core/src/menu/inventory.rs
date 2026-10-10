@@ -54,6 +54,10 @@ pub struct InvData {
     pub plural: Vec<Vec<u16>>,
     pub desc: Vec<Vec<u16>>,
     pub icon: Vec<String>,
+    /// the icon's size (def +0xC / +0x10: 16x16, or 32x32 - the Large Fish, the exhibit crates) and the list's 16x16
+    /// picture where the def has another one for it (def +0x28, `icons/supply/NNN_small.png`)
+    pub icon_size: Vec<(i32, i32)>,
+    pub icon_small: Vec<Option<String>>,
     pub story: Vec<bool>,
     /// the use script (def +0x30) as the script host's id `inline_0xADDR`; None = no script (Use disabled)
     pub script: Vec<Option<String>>,
@@ -92,6 +96,8 @@ impl InvData {
                 d.plural.resize(n, Vec::new());
                 d.desc.resize(n, Vec::new());
                 d.icon.resize(n, String::new());
+                d.icon_size.resize(n, (16, 16));
+                d.icon_small.resize(n, None);
                 d.story.resize(n, false);
                 d.script.resize(n, None);
                 d.effect.resize(n, None);
@@ -105,6 +111,16 @@ impl InvData {
             };
             d.desc[i] = s("description");
             d.icon[i] = v["icon"].as_str().unwrap_or("").to_string();
+            // (the PNG's IHDR: width / height)
+            if let Some(b) = src.read(&d.icon[i]).filter(|b| b.len() >= 24 && &b[12..16] == b"IHDR") {
+                let be = |o: usize| u32::from_be_bytes([b[o], b[o + 1], b[o + 2], b[o + 3]]) as i32;
+                d.icon_size[i] = (be(16), be(20));
+            }
+            if let Some(small) = d.icon[i].strip_suffix(".png").map(|p| format!("{p}_small.png")) {
+                if src.read(&small).is_some() {
+                    d.icon_small[i] = Some(small);
+                }
+            }
             d.story[i] = v["story_item"].as_bool().unwrap_or(false);
             let sc = v["use_script"]
                 .as_str()
@@ -532,7 +548,8 @@ impl Inventory {
                     break;
                 }
                 let item = list[idx as usize] as usize;
-                let icon = d.inv.icon.get(item).cloned().unwrap_or_default();
+                // (the list's own 16x16 picture: menu_parity inventory_story_use, a Hercule Exhibit crate)
+                let icon = d.inv.icon_small.get(item).cloned().flatten().or_else(|| d.inv.icon.get(item).cloned()).unwrap_or_default();
                 let (iw, ih) = (16, 16);
                 cv.image(
                     &icon,
@@ -643,7 +660,9 @@ impl UseDialog {
         let mut cv = Canvas::new();
         dialog_frame(&mut cv, 208, 104);
         let i = self.item as usize;
-        let (iw, ih) = (16, 16);
+        // (the def's first picture at its own size: 32x32 for the Large Fish and the exhibit crates - the name and
+        // the description move with it)
+        let (iw, ih) = d.inv.icon_size.get(i).copied().unwrap_or((16, 16));
         cv.image(
             d.inv.icon.get(i).map(|s| s.as_str()).unwrap_or(""),
             0,

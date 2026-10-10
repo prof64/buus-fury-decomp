@@ -635,6 +635,9 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             // set_character keeps the player object in its place of the world list (`0x08010692` changes its sprite
             // and form in place; e_7_2_1 f1387, dbx_004_6-1 f17398: the game's list order is unchanged)
             switch_character(h.w, arg(a, 0))?;
+            // (the native clears the timed boost with it: GD+0x4DC := 0 at 0x08002A80 - also with the leader
+            // offstage, where the host state holds the count)
+            h.s.boost[0] = 0;
             unit()
         }
         0x96 => done(h.w.story.chars.get(arg(a, 0) as usize).is_some_and(|c| c.flags & 1 != 0) as i32),

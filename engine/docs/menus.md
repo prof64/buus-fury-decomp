@@ -45,6 +45,15 @@ shows the same screen (the state is in `World`, so rollback re-simulates menu fr
 START / SELECT do nothing (a per-player pause would let one player's world time diverge from another's in a shared
 world). Story state the menus change (stats, items, equipment, party) is shared, as in co-op generally.
 
+**Inventory icons.** A supply's def has two pictures: +0xC (w, h, attributes, graphic) is the Use dialog's, drawn at
+its own size - 32x32 for the Large Fish and the 40 exhibit crates, the name and the description placed after it -,
++0x1C the list's 16x16 one (`icons/supply/NNN_small.png` where it is another drawing); menu_parity
+`inventory_story_use`. Item use: `inventory_use_each` / `_limits` (a Turkey, a Milk, a Senzu Bean are used up at full
+HP / EP too; the Capsule and the Lazarus Crystal have no Use), `inventory_use_holy_twice`, `inventory_use_chop_owned`.
+Stats: `status_alloc_cap` (a stat stops at the level), `status_level_199` / `_200` / `_past`; RecalcStats itself is
+checked for every equipment item against the game's routine called in the emulator (wf-app `tests/stats_parity.rs`,
+`data/buu/stats_recalc.json`, 525 cases).
+
 **Link play screens.** The Dojo's pages are the game's own, in wf-core (`menu::link::dojo` / `chars`, [`Link`]
 pages `LinkPage::Setup` / `Chars` and the nested wait box `Link::wait`), layouts measured and gated pixel for pixel
 against two linked emulators (`re/buu/menu/scenarios_link.py`, `link_setup*`, `link_guest_wait`, `link_chars*`, all

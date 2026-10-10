@@ -302,7 +302,9 @@ A character record with a free `index` is a story character as well as a battle 
 
 `equip` (body, hands, feet, accessory; default the game's `[0, 44, 77, 112]`) and `in_party` (in the party at a
 new game) are optional. Its forms (`forms/*.json` with `char_index` = the index) give the sprite (`gfx_id`), bonuses
-and transformations (`transform_up` / `_down`). The example joins through an NPC's talk event and switches with a
+and transformations (`transform_up` / `_down`); a form gains XP only with bit 4 of its `flags` set (16, as the game's
+playable forms have: the nine side-character forms 45..53 have 0, so a form that `$extends` one of them sets
+`"flags": 16` to level up). The example joins through an NPC's talk event and switches with a
 choice (`mods-examples/new-party-member`).
 
 ### Maps: `maps/<id>/`

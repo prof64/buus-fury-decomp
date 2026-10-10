@@ -863,14 +863,18 @@ impl StoryHost {
         let new_game = pre.iter().any(|e| matches!(e, Event::Field(FieldEvent::Run { run: Callback::Event(id), cause: Cause::Menu, .. }) if id == "s004"));
         let fresh = self.started.len() > before && !new_game;
         let n0 = sess.world.events.len();
+        // (a menu open over the field at the frame's start: the field's timers do not count this frame)
+        let menu_hold = wf_core::menu::active(&sess.world);
         sess.step_update();
+        // (nor in the iteration the menu's close ends in: the field is drawn again, not updated)
+        let menu_hold = menu_hold || sess.world.menu.closing_iter;
         // the countdown (GD+0x4D4) counts the frames whose object pass sees the field free; our frame order (update,
         // then the script's resume, then the post step's trigger check) is settled after them below
         let cd0 = sess.world.scene.timers.countdown;
-        let free_at_tick = wf_script_core::countdown_counts(&sess.world);
+        let free_at_tick = !menu_hold && wf_script_core::countdown_counts(&sess.world);
         // (an event the countdown's hook started runs inside the countdown object's update: its frame is counted)
         let hook_event = self.hs.timer_event;
-        wf_script_core::tick_timers(&mut sess.world, &mut self.hs);
+        wf_script_core::tick_timers_held(&mut sess.world, &mut self.hs, menu_hold);
         // the running script resumes from its wait (not one this frame's start began: its first wait counts from the
         // next frame), then the scripts the update started (NPC talk)
         let evs: Vec<Event> = sess.world.events[n0..].to_vec();
@@ -884,7 +888,7 @@ impl StoryHost {
         wf_core::field::hud_beep_after_scripts(&mut sess.world);
         // (an event that ended now - at the top of the game's frame - leaves the field free for this frame's count:
         // Airship db5_023 f569, the level-up popup's last box)
-        let ticked_late = !free_at_tick && !hook_event && sess.world.scene.timers.countdown_on && sess.world.scene.timers.countdown > 1 && wf_script_core::countdown_counts(&sess.world);
+        let ticked_late = !menu_hold && !free_at_tick && !hook_event && sess.world.scene.timers.countdown_on && sess.world.scene.timers.countdown > 1 && wf_script_core::countdown_counts(&sess.world);
         if ticked_late {
             sess.world.scene.timers.countdown -= 1;
         }
@@ -903,9 +907,57 @@ impl StoryHost {
         if free_mid && !wf_script_core::countdown_counts(&sess.world) && cd1 < cd0 && cd1 > 0 {
             sess.world.scene.timers.countdown = cd0;
         }
+        // the timed boost (Holy Water / `boost_stats`: GD+0x4DC) is counted by the same routine as the countdown
+        // (0x0800425C, the field update's: the countdown, the stopwatch, then the boost) - a frame counts when the
+        // field is free at its end (the frame a hold ends in counts: an item-get's last, an arrival fade's, an
+        // event's; the frame one starts in does not), no menu over it (tests/holy_timer.rs: the game's count along
+        // 631 segments)
+        // - not while Instant Transmission's target is chosen (a mode of its own: rclose_067_071 rows 62 .. 64)
+        let w = &sess.world;
+        let choosing = w.player_idx(0).is_some_and(|i| w.pl_ref(i).it_sel.is_some());
+        let counted = !menu_hold && !choosing && wf_script_core::field_free(w);
+        // (the boost is the game's - GameData -, not the player object's: with no leader object, a cutscene map, the
+        // host state holds it and the leader made afterwards takes it: sb_000_18_12's last row)
+        match sess.world.player_idx(0) {
+            Some(i) => {
+                if std::mem::take(&mut self.hs.boost_orphan) && self.hs.boost[0] > 0 && sess.world.pl_ref(i).holy_left == 0 {
+                    let b = self.hs.boost;
+                    let p = sess.world.pl(i);
+                    p.holy_left = b[0];
+                    p.boost = [b[1], b[2], b[3], b[4]];
+                    wf_core::player::refresh(&mut sess.world, i);
+                }
+                let n = boost_left(&sess.world);
+                if counted && n > 0 {
+                    set_boost_left(&mut sess.world, n - 1);
+                }
+                let p = sess.world.pl_ref(i);
+                (self.hs.boost[0], self.hs.boost[1], self.hs.boost[2], self.hs.boost[3], self.hs.boost[4]) = (p.holy_left, p.boost[0], p.boost[1], p.boost[2], p.boost[3]);
+            }
+            None => {
+                self.hs.boost_orphan = true;
+                if counted && self.hs.boost[0] > 0 {
+                    self.hs.boost[0] -= 1;
+                }
+            }
+        }
         // the game runs a frame's scripts before its objects: a HUD a script showed gets its update (the
         // stat-points mark) in the same frame, after the script's own objects (segments sb 20-2 f1574, 20-5 f5212)
         wf_core::vram::stat_mark(&mut sess.world);
+    }
+}
+
+/// the leader's timed boost: frames left (0 without a player)
+fn boost_left(w: &World) -> i32 {
+    w.player_idx(0).map_or(0, |i| w.pl_ref(i).holy_left)
+}
+
+/// set the timed boost's frames left; at 0 the stats are applied again (`0x0801064C` from the count's end)
+fn set_boost_left(w: &mut World, n: i32) {
+    let Some(i) = w.player_idx(0) else { return };
+    w.pl(i).holy_left = n;
+    if n == 0 {
+        wf_core::player::refresh(w, i);
     }
 }
 
