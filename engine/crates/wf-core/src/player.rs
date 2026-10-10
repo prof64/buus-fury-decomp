@@ -1778,7 +1778,9 @@ pub fn update(w: &mut World, i: usize) {
     // (battle; in the field the death script plays it - s000 node 7's `play_music(8)` - and not on its other branches:
     // run 3 row 1,796,302, 0-15, flag 282 set by s020 - a scripted loss, s000 jumps to s021 with no song)
     // (Battle mode's arena rules: at the loss, `battle::outcome`)
-    if ko >= 0 && w.frame as i64 - ko == if w.opts.arena { crate::battle::ARENA_KO } else { 200 } && w.field.is_none() {
+    // (not a link fight: the Dojo's song plays on through every knockdown - two linked emulators, the sound object's
+    // song over recording dojo_px3's three rounds)
+    if ko >= 0 && w.frame as i64 - ko == if w.opts.arena { crate::battle::ARENA_KO } else { 200 } && w.field.is_none() && !w.opts.link {
         w.events.push(Event::Song { id: 8 });
     }
     // (the task list - screen shakes - runs after the whole object pass: `battle::post_step`, the field's step_post)

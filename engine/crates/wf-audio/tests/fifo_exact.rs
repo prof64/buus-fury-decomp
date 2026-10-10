@@ -132,6 +132,8 @@ fn transitions_match_fifo_capture() {
                     "stop_sfx" => d.stop_all_sfx(),
                     "clear" => d.clear_tracks(),
                     "stop" => d.stop_song(),
+                    "volm" => d.set_music_volume(i(2) as u8),
+                    "vols" => d.set_sfx_volume(i(2) as u8),
                     o => panic!("op {o}"),
                 }
             }

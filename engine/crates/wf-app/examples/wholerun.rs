@@ -169,6 +169,26 @@ fn main() {
             })
             .collect()
     });
+    // --music FILE: the game's music state per row where it changed (tools/wholerun/music.py: playing byte, song,
+    // music / sfx volume) - the app's (its song requests and stops applied in order, the Options' volumes) against it
+    // after each logic iteration, at the iteration's last row; MUS lines for the first `--sounds-show` differences
+    let game_mus: Option<Vec<(usize, [i64; 4])>> = opt("--music").map(|p| {
+        let txt = if p.ends_with(".gz") {
+            String::from_utf8(std::process::Command::new("gzip").args(["-dc", &p]).output().expect("gzip").stdout).expect("utf8")
+        } else {
+            std::fs::read_to_string(&p).expect("music")
+        };
+        let v: serde_json::Value = serde_json::from_str(&txt).expect("music json");
+        v["ev"].as_array().expect("ev").iter().map(|r| {
+            let n = |k: usize| r[k].as_i64().unwrap_or(0);
+            (n(0) as usize, [n(1), n(2), n(3), n(4)])
+        }).collect()
+    });
+    let (mut mus_bad, mut mus_iters, mut mus_at) = (0usize, 0usize, 0usize);
+    let mut mus_first: Option<(usize, String)> = None;
+    // (ours: playing, song - nothing asked for yet)
+    let mut mus_ours: [i64; 2] = [0, -1];
+    let mut mus_was_bad = false;
     let snd_show: usize = opt("--sounds-show").and_then(|v| v.parse().ok()).unwrap_or(40);
     let (mut snd_bad, mut snd_iters) = (0usize, 0usize);
     // the first sound difference (row, what): the report's `sounds_first` (tools/wholerun/check.py)
@@ -279,6 +299,45 @@ fn main() {
                     }
                 }
                 snd_iters += 1;
+            }
+            if let Some(gm) = game_mus.as_ref().filter(|_| logic && no_lag) {
+                // (a leg from a cut: what the imported world has playing)
+                if mus_iters == 0 && app.world().scene.song >= 0 {
+                    mus_ours = [1, app.world().scene.song as i64];
+                }
+                for e in &app.world().events {
+                    match e {
+                        wf_core::world::Event::Song { id } => mus_ours = [1, *id as i64],
+                        wf_core::world::Event::SongStop => mus_ours[0] = 0,
+                        _ => {}
+                    }
+                }
+                let mut j = k;
+                while j + 1 < lfs.len() && lfs[j + 1] == lf {
+                    j += 1;
+                }
+                while mus_at + 1 < gm.len() && gm[mus_at + 1].0 <= j {
+                    mus_at += 1;
+                }
+                let game = gm[mus_at].1;
+                let st = &app.world().menu.settings;
+                let ours = [mus_ours[0], mus_ours[1], st.music as i64, st.sfx as i64];
+                // (the song of a stopped player is whatever played last: compared while playing)
+                // (the Options block is loaded by the boot: zero from a reset - the sound object cleared, no song - until
+                // then, before any sound)
+                let same = ours[0] == game[0] && (ours[0] == 0 || ours[1] == game[1]) && (ours[2..] == game[2..] || game == [0, -1, 0, 0]);
+                if !same {
+                    mus_bad += 1;
+                    if mus_first.is_none() {
+                        mus_first = Some((k, format!("app {ours:?} game {game:?}")));
+                    }
+                    // (a line per run of differing iterations)
+                    if !mus_was_bad && mus_bad <= 400 * snd_show {
+                        println!("MUS row {k} ({}) lf {lf} menu {menu}: app {ours:?} game {game:?} [playing, song, music, sfx]", stretch_of(k));
+                    }
+                }
+                mus_was_bad = !same;
+                mus_iters += 1;
             }
         } else {
             // the game's lag frame (recorded): the sound hardware's frame only
@@ -531,6 +590,9 @@ fn main() {
     if game_snd.is_some() {
         println!("sounds: {snd_bad} of {snd_iters} logic iterations differ");
     }
+    if game_mus.is_some() {
+        println!("music: {mus_bad} of {mus_iters} logic iterations differ");
+    }
     println!("whole run, no imports ({} lag): exact to row {exact_to} of {k} ({})", mode_name, stretch_of(exact_to));
     for l in &lasting {
         println!("  first lasting {}: {:?}", l.0, l.3.as_ref().map(|(r, d)| (r, stretch_of(*r), d)));
@@ -546,6 +608,8 @@ fn main() {
             "stepped": stepped, "sim_lag": own_lag, "sim_lag_on_logic": lag_bad, "recorded_lag_replayed": replayed_lag, "script_errors": errors,
             "sounds_compared": game_snd.is_some(), "sounds_bad": snd_bad, "sounds_iters": snd_iters,
             "sounds_first": snd_first.as_ref().map(|(r, d)| serde_json::json!({"row": r, "stretch": stretch_of(*r), "what": d})),
+            "music_compared": game_mus.is_some(), "music_bad": mus_bad, "music_iters": mus_iters,
+            "music_first": mus_first.as_ref().map(|(r, d)| serde_json::json!({"row": r, "stretch": stretch_of(*r), "what": d})),
         });
         std::fs::write(out, serde_json::to_string_pretty(&rep).unwrap()).expect("report");
     }

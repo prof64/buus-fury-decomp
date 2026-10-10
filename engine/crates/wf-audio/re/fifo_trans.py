@@ -25,6 +25,11 @@ SEQS = {
     'vibrato_carry': [(0, 'song', 16), (240, 'song', 10), (480, 'song', 16)],
     # the scripts' stop_music (native 0x24, 0x08000900: the player's playing byte +5 = 0, nothing else), then a song
     'song_stop': [(0, 'song', 3), (300, 'stop'), (500, 'song', 7), (700, 'stop'), (701, 'song', 7)],
+    # the Options' volumes mid-song (0x0803F18C music: every track's master byte; 0x0803E42A the SFX voices'): up,
+    # down under a running SFX, to 0 and back
+    'volume_change': [(0, 'song', 3), (200, 'volm', 8), (380, 'sfx', 41, 0x40, 0), (400, 'volm', 1), (402, 'vols', 2),
+                      (420, 'sfx', 44, 0x40, 20), (600, 'volm', 0), (640, 'vols', 0), (660, 'sfx', 41, 0x40, 0),
+                      (700, 'volm', 4), (702, 'vols', 6), (720, 'sfx', 41, 0x40, 0), (760, 'song', 12)],
     'quick_switch': [(0, 'song', 1), (2, 'song', 2), (5, 'song', 1), (200, 'sfx', 3, 0x40, 0), (201, 'song', 20)],
 }
 FRAMES = 900
@@ -59,6 +64,10 @@ def run(h, name, seq):
                     e.run(1)
                 elif op[0] == 'clear':
                     h.call(CLEAR_TRACKS, PLAYER)
+                elif op[0] == 'volm':
+                    h.call(0x0803F18C, PLAYER, op[1])
+                elif op[0] == 'vols':
+                    h.call(0x0803E42A, VOICES, op[1])
                 assert len(todo) == 1, 'one op per frame'
         else:
             e.run(1)

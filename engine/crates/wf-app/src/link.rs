@@ -260,7 +260,9 @@ struct Flow {
     result: Option<Ending>,
     to_chars: bool,
     /// the link was lost in a fight: its last picture is what the link error's script fades out
-    lost_view: Option<Box<RenderView>>,    /// the friend left the link with B (its hello says so), and the page was told (`menu::link::friend_left`)
+    lost_view: Option<Box<RenderView>>,    /// the song this flow started (the Dojo's, at its first fight)
+    song: Option<u16>,
+    /// the friend left the link with B (its hello says so), and the page was told (`menu::link::friend_left`)
     friend_left: bool,
     left_told: bool,
 }
@@ -339,6 +341,7 @@ impl Flow {
             result: None,
             to_chars: false,
             lost_view: None,
+            song: None,
             friend_left: false,
             left_told: false,
         })
@@ -640,7 +643,7 @@ impl Flow {
         self.net.set_hello(&h);
     }
 
-    fn start_match(&mut self, now: f64, _ev: &mut Vec<SimEvent>) -> Out {
+    fn start_match(&mut self, now: f64, ev: &mut Vec<SimEvent>) -> Out {
         let Some(st) = self.net.lobby.start.clone() else { return Out::None };
         let me = self.net.t.local_id().unwrap_or_default();
         let Some(slot) = st.players.iter().position(|s| s.id == me) else {
@@ -649,6 +652,15 @@ impl Flow {
         };
         let setup: DojoSetup = serde_json::from_value(st.extra.clone()).unwrap_or(self.setup);
         let game = DojoGame::new(self.data.clone(), st.config.clone(), setup, self.rules);
+        // the Dojo's song (area 0-90: 19) from the first fight's load - the title's song 45 plays through the link's
+        // pages until then; it is requested once: the later rounds, the character page after the fight, a second
+        // fight and the pages back to the title keep it (two linked emulators, the sound object's playing byte and
+        // song per frame over recording dojo_px3 and B back to the title's pages)
+        let song = self.data.areas.get(&game.s.world.arena.map).and_then(|a| a.1);
+        if let Some(s) = song.filter(|s| self.song != Some(*s)) {
+            ev.push(SimEvent::Audio(AudioEvent::PlaySong(s)));
+            self.song = Some(s);
+        }
         let conf = DojoGame::new(self.data.clone(), st.config.clone(), setup, self.rules);
         let ncfg = NetConfig { slots: st.players.len(), input_delay: st.input_delay, max_prediction: st.max_prediction, session: st.session, ..Default::default() };
         let peers = st.players.iter().enumerate().filter(|(_, s)| s.id != me).map(|(k, s)| (s.id.clone(), vec![k])).collect();
@@ -1385,6 +1397,13 @@ impl LinkSim {
         }
         let flow = self.flow.as_mut().expect("flow");
         let mut out = flow.step(now, &clock, held, pressed, events);
+        // the song the flow started (the Dojo's) is what the title app has playing: its next request - the title's song
+        // when a lost link's script returns to the title, a New Game's - is made against it, as the game's PlaySong
+        // checks (two linked emulators: a link lost in a fight ends on the title with song 45 requested; lost on a
+        // page before any fight, or left with B after one, nothing is requested)
+        if let Some(s) = flow.song {
+            self.inner.session.world.scene.song = s as i32;
+        }
         // the link is lost: the game's link error on the title app - its script s001 over what the screen showed (the
         // page, or the fight's last picture), then the title; the flow ends there
         if matches!(flow.phase, Phase::Lost) {

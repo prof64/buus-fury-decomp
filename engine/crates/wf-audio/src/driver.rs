@@ -893,10 +893,18 @@ impl<'a> Driver<'a> {
     /// Options-menu volumes (`0x0803F18C` / `0x0803E42A`: master byte of every track / SFX voice; flags a
     /// volume update like the game).
     pub fn set_master_volumes(&mut self, music: u8, sfx: u8) {
+        self.set_music_volume(music);
+        self.set_sfx_volume(sfx);
+    }
+    /// `0x0803F18C`: the music volume alone
+    pub fn set_music_volume(&mut self, music: u8) {
         for t in self.player.tracks.iter_mut() {
             t.v.master = music;
             t.v.flags |= 0x10;
         }
+    }
+    /// `0x0803E42A`: the sound effects' volume alone
+    pub fn set_sfx_volume(&mut self, sfx: u8) {
         for v in self.voices.iter_mut() {
             v.master = sfx;
             v.flags |= 0x10;

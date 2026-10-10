@@ -566,11 +566,12 @@ pub fn call(h: &mut CoreHost, c: &Call) -> R {
             block(h.s, Pending::Menu { native: n, push: false })
         }
         0x8e => {
-            h.w.events.push(Event::SongStop);
             // the title's song is requested in this iteration with a stop-all (whole-run sound requests, the ending:
             // StopAll + PlaySong(45) in the frame return_to_title runs); `title::title_world` does not request it again
+            // - through the title's check (`0x08005402`: not when it is the song playing - two linked emulators, a
+            // link lost on a page: the link error's return_to_title makes no request, the title's song plays on)
             h.w.events.push(Event::SfxStopAll);
-            h.w.events.push(Event::Song { id: wf_core::menu::title::TITLE_SONG });
+            scene::play_song(h.w, wf_core::menu::title::TITLE_SONG);
             h.w.scene.requests.push(scene::Request::ReturnToTitle);
             unit()
         }
