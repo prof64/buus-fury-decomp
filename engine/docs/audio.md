@@ -130,6 +130,24 @@ the default extraction (`extract_rendered`).
   sequences identical, every sample (15 s each).
   Also the Options' volumes mid-song (`volume_change`: `0x0803F18C` / `0x0803E42A` - `Driver::set_music_volume` /
   `set_sfx_volume` - up, down under a running SFX, to 0 and back, new SFX after each): identical, every sample.
+* **The running game** (`tests/fifo_exact.rs` `live_game_matches_fifo_capture`, captures by `re/fifo_live.py` -
+  nothing injected, the game played by keys): the pause menu opened over the area's music, its cursor, its pages (an
+  item's Use, the Options' volumes changed under the music), closed; an item picked up indoors (two in a row) and in
+  the open (the item-get presentation, SFX 45 over the song - the music is neither stopped nor lowered); the link
+  fight's supply pick-up on two linked emulators (the host's sound, the fight's SFX around it). The capture takes the
+  driver's whole RAM between two updates (`Driver::seed_ram`), then every update (a write of the ring's write
+  position `sound + 8`: its size), every sound call in order, and the ring's bytes as written. 5 captures, 930,672
+  samples, **all identical** - references in `data/audio/live_*.json` (RAM, update sizes, calls, FNV-1a 64 of the
+  stream; no sound data).
+  What it shows about **the update's timing** (`0x0803F296`, called from the main loop after the state update):
+  `n = (played - written) & 0x3FF`, the DMA's position `sound + 4` counted by the timer interrupt `0x03000AE0` **16
+  samples at a time**; under 64 nothing; else the SFX voices' pending changes once, then music + SFX mixed in runs of
+  at most 512 (the mix buffer) until all `n` are written. A normal frame's update is **256 or 272** samples. When the
+  main loop is late - a menu's redraw, an area's load: one iteration of several video frames - the interrupt itself
+  calls the update once only 96 samples are left unplayed (`0x03000B40`: 928 samples, unless an update is running:
+  the busy byte `sound + 0`), and the iteration's own update follows with the rest: the music never loses time, and a
+  call made before such a refill starts at it. (An update inside a video frame's end, two updates in one frame and a
+  frame without any all occur; the frozen-game captures never had them.)
 * **The music's state along the real runs** (`tools/wholerun/music.py` -> `data/realrun*/music.json.gz`; compared by
   `examples/wholerun.rs --music`, part of `tools/wholerun/check.sh`): the game's playing byte (player +5), its song
   (+0xC) and the Options' volumes after every frame of the three whole runs against the app's (its song requests and
@@ -161,6 +179,10 @@ the default extraction (`extract_rendered`).
 
 ## 7. Deviations / limits
 
+* The app's updates are whole 16-sample blocks like the game's (256 or 272 samples a frame, `audio::update_samples`;
+  they were 267 / 268): SFX start on the game's sample grid. The app has no long iterations, so no refill from the
+  interrupt either: every frame's requests start at its own update - where the game's start too, measured from the
+  iteration that made them.
 * The app's audio engine (`wf-app` `audio.rs`) takes each game frame's requests at its own driver update, as the game
   does (`App::take_audio_frames` -> `AudioEngine::push_frame`; native: one channel message per frame, web: a frame
   word, kind 7, after each frame's requests). Before 2026-10-10 every request of a device callback (2-5 frames) was
@@ -171,6 +193,7 @@ the default extraction (`extract_rendered`).
 * `hq` (float, interpolated) is intentionally not bit-exact; use `Driver::render` for the reference sound.
 * State carry-over between songs is reproduced only if the caller keeps one `Driver` across songs (as the game
   does); a new `Driver` per song = fresh boot.
-* Not modelled: the GBA's analogue output stage (the 8-bit FIFO stream *is* the digital output), the IRQ-driven
-  catch-up mixing (it only changes chunk sizes, which do not affect music; SFX start on the next update like the game).
+* Not modelled: the GBA's analogue output stage (the 8-bit FIFO stream *is* the digital output). The interrupt's
+  refill updates (§6, the running game) need no model of their own: an update is an update - `Driver::render_into`
+  with their sizes reproduces them, every sample.
 * Effect ids ≥ 32 would read past the handler table in the game; none occur.

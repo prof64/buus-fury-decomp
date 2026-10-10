@@ -45,17 +45,18 @@ fn each_frames_requests_start_at_its_own_update() {
             }
         }
         acc += MIX_RATE / GBA_FPS;
-        let n = acc as usize;
-        acc -= n as f64;
+        let n = wf_app::audio::update_samples(&mut acc);
+        assert!(n == 256 || n == 272, "an update is whole 16-sample blocks: {n}");
         d.render_into(&mut want, n);
     }
     // the app: every frame's requests handed over at once (one device burst), then the samples asked for at the
     // driver's own rate (no resampling)
     let mut a = AudioEngine::new(bank, MIX_RATE.round() as u32);
     a.resample = Resample::Hold;
-    // (three frames handed over per device callback of three frames' samples - a 50 ms buffer)
+    // (three frames handed over per device callback of nearly three frames' samples - a 50 ms buffer; three updates
+    // are at least 784 samples)
     let mut got: Vec<(i8, i8)> = Vec::new();
-    let mut out = vec![0.0f32; 2 * 800];
+    let mut out = vec![0.0f32; 2 * 760];
     for burst in frames.chunks(3) {
         for g in burst {
             a.push_frame(g.clone());
