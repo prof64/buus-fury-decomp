@@ -85,6 +85,10 @@ pub struct LinkHello {
     pub link_id: String,
     #[serde(default)]
     pub dojo: Option<DojoHello>,
+    /// this side left the link with B (its Select Saved Game's Cancel): the friend's page goes back to the title's
+    /// Multiplayer page by itself, as in the game - not the link error a lost connection is
+    #[serde(default)]
+    pub left: bool,
 }
 
 const SFX_MENU: u8 = 40;
@@ -219,6 +223,9 @@ enum Out {
     None,
     /// the flow is over: close the title's link box
     Done,
+    /// the link was left on a page (its B, or the friend's): the page became the title's Multiplayer page - the flow
+    /// is over with the title as it is
+    Left,
     /// a save slot changed (prize / trade): the new save
     Slot(usize, SaveData),
 }
@@ -253,7 +260,9 @@ struct Flow {
     result: Option<Ending>,
     to_chars: bool,
     /// the link was lost in a fight: its last picture is what the link error's script fades out
-    lost_view: Option<Box<RenderView>>,
+    lost_view: Option<Box<RenderView>>,    /// the friend left the link with B (its hello says so), and the page was told (`menu::link::friend_left`)
+    friend_left: bool,
+    left_told: bool,
 }
 
 /// a finished Dojo match as this peer confirmed it (the tests compare both peers')
@@ -288,7 +297,7 @@ impl Flow {
     fn new(kind: LinkKind, data: Arc<GameData>, cfg: &mut LinkConfig, saves: Vec<Option<SaveData>>) -> Result<Flow, String> {
         let (t, role) = (cfg.connect)(kind)?;
         let host = role == Role::Host;
-        let hello = LinkHello { link_id: cfg.link_id.clone(), dojo: None };
+        let hello = LinkHello { link_id: cfg.link_id.clone(), dojo: None, left: false };
         let settings = LobbySettings {
             role,
             name: cfg.name.clone(),
@@ -330,6 +339,8 @@ impl Flow {
             result: None,
             to_chars: false,
             lost_view: None,
+            friend_left: false,
+            left_told: false,
         })
     }
 
@@ -357,6 +368,9 @@ impl Flow {
 
     /// what the local player did on a wf-core link page (`menu::link`)
     fn link_action(&mut self, a: LinkAction, now: f64, ev: &mut Vec<SimEvent>) -> Out {
+        if matches!(a, LinkAction::Left) {
+            return Out::Left;
+        }
         if let Phase::Trade(u) = &mut self.phase {
             match a {
                 LinkAction::Propose(e) => {
@@ -396,7 +410,7 @@ impl Flow {
         if self.kind == LinkKind::Dojo {
             let host = self.host();
             match a {
-                LinkAction::Back => return Out::Done,
+                LinkAction::Back => return Out::Left,
                 // the save: the host goes on to its setup page, the guest waits for the host's setup
                 LinkAction::Save(s) => {
                     self.slot = s;
@@ -486,7 +500,7 @@ impl Flow {
             return Out::None;
         }
         match (&self.phase, a) {
-            (Phase::Saves { .. }, LinkAction::Back) => Out::Done,
+            (Phase::Saves { .. }, LinkAction::Back) => Out::Left,
             (Phase::Saves { .. }, LinkAction::Save(s)) if self.usable(s) => {
                 self.slot = s;
                 match self.kind {
@@ -565,7 +579,11 @@ impl Flow {
             // (its hello changes as it picks: the latest)
             self.friend = Some(f);
         }
-        let lost = self.friend_gone() || self.net.t.closed();
+        if self.friend.as_ref().is_some_and(|(_, h)| h.left) {
+            self.friend_left = true;
+        }
+        // (a friend that left with B is not a lost link: its page ends by itself - `LinkSim`)
+        let lost = !self.friend_left && (self.friend_gone() || self.net.t.closed());
         if lost && !matches!(self.phase, Phase::Waiting | Phase::Message(_) | Phase::Lost) {
             self.set_phase(Phase::Lost);
             return Out::None;
@@ -610,9 +628,15 @@ impl Flow {
         }
     }
 
+    /// leaving the link with B: the friend is told (its page follows to the Multiplayer page)
+    fn say_left(&mut self) {
+        let h = LinkHello { link_id: self.link_id.clone(), dojo: None, left: true };
+        self.net.set_hello(&h);
+    }
+
     fn send_dojo_hello(&mut self, setup: Option<DojoSetup>) {
         let d = DojoHello { save: self.dsave.clone().unwrap_or_default(), pick: self.pick, setup, picked: self.picked.is_some(), page_pick: self.picked.unwrap_or(0), played: self.played };
-        let h = LinkHello { link_id: self.link_id.clone(), dojo: Some(d) };
+        let h = LinkHello { link_id: self.link_id.clone(), dojo: Some(d), left: false };
         self.net.set_hello(&h);
     }
 
@@ -817,6 +841,12 @@ impl Flow {
     fn step_trade(&mut self, now: f64, pressed: u16, ev: &mut Vec<SimEvent>) -> Out {
         let Phase::Trade(u) = &mut self.phase else { return Out::None };
         trade_io(&mut self.net, u, now);
+        if self.net.friend().is_some_and(|(_, h)| h.left) {
+            self.friend_left = true;
+        }
+        if self.friend_left && u.done.is_none() {
+            return Out::None;
+        }
         let mut done = None;
         for e in u.peer.events() {
             match e {
@@ -1041,6 +1071,8 @@ pub struct LinkSim {
     /// the link is lost: the title app runs the game's link error (`menu::link::lost`) - with the fight's last
     /// picture, when it was lost in one, until the script's scene loads
     lost: Option<Option<Box<RenderView>>>,
+    /// a flow that left the link: its connection kept for a moment (the friend hears of it), steps left
+    leaving: Option<(Box<Flow>, u32)>,
 }
 
 /// the title's link box: its kind (2 Dojo, 1 Trading Post) while open
@@ -1053,7 +1085,7 @@ pub fn title_wait(w: &wf_core::world::World) -> Option<u8> {
 
 impl LinkSim {
     pub fn new(inner: StorySim, cfg: LinkConfig) -> LinkSim {
-        LinkSim { inner, cfg, flow: None, wait_seen: false, closing: None, prev: 0, steps: 0, last: None, record: None, page: None, lost: None }
+        LinkSim { inner, cfg, flow: None, wait_seen: false, closing: None, prev: 0, steps: 0, last: None, record: None, page: None, lost: None, leaving: None }
     }
 
     /// what the link part shows now ("title", "waiting", "saves", "chars", "setup", "match", "trade", "complete",
@@ -1273,11 +1305,21 @@ impl LinkSim {
             }
             return;
         }
+        // a flow that left the link: its connection a moment longer (its last hello goes out)
+        if let Some((f, n)) = self.leaving.as_mut() {
+            let _ = f.net.pump((self.cfg.clock)());
+            *n = n.saturating_sub(1);
+            if *n == 0 {
+                self.leaving = None;
+            }
+        }
         let Some(flow) = self.flow.as_mut() else {
             self.inner.step(inputs, events);
             match title_wait(&self.inner.session.world) {
                 Some(kind) if !self.wait_seen => {
                     self.wait_seen = true;
+                    // (the next link starts on a connection of its own)
+                    self.leaving = None;
                     let k = if kind == 2 { LinkKind::Dojo } else { LinkKind::Trade };
                     let saves = (0..SLOTS).map(|i| self.inner.session.world.saves.slot(i).cloned()).collect();
                     let data = self.data();
@@ -1324,6 +1366,12 @@ impl LinkSim {
                         }
                         self.page = Some((saved, "saves"));
                     }
+                    // no saved game at all: the game's Select Saved Game with "No Saved Games" over it (B leaves)
+                    None if flow.saves.iter().all(|x| x.is_none()) => {
+                        flow.set_phase(Phase::Saves { sel: 0 });
+                        wf_core::menu::link::open_saves(&mut self.inner.session.world, flow.kind == LinkKind::Trade);
+                        self.page = Some((saved, "saves"));
+                    }
                     None => flow.set_phase(Phase::NoSaves),
                 }
                 return;
@@ -1364,6 +1412,11 @@ impl LinkSim {
                 }
             }
             return;
+        }
+        // the friend left the link with B: the page shown goes back to the Multiplayer page by itself
+        if flow.friend_left && !flow.left_told && self.page.is_some() {
+            flow.left_told = true;
+            wf_core::menu::link::friend_left(&mut self.inner.session.world);
         }
         // the phase's page: wf-core's link screen on the title app, stepped with the keys; its actions go to the flow
         if matches!(out, Out::None) {
@@ -1458,6 +1511,11 @@ impl LinkSim {
                     self.last = Some("complete".into());
                     return;
                 }
+                // a page that became the title's Multiplayer page: its B (Select Saved Game's Cancel, "No Saved
+                // Games"), or the friend's (`friend_left`) - the link is left
+                if on_title && matches!(out, Out::None) && (!matches!(flow.phase, Phase::Trade(_)) || flow.friend_left) {
+                    out = Out::Left;
+                }
             }
         }
         let flow = self.flow.as_mut().expect("flow");
@@ -1479,6 +1537,23 @@ impl LinkSim {
                 });
                 self.flow = None;
                 self.closing = Some(0);
+                if let Some(p) = &self.cfg.report {
+                    let _ = std::fs::write(p, serde_json::to_vec_pretty(&self.report_json()).unwrap_or_default());
+                }
+            }
+            // the page became the title's Multiplayer page (its B, or the friend's): the title stays as it is; the
+            // connection lives on for a moment so the friend hears that this side left
+            Out::Left => {
+                self.page = None;
+                self.last = Some(match &flow.result {
+                    Some(e) => format!("{e:?}"),
+                    None => "left".into(),
+                });
+                if let Some(mut f) = self.flow.take() {
+                    f.say_left();
+                    self.leaving = Some((Box::new(f), 45));
+                }
+                self.wait_seen = false;
                 if let Some(p) = &self.cfg.report {
                     let _ = std::fs::write(p, serde_json::to_vec_pretty(&self.report_json()).unwrap_or_default());
                 }

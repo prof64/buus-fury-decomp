@@ -73,6 +73,11 @@ link shows the character pick again (`link::open_chars`). A lost link is the gam
 engine script s001 over the page - netcode.md; menu_parity `link_lost_*`, a scenario's `reset_b` resets the friend's
 emulator, `meta.field` has the scene's frames compared too and `meta.options` gives the text speed its box types at).
 
+Select Saved Game's B leaves the link: the page is replaced by the title's Multiplayer page (`link_saves_back`); the
+friend's leaving does the same to whatever page shows (`link::friend_left`, `link_friend_left*`); without a saved
+game the list has the box "No Saved Games" over it (`dojo::WaitKind::NoSaves`, `link_nosaves`: B leaves after the
+box's exit-stub iteration) and its A prompt is grey from the start.
+
 **The link error's `return_to_title`** (s001): the title is made in the script's own iteration and runs its first
 step there (`Session::step_post`, `World::link_error`) - its picture is up at that iteration's end and its cursor has
 counted two. The ending's `return_to_title` keeps its own timing (the title made at the next step's start; its cursor

@@ -58,9 +58,12 @@ class LinkCap(Cap):
         return row
 
 
-def pair():
+def pair(blank=False):
     sav = (ROOT / 'work' / 'run2' / 'end.sav').read_bytes()
     a, b = dr.mkemu('buu_menus.ss'), dr.mkemu('buu_menus.ss')
+    if blank:
+        # (a cartridge without a saved game: the EEPROM erased)
+        sav = bytes([0xFF]) * len(dr.sbemu.sd_read(a))
     for e in (a, b):
         dr.sbemu.sd_write(e, sav)
         e.run(3)
@@ -71,7 +74,7 @@ def pair():
 
 
 def run(name, sc):
-    a, b = pair()
+    a, b = pair(sc.get('blank', False))
     # `subject: 'b'`: the guest's screen is recorded (the flow's keys stay (A, B); `keys` are then B's and `keys_b`
     # A's)
     guest = sc.get('subject') == 'b'

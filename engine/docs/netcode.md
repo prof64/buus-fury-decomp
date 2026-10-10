@@ -352,7 +352,15 @@ network options, `--net-name`, `--net-key` apply); B (Cancel) leaves as in the g
   under the script's fade); `LinkSim` keeps the fight's last picture there instead when the link was lost in one
   (phase "lost"). Gated frame by frame, the scene's frames and the title after it included: menu_parity
   `link_lost_setup` / `link_lost_saves` / `link_lost_chars`. A trade in doubt keeps its page (the journal's lock).
-  Left as the app's own drawing: "No Saved Games" and the lobby's refusals (a full room, another version).
+* **Leaving with B** (Select Saved Game's Cancel): the page becomes the title's Multiplayer page (menu_parity
+  `link_saves_back`), and the friend's page follows by itself whatever it shows - no link error (two linked
+  emulators: `link_friend_left` / `link_friend_left_setup`; the game's side follows 9 to 60 iterations later, ours
+  when it hears of it). The leaving side says so in its hello (`LinkHello::left`) and keeps its connection for 45
+  more steps (`LinkSim::leaving`); the friend's flow gives `menu::link::friend_left` to its page and ends on the
+  Multiplayer page too (tests/link.rs `dojo_friend_leaves_with_b`).
+* **No saved game at all**: the game's Select Saved Game with the box "No Saved Games" / B Cancel over it (the wait
+  box's state 2; menu_parity `link_nosaves`, both emulators with erased saves), B leaves as above.
+  Left as the app's own drawing: the lobby's refusals (a full room, another version) and a missing save folder.
 * **Trading Post**: the game's own pages (wf-core `menu::link::trade`, gated frame by frame against two linked
   emulators: menu_parity `link_trade_*`): the picker ("Your Trade:", the list with its arrows, "How many to
   trade?"), R **Propose Trade** -> "Waiting for a friend..." until the friend's proposal -> the proposal ("Your

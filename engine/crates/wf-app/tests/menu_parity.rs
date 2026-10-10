@@ -302,6 +302,10 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
         if row["lost"].as_bool() == Some(true) {
             wf_core::menu::link::lost(&mut sim.session.world);
         }
+        // the friend left the link with B (the row whose iteration made the Multiplayer page of ours)
+        if row["left"].as_bool() == Some(true) {
+            wf_core::menu::link::friend_left(&mut sim.session.world);
+        }
         // the link pages' friend (linkcap.py `flags` rows: [0x03002F54, 0x03002F50, 0x03002FB0, 0x03002FB4]): the
         // friend's answer (the wait box's flag) and its character pick arrive in the frame the trace first shows them
         // (the link message comes before the iteration's step)

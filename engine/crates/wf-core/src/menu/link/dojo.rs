@@ -152,6 +152,9 @@ pub enum WaitKind {
     /// the character pick (vt `0x0804AFA0`, enter `0x080242EC`, step `0x080243F4`): the friend's pick
     /// (`[0x03002FB0 + 4]`), the 31st step ends it
     Pick,
+    /// "No Saved Games" (the box's state 2, string 91) over a Select Saved Game without a saved game: B leaves the
+    /// link (two linked emulators with erased saves: menu_parity link_nosaves)
+    NoSaves,
 }
 
 /// "Waiting for a friend..." nested over a link page
@@ -174,7 +177,7 @@ pub enum WaitEnd {
 
 impl Wait {
     pub fn new(t: &TextData, kind: WaitKind) -> Wait {
-        Wait { kind, c: super::super::title::wait_kids(t, 0), count: 0 }
+        Wait { kind, c: super::super::title::wait_kids(t, if kind == WaitKind::NoSaves { 2 } else { 0 }), count: 0 }
     }
 
     /// step `0x080245D8` / `0x080243F4`: the friend's answer counted (the 11th / 31st step ends the box), else the
@@ -185,6 +188,7 @@ impl Wait {
             let last = match self.kind {
                 WaitKind::Answer => 10,
                 WaitKind::Pick => 30,
+                WaitKind::NoSaves => i32::MAX - 1,
             };
             if self.count > last {
                 return Some(WaitEnd::Done);

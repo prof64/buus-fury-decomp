@@ -149,6 +149,33 @@ LINK.update({
     'link_lost_chars': dict(flow=TO_CHARS, open={'kind': 'link_chars', 'host': True}, probe0=chars_probe, **LOST),
 })
 
+
+
+def _left(frames, rows):
+    """the row whose iteration made the title's Multiplayer page (vt 0x0804B5AC) out of the link page with no key of
+    ours - the friend left the link with B: `left`"""
+    for f, r in zip(frames, rows):
+        if f.get('vt') == 0x0804B5AC:
+            r['left'] = True
+            break
+
+
+LINK.update({
+    # B on Select Saved Game: the title's Multiplayer page again
+    'link_saves_back': dict(flow=TO_SAVES_DOJO, keys=['-:10', 'B:2', '-:80'],
+                            open={'kind': 'link_saves', 'trade': False}, probe0=list_sel),
+    # the friend's B on its Select Saved Game (it leaves the link): ours goes back to the Multiplayer page by itself -
+    # from Select Saved Game, and from the host's setup page
+    'link_friend_left': dict(flow=TO_SAVES_DOJO, keys=['-:180'], keys_b=['-:10', 'B:2'],
+                             open={'kind': 'link_saves', 'trade': False}, probe0=list_sel, probe=_vt, post=_left),
+    'link_friend_left_setup': dict(flow=TO_SAVES_DOJO + [('A', '-', 7), ('-', '-', 120)], keys=['-:120'],
+                                   keys_b=['-:10', 'B:2'], open={'kind': 'link_setup', 'host': True},
+                                   probe0=setup_probe, probe=_vt, post=_left),
+    # no saved game on the cartridge (`blank`: both boot with empty saves): "No Saved Games" over the list, B leaves
+    'link_nosaves': dict(flow=TO_SAVES_DOJO, blank=True, keys=['-:40', 'B:2', '-:60'],
+                         open={'kind': 'link_saves', 'trade': False}, probe0=list_sel),
+})
+
 # the Trading Post's pages (scenarios_trade.py)
 from scenarios_trade import TRADE, probe as _trade_probe, post as _trade_post  # noqa: E402
 LINK['link_trade_list'].update(probe0=cursor_t, probe=_trade_probe, post=_trade_post)

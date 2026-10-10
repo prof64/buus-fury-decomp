@@ -323,6 +323,37 @@ fn dojo_rematch_from_the_character_page() {
     r.until(4000, "back at the title", |r| r.a.done() && r.b.done());
 }
 
+/// the friend leaves the link with B on its Select Saved Game: ours goes back to the title's Multiplayer page by
+/// itself (the game's flow) - no link error
+#[test]
+fn dojo_friend_leaves_with_b() {
+    let Some(dir) = content_dir() else { return };
+    let d = wf_app::battle::load_data(&packs(&dir)).unwrap();
+    let sa = save(&d, &[(0, 90)], &[], 0);
+    let sb = save(&d, &[(4, 60)], &[], 0);
+    let Some(mut r) = run("dojo-leave", LinkKind::Dojo, &sa, &sb, 9) else { return };
+    // (the guest's scripted player backs out as soon as it is on a link page)
+    r.b.sim.bot_mut().unwrap().matches = 0;
+    let mut seen = std::collections::BTreeSet::new();
+    for _ in 0..6000 {
+        if r.a.done() && r.b.done() {
+            break;
+        }
+        r.step();
+        seen.insert(r.a.sim.phase());
+        seen.insert(r.b.sim.phase());
+    }
+    assert!(r.a.done() && r.b.done(), "both back at the title ({} / {})", r.a.sim.phase(), r.b.sim.phase());
+    assert!(!seen.contains("lost") && !seen.contains("message") && !seen.contains("match"), "phases seen {seen:?}");
+    assert_eq!((r.a.sim.last.as_deref(), r.b.sim.last.as_deref()), (Some("left"), Some("left")));
+    for p in [&r.a, &r.b] {
+        assert!(
+            matches!(p.sim.inner.session.world.menu.stack.last(), Some(wf_core::menu::Screen::Title(t)) if t.page == wf_core::menu::title::TPage::Multi && t.wait.is_none()),
+            "the title's Multiplayer page, no box"
+        );
+    }
+}
+
 #[test]
 fn dojo_disconnect_mid_match() {
     let Some(dir) = content_dir() else { return };

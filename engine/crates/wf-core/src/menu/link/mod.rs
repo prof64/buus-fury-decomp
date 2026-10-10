@@ -74,6 +74,8 @@ pub enum LinkAction {
     Complete { mine: Vec<trade::TradeEntry>, friend: Vec<trade::TradeEntry> },
     /// B on the Trading Post's picker: back to Select Saved Game (the page shows it)
     Unpick,
+    /// the friend left the link and this page became the title's Multiplayer page (`friend_left`)
+    Left,
 }
 
 /// what the friend's side has done, as far as the pages show it
@@ -145,6 +147,13 @@ pub struct Link {
     /// the save slot this side picked (its party is the In-Game roster)
     #[serde(default)]
     pub slot: usize,
+    /// the friend left the link (its B out of Select Saved Game): this page becomes the title's Multiplayer page at
+    /// its next step (`friend_left`)
+    #[serde(default)]
+    pub left: bool,
+    /// "No Saved Games" ended with B: the Multiplayer page at the next step
+    #[serde(default)]
+    pub leave: bool,
 }
 
 /// the pages' sounds: the list's A (0x08020054: sound 40), the cursor (39)
@@ -158,11 +167,16 @@ impl Link {
         l.corners = false;
         // (the Trading Post's list has no walker: 0x080202C8 with +0x2F8 = 0)
         l.walker = !trade;
+        // (the A prompt is grey on an empty game - from the start: menu_parity link_nosaves)
+        let ex = w.saves.slot(l.sel.max(0) as usize).is_some();
+        if let Some(Widget::Button(b)) = l.c.kids.get_mut(0) {
+            b.enabled = ex;
+        }
         Link::new(LinkPage::Saves(l), trade)
     }
     /// a page with nothing pending
     pub fn new(page: LinkPage, trade: bool) -> Link {
-        Link { page, trade, actions: Vec::new(), friend: Friend::default(), figs_shown: None, host: false, wait: None, stub: false, walk_from_idle: false, walk_jump: false, slot: 0 }
+        Link { page, trade, actions: Vec::new(), friend: Friend::default(), figs_shown: None, host: false, wait: None, stub: false, walk_from_idle: false, walk_jump: false, slot: 0, left: false, leave: false }
     }
     /// the actions since the last call (the app's link flow)
     pub fn take_actions(&mut self) -> Vec<LinkAction> {
@@ -224,12 +238,20 @@ impl Link {
         let flag = match wt.kind {
             dojo::WaitKind::Pick => self.friend.picked.is_some(),
             dojo::WaitKind::Answer => self.friend.answered,
+            dojo::WaitKind::NoSaves => false,
         };
         let end = wt.step(w, flag);
         let t = std::sync::Arc::clone(&w.data);
         let t = &t.menu.as_ref().expect("menu content").text;
         match end {
             None => self.wait = Some(wt),
+            // "No Saved Games": B leaves the link - the title's Multiplayer page
+            // "No Saved Games": B leaves the link. The box is a nested mode: its exit stub's iteration first (nothing
+            // drawn), then the title's Multiplayer page (menu_parity link_nosaves: the page's first cursor redraw)
+            Some(dojo::WaitEnd::Cancel) if wt.kind == dojo::WaitKind::NoSaves => {
+                self.actions.push(LinkAction::Back);
+                self.leave = true;
+            }
             Some(dojo::WaitEnd::Cancel) => {
                 self.actions.push(LinkAction::WaitCancel);
                 match &mut self.page {
@@ -263,6 +285,7 @@ impl Link {
                     self.figs_shown = None;
                     self.actions.push(LinkAction::Chars);
                 }
+                dojo::WaitKind::NoSaves => {}
                 dojo::WaitKind::Pick => {
                     self.actions.push(LinkAction::Fight);
                     if let LinkPage::Chars(c) = &mut self.page {
@@ -295,10 +318,11 @@ impl Link {
                         }
                         (true, None)
                     }
+                    // B: the link is left - the title's Multiplayer page again (menu_parity link_saves_back)
                     1 => {
                         w.sfx(super::SFX_MENU, 64);
                         p.actions.push(LinkAction::Back);
-                        (true, None)
+                        (true, Some(Action::Replace(super::Screen::Title(super::title::Title::multi(w)))))
                     }
                     2 | 3 => {
                         let moved = if code == 2 { l.sel != 0 } else { l.sel < 2 };
@@ -515,6 +539,16 @@ impl Page for Link {
         }
     }
     fn step(&mut self, w: &mut World) -> Action {
+        // the friend left the link: the title's Multiplayer page again (two linked emulators, the friend's B on its
+        // Select Saved Game: ours follows by itself some iterations later, whatever page it shows - menu_parity
+        // link_friend_left / link_friend_left_setup)
+        if self.left {
+            self.actions.push(LinkAction::Left);
+            return Action::Replace(super::Screen::Title(super::title::Title::multi(w)));
+        }
+        if self.leave {
+            return Action::Replace(super::Screen::Title(super::title::Title::multi(w)));
+        }
         if self.wait.is_some() {
             return self.step_wait(w);
         }
@@ -572,6 +606,7 @@ pub fn open_saves(w: &mut World, trade: bool) {
             }
         }
     }
+    no_saves_box(w, &mut l);
     open(w, l);
 }
 
@@ -612,6 +647,7 @@ pub fn open_json(w: &World, v: &serde_json::Value) -> Option<(super::Screen, sup
                     }
                 }
             }
+            no_saves_box(w, &mut l);
             l
         }
         // the Dojo's setup page: `{"kind": "link_setup", "sel": 9, "balanced": true, "rounds": 3, "cursor_t": n}`
@@ -672,6 +708,23 @@ pub fn open_json(w: &World, v: &serde_json::Value) -> Option<(super::Screen, sup
     let mut l = l;
     l.host = v["host"].as_bool().unwrap_or(false);
     Some((super::Screen::Link(l), super::title::BOOT, false))
+}
+
+/// the friend left the link (its B out of Select Saved Game - the app's link flow tells it): the page becomes the
+/// title's Multiplayer page at its next step
+pub fn friend_left(w: &mut World) {
+    if let Some(l) = link_mut(w) {
+        l.left = true;
+    }
+}
+
+/// Select Saved Game without a saved game: "No Saved Games" over it (the wait box's state 2)
+fn no_saves_box(w: &World, l: &mut Link) {
+    if (0..3).all(|i| w.saves.slot(i).is_none()) {
+        if let Some(md) = w.data.menu.as_ref() {
+            l.wait = Some(dojo::Wait::new(&md.text, dojo::WaitKind::NoSaves));
+        }
+    }
 }
 
 /// the link is gone (the friend's console off or reset, the cable out): the game's link error handler ends the link
