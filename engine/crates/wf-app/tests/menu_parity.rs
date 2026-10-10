@@ -268,8 +268,30 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
         // (a script-opened screen: the opening is the script's iteration, row 0 - its fade starts with the next one,
         // as START's open in the field)
         let opened_fade = k == 0 && meta["open"].is_object() && matches!(sim.world().menu.phase, wf_core::menu::Phase::FadeOut { .. });
+        // the link-cable scenarios (re/buu/menu/linkcap.py): the cable's up flag reaches the title's link box (the flag
+        // the cable set in an iteration: the box's update sees it in the next)
+        if logic && meta["link"].as_bool() == Some(true) {
+            let up = k > 0 && rows[k - 1]["up"].as_i64() == Some(1);
+            if let Some(wf_core::menu::Screen::Title(t)) = sim.session.world.menu.stack.last_mut() {
+                if up && t.wait.is_some() && t.link_up.is_none() {
+                    t.link_up = Some(0);
+                }
+            }
+        }
         if logic && !opened_fade {
             sim.step(&[keys], &mut ev);
+            // the box ended with the link up: the Multiplayer page's handler builds the link's Select Saved Game in the
+            // same iteration (as the app's link flow does)
+            if meta["link"].as_bool() == Some(true) {
+                let w = &mut sim.session.world;
+                let linked = match w.menu.stack.last_mut() {
+                    Some(wf_core::menu::Screen::Title(t)) => t.linked.take(),
+                    _ => None,
+                };
+                if let Some(kind) = linked {
+                    wf_core::menu::link::open_saves(w, kind == 1);
+                }
+            }
             // a screen whose fade-out runs the world (the computer's): the field around it is only approximately
             // imported (NPC timers), so the RNG follows the game's while it fades (captures with per-row `rng`)
             let w = &mut sim.session.world;
@@ -279,8 +301,9 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
                 }
             }
         }
-        // the RNG once the screen is open (the field frame before may draw differently)
-        if live && k == 0 {
+        // the RNG once the screen is open (the field frame before may draw differently); the link scenarios' too (the
+        // figures of the save list draw from it)
+        if (live || meta["link"].as_bool() == Some(true)) && k == 0 {
             if let Some(r) = sj["rng"].as_array().filter(|r| r.len() == 2) {
                 sim.session.world.rng.set_state([i(&r[0]) as u32, i(&r[1]) as u32]);
             }

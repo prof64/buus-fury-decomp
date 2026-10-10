@@ -88,6 +88,14 @@ pub struct Title {
     /// its controls in `confirm`)
     #[serde(default)]
     pub wait: Option<u8>,
+    /// the link is up ([`0x03002F54`], set by the app's link flow / a harness): the box's updates since
+    /// (`0x080240B8`: at 10 the mode returns 2)
+    #[serde(default)]
+    pub link_up: Option<u8>,
+    /// the box ended with the link up: its kind (2 Dojo, 1 Trading Post) - the Multiplayer page's handler
+    /// `0x0801E84A` goes on to the link's Select Saved Game (`menu::link`, opened by the app / harness next iteration)
+    #[serde(default)]
+    pub linked: Option<u8>,
 }
 
 /// redraw frames (the title picture is decoded each time): measured from the captures
@@ -121,6 +129,8 @@ impl Title {
             held: None,
             opts: None,
             wait: None,
+            link_up: None,
+            linked: None,
         };
         t.set_page(w, TPage::Title);
         t
@@ -436,6 +446,27 @@ impl Page for Title {
         if self.stub {
             self.stub = false;
             return Action::None;
+        }
+        if let (Some(kind), Some(n)) = (self.wait, self.link_up) {
+            // `0x080240B8`: the link up, ten updates, then the mode returns 2 - the box goes as with B (its exit turns
+            // BG0 off, no redraw: menu_parity link_connect lf 1,159 up, 1,169 the title without the box)
+            let n = n + 1;
+            self.link_up = Some(n);
+            if n >= 10 {
+                self.confirm = None;
+                self.wait = None;
+                self.link_up = None;
+                self.c.focus = None;
+                self.stub = true;
+                self.linked = Some(kind);
+                if let Some(s) = w.menu.shown.as_mut() {
+                    if let super::Screen::Title(x) = &mut **s {
+                        x.confirm = None;
+                        x.wait = None;
+                    }
+                }
+                return Action::None;
+            }
         }
         if self.wait.is_some() {
             // events `0x080242C2`: B (code 1) ends the mode (no sound); its exit `0x0802426E` turns BG0 off and the
@@ -1117,6 +1148,10 @@ pub fn open_json(
         return None;
     }
     let mut t = Title::new(w);
+    // (`"page": "multi"`: the Multiplayer page on show - Dojo / Trading Post)
+    if v["page"].as_str() == Some("multi") {
+        t.set_page(w, TPage::Multi);
+    }
     if let Some(ct) = v["cursor_t"].as_u64() {
         for k in t.c.kids.iter_mut() {
             if let Widget::Cursor(c) = k {

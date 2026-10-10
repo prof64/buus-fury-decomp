@@ -13,14 +13,15 @@ TO_SETUP = TO_SAVES_DOJO + [('A', 'A', 7), ('-', '-', 120)]
 TO_TRADE = TO_SAVES_TRADE + [('A', 'A', 7), ('-', '-', 240)]
 
 
-def cursor_t(e, o):
-    """the running mode's cursor child (vt 0x08049898): its blink counter, as the title scenarios take it (one step
-    ahead in the next iteration; at a multiple of 8 the redraw it asked for is still in progress)"""
+def cursor_t(e, o, ahead=1):
+    """the running mode's cursor child (vt 0x08049898): its blink counter, as the title scenarios take it (`ahead`:
+    one step ahead in the next iteration for a mode's own cursor - the title page's under the link flow is read as
+    is: menu_parity link_connect)"""
     m = e.r32(0x03000F90)
     for j in range(min(e.r32(m + 4), 64)):
         c = e.r32(m + 8 + 4 * j)
         if e.r32(c) == 0x08049898:
-            o['cursor_t'] = e.r32(c + 8) + 1
+            o['cursor_t'] = e.r32(c + 8) + ahead
 
 
 def figs(e, o):
@@ -46,6 +47,9 @@ def keys(*seq, gap=12):
 
 
 LINK = {
+    # Multiplayer -> Dojo on both: the title's link box, the cable up, the box's count, the Select Saved Game list in
+    'link_connect': dict(flow=TO_SAVES_DOJO[:-2], keys=['-:10', 'A:7', '-:200'], keys_b=['-:10', 'A:7'], up=True,
+                         open={'kind': 'title', 'page': 'multi'}, probe0=lambda e, o: cursor_t(e, o, 0)),
     # Select Saved Game: the list (game 1's party figures animate), the cursor down to the empty game and back
     'link_saves': dict(flow=TO_SAVES_DOJO, keys=['-:20'] + keys('DOWN', 'UP', 'DOWN', 'UP') + ['-:30'],
                        open={'kind': 'link_saves', 'trade': False}, probe0=list_sel),

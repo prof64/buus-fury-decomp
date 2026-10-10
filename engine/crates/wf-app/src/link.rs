@@ -34,6 +34,7 @@ use wf_core::content::GameData;
 use wf_core::input::{A, B, DOWN, L, LEFT, R, RIGHT, UP};
 use wf_core::menu::save::{SaveData, SLOTS};
 use wf_core::menu::text::{units, Canvas, Pen, TextData};
+use wf_core::menu::link::LinkAction;
 use wf_core::menu::MenuData;
 use wf_net::dojo::{balanced_roster, fighter_setup, DojoChar, DojoGame, DojoHello, DojoMatch, DojoMode, DojoRules, DojoSave, DojoSetup, Ending, Phase as DPhase};
 use wf_net::game::Game;
@@ -345,6 +346,33 @@ impl Flow {
         self.friend.as_ref().is_some_and(|(id, _)| !self.net.lobby.peer_connected(id))
     }
 
+    /// what the local player did on a wf-core link page (`menu::link`)
+    fn link_action(&mut self, a: LinkAction, now: f64, ev: &mut Vec<SimEvent>) -> Out {
+        match (&self.phase, a) {
+            (Phase::Saves { .. }, LinkAction::Back) => Out::Done,
+            (Phase::Saves { .. }, LinkAction::Save(s)) if self.usable(s) => {
+                self.slot = s;
+                match self.kind {
+                    LinkKind::Dojo => {
+                        self.dsave = self.saves[s].as_ref().and_then(|sd| DojoSave::from_save(s, sd, &self.data));
+                        self.set_phase(Phase::Setup { row: if self.host() { 0 } else { 2 } });
+                        Out::None
+                    }
+                    LinkKind::Trade => self.open_trade(now, ev),
+                }
+            }
+            _ => Out::None,
+        }
+    }
+
+    /// the wf-core link page this phase shows (None: drawn by the flow itself)
+    fn page(&self) -> Option<&'static str> {
+        match self.phase {
+            Phase::Saves { .. } => Some("saves"),
+            _ => None,
+        }
+    }
+
     /// one frame. `pressed`: new presses; `held`: the buttons held (the match's input)
     fn step(&mut self, now: f64, clock: &Clock, held: u16, pressed: u16, ev: &mut Vec<SimEvent>) -> Out {
         self.t = self.t.wrapping_add(1);
@@ -389,16 +417,8 @@ impl Flow {
             }
         }
         match &mut self.phase {
-            Phase::Waiting => {
-                if self.friend.is_some() {
-                    let sel = (0..SLOTS).find(|&i| self.usable(i));
-                    self.set_phase(match sel {
-                        Some(sel) => Phase::Saves { sel },
-                        None => Phase::NoSaves,
-                    });
-                }
-                Out::None
-            }
+            // (the title's box: once the friend is there it counts its 10 updates and ends - `linked`)
+            Phase::Waiting => Out::None,
             Phase::NoSaves | Phase::Message(_) | Phase::Result(_) | Phase::Complete(_) => {
                 if pressed & (A | B) != 0 {
                     sfx(ev, SFX_MENU);
@@ -406,41 +426,9 @@ impl Flow {
                 }
                 Out::None
             }
-            Phase::Saves { sel } => {
-                let old = *sel;
-                let mut s = old;
-                if pressed & (UP | DOWN) != 0 {
-                    let d = if pressed & UP != 0 { SLOTS - 1 } else { 1 };
-                    for _ in 0..SLOTS {
-                        s = (s + d) % SLOTS;
-                        if self.usable(s) {
-                            break;
-                        }
-                    }
-                    if s != old {
-                        sfx(ev, SFX_CURSOR);
-                        if let Phase::Saves { sel } = &mut self.phase {
-                            *sel = s;
-                        }
-                    }
-                }
-                if pressed & B != 0 {
-                    sfx(ev, SFX_MENU);
-                    return Out::Done;
-                }
-                if pressed & A != 0 && self.usable(s) {
-                    sfx(ev, SFX_MENU);
-                    self.slot = s;
-                    match self.kind {
-                        LinkKind::Dojo => {
-                            self.dsave = self.saves[s].as_ref().and_then(|sd| DojoSave::from_save(s, sd, &self.data));
-                            self.set_phase(Phase::Setup { row: if self.host() { 0 } else { 2 } });
-                        }
-                        LinkKind::Trade => return self.open_trade(now, ev),
-                    }
-                }
-                Out::None
-            }
+            // (the page itself is wf-core's `menu::link` screen on the title app: `LinkSim` steps it, its actions
+            // come in through `link_action`)
+            Phase::Saves { .. } => Out::None,
             Phase::Setup { row } => {
                 let host = self.role == Role::Host;
                 let mut r = *row;
@@ -1239,6 +1227,9 @@ pub struct LinkSim {
     pub last: Option<String>,
     /// the last Dojo match
     pub record: Option<MatchRecord>,
+    /// a wf-core link page is open on the title app (`inner`): the title's state from before, restored when the
+    /// flow ends, and the page open
+    page: Option<(Box<crate::story::StoryState>, &'static str)>,
 }
 
 /// the title's link box: its kind (2 Dojo, 1 Trading Post) while open
@@ -1251,7 +1242,7 @@ pub fn title_wait(w: &wf_core::world::World) -> Option<u8> {
 
 impl LinkSim {
     pub fn new(inner: StorySim, cfg: LinkConfig) -> LinkSim {
-        LinkSim { inner, cfg, flow: None, wait_seen: false, closing: None, prev: 0, steps: 0, last: None, record: None }
+        LinkSim { inner, cfg, flow: None, wait_seen: false, closing: None, prev: 0, steps: 0, last: None, record: None, page: None }
     }
 
     /// what the link part shows now ("title", "waiting", "saves", "chars", "setup", "match", "result", "trade",
@@ -1487,9 +1478,35 @@ impl LinkSim {
         };
         let now = (self.cfg.clock)();
         let clock = self.cfg.clock.clone();
-        // waiting: the title's own box runs (its B Cancel), the lobby under it
+        // waiting: the title's own box runs (its B Cancel), the lobby under it; the friend there = the link up: the box
+        // counts its updates and ends, and the link's Select Saved Game is built in that iteration (menu_parity
+        // link_connect)
         if matches!(flow.phase, Phase::Waiting) {
+            let up = flow.friend.is_some();
+            if let Some(wf_core::menu::Screen::Title(t)) = self.inner.session.world.menu.stack.last_mut() {
+                if up && t.wait.is_some() && t.link_up.is_none() {
+                    t.link_up = Some(0);
+                }
+            }
             self.inner.step(inputs, events);
+            let linked = match self.inner.session.world.menu.stack.last_mut() {
+                Some(wf_core::menu::Screen::Title(t)) => t.linked.take(),
+                _ => None,
+            };
+            if linked.is_some() {
+                let saved = Box::new(self.inner.save_mem());
+                let flow = self.flow.as_mut().expect("flow");
+                let sel = (0..SLOTS).find(|&i| flow.usable(i));
+                match sel {
+                    Some(sel) => {
+                        flow.set_phase(Phase::Saves { sel });
+                        wf_core::menu::link::open_saves(&mut self.inner.session.world, flow.kind == LinkKind::Trade);
+                        self.page = Some((saved, "saves"));
+                    }
+                    None => flow.set_phase(Phase::NoSaves),
+                }
+                return;
+            }
             if title_wait(&self.inner.session.world).is_none() {
                 self.flow = None;
                 self.wait_seen = false;
@@ -1498,13 +1515,54 @@ impl LinkSim {
             }
         }
         let flow = self.flow.as_mut().expect("flow");
-        let out = flow.step(now, &clock, held, pressed, events);
+        let mut out = flow.step(now, &clock, held, pressed, events);
+        // the phase's page: wf-core's link screen on the title app, stepped with the keys; its actions go to the flow
+        if matches!(out, Out::None) {
+            let want = flow.page();
+            if want != self.page.as_ref().map(|p| p.1) {
+                match want {
+                    Some(name) => {
+                        let saved = self.page.take().map(|p| p.0).unwrap_or_else(|| Box::new(self.inner.save_mem()));
+                        let w = &mut self.inner.session.world;
+                        let trade = flow.kind == LinkKind::Trade;
+                        let l = match name {
+                            _ => wf_core::menu::link::Link::saves(w, trade),
+                        };
+                        wf_core::menu::link::open(w, l);
+                        self.page = Some((saved, name));
+                    }
+                    None => {
+                        if let Some((saved, _)) = self.page.take() {
+                            self.inner.load_mem(&saved);
+                        }
+                    }
+                }
+            }
+            if self.page.is_some() {
+                self.inner.step(inputs, events);
+                let acts = match self.inner.session.world.menu.stack.last_mut() {
+                    Some(wf_core::menu::Screen::Link(l)) => std::mem::take(&mut l.actions),
+                    _ => Vec::new(),
+                };
+                let flow = self.flow.as_mut().expect("flow");
+                for a in acts {
+                    out = flow.link_action(a, now, events);
+                    if !matches!(out, Out::None) {
+                        break;
+                    }
+                }
+            }
+        }
+        let flow = self.flow.as_mut().expect("flow");
         if let Some(r) = flow.record.take() {
             self.record = Some(r);
         }
         match out {
             Out::None => {}
             Out::Done => {
+                if let Some((saved, _)) = self.page.take() {
+                    self.inner.load_mem(&saved);
+                }
                 self.last = Some(match &flow.phase {
                     Phase::Message(m) if !m.is_empty() => String::from_utf16_lossy(m),
                     Phase::Message(_) => "disconnected".into(),
@@ -1528,6 +1586,7 @@ impl LinkSim {
 
     fn view_inner(&self, out: &mut RenderView) {
         match self.flow.as_ref() {
+            Some(_) if self.page.is_some() => self.inner.view(out),
             Some(f) if !matches!(f.phase, Phase::Waiting) => {
                 let Some(d) = self.inner.session.world.data.menu.clone() else { return self.inner.view(out) };
                 if let Phase::Match(m) = &f.phase {

@@ -78,7 +78,8 @@ def run(name, sc):
     ka, kb = program(sc['keys']), program(sc.get('keys_b', []))
     for i, k in enumerate(ka):
         c.keys_b = kb[i] if i < len(kb) else 0
-        c.step(k, capture.probe)
+        # (the link's up flag [0x03002F54] per frame: the title's link box counts from it)
+        c.step(k, lambda e: dict(capture.probe(e), up=e.r32(0x03002F54)))
     d = OUT / name
     d.mkdir(parents=True, exist_ok=True)
     from PIL import Image
@@ -87,7 +88,8 @@ def run(name, sc):
     for i, s in enumerate(c.screens):
         Image.fromarray(s).save(d / f'f{i:04d}.png')
     meta = {'open': sc['open'], 'link': True, 'saves': saves}
-    rows = [dict(keys=f['keys'], lf=f['lf'], snd=f['snd'], h=f['h']) for f in c.frames]
+    rows = [dict(keys=f['keys'], lf=f['lf'], snd=f['snd'], h=f['h'], **({'up': f['up']} if sc.get('up') else {}))
+            for f in c.frames]
     capture.DATA.mkdir(parents=True, exist_ok=True)
     (capture.DATA / f'{name}.json').write_text(json.dumps(dict(scenario=name, state='link', meta=meta, story=st, frames=rows),
                                                           separators=(',', ':')))

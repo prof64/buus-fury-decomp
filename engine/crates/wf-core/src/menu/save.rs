@@ -318,6 +318,18 @@ pub struct Fig {
     /// not the selected slot's chosen character: the idle state's standing pose, no walk
     #[serde(default)]
     pub idle: bool,
+    /// the idle state's tick (enter `0x0800DFBE`: rand(255), the figure build's draw for it; +1 per update): its
+    /// blink cel while `tick & 0xFF > 0xF0` (a selectable figure that does not walk; menu_parity link_connect f182)
+    #[serde(default)]
+    pub idle_t: i32,
+    /// which of the build's rand(255) draws is this figure's (`GameList::rng_owed` at its making)
+    #[serde(default)]
+    pub draw: u32,
+    /// the idle animation's cel (the player idle state's tick rule, `player::tick_idle`) and its cel count
+    #[serde(default)]
+    pub idle_cel: i32,
+    #[serde(default)]
+    pub idle_n: i32,
 }
 
 /// the idle animation and facing of the figures
@@ -363,6 +375,7 @@ impl GameList {
                 continue;
             };
             for (k, &(form, sel)) in s.party.iter().enumerate() {
+                let draw = self.rng_owed;
                 self.rng_owed += 1;
                 let Some(sprite) = form_sprite(w, form) else {
                     continue;
@@ -378,6 +391,10 @@ impl GameList {
                     t: FIG_T0,
                     live: false,
                     idle: !sel || !walk,
+                    idle_t: 0,
+                    draw,
+                    idle_cel: 0,
+                    idle_n: w.data.sprite(sprite).and_then(|sp| sp.anim_raw(FIG_FROZEN_ANIM)).map(|a| a.nframes()).unwrap_or(1),
                 });
             }
         }
@@ -395,8 +412,11 @@ impl GameList {
             crate::vram::figure_created(w, k as u32, f.sprite);
             self.fig_vram.push(f.sprite);
         }
-        for _ in 0..std::mem::take(&mut self.rng_owed) {
-            w.rng.rand(255);
+        for k in 0..std::mem::take(&mut self.rng_owed) {
+            let r = w.rng.rand(255);
+            for f in self.figs.iter_mut().filter(|f| f.draw == k) {
+                f.idle_t = r;
+            }
         }
     }
     /// the figures' object tiles go with the screen
@@ -409,6 +429,20 @@ impl GameList {
         for f in self.figs.iter_mut() {
             if f.live && !f.frozen {
                 f.t += 1;
+            }
+            // the idle state ticks for every figure, the turned-away (frozen) ones too (their blink: menu_parity
+            // link_saves f40, a frozen Gohan at tick 246) - `player::tick_idle`
+            if f.live {
+                f.idle_t = (f.idle_t + 1) & 0xffff;
+                if f.idle_n == 2 {
+                    f.idle_cel = i32::from((f.idle_t & 0xff) > 0xf0);
+                } else {
+                    f.idle_cel = (f.idle_t >> 3) & 0xff;
+                    if f.idle_cel >= f.idle_n {
+                        f.idle_cel = 0;
+                        f.idle_t = 0;
+                    }
+                }
             }
             f.live = true;
         }
@@ -432,9 +466,13 @@ impl GameList {
                 (FIG_ANIM, FIG_DIR)
             };
             let Some(an) = sp.anim_raw(raw) else { continue };
-            let t = if f.frozen || f.idle { 0 } else { f.t.max(0) };
-            let Some(k) = an.step_index_at(dir, t, an.looped) else {
-                continue;
+            let k = if f.frozen || f.idle {
+                (f.idle_cel.max(0) as usize).min(an.steps(dir).len().saturating_sub(1))
+            } else {
+                let Some(k) = an.step_index_at(dir, f.t.max(0), an.looped) else {
+                    continue;
+                };
+                k
             };
             let st = &an.steps(dir)[k];
             let remap = if f.frozen {

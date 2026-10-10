@@ -179,6 +179,28 @@ impl Page for Link {
     }
 }
 
+/// the link's first page as the title's Multiplayer handler builds it (`0x0801E84A`: the box ended with the link up,
+/// Select Saved Game made in that iteration - its figures with it: menu_parity link_connect)
+pub fn open_saves(w: &mut World, trade: bool) {
+    let mut l = Link::saves(w, trade);
+    if let LinkPage::Saves(g) = &mut l.page {
+        g.prepare();
+        g.build_figs(w);
+        // (its cursor counts from that iteration too)
+        for k in g.c.kids.iter_mut() {
+            if let Widget::Cursor(c) = k {
+                c.t = 1;
+            }
+        }
+    }
+    open(w, l);
+}
+
+/// show a page (the app's link flow, over the title): it replaces the menu on show
+pub fn open(w: &mut World, l: Link) {
+    super::open(w, super::Screen::Link(l), super::title::BOOT, false);
+}
+
 /// a harness opening a page from JSON (`menu::open_from_json`): `{"kind": "link_saves", "trade": false, "sel": 0}` -
 /// the page on show (no transition: the capture starts on it)
 pub fn open_json(w: &World, v: &serde_json::Value) -> Option<(super::Screen, super::Transition, bool)> {
@@ -200,6 +222,7 @@ pub fn open_json(w: &World, v: &serde_json::Value) -> Option<(super::Screen, sup
                     f.live = true;
                     if let Some(&t) = ts.get(k) {
                         f.t = t as i32 + FIG_T_OFF;
+                        f.idle_t = t as i32 + FIG_T_OFF;
                     }
                 }
             }
