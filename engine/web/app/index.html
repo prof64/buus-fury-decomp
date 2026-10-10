@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Buu&#39;s Fury Engine</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { --bg: #0d0d0f; --panel: #17171b; --fg: #ecebe7; --muted: #9a988f; --line: #2e2d33; --accent: #f0a030; --bad: #ff7a6b; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, sans-serif; overflow: hidden; }
+  .screen { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 16px; }
+  .screen.on { display: flex; }
+  .card { width: min(560px, 100%); background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 28px; }
+  h1 { margin: 0 0 6px; font-size: 22px; }
+  p { margin: 8px 0; color: var(--muted); }
+  #drop { margin-top: 18px; border: 2px dashed var(--line); border-radius: 12px; padding: 40px 16px; text-align: center; cursor: pointer; transition: border-color .15s; }
+  #drop.over, #drop:hover { border-color: var(--accent); }
+  #drop b { color: var(--fg); }
+  .vh { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+  .err { color: var(--bad); margin-top: 12px; white-space: pre-wrap; }
+  .bar { height: 10px; background: var(--line); border-radius: 6px; overflow: hidden; margin: 16px 0 8px; }
+  .bar > div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  #stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #000; }
+  #screen { image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
+  #start { background: rgba(0,0,0,.55); cursor: pointer; }
+  #start .card { text-align: center; }
+  kbd { font: 12px ui-monospace, monospace; background: #26252b; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 1px 5px; color: var(--fg); }
+  /* the in-game buttons live in a bar above the game picture (playtest 31: they sat over the picture top right in
+     PC wide); the stage starts under the bar while it shows, and the picture is sized to the space left */
+  #topbar { position: fixed; top: 0; left: 0; right: 0; height: 34px; z-index: 5; display: none; align-items: center; justify-content: flex-end; gap: 8px; padding: 0 10px; background: #000; }
+  body.withbar #stage { top: 34px; }
+  #hudbtn, #replaysbtn { background: rgba(23,23,27,.75); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 3px 10px; font: inherit; cursor: pointer; display: none; }
+  #stats { position: fixed; left: 10px; bottom: 10px; z-index: 5; font: 12px/1.4 ui-monospace, monospace; background: rgba(0,0,0,.6); padding: 6px 8px; border-radius: 6px; display: none; white-space: pre; }
+  #settings { background: rgba(0,0,0,.6); z-index: 10; }
+  #settings .card { max-height: calc(100vh - 32px); overflow: auto; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .row:last-child { border-bottom: 0; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 18px 0 4px; }
+  button, select, input[type=range] { font: inherit; }
+  button, select { background: #26252b; color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+  button.wait { border-color: var(--accent); color: var(--accent); }
+  button.danger { color: var(--bad); }
+  .keys { color: var(--muted); font: 13px ui-monospace, monospace; }
+  .muted { color: var(--muted); font-size: 13px; }
+  #replays { background: rgba(0,0,0,.6); z-index: 10; }
+  #replays .card { width: min(760px, 100%); max-height: calc(100vh - 32px); overflow: auto; }
+  .btns { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+  #scrub { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); width: min(720px, calc(100% - 32px)); z-index: 5; display: none; accent-color: var(--accent); }
+</style>
+</head>
+<body>
+
+<section class="screen" id="rom">
+  <div class="card">
+    <h1>Drop your Buu's Fury ROM</h1>
+    <p>This engine plays <b>Dragon Ball Z: Buu's Fury</b> (Game Boy Advance, USA) from your own copy of the game.
+      The ROM is read and converted right here in your browser; nothing is uploaded and no game data ships with the page.</p>
+    <div id="drop"><b>Drop the .gba file here</b><br><span class="muted">or click to choose it</span></div>
+    <input type="file" id="pick" accept=".gba,.bin,.agb" class="vh" aria-label="Choose ROM file">
+    <div class="err" id="romerr"></div>
+  </div>
+</section>
+
+<section class="screen" id="progress">
+  <div class="card">
+    <h1 id="ptitle">Extracting game content…</h1>
+    <div class="bar"><div id="pbar"></div></div>
+    <p id="ptext">Starting…</p>
+  </div>
+</section>
+
+<div id="stage" hidden><canvas id="screen" width="240" height="160"></canvas></div>
+
+<section class="screen" id="start">
+  <div class="card">
+    <h1>Ready</h1>
+    <p>Click or press <kbd>Enter</kbd> to start. · <a href="?net" style="color:var(--accent)" onclick="event.stopPropagation()">Play online</a></p>
+    <p class="muted">Arrows move · <kbd>X</kbd> A · <kbd>Z</kbd> B · <kbd>A</kbd> L · <kbd>S</kbd> R · <kbd>Enter</kbd> Start · <kbd>Backspace</kbd> Select · <kbd>Esc</kbd> settings · <kbd>F3</kbd> stats</p>
+    <p class="muted">Hold <kbd>`</kbd> rewind · hold <kbd>Tab</kbd> fast forward · <kbd>P</kbd> pause · <kbd>N</kbd> frame advance · <kbd>F6</kbd>–<kbd>F9</kbd> load / <kbd>Shift</kbd>+<kbd>F6</kbd>–<kbd>F9</kbd> save state · <kbd>F10</kbd> replays · <kbd>F4</kbd> training overlay · <kbd>I</kbd> input display</p>
+  </div>
+</section>
+
+<div id="topbar"><button id="replaysbtn" title="Replays (F10)">Replays</button><button id="hudbtn" title="Settings (Esc)">Settings</button></div>
+<input type="range" id="scrub" min="0" max="1" value="0" aria-label="Replay position">
+
+<section class="screen" id="replays">
+  <div class="card">
+    <h1>Replays</h1>
+    <p class="muted">Every fight is recorded. Play one back (P pause, N frame advance, −/= speed, Tab fast forward,
+      hold ` rewind, [ ] seek, Home start, B take over), run it as a ghost next to a live fight, or verify it against
+      this build.</p>
+    <div class="row"><span class="btns" style="justify-content:flex-start">
+      <button id="replayup">Upload…</button><button id="replaycur">Download current</button></span>
+      <button id="replaysclose">Close (F10)</button></div>
+    <input type="file" id="replaypick" accept=".wfr,.json" multiple hidden>
+    <p class="muted" id="replayinfo"></p>
+    <div id="replaylist"></div>
+  </div>
+</section>
+<div id="stats"></div>
+
+<section class="screen" id="settings">
+  <div class="card">
+    <h1>Settings</h1>
+    <h2>Video</h2>
+    <div class="row"><span>View</span>
+      <select id="mode">
+        <option value="pc:0">PC zoomed out (auto)</option>
+        <option value="pc:1">PC zoomed out, 1x</option>
+        <option value="pc:2">PC zoomed out, 2x</option>
+        <option value="pc:3">PC zoomed out, 3x</option>
+        <option value="pc:4">PC zoomed out, 4x</option>
+        <option value="pc:5">PC zoomed out, 5x</option>
+        <option value="pc:6">PC zoomed out, 6x</option>
+        <option value="gba:0">Classic 240×160 (fit)</option>
+        <option value="gba:2">Classic 240×160, 2x</option>
+        <option value="gba:3">Classic 240×160, 3x</option>
+        <option value="gba:4">Classic 240×160, 4x</option>
+      </select></div>
+    <h2>Audio</h2>
+    <div class="row"><span>Volume</span><input type="range" id="vol" min="0" max="2" step="0.05" value="1"></div>
+    <div class="row"><span>Resampling</span>
+      <select id="resample"><option value="linear">Linear (smooth)</option><option value="hold">Sample-and-hold (raw)</option></select></div>
+    <h2>Controls <span class="muted" style="text-transform:none;letter-spacing:0">— gamepads work out of the box</span></h2>
+    <div id="binds"></div>
+    <div class="row"><span class="muted">Click a button, then press the new key.</span><button id="resetbinds">Reset to defaults</button></div>
+    <h2>Hotkeys <span class="muted" style="text-transform:none;letter-spacing:0">— replays, rewind, save states, training</span></h2>
+    <div id="hotkeys"></div>
+    <div class="row"><span class="muted">Modifiers count (Shift+F6). A key bound to a game button only works as a hotkey with a modifier.</span><button id="resethot">Reset hotkeys</button></div>
+    <h2>Mods</h2>
+    <div id="mods"></div>
+    <div class="row"><span class="muted">A mod is a folder with a pack.json and the files it changes (see CONTENT.md).</span>
+      <button id="addmod">Add mod folder…</button></div>
+    <input type="file" id="modpick" webkitdirectory hidden>
+    <h2>Data</h2>
+    <div class="row"><span class="muted" id="storeinfo"></span><button class="danger" id="forget">Forget ROM &amp; content</button></div>
+    <div class="row"><span></span><button id="close">Close (Esc)</button></div>
+  </div>
+</section>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

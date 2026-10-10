@@ -1,0 +1,2496 @@
+{
+ "meta": {
+  "source": "Dragon Ball Z: Buu's Fury (USA) ROM; see re/buu/notes.md",
+  "generator": "re/buu/extract_characters.py",
+  "units": {
+   "hp_ep": "points",
+   "stats": "points (u8 in record, u16 on player object)",
+   "speed": "1/256 pixel per frame (24.8 fixed point position units)"
+  }
+ },
+ "level_range": {
+  "min": 50,
+  "max": 200,
+  "note": "level = 50 + max{i: XP >= table[i]} (0x080135D2); see levels.json"
+ },
+ "stat_points": {
+  "per_level": 3,
+  "cost_per_stat_point": 1,
+  "stats": [
+   "STR",
+   "POW",
+   "END",
+   "SPD"
+  ],
+  "note": "LevelUp 0x08013678 adds 3*(new-old) to record+0x2C; spent 1:1 on the Status screen (VERIFIED emu)"
+ },
+ "level_up": {
+  "function": "0x08013678",
+  "note": "per level gained: 4 rand(256) draws -> HP/EP growth (see growth); HP and EP refilled to the new max. STR/POW/END/SPD do NOT grow automatically."
+ },
+ "movement": {
+  "walk": "5*SPD + 102",
+  "dash": "walk + 320",
+  "units": "1/256 px per frame",
+  "function": "0x0800E074",
+  "dash_input": "double-tap a direction within 20 frames (idle state 0x08013022)",
+  "status": "VERIFIED (disasm + emu)"
+ },
+ "fusion": {
+  "function": "0x0801375E",
+  "maxHP_HP_maxEP_EP": "(A+B)*154>>8",
+  "xp": "(A.xp+B.xp)/2",
+  "STR_POW_END": "(A+B)/2 + 10",
+  "SPD": "(A+B)/2 + 16",
+  "note": "VERIFIED (disasm)"
+ },
+ "characters": [
+  {
+   "index": 0,
+   "name": "Goku",
+   "record_ram": "0x3001560",
+   "new_game": {
+    "level": 60,
+    "hp": 135,
+    "ep": 90,
+    "STR": 27,
+    "POW": 27,
+    "END": 26,
+    "SPD": 50,
+    "form": 2,
+    "skills": [
+     7,
+     20,
+     15,
+     14
+    ],
+    "skill_names": [
+     "Energy Blast",
+     "Super Saiyan",
+     "Kamehameha",
+     "Instant Transmission"
+    ],
+    "xp": 2200
+   },
+   "growth": {
+    "raw_u32": [
+     327680,
+     393216,
+     512,
+     1024,
+     256,
+     196608,
+     128,
+     1280
+    ],
+    "hp_add": "(g0*rand(256)>>8) + g1   (16.16 fixed: HP += result>>16)",
+    "hp_pct": "(g2*rand(256)>>8) + g3   (HP += HP*result>>16)",
+    "ep_add": "g4*rand(256) + g5        (EP += result>>16)  [note: no >>8 on the random term]",
+    "ep_pct": "(g6*rand(256)>>8) + g7   (EP += EP*result>>16)",
+    "hp_add_range": [
+     6.0,
+     10.98046875
+    ],
+    "hp_pct_range": [
+     0.015625,
+     0.023406982421875
+    ],
+    "ep_add_range": [
+     3.0,
+     3.99609375
+    ],
+    "ep_pct_range": [
+     0.01953125,
+     0.02147674560546875
+    ]
+   },
+   "forms": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+   ]
+  },
+  {
+   "index": 1,
+   "name": "Gohan",
+   "record_ram": "0x30015c8",
+   "new_game": {
+    "level": 55,
+    "hp": 85,
+    "ep": 85,
+    "STR": 20,
+    "POW": 29,
+    "END": 16,
+    "SPD": 52,
+    "form": 10,
+    "skills": [
+     7,
+     20,
+     6,
+     17
+    ],
+    "skill_names": [
+     "Energy Blast",
+     "Super Saiyan",
+     "Electric Kamehameha",
+     "Masenkoha"
+    ],
+    "xp": 350
+   },
+   "growth": {
+    "raw_u32": [
+     196608,
+     327680,
+     256,
+     1060,
+     256,
+     262144,
+     128,
+     1384
+    ],
+    "hp_add": "(g0*rand(256)>>8) + g1   (16.16 fixed: HP += result>>16)",
+    "hp_pct": "(g2*rand(256)>>8) + g3   (HP += HP*result>>16)",
+    "ep_add": "g4*rand(256) + g5        (EP += result>>16)  [note: no >>8 on the random term]",
+    "ep_pct": "(g6*rand(256)>>8) + g7   (EP += EP*result>>16)",
+    "hp_add_range": [
+     5.0,
+     7.98828125
+    ],
+    "hp_pct_range": [
+     0.01617431640625,
+     0.0200653076171875
+    ],
+    "ep_add_range": [
+     4.0,
+     4.99609375
+    ],
+    "ep_pct_range": [
+     0.0211181640625,
+     0.02306365966796875
+    ]
+   },
+   "forms": [
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18
+   ]
+  },
+  {
+   "index": 2,
+   "name": "Goten",
+   "record_ram": "0x3001630",
+   "new_game": {
+    "level": 75,
+    "hp": 292,
+    "ep": 213,
+    "STR": 46,
+    "POW": 48,
+    "END": 31,
+    "SPD": 55,
+    "form": 19,
+    "skills": [
+     7,
+     20,
+     16,
+     8
+    ],
+    "skill_names": [
+     "Energy Blast",
+     "Super Saiyan",
+     "Kamekameha",
+     "Energy Punch"
+    ],
+    "xp": 40325
+   },
+   "growth": {
+    "raw_u32": [
+     262144,
+     393216,
+     384,
+     1060,
+     256,
+     262144,
+     64,
+     1280
+    ],
+    "hp_add": "(g0*rand(256)>>8) + g1   (16.16 fixed: HP += result>>16)",
+    "hp_pct": "(g2*rand(256)>>8) + g3   (HP += HP*result>>16)",
+    "ep_add": "g4*rand(256) + g5        (EP += result>>16)  [note: no >>8 on the random term]",
+    "ep_pct": "(g6*rand(256)>>8) + g7   (EP += EP*result>>16)",
+    "hp_add_range": [
+     6.0,
+     9.984375
+    ],
+    "hp_pct_range": [
+     0.01617431640625,
+     0.02201080322265625
+    ],
+    "ep_add_range": [
+     4.0,
+     4.99609375
+    ],
+    "ep_pct_range": [
+     0.01953125,
+     0.020503997802734375
+    ]
+   },
+   "forms": [
+    19,
+    20
+   ]
+  },
+  {
+   "index": 3,
+   "name": "Trunks",
+   "record_ram": "0x3001698",
+   "new_game": {
+    "level": 60,
+    "hp": 136,
+    "ep": 90,
+    "STR": 30,
+    "POW": 25,
+    "END": 25,
+    "SPD": 55,
+    "form": 21,
+    "skills": [
+     7,
+     20,
+     4,
+     11
+    ],
+    "skill_names": [
+     "Energy Blast",
+     "Super Saiyan",
+     "Burning Attack",
+     "Flame Kamehameha"
+    ],
+    "xp": 2200
+   },
+   "growth": {
+    "raw_u32": [
+     262144,
+     393216,
+     384,
+     1200,
+     256,
+     196608,
+     64,
+     1280
+    ],
+    "hp_add": "(g0*rand(256)>>8) + g1   (16.16 fixed: HP += result>>16)",
+    "hp_pct": "(g2*rand(256)>>8) + g3   (HP += HP*result>>16)",
+    "ep_add": "g4*rand(256) + g5        (EP += result>>16)  [note: no >>8 on the random term]",
+    "ep_pct": "(g6*rand(256)>>8) + g7   (EP += EP*result>>16)",
+    "hp_add_range": [
+     6.0,
+     9.984375
+    ],
+    "hp_pct_range": [
+     0.018310546875,
+     0.02414703369140625
+    ],
+    "ep_add_range": [
+     3.0,
+     3.99609375
+    ],
+    "ep_pct_range": [
+     0.01953125,
+     0.020503997802734375
+    ]
+   },
+   "forms": [
+    21,
+    22,
+    23,
+    24,
+    25
+   ]
+  },
+  {
+   "index": 4,
+   "name": "Vegeta",
+   "record_ram": "0x3001700",
+   "new_game": {
+    "level": 75,
+    "hp": 335,
+    "ep": 165,
+    "STR": 47,
+    "POW": 32,
+    "END": 46,
+    "SPD": 45,
+    "form": 26,
+    "skills": [
+     7,
+     20,
+     10,
+     2
+    ],
+    "skill_names": [
+     "Energy Blast",
+     "Super Saiyan",
+     "Final Flash",
+     "Big Bang"
+    ],
+    "xp": 40325
+   },
+   "growth": {
+    "raw_u32": [
+     196608,
+     327680,
+     384,
+     1280,
+     256,
+     196608,
+     128,
+     1200
+    ],
+    "hp_add": "(g0*rand(256)>>8) + g1   (16.16 fixed: HP += result>>16)",
+    "hp_pct": "(g2*rand(256)>>8) + g3   (HP += HP*result>>16)",
+    "ep_add": "g4*rand(256) + g5        (EP += result>>16)  [note: no >>8 on the random term]",
+    "ep_pct": "(g6*rand(256)>>8) + g7   (EP += EP*result>>16)",
+    "hp_add_range": [
+     5.0,
+     7.98828125
+    ],
+    "hp_pct_range": [
+     0.01953125,
+     0.02536773681640625
+    ],
+    "ep_add_range": [
+     3.0,
+     3.99609375
+    ],
+    "ep_pct_range": [
+     0.018310546875,
+     0.02025604248046875
+    ]
+   },
+   "forms": [
+    26,
+    27,
+    28,
+    29,
+    30
+   ]
+  },
+  {
+   "index": 5,
+   "name": "Gotenks",
+   "record_ram": "0x3001768",
+   "new_game": {
+    "level": 75,
+    "hp": 172,
+    "ep": 88,
+    "STR": 45,
+    "POW": 21,
+    "END": 28,
+    "SPD": 45,
+    "form": 31,
+    "skills": [
+     7,
+     20,
+     13,
+     23
+    ],
+    "skill_names": [
+     "Energy Blast",
+     "Super Saiyan",
+     "Super Kamikaze Ghost Attack",
+     "Ultra Volleyball Attack"
+    ],
+    "xp": 40325
+   },
+   "growth": {
+    "raw_u32": [
+     0,
+     0,
+     0,
+     0,
+     68063,
+     0,
+     0,
+     0
+    ],
+    "note": "unused: fusions (5-7) gain XP through their components and the extra characters (8) have no can-gain-XP flag; row contents are filler"
+   },
+   "forms": [
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38
+   ]
+  },
+  {
+   "index": 6,
+   "name": "Vegito",
+   "record_ram": "0x30017d0",
+   "new_game": {
+    "level": 75,
+    "hp": 172,
+    "ep": 88,
+    "STR": 45,
+    "POW": 21,
+    "END": 28,
+    "SPD": 45,
+    "form": 39,
+    "skills": [
+     7,
+     20,
+     1,
+     9
+    ],
+    "skill_names": [
+     "Energy Blast",
+     "Super Saiyan",
+     "Banshee Blast",
+     "Energy Sword"
+    ],
+    "xp": 40325
+   },
+   "growth": {
+    "raw_u32": [
+     0,
+     0,
+     0,
+     0,
+     68063,
+     0,
+     0,
+     0
+    ],
+    "note": "unused: fusions (5-7) gain XP through their components and the extra characters (8) have no can-gain-XP flag; row contents are filler"
+   },
+   "forms": [
+    39,
+    40
+   ]
+  },
+  {
+   "index": 7,
+   "name": "Gogeta",
+   "record_ram": "0x3001838",
+   "new_game": {
+    "level": 75,
+    "hp": 172,
+    "ep": 88,
+    "STR": 45,
+    "POW": 21,
+    "END": 28,
+    "SPD": 45,
+    "form": 41,
+    "skills": [
+     7,
+     3,
+     5
+    ],
+    "skill_names": [
+     "Energy Blast",
+     "Big Bang Kamehameha",
+     "Dragon Fist Explosion"
+    ],
+    "xp": 40325
+   },
+   "growth": {
+    "raw_u32": [
+     0,
+     0,
+     0,
+     0,
+     68063,
+     0,
+     0,
+     0
+    ],
+    "note": "unused: fusions (5-7) gain XP through their components and the extra characters (8) have no can-gain-XP flag; row contents are filler"
+   },
+   "forms": [
+    41,
+    42,
+    43,
+    44
+   ]
+  },
+  {
+   "index": 8,
+   "name": "Other (Android 18/Hercule/Krillin/Piccolo/Pikkon/Tien/Videl/Yamcha)",
+   "record_ram": "0x30018a0",
+   "new_game": {
+    "level": 50,
+    "hp": 50,
+    "ep": 40,
+    "STR": 17,
+    "POW": 17,
+    "END": 16,
+    "SPD": 45,
+    "form": 45,
+    "skills": [
+     7
+    ],
+    "skill_names": [
+     "Energy Blast"
+    ],
+    "xp": 0
+   },
+   "growth": {
+    "raw_u32": [
+     0,
+     0,
+     0,
+     0,
+     68063,
+     0,
+     0,
+     0
+    ],
+    "note": "unused: fusions (5-7) gain XP through their components and the extra characters (8) have no can-gain-XP flag; row contents are filler"
+   },
+   "forms": [
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53
+   ]
+  }
+ ],
+ "forms": [
+  {
+   "index": 0,
+   "address": "0x86b82ec",
+   "flags": 16,
+   "name_string": 158,
+   "name": "Goku",
+   "upper_name": "GOKU",
+   "controller_slot": "0x3001b70",
+   "char_index": 0,
+   "unk_0d": 0,
+   "gfx_id": 115,
+   "portrait_or_anim_bytes": [
+    57,
+    57,
+    56,
+    58,
+    58,
+    56
+   ],
+   "transform_up": 3,
+   "transform_down": 255,
+   "flag_bits": [
+    "can gain XP (GainExp 0x08013914 returns early without it)"
+   ],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 1,
+   "address": "0x86b8304",
+   "flags": 16,
+   "name_string": 158,
+   "name": "Goku",
+   "upper_name": "GOKU",
+   "controller_slot": "0x3001b70",
+   "char_index": 0,
+   "unk_0d": 0,
+   "gfx_id": 116,
+   "portrait_or_anim_bytes": [
+    55,
+    55,
+    55,
+    55,
+    55,
+    55
+   ],
+   "transform_up": 255,
+   "transform_down": 255,
+   "flag_bits": [
+    "can gain XP (GainExp 0x08013914 returns early without it)"
+   ],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 2,
+   "address": "0x86b831c",
+   "flags": 16,
+   "name_string": 158,
+   "name": "Goku",
+   "upper_name": "GOKU",
+   "controller_slot": "0x3001b70",
+   "char_index": 0,
+   "unk_0d": 0,
+   "gfx_id": 117,
+   "portrait_or_anim_bytes": [
+    57,
+    57,
+    56,
+    58,
+    58,
+    56
+   ],
+   "transform_up": 4,
+   "transform_down": 255,
+   "flag_bits": [
+    "can gain XP (GainExp 0x08013914 returns early without it)"
+   ],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 3,
+   "address": "0x86b8334",
+   "flags": 81,
+   "name_string": 158,
+   "name": "Goku",
+   "upper_name": "GOKU",
+   "controller_slot": "0x3001b78",
+   "char_index": 0,
+   "unk_0d": 0,
+   "gfx_id": 118,
+   "portrait_or_anim_bytes": [
+    60,
+    60,
+    59,
+    59,
+    59,
+    59
+   ],
+   "transform_up": 5,
+   "transform_down": 0,
+   "flag_bits": [
+    "super_saiyan: energy costs + gauge use record+0x1E (SS gauge); drains 1 per 20 frames (0x0800E3E6)",
+    "can gain XP (GainExp 0x08013914 returns early without it)",
+    "transformed form [INFERRED]"
+   ],
+   "measured_bonus": {
+    "STR": 5,
+    "POW": 5,
+    "END": 5,
+    "END_energy": 5,
+    "walk_speed": 128,
+    "dash_speed": 128,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 4,
+   "address": "0x86b834c",
+   "flags": 81,
+   "name_string": 158,
+   "name": "Goku",
+   "upper_name": "GOKU",
+   "controller_slot": "0x3001b78",
+   "char_index": 0,
+   "unk_0d": 0,
+   "gfx_id": 119,
+   "portrait_or_anim_bytes": [
+    60,
+    60,
+    59,
+    59,
+    59,
+    59
+   ],
+   "transform_up": 6,
+   "transform_down": 2,
+   "flag_bits": [
+    "super_saiyan: energy costs + gauge use record+0x1E (SS gauge); drains 1 per 20 frames (0x0800E3E6)",
+    "can gain XP (GainExp 0x08013914 returns early without it)",
+    "transformed form [INFERRED]"
+   ],
+   "measured_bonus": {
+    "STR": 5,
+    "POW": 5,
+    "END": 5,
+    "END_energy": 5,
+    "walk_speed": 128,
+    "dash_speed": 128,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 5,
+   "address": "0x86b8364",
+   "flags": 82,
+   "name_string": 158,
+   "name": "Goku",
+   "upper_name": "GOKU",
+   "controller_slot": "0x3001b80",
+   "char_index": 0,
+   "unk_0d": 0,
+   "gfx_id": 120,
+   "portrait_or_anim_bytes": [
+    61,
+    61,
+    61,
+    61,
+    61,
+    61
+   ],
+   "transform_up": 255,
+   "transform_down": 0,
+   "flag_bits": [
+    "super_saiyan_3: energy costs + gauge use record+0x20; drains (22*maxEP+0x3333)/65536 per frame (0x0800E4C4)",
+    "can gain XP (GainExp 0x08013914 returns early without it)",
+    "transformed form [INFERRED]"
+   ],
+   "measured_bonus": {
+    "STR": 15,
+    "POW": 15,
+    "END": 15,
+    "END_energy": 15,
+    "walk_speed": 192,
+    "dash_speed": 192,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 6,
+   "address": "0x86b837c",
+   "flags": 82,
+   "name_string": 158,
+   "name": "Goku",
+   "upper_name": "GOKU",
+   "controller_slot": "0x3001b80",
+   "char_index": 0,
+   "unk_0d": 0,
+   "gfx_id": 121,
+   "portrait_or_anim_bytes": [
+    61,
+    61,
+    61,
+    61,
+    61,
+    61
+   ],
+   "transform_up": 255,
+   "transform_down": 2,
+   "flag_bits": [
+    "super_saiyan_3: energy costs + gauge use record+0x20; drains (22*maxEP+0x3333)/65536 per frame (0x0800E4C4)",
+    "can gain XP (GainExp 0x08013914 returns early without it)",
+    "transformed form [INFERRED]"
+   ],
+   "measured_bonus": {
+    "STR": 15,
+    "POW": 15,
+    "END": 15,
+    "END_energy": 15,
+    "walk_speed": 192,
+    "dash_speed": 192,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 7,
+   "address": "0x86b8394",
+   "flags": 18,
+   "name_string": 158,
+   "name": "Goku",
+   "upper_name": "GOKU",
+   "controller_slot": "0x3001b84",
+   "char_index": 0,
+   "unk_0d": 0,
+   "gfx_id": 121,
+   "portrait_or_anim_bytes": [
+    61,
+    61,
+    61,
+    61,
+    61,
+    61
+   ],
+   "transform_up": 255,
+   "transform_down": 2,
+   "flag_bits": [
+    "super_saiyan_3: energy costs + gauge use record+0x20; drains (22*maxEP+0x3333)/65536 per frame (0x0800E4C4)",
+    "can gain XP (GainExp 0x08013914 returns early without it)"
+   ],
+   "measured_bonus": {
+    "STR": 15,
+    "POW": 15,
+    "END": 15,
+    "END_energy": 15,
+    "walk_speed": 192,
+    "dash_speed": 192,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 8,
+   "address": "0x86b83ac",
+   "flags": 18,
+   "name_string": 158,
+   "name": "Goku",
+   "upper_name": "GOKU",
+   "controller_slot": "0x3001b84",
+   "char_index": 0,
+   "unk_0d": 0,
+   "gfx_id": 120,
+   "portrait_or_anim_bytes": [
+    61,
+    61,
+    61,
+    61,
+    61,
+    61
+   ],
+   "transform_up": 255,
+   "transform_down": 0,
+   "flag_bits": [
+    "super_saiyan_3: energy costs + gauge use record+0x20; drains (22*maxEP+0x3333)/65536 per frame (0x0800E4C4)",
+    "can gain XP (GainExp 0x08013914 returns early without it)"
+   ],
+   "measured_bonus": {
+    "STR": 15,
+    "POW": 15,
+    "END": 15,
+    "END_energy": 15,
+    "walk_speed": 192,
+    "dash_speed": 192,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 9,
+   "address": "0x86b83c4",
+   "flags": 16,
+   "name_string": 159,
+   "name": "Gohan",
+   "upper_name": "GOHAN",
+   "controller_slot": "0x3001b70",
+   "char_index": 1,
+   "unk_0d": 0,
+   "gfx_id": 106,
+   "portrait_or_anim_bytes": [
+    37,
+    37,
+    38,
+    38,
+    38,
+    36
+   ],
+   "transform_up": 255,
+   "transform_down": 255,
+   "flag_bits": [
+    "can gain XP (GainExp 0x08013914 returns early without it)"
+   ],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 10,
+   "address": "0x86b83dc",
+   "flags": 16,
+   "name_string": 159,
+   "name": "Gohan",
+   "upper_name": "GOHAN",
+   "controller_slot": "0x3001b70",
+   "char_index": 1,
+   "unk_0d": 0,
+   "gfx_id": 107,
+   "portrait_or_anim_bytes": [
+    39,
+    39,
+    40,
+    41,
+    41,
+    41
+   ],
+   "transform_up": 16,
+   "transform_down": 255,
+   "flag_bits": [
+    "can gain XP (GainExp 0x08013914 returns early without it)"
+   ],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 11,
+   "address": "0x86b83f4",
+   "flags": 16,
+   "name_string": 159,
+   "name": "Gohan",
+   "upper_name": "GOHAN",
+   "controller_slot": "0x3001b70",
+   "char_index": 1,
+   "unk_0d": 0,
+   "gfx_id": 108,
+   "portrait_or_anim_bytes": [
+    43,
+    43,
+    44,
+    42,
+    42,
+    42
+   ],
+   "transform_up": 255,
+   "transform_down": 255,
+   "flag_bits": [
+    "can gain XP (GainExp 0x08013914 returns early without it)"
+   ],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 12,
+   "address": "0x86b840c",
+   "flags": 16,
+   "name_string": 159,
+   "name": "Gohan",
+   "upper_name": "GOHAN",
+   "controller_slot": "0x3001b70",
+   "char_index": 1,
+   "unk_0d": 0,
+   "gfx_id": 109,
+   "portrait_or_anim_bytes": [
+    43,
+    43,
+    44,
+    42,
+    42,
+    42
+   ],
+   "transform_up": 255,
+   "transform_down": 255,
+   "flag_bits": [
+    "can gain XP (GainExp 0x08013914 returns early without it)"
+   ],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 13,
+   "address": "0x86b8424",
+   "flags": 16,
+   "name_string": 159,
+   "name": "Gohan",
+   "upper_name": "GOHAN",
+   "controller_slot": "0x3001b70",
+   "char_index": 1,
+   "unk_0d": 0,
+   "gfx_id": 110,
+   "portrait_or_anim_bytes": [
+    46,
+    46,
+    45,
+    45,
+    45,
+    45
+   ],
+   "transform_up": 255,
+   "transform_down": 255,
+   "flag_bits": [
+    "can gain XP (GainExp 0x08013914 returns early without it)"
+   ],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 14,
+   "address": "0x86b843c",
+   "flags": 16,
+   "name_string": 159,
+   "name": "Gohan",
+   "upper_name": "GOHAN",
+   "controller_slot": "0x3001b74",
+   "char_index": 1,
+   "unk_0d": 0,
+   "gfx_id": 111,
+   "portrait_or_anim_bytes": [
+    47,
+    47,
+    47,
+    47,
+    47,
+    47
+   ],
+   "transform_up": 255,
+   "transform_down": 10,
+   "flag_bits": [
+    "can gain XP (GainExp 0x08013914 returns early without it)"
+   ],
+   "measured_bonus": {
+    "STR": 5,
+    "POW": 5,
+    "END": 5,
+    "END_energy": 5,
+    "walk_speed": 128,
+    "dash_speed": 128,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 15,
+   "address": "0x86b8454",
+   "flags": 16,
+   "name_string": 159,
+   "name": "Gohan",
+   "upper_name": "GOHAN",
+   "controller_slot": "0x3001b70",
+   "char_index": 1,
+   "unk_0d": 0,
+   "gfx_id": 112,
+   "portrait_or_anim_bytes": [
+    49,
+    49,
+    50,
+    50,
+    50,
+    48
+   ],
+   "transform_up": 18,
+   "transform_down": 255,
+   "flag_bits": [
+    "can gain XP (GainExp 0x08013914 returns early without it)"
+   ],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 16,
+   "address": "0x86b846c",
+   "flags": 81,
+   "name_string": 159,
+   "name": "Gohan",
+   "upper_name": "GOHAN",
+   "controller_slot": "0x3001b78",
+   "char_index": 1,
+   "unk_0d": 0,
+   "gfx_id": 113,
+   "portrait_or_anim_bytes": [
+    51,
+    51,
+    51,
+    51,
+    51,
+    51
+   ],
+   "transform_up": 255,
+   "transform_down": 10,
+   "flag_bits": [
+    "super_saiyan: energy costs + gauge use record+0x1E (SS gauge); drains 1 per 20 frames (0x0800E3E6)",
+    "can gain XP (GainExp 0x08013914 returns early without it)",
+    "transformed form [INFERRED]"
+   ],
+   "measured_bonus": {
+    "STR": 5,
+    "POW": 5,
+    "END": 5,
+    "END_energy": 5,
+    "walk_speed": 128,
+    "dash_speed": 128,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 17,
+   "address": "0x86b8484",
+   "flags": 17,
+   "name_string": 159,
+   "name": "Gohan",
+   "upper_name": "GOHAN",
+   "controller_slot": "0x3001b7c",
+   "char_index": 1,
+   "unk_0d": 0,
+   "gfx_id": 113,
+   "portrait_or_anim_bytes": [
+    51,
+    51,
+    51,
+    51,
+    51,
+    51
+   ],
+   "transform_up": 255,
+   "transform_down": 10,
+   "flag_bits": [
+    "super_saiyan: energy costs + gauge use record+0x1E (SS gauge); drains 1 per 20 frames (0x0800E3E6)",
+    "can gain XP (GainExp 0x08013914 returns early without it)"
+   ],
+   "measured_bonus": {
+    "STR": 5,
+    "POW": 5,
+    "END": 5,
+    "END_energy": 5,
+    "walk_speed": 128,
+    "dash_speed": 128,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 18,
+   "address": "0x86b849c",
+   "flags": 17,
+   "name_string": 159,
+   "name": "Gohan",
+   "upper_name": "GOHAN",
+   "controller_slot": "0x3001b78",
+   "char_index": 1,
+   "unk_0d": 0,
+   "gfx_id": 114,
+   "portrait_or_anim_bytes": [
+    54,
+    54,
+    54,
+    54,
+    54,
+    53
+   ],
+   "transform_up": 255,
+   "transform_down": 15,
+   "flag_bits": [
+    "super_saiyan: energy costs + gauge use record+0x1E (SS gauge); drains 1 per 20 frames (0x0800E3E6)",
+    "can gain XP (GainExp 0x08013914 returns early without it)"
+   ],
+   "measured_bonus": {
+    "STR": 5,
+    "POW": 5,
+    "END": 5,
+    "END_energy": 5,
+    "walk_speed": 128,
+    "dash_speed": 128,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 19,
+   "address": "0x86b84b4",
+   "flags": 16,
+   "name_string": 160,
+   "name": "Goten",
+   "upper_name": "GOTEN",
+   "controller_slot": "0x3001b70",
+   "char_index": 2,
+   "unk_0d": 0,
+   "gfx_id": 123,
+   "portrait_or_anim_bytes": [
+    63,
+    63,
+    62,
+    62,
+    64,
+    62
+   ],
+   "transform_up": 20,
+   "transform_down": 255,
+   "flag_bits": [
+    "can gain XP (GainExp 0x08013914 returns early without it)"
+   ],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 20,
+   "address": "0x86b84cc",
+   "flags": 81,
+   "name_string": 160,
+   "name": "Goten",
+   "upper_name": "GOTEN",
+   "controller_slot": "0x3001b78",
+   "char_index": 2,
+   "unk_0d": 0,
+   "gfx_id": 124,
+   "portrait_or_anim_bytes": [
+    66,
+    66,
+    65,
+    65,
+    65,
+    65
+   ],
+   "transform_up": 255,
+   "transform_down": 19,
+   "flag_bits": [
+    "super_saiyan: energy costs + gauge use record+0x1E (SS gauge); drains 1 per 20 frames (0x0800E3E6)",
+    "can gain XP (GainExp 0x08013914 returns early without it)",
+    "transformed form [INFERRED]"
+   ],
+   "measured_bonus": {
+    "STR": 5,
+    "POW": 5,
+    "END": 5,
+    "END_energy": 5,
+    "walk_speed": 128,
+    "dash_speed": 128,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 21,
+   "address": "0x86b84e4",
+   "flags": 16,
+   "name_string": 161,
+   "name": "Trunks",
+   "upper_name": "TRUNKS",
+   "controller_slot": "0x3001b70",
+   "char_index": 3,
+   "unk_0d": 0,
+   "gfx_id": 269,
+   "portrait_or_anim_bytes": [
+    137,
+    137,
+    136,
+    136,
+    138,
+    136
+   ],
+   "transform_up": 22,
+   "transform_down": 255,
+   "flag_bits": [
+    "can gain XP (GainExp 0x08013914 returns early without it)"
+   ],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 22,
+   "address": "0x86b84fc",
+   "flags": 81,
+   "name_string": 161,
+   "name": "Trunks",
+   "upper_name": "TRUNKS",
+   "controller_slot": "0x3001b78",
+   "char_index": 3,
+   "unk_0d": 0,
+   "gfx_id": 270,
+   "portrait_or_anim_bytes": [
+    140,
+    140,
+    139,
+    139,
+    139,
+    139
+   ],
+   "transform_up": 255,
+   "transform_down": 21,
+   "flag_bits": [
+    "super_saiyan: energy costs + gauge use record+0x1E (SS gauge); drains 1 per 20 frames (0x0800E3E6)",
+    "can gain XP (GainExp 0x08013914 returns early without it)",
+    "transformed form [INFERRED]"
+   ],
+   "measured_bonus": {
+    "STR": 5,
+    "POW": 5,
+    "END": 5,
+    "END_energy": 5,
+    "walk_speed": 128,
+    "dash_speed": 128,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 23,
+   "address": "0x86b8514",
+   "flags": 16,
+   "name_string": 161,
+   "name": "Trunks",
+   "upper_name": "TRUNKS",
+   "controller_slot": "0x3001b70",
+   "char_index": 3,
+   "unk_0d": 0,
+   "gfx_id": 271,
+   "portrait_or_anim_bytes": [
+    141,
+    141,
+    141,
+    141,
+    141,
+    141
+   ],
+   "transform_up": 255,
+   "transform_down": 255,
+   "flag_bits": [
+    "can gain XP (GainExp 0x08013914 returns early without it)"
+   ],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 24,
+   "address": "0x86b852c",
+   "flags": 16,
+   "name_string": 161,
+   "name": "Trunks",
+   "upper_name": "TRUNKS",
+   "controller_slot": "0x3001b88",
+   "char_index": 3,
+   "unk_0d": 0,
+   "gfx_id": 269,
+   "portrait_or_anim_bytes": [
+    137,
+    137,
+    136,
+    136,
+    138,
+    136
+   ],
+   "transform_up": 25,
+   "transform_down": 255,
+   "flag_bits": [
+    "can gain XP (GainExp 0x08013914 returns early without it)"
+   ],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": -283,
+    "dash_speed": -523,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 25,
+   "address": "0x86b8544",
+   "flags": 17,
+   "name_string": 161,
+   "name": "Trunks",
+   "upper_name": "TRUNKS",
+   "controller_slot": "0x3001b8c",
+   "char_index": 3,
+   "unk_0d": 0,
+   "gfx_id": 270,
+   "portrait_or_anim_bytes": [
+    140,
+    140,
+    139,
+    139,
+    139,
+    139
+   ],
+   "transform_up": 255,
+   "transform_down": 24,
+   "flag_bits": [
+    "super_saiyan: energy costs + gauge use record+0x1E (SS gauge); drains 1 per 20 frames (0x0800E3E6)",
+    "can gain XP (GainExp 0x08013914 returns early without it)"
+   ],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 64,
+    "dash_speed": 64,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 26,
+   "address": "0x86b855c",
+   "flags": 16,
+   "name_string": 162,
+   "name": "Vegeta",
+   "upper_name": "VEGETA",
+   "controller_slot": "0x3001b70",
+   "char_index": 4,
+   "unk_0d": 0,
+   "gfx_id": 279,
+   "portrait_or_anim_bytes": [
+    147,
+    147,
+    145,
+    144,
+    144,
+    144
+   ],
+   "transform_up": 28,
+   "transform_down": 255,
+   "flag_bits": [
+    "can gain XP (GainExp 0x08013914 returns early without it)"
+   ],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 27,
+   "address": "0x86b8574",
+   "flags": 16,
+   "name_string": 162,
+   "name": "Vegeta",
+   "upper_name": "VEGETA",
+   "controller_slot": "0x3001b70",
+   "char_index": 4,
+   "unk_0d": 0,
+   "gfx_id": 280,
+   "portrait_or_anim_bytes": [
+    147,
+    147,
+    145,
+    144,
+    144,
+    144
+   ],
+   "transform_up": 29,
+   "transform_down": 255,
+   "flag_bits": [
+    "can gain XP (GainExp 0x08013914 returns early without it)"
+   ],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 28,
+   "address": "0x86b858c",
+   "flags": 81,
+   "name_string": 162,
+   "name": "Vegeta",
+   "upper_name": "VEGETA",
+   "controller_slot": "0x3001b78",
+   "char_index": 4,
+   "unk_0d": 0,
+   "gfx_id": 282,
+   "portrait_or_anim_bytes": [
+    149,
+    149,
+    148,
+    148,
+    148,
+    148
+   ],
+   "transform_up": 255,
+   "transform_down": 26,
+   "flag_bits": [
+    "super_saiyan: energy costs + gauge use record+0x1E (SS gauge); drains 1 per 20 frames (0x0800E3E6)",
+    "can gain XP (GainExp 0x08013914 returns early without it)",
+    "transformed form [INFERRED]"
+   ],
+   "measured_bonus": {
+    "STR": 5,
+    "POW": 5,
+    "END": 5,
+    "END_energy": 5,
+    "walk_speed": 128,
+    "dash_speed": 128,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 29,
+   "address": "0x86b85a4",
+   "flags": 81,
+   "name_string": 162,
+   "name": "Vegeta",
+   "upper_name": "VEGETA",
+   "controller_slot": "0x3001b78",
+   "char_index": 4,
+   "unk_0d": 0,
+   "gfx_id": 283,
+   "portrait_or_anim_bytes": [
+    149,
+    149,
+    148,
+    148,
+    148,
+    148
+   ],
+   "transform_up": 255,
+   "transform_down": 27,
+   "flag_bits": [
+    "super_saiyan: energy costs + gauge use record+0x1E (SS gauge); drains 1 per 20 frames (0x0800E3E6)",
+    "can gain XP (GainExp 0x08013914 returns early without it)",
+    "transformed form [INFERRED]"
+   ],
+   "measured_bonus": {
+    "STR": 5,
+    "POW": 5,
+    "END": 5,
+    "END_energy": 5,
+    "walk_speed": 128,
+    "dash_speed": 128,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 30,
+   "address": "0x86b85bc",
+   "flags": 17,
+   "name_string": 162,
+   "name": "Vegeta",
+   "upper_name": "VEGETA",
+   "controller_slot": "0x3001b7c",
+   "char_index": 4,
+   "unk_0d": 0,
+   "gfx_id": 282,
+   "portrait_or_anim_bytes": [
+    146,
+    146,
+    146,
+    146,
+    146,
+    146
+   ],
+   "transform_up": 255,
+   "transform_down": 26,
+   "flag_bits": [
+    "super_saiyan: energy costs + gauge use record+0x1E (SS gauge); drains 1 per 20 frames (0x0800E3E6)",
+    "can gain XP (GainExp 0x08013914 returns early without it)"
+   ],
+   "measured_bonus": {
+    "STR": 5,
+    "POW": 5,
+    "END": 5,
+    "END_energy": 5,
+    "walk_speed": 128,
+    "dash_speed": 128,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 31,
+   "address": "0x86b85d4",
+   "flags": 28,
+   "name_string": 163,
+   "name": "Gotenks",
+   "upper_name": "GOTENKS",
+   "controller_slot": "0x3001b60",
+   "char_index": 5,
+   "unk_0d": 0,
+   "gfx_id": 126,
+   "portrait_or_anim_bytes": [
+    69,
+    69,
+    70,
+    68,
+    68,
+    68
+   ],
+   "transform_up": 34,
+   "transform_down": 255,
+   "flag_bits": [
+    "fusion: XP is split to both component characters; stats derived from components (0x0801375E)",
+    "fusion (timed/dance variant) [INFERRED]",
+    "can gain XP (GainExp 0x08013914 returns early without it)"
+   ],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 32,
+   "address": "0x86b85ec",
+   "flags": 52,
+   "name_string": 163,
+   "name": "Gotenks",
+   "upper_name": "GOTENKS",
+   "controller_slot": "0x3001b64",
+   "char_index": 5,
+   "unk_0d": 0,
+   "gfx_id": 127,
+   "portrait_or_anim_bytes": [
+    69,
+    69,
+    70,
+    68,
+    68,
+    68
+   ],
+   "transform_up": 255,
+   "transform_down": 255,
+   "flag_bits": [
+    "fusion: XP is split to both component characters; stats derived from components (0x0801375E)",
+    "can gain XP (GainExp 0x08013914 returns early without it)",
+    "fusion variant [INFERRED]"
+   ],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 33,
+   "address": "0x86b8604",
+   "flags": 52,
+   "name_string": 163,
+   "name": "Gotenks",
+   "upper_name": "GOTENKS",
+   "controller_slot": "0x3001b64",
+   "char_index": 5,
+   "unk_0d": 0,
+   "gfx_id": 128,
+   "portrait_or_anim_bytes": [
+    69,
+    69,
+    70,
+    68,
+    68,
+    68
+   ],
+   "transform_up": 255,
+   "transform_down": 255,
+   "flag_bits": [
+    "fusion: XP is split to both component characters; stats derived from components (0x0801375E)",
+    "can gain XP (GainExp 0x08013914 returns early without it)",
+    "fusion variant [INFERRED]"
+   ],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 34,
+   "address": "0x86b861c",
+   "flags": 93,
+   "name_string": 163,
+   "name": "Gotenks",
+   "upper_name": "GOTENKS",
+   "controller_slot": "0x3001b68",
+   "char_index": 5,
+   "unk_0d": 0,
+   "gfx_id": 129,
+   "portrait_or_anim_bytes": [
+    72,
+    72,
+    71,
+    71,
+    71,
+    71
+   ],
+   "transform_up": 35,
+   "transform_down": 31,
+   "flag_bits": [
+    "super_saiyan: energy costs + gauge use record+0x1E (SS gauge); drains 1 per 20 frames (0x0800E3E6)",
+    "fusion: XP is split to both component characters; stats derived from components (0x0801375E)",
+    "fusion (timed/dance variant) [INFERRED]",
+    "can gain XP (GainExp 0x08013914 returns early without it)",
+    "transformed form [INFERRED]"
+   ],
+   "measured_bonus": {
+    "STR": 5,
+    "POW": 5,
+    "END": 5,
+    "END_energy": 5,
+    "walk_speed": 128,
+    "dash_speed": 128,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 35,
+   "address": "0x86b8634",
+   "flags": 94,
+   "name_string": 163,
+   "name": "Gotenks",
+   "upper_name": "GOTENKS",
+   "controller_slot": "0x3001b6c",
+   "char_index": 5,
+   "unk_0d": 0,
+   "gfx_id": 130,
+   "portrait_or_anim_bytes": [
+    73,
+    73,
+    73,
+    73,
+    73,
+    73
+   ],
+   "transform_up": 255,
+   "transform_down": 31,
+   "flag_bits": [
+    "super_saiyan_3: energy costs + gauge use record+0x20; drains (22*maxEP+0x3333)/65536 per frame (0x0800E4C4)",
+    "fusion: XP is split to both component characters; stats derived from components (0x0801375E)",
+    "fusion (timed/dance variant) [INFERRED]",
+    "can gain XP (GainExp 0x08013914 returns early without it)",
+    "transformed form [INFERRED]"
+   ],
+   "measured_bonus": {
+    "STR": 15,
+    "POW": 15,
+    "END": 15,
+    "END_energy": 15,
+    "walk_speed": 192,
+    "dash_speed": 192,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 36,
+   "address": "0x86b864c",
+   "flags": 20,
+   "name_string": 163,
+   "name": "Gotenks",
+   "upper_name": "GOTENKS",
+   "controller_slot": "0x3001b70",
+   "char_index": 5,
+   "unk_0d": 0,
+   "gfx_id": 126,
+   "portrait_or_anim_bytes": [
+    69,
+    69,
+    70,
+    68,
+    68,
+    68
+   ],
+   "transform_up": 37,
+   "transform_down": 255,
+   "flag_bits": [
+    "fusion: XP is split to both component characters; stats derived from components (0x0801375E)",
+    "can gain XP (GainExp 0x08013914 returns early without it)"
+   ],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 37,
+   "address": "0x86b8664",
+   "flags": 21,
+   "name_string": 163,
+   "name": "Gotenks",
+   "upper_name": "GOTENKS",
+   "controller_slot": "0x3001b7c",
+   "char_index": 5,
+   "unk_0d": 0,
+   "gfx_id": 129,
+   "portrait_or_anim_bytes": [
+    72,
+    72,
+    71,
+    71,
+    71,
+    71
+   ],
+   "transform_up": 38,
+   "transform_down": 36,
+   "flag_bits": [
+    "super_saiyan: energy costs + gauge use record+0x1E (SS gauge); drains 1 per 20 frames (0x0800E3E6)",
+    "fusion: XP is split to both component characters; stats derived from components (0x0801375E)",
+    "can gain XP (GainExp 0x08013914 returns early without it)"
+   ],
+   "measured_bonus": {
+    "STR": 5,
+    "POW": 5,
+    "END": 5,
+    "END_energy": 5,
+    "walk_speed": 128,
+    "dash_speed": 128,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 38,
+   "address": "0x86b867c",
+   "flags": 22,
+   "name_string": 163,
+   "name": "Gotenks",
+   "upper_name": "GOTENKS",
+   "controller_slot": "0x3001b84",
+   "char_index": 5,
+   "unk_0d": 0,
+   "gfx_id": 130,
+   "portrait_or_anim_bytes": [
+    73,
+    73,
+    73,
+    73,
+    73,
+    73
+   ],
+   "transform_up": 255,
+   "transform_down": 36,
+   "flag_bits": [
+    "super_saiyan_3: energy costs + gauge use record+0x20; drains (22*maxEP+0x3333)/65536 per frame (0x0800E4C4)",
+    "fusion: XP is split to both component characters; stats derived from components (0x0801375E)",
+    "can gain XP (GainExp 0x08013914 returns early without it)"
+   ],
+   "measured_bonus": {
+    "STR": 15,
+    "POW": 15,
+    "END": 15,
+    "END_energy": 15,
+    "walk_speed": 192,
+    "dash_speed": 192,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 39,
+   "address": "0x86b8694",
+   "flags": 20,
+   "name_string": 164,
+   "name": "Vegito",
+   "upper_name": "VEGITO",
+   "controller_slot": "0x3001b70",
+   "char_index": 6,
+   "unk_0d": 0,
+   "gfx_id": 284,
+   "portrait_or_anim_bytes": [
+    150,
+    150,
+    150,
+    150,
+    150,
+    150
+   ],
+   "transform_up": 40,
+   "transform_down": 255,
+   "flag_bits": [
+    "fusion: XP is split to both component characters; stats derived from components (0x0801375E)",
+    "can gain XP (GainExp 0x08013914 returns early without it)"
+   ],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 40,
+   "address": "0x86b86ac",
+   "flags": 85,
+   "name_string": 164,
+   "name": "Vegito",
+   "upper_name": "VEGITO",
+   "controller_slot": "0x3001b78",
+   "char_index": 6,
+   "unk_0d": 0,
+   "gfx_id": 285,
+   "portrait_or_anim_bytes": [
+    151,
+    151,
+    151,
+    151,
+    151,
+    151
+   ],
+   "transform_up": 255,
+   "transform_down": 39,
+   "flag_bits": [
+    "super_saiyan: energy costs + gauge use record+0x1E (SS gauge); drains 1 per 20 frames (0x0800E3E6)",
+    "fusion: XP is split to both component characters; stats derived from components (0x0801375E)",
+    "can gain XP (GainExp 0x08013914 returns early without it)",
+    "transformed form [INFERRED]"
+   ],
+   "measured_bonus": {
+    "STR": 5,
+    "POW": 5,
+    "END": 5,
+    "END_energy": 5,
+    "walk_speed": 128,
+    "dash_speed": 128,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 41,
+   "address": "0x86b86c4",
+   "flags": 28,
+   "name_string": 165,
+   "name": "Gogeta",
+   "upper_name": "GOGETA",
+   "controller_slot": "0x3001b60",
+   "char_index": 7,
+   "unk_0d": 0,
+   "gfx_id": 102,
+   "portrait_or_anim_bytes": [
+    34,
+    34,
+    34,
+    34,
+    34,
+    34
+   ],
+   "transform_up": 255,
+   "transform_down": 255,
+   "flag_bits": [
+    "fusion: XP is split to both component characters; stats derived from components (0x0801375E)",
+    "fusion (timed/dance variant) [INFERRED]",
+    "can gain XP (GainExp 0x08013914 returns early without it)"
+   ],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 42,
+   "address": "0x86b86dc",
+   "flags": 52,
+   "name_string": 165,
+   "name": "Gogeta",
+   "upper_name": "GOGETA",
+   "controller_slot": "0x3001b64",
+   "char_index": 7,
+   "unk_0d": 0,
+   "gfx_id": 104,
+   "portrait_or_anim_bytes": [
+    34,
+    34,
+    34,
+    34,
+    34,
+    34
+   ],
+   "transform_up": 255,
+   "transform_down": 255,
+   "flag_bits": [
+    "fusion: XP is split to both component characters; stats derived from components (0x0801375E)",
+    "can gain XP (GainExp 0x08013914 returns early without it)",
+    "fusion variant [INFERRED]"
+   ],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 43,
+   "address": "0x86b86f4",
+   "flags": 52,
+   "name_string": 165,
+   "name": "Gogeta",
+   "upper_name": "GOGETA",
+   "controller_slot": "0x3001b64",
+   "char_index": 7,
+   "unk_0d": 0,
+   "gfx_id": 105,
+   "portrait_or_anim_bytes": [
+    34,
+    34,
+    34,
+    34,
+    34,
+    34
+   ],
+   "transform_up": 255,
+   "transform_down": 255,
+   "flag_bits": [
+    "fusion: XP is split to both component characters; stats derived from components (0x0801375E)",
+    "can gain XP (GainExp 0x08013914 returns early without it)",
+    "fusion variant [INFERRED]"
+   ],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 44,
+   "address": "0x86b870c",
+   "flags": 20,
+   "name_string": 165,
+   "name": "Gogeta",
+   "upper_name": "GOGETA",
+   "controller_slot": "0x3001b70",
+   "char_index": 7,
+   "unk_0d": 0,
+   "gfx_id": 102,
+   "portrait_or_anim_bytes": [
+    34,
+    34,
+    34,
+    34,
+    34,
+    34
+   ],
+   "transform_up": 255,
+   "transform_down": 255,
+   "flag_bits": [
+    "fusion: XP is split to both component characters; stats derived from components (0x0801375E)",
+    "can gain XP (GainExp 0x08013914 returns early without it)"
+   ],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 45,
+   "address": "0x86b8724",
+   "flags": 0,
+   "name_string": 0,
+   "name": "",
+   "upper_name": "",
+   "controller_slot": "0x3001b70",
+   "char_index": 8,
+   "unk_0d": 0,
+   "gfx_id": 0,
+   "portrait_or_anim_bytes": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "transform_up": 0,
+   "transform_down": 0,
+   "flag_bits": [],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 46,
+   "address": "0x86b873c",
+   "flags": 0,
+   "name_string": 166,
+   "name": "Android 18",
+   "upper_name": "ANDROID 18",
+   "controller_slot": "0x3001b70",
+   "char_index": 8,
+   "unk_0d": 0,
+   "gfx_id": 16,
+   "portrait_or_anim_bytes": [
+    9,
+    9,
+    9,
+    9,
+    9,
+    9
+   ],
+   "transform_up": 255,
+   "transform_down": 255,
+   "flag_bits": [],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 47,
+   "address": "0x86b8754",
+   "flags": 0,
+   "name_string": 167,
+   "name": "Hercule",
+   "upper_name": "HERCULE",
+   "controller_slot": "0x3001b70",
+   "char_index": 8,
+   "unk_0d": 0,
+   "gfx_id": 138,
+   "portrait_or_anim_bytes": [
+    76,
+    76,
+    76,
+    76,
+    76,
+    76
+   ],
+   "transform_up": 255,
+   "transform_down": 255,
+   "flag_bits": [],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 48,
+   "address": "0x86b876c",
+   "flags": 0,
+   "name_string": 168,
+   "name": "Krillin",
+   "upper_name": "KRILLIN",
+   "controller_slot": "0x3001b70",
+   "char_index": 8,
+   "unk_0d": 0,
+   "gfx_id": 166,
+   "portrait_or_anim_bytes": [
+    90,
+    90,
+    90,
+    90,
+    90,
+    90
+   ],
+   "transform_up": 255,
+   "transform_down": 255,
+   "flag_bits": [],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 49,
+   "address": "0x86b8784",
+   "flags": 0,
+   "name_string": 169,
+   "name": "Piccolo",
+   "upper_name": "PICCOLO",
+   "controller_slot": "0x3001b70",
+   "char_index": 8,
+   "unk_0d": 0,
+   "gfx_id": 222,
+   "portrait_or_anim_bytes": [
+    112,
+    112,
+    112,
+    112,
+    112,
+    112
+   ],
+   "transform_up": 255,
+   "transform_down": 255,
+   "flag_bits": [],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 50,
+   "address": "0x86b879c",
+   "flags": 0,
+   "name_string": 170,
+   "name": "Pikkon",
+   "upper_name": "PIKKON",
+   "controller_slot": "0x3001b70",
+   "char_index": 8,
+   "unk_0d": 0,
+   "gfx_id": 224,
+   "portrait_or_anim_bytes": [
+    113,
+    113,
+    113,
+    113,
+    113,
+    113
+   ],
+   "transform_up": 255,
+   "transform_down": 255,
+   "flag_bits": [],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 51,
+   "address": "0x86b87b4",
+   "flags": 0,
+   "name_string": 171,
+   "name": "Tien",
+   "upper_name": "TIEN",
+   "controller_slot": "0x3001b70",
+   "char_index": 8,
+   "unk_0d": 0,
+   "gfx_id": 264,
+   "portrait_or_anim_bytes": [
+    135,
+    135,
+    135,
+    135,
+    135,
+    135
+   ],
+   "transform_up": 255,
+   "transform_down": 255,
+   "flag_bits": [],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 52,
+   "address": "0x86b87cc",
+   "flags": 0,
+   "name_string": 172,
+   "name": "Videl",
+   "upper_name": "VIDEL",
+   "controller_slot": "0x3001b70",
+   "char_index": 8,
+   "unk_0d": 0,
+   "gfx_id": 287,
+   "portrait_or_anim_bytes": [
+    153,
+    153,
+    153,
+    153,
+    153,
+    153
+   ],
+   "transform_up": 255,
+   "transform_down": 255,
+   "flag_bits": [],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  },
+  {
+   "index": 53,
+   "address": "0x86b87e4",
+   "flags": 0,
+   "name_string": 173,
+   "name": "Yamcha",
+   "upper_name": "YAMCHA",
+   "controller_slot": "0x3001b70",
+   "char_index": 8,
+   "unk_0d": 0,
+   "gfx_id": 302,
+   "portrait_or_anim_bytes": [
+    159,
+    159,
+    159,
+    159,
+    159,
+    159
+   ],
+   "transform_up": 255,
+   "transform_down": 255,
+   "flag_bits": [],
+   "measured_bonus": {
+    "STR": 0,
+    "POW": 0,
+    "END": 0,
+    "END_energy": 0,
+    "walk_speed": 0,
+    "dash_speed": 0,
+    "note": "added to the player object on top of record stats; VERIFIED (emu)"
+   }
+  }
+ ],
+ "form_flag_bits": {
+  "0x1": "super_saiyan: energy costs + gauge use record+0x1E (SS gauge); drains 1 per 20 frames (0x0800E3E6)",
+  "0x2": "super_saiyan_3: energy costs + gauge use record+0x20; drains (22*maxEP+0x3333)/65536 per frame (0x0800E4C4)",
+  "0x4": "fusion: XP is split to both component characters; stats derived from components (0x0801375E)",
+  "0x8": "fusion (timed/dance variant) [INFERRED]",
+  "0x10": "can gain XP (GainExp 0x08013914 returns early without it)",
+  "0x20": "fusion variant [INFERRED]",
+  "0x40": "transformed form [INFERRED]"
+ },
+ "record_layout": {
+  "+0x00": "u8 ? (2 after new game; 3 for Goku in Snakeway state)",
+  "+0x02": "u16 fusion components: bits0-3 char A, bits4-7 char B, bits8-15 level",
+  "+0x04": "u32 SS cooldown/fatigue counter (decremented by (rec+0x62)>>6 per frame in normal form, 0x08013E06); SS needs it == 0",
+  "+0x08": "s32 -1",
+  "+0x0C": "u8 number of known energy skills",
+  "+0x0D..0x14": "u8 skill ids (table 0x0871DAF8)",
+  "+0x14": "u8 current form (table 0x086B82EC)",
+  "+0x15": "u8 selected skill slot",
+  "+0x16": "s16 HP",
+  "+0x18": "s16 max HP",
+  "+0x1A": "s16 EP",
+  "+0x1C": "s16 max EP",
+  "+0x1E": "u16 Super Saiyan gauge",
+  "+0x20": "u16 Super Saiyan 3 gauge",
+  "+0x24": "u32 XP",
+  "+0x28": "u8 base STR",
+  "+0x29": "u8 base POW",
+  "+0x2A": "u8 base END",
+  "+0x2B": "u8 base SPD",
+  "+0x2C": "u16 unspent stat points",
+  "+0x2E+2n": "u8 skill level (0..2) for slot n, +0x2F+2n duplicate/max",
+  "+0x3C/+0x40/+0x44/+0x48": "u32 equipped item id: body / hands / feet / accessory (equipment table)",
+  "+0x4C..+0x54": "u16 effective STR, POW, END(melee def), END2(energy def), SPD (after equipment + Holy Water), RecalcStats 0x08013C66",
+  "+0x56": "u8 energy-attack cost factor /16 (16 = 100%; Dragon Armor halves)",
+  "+0x57": "u8 energy-block cost factor /16 (Mystic Aegis, Magician's Gloves halve)",
+  "+0x58": "u16 XP multiplier /256 (256 + armband/boot bonuses)",
+  "+0x5A": "u16 256 (unused/unknown multiplier)",
+  "+0x5C": "u16 thorns damage (Spiked Breastplate: n*0xA4>>6)",
+  "+0x5E": "u16 256 (unknown)",
+  "+0x60": "u16 block damage factor /65536 (0x1000 = 1/16; Jade Keiko halves)",
+  "+0x62": "u16 SS cooldown rate (0x4000; Super items x7/8)",
+  "+0x64": "u16 HP regen per frame /256 (\"Z\" Armor 5*0x445>>8 = 21)",
+  "+0x66": "s8 crit bonus percent (Charge Gloves 5, Shock Boots 10, Soccer Cleats 20) -> obj+0x1BC = n*656",
+  "+0x67": "u8 copied from GameData+0x4F0 (player-object flag +0x1CC = (value == 0))"
+ }
+}

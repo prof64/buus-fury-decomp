@@ -1,0 +1,11 @@
+{
+  "from": "effects/fx_0871370c/sheet.png",
+  "recolor": {
+    "#ffb529": "#8a3cff",
+    "#ffff4a": "#c08cff",
+    "#ffd600": "#a060ff",
+    "#ffad00": "#7020e0",
+    "#ffff94": "#e0c8ff",
+    "#ffffde": "#f4ecff"
+  }
+}

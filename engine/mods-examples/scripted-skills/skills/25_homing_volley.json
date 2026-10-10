@@ -1,0 +1,19 @@
+{
+  "id": "25_homing_volley",
+  "skill": 25,
+  "name": "Homing Volley",
+  "description": "Hold the B Button to gather up to three ki orbs, release it to fire them. The orbs seek out enemies.",
+  "max_level": null,
+  "ep": {
+    "rule": "mod skill: 10 EP to start (needs 16), 6 EP per extra orb (engine.cost + the script's spend)"
+  },
+  "engine": {
+    "script": "hooks/skills/homing_volley.rhai",
+    "check": [16],
+    "cost": [10],
+    "damage": [700],
+    "attack_sub": 4,
+    "cooldown": 30,
+    "anim": ["special_charge", "kiblast"]
+  }
+}

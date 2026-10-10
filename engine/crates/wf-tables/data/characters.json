@@ -1,0 +1,607 @@
+{
+ "meta": {
+  "source": "Dragon Ball Z: Buu's Fury (USA) ROM; see re/buu/notes.md",
+  "generator": "re/buu/extract_characters.py",
+  "units": {
+   "hp_ep": "points",
+   "stats": "points (u8 in record, u16 on player object)",
+   "speed": "1/256 pixel per frame (24.8 fixed point position units)"
+  }
+ },
+ "level_range": {
+  "min": 50,
+  "max": 200,
+  "note": "level = 50 + max{i: XP >= table[i]} (0x080135D2); see levels.json"
+ },
+ "stat_points": {
+  "per_level": 3,
+  "cost_per_stat_point": 1,
+  "stats": [
+   "STR",
+   "POW",
+   "END",
+   "SPD"
+  ],
+  "note": "LevelUp 0x08013678 adds 3*(new-old) to record+0x2C; spent 1:1 on the Status screen (VERIFIED emu)"
+ },
+ "level_up": {
+  "function": "0x08013678",
+  "note": "per level gained: 4 rand(256) draws -> HP/EP growth (see growth); HP and EP refilled to the new max. STR/POW/END/SPD do NOT grow automatically."
+ },
+ "movement": {
+  "walk": "5*SPD + 102",
+  "dash": "walk + 320",
+  "units": "1/256 px per frame",
+  "function": "0x0800E074",
+  "dash_input": "double-tap a direction within 20 frames (idle state 0x08013022)",
+  "status": "VERIFIED (disasm + emu)"
+ },
+ "fusion": {
+  "function": "0x0801375E",
+  "maxHP_HP_maxEP_EP": "(A+B)*154>>8",
+  "xp": "(A.xp+B.xp)/2",
+  "STR_POW_END": "(A+B)/2 + 10",
+  "SPD": "(A+B)/2 + 16",
+  "note": "VERIFIED (disasm)"
+ },
+ "form_flag_bits": {
+  "0x1": "super_saiyan: energy costs + gauge use record+0x1E (SS gauge); drains 1 per 20 frames (0x0800E3E6)",
+  "0x2": "super_saiyan_3: energy costs + gauge use record+0x20; drains (22*maxEP+0x3333)/65536 per frame (0x0800E4C4)",
+  "0x4": "fusion: XP is split to both component characters; stats derived from components (0x0801375E)",
+  "0x8": "fusion (timed/dance variant) [INFERRED]",
+  "0x10": "can gain XP (GainExp 0x08013914 returns early without it)",
+  "0x20": "fusion variant [INFERRED]",
+  "0x40": "transformed form [INFERRED]"
+ },
+ "record_layout": {
+  "+0x00": "u8 ? (2 after new game; 3 for Goku in Snakeway state)",
+  "+0x02": "u16 fusion components: bits0-3 char A, bits4-7 char B, bits8-15 level",
+  "+0x04": "u32 SS cooldown/fatigue counter (decremented by (rec+0x62)>>6 per frame in normal form, 0x08013E06); SS needs it == 0",
+  "+0x08": "s32 -1",
+  "+0x0C": "u8 number of known energy skills",
+  "+0x0D..0x14": "u8 skill ids (table 0x0871DAF8)",
+  "+0x14": "u8 current form (table 0x086B82EC)",
+  "+0x15": "u8 selected skill slot",
+  "+0x16": "s16 HP",
+  "+0x18": "s16 max HP",
+  "+0x1A": "s16 EP",
+  "+0x1C": "s16 max EP",
+  "+0x1E": "u16 Super Saiyan gauge",
+  "+0x20": "u16 Super Saiyan 3 gauge",
+  "+0x24": "u32 XP",
+  "+0x28": "u8 base STR",
+  "+0x29": "u8 base POW",
+  "+0x2A": "u8 base END",
+  "+0x2B": "u8 base SPD",
+  "+0x2C": "u16 unspent stat points",
+  "+0x2E+2n": "u8 skill level (0..2) for slot n, +0x2F+2n duplicate/max",
+  "+0x3C/+0x40/+0x44/+0x48": "u32 equipped item id: body / hands / feet / accessory (equipment table)",
+  "+0x4C..+0x54": "u16 effective STR, POW, END(melee def), END2(energy def), SPD (after equipment + Holy Water), RecalcStats 0x08013C66",
+  "+0x56": "u8 energy-attack cost factor /16 (16 = 100%; Dragon Armor halves)",
+  "+0x57": "u8 energy-block cost factor /16 (Mystic Aegis, Magician's Gloves halve)",
+  "+0x58": "u16 XP multiplier /256 (256 + armband/boot bonuses)",
+  "+0x5A": "u16 256 (unused/unknown multiplier)",
+  "+0x5C": "u16 thorns damage (Spiked Breastplate: n*0xA4>>6)",
+  "+0x5E": "u16 256 (unknown)",
+  "+0x60": "u16 block damage factor /65536 (0x1000 = 1/16; Jade Keiko halves)",
+  "+0x62": "u16 SS cooldown rate (0x4000; Super items x7/8)",
+  "+0x64": "u16 HP regen per frame /256 (\"Z\" Armor 5*0x445>>8 = 21)",
+  "+0x66": "s8 crit bonus percent (Charge Gloves 5, Shock Boots 10, Soccer Cleats 20) -> obj+0x1BC = n*656",
+  "+0x67": "u8 copied from GameData+0x4F0 (player-object flag +0x1CC = (value == 0))"
+ },
+ "char_names": [
+  "Goku",
+  "Gohan",
+  "Goten",
+  "Trunks",
+  "Vegeta",
+  "Gotenks",
+  "Vegito",
+  "Gogeta",
+  "Other (Android 18/Hercule/Krillin/Piccolo/Pikkon/Tien/Videl/Yamcha)"
+ ],
+ "flag_bits": {
+  "1": "super_saiyan: energy costs + gauge use record+0x1E (SS gauge); drains 1 per 20 frames (0x0800E3E6)",
+  "2": "super_saiyan_3: energy costs + gauge use record+0x20; drains (22*maxEP+0x3333)/65536 per frame (0x0800E4C4)",
+  "4": "fusion: XP is split to both component characters; stats derived from components (0x0801375E)",
+  "8": "fusion (timed/dance variant) [INFERRED]",
+  "16": "can gain XP (GainExp 0x08013914 returns early without it)",
+  "32": "fusion variant [INFERRED]",
+  "64": "transformed form [INFERRED]"
+ },
+ "growth_doc": {
+  "hp_add": "(g0*rand(256)>>8) + g1   (16.16 fixed: HP += result>>16)",
+  "hp_pct": "(g2*rand(256)>>8) + g3   (HP += HP*result>>16)",
+  "ep_add": "g4*rand(256) + g5        (EP += result>>16)  [note: no >>8 on the random term]",
+  "ep_pct": "(g6*rand(256)>>8) + g7   (EP += EP*result>>16)"
+ },
+ "growth_unused_note": "unused: fusions (5-7) gain XP through their components and the extra characters (8) have no can-gain-XP flag; row contents are filler",
+ "measured_bonus": {
+  "0": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "1": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "2": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "3": {
+   "STR": 5,
+   "POW": 5,
+   "END": 5,
+   "END_energy": 5,
+   "walk_speed": 128,
+   "dash_speed": 128,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "4": {
+   "STR": 5,
+   "POW": 5,
+   "END": 5,
+   "END_energy": 5,
+   "walk_speed": 128,
+   "dash_speed": 128,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "5": {
+   "STR": 15,
+   "POW": 15,
+   "END": 15,
+   "END_energy": 15,
+   "walk_speed": 192,
+   "dash_speed": 192,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "6": {
+   "STR": 15,
+   "POW": 15,
+   "END": 15,
+   "END_energy": 15,
+   "walk_speed": 192,
+   "dash_speed": 192,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "7": {
+   "STR": 15,
+   "POW": 15,
+   "END": 15,
+   "END_energy": 15,
+   "walk_speed": 192,
+   "dash_speed": 192,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "8": {
+   "STR": 15,
+   "POW": 15,
+   "END": 15,
+   "END_energy": 15,
+   "walk_speed": 192,
+   "dash_speed": 192,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "9": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "10": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "11": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "12": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "13": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "14": {
+   "STR": 5,
+   "POW": 5,
+   "END": 5,
+   "END_energy": 5,
+   "walk_speed": 128,
+   "dash_speed": 128,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "15": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "16": {
+   "STR": 5,
+   "POW": 5,
+   "END": 5,
+   "END_energy": 5,
+   "walk_speed": 128,
+   "dash_speed": 128,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "17": {
+   "STR": 5,
+   "POW": 5,
+   "END": 5,
+   "END_energy": 5,
+   "walk_speed": 128,
+   "dash_speed": 128,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "18": {
+   "STR": 5,
+   "POW": 5,
+   "END": 5,
+   "END_energy": 5,
+   "walk_speed": 128,
+   "dash_speed": 128,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "19": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "20": {
+   "STR": 5,
+   "POW": 5,
+   "END": 5,
+   "END_energy": 5,
+   "walk_speed": 128,
+   "dash_speed": 128,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "21": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "22": {
+   "STR": 5,
+   "POW": 5,
+   "END": 5,
+   "END_energy": 5,
+   "walk_speed": 128,
+   "dash_speed": 128,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "23": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "24": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": -283,
+   "dash_speed": -523,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "25": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 64,
+   "dash_speed": 64,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "26": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "27": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "28": {
+   "STR": 5,
+   "POW": 5,
+   "END": 5,
+   "END_energy": 5,
+   "walk_speed": 128,
+   "dash_speed": 128,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "29": {
+   "STR": 5,
+   "POW": 5,
+   "END": 5,
+   "END_energy": 5,
+   "walk_speed": 128,
+   "dash_speed": 128,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "30": {
+   "STR": 5,
+   "POW": 5,
+   "END": 5,
+   "END_energy": 5,
+   "walk_speed": 128,
+   "dash_speed": 128,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "31": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "32": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "33": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "34": {
+   "STR": 5,
+   "POW": 5,
+   "END": 5,
+   "END_energy": 5,
+   "walk_speed": 128,
+   "dash_speed": 128,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "35": {
+   "STR": 15,
+   "POW": 15,
+   "END": 15,
+   "END_energy": 15,
+   "walk_speed": 192,
+   "dash_speed": 192,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "36": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "37": {
+   "STR": 5,
+   "POW": 5,
+   "END": 5,
+   "END_energy": 5,
+   "walk_speed": 128,
+   "dash_speed": 128,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "38": {
+   "STR": 15,
+   "POW": 15,
+   "END": 15,
+   "END_energy": 15,
+   "walk_speed": 192,
+   "dash_speed": 192,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "39": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "40": {
+   "STR": 5,
+   "POW": 5,
+   "END": 5,
+   "END_energy": 5,
+   "walk_speed": 128,
+   "dash_speed": 128,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "41": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "42": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "43": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "44": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "45": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "46": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "47": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "48": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "49": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "50": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "51": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "52": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  },
+  "53": {
+   "STR": 0,
+   "POW": 0,
+   "END": 0,
+   "END_energy": 0,
+   "walk_speed": 0,
+   "dash_speed": 0,
+   "note": "added to the player object on top of record stats; VERIFIED (emu)"
+  }
+ }
+}

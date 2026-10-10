@@ -1,0 +1,2902 @@
+[
+{
+"n": 0,
+"chapter": "ship",
+"name": "ship_c14",
+"frames": 378903,
+"start": {
+"area": [
+7,
+2,
+1
+],
+"p": [
+232,
+168,
+1
+],
+"scene": 0,
+"lf": 192179,
+"hp": 201,
+"zenie": 560
+},
+"end": {
+"area": [
+8,
+16,
+1
+],
+"p": [
+49,
+104,
+1
+],
+"scene": 1,
+"lf": 552484,
+"hp": 589,
+"zenie": 3080
+},
+"local_start": "work/ship/real4/start.ss",
+"local_end": "work/ship/real4/end.ss"
+},
+{
+"n": 1,
+"chapter": "ship",
+"name": "ship_c15",
+"frames": 19291,
+"start": {
+"area": [
+8,
+16,
+1
+],
+"p": [
+49,
+104,
+1
+],
+"scene": 1,
+"lf": 552484,
+"hp": 589,
+"zenie": 3080
+},
+"end": {
+"area": [
+8,
+70,
+1
+],
+"p": [
+204,
+222,
+2
+],
+"scene": 0,
+"lf": 570405,
+"hp": 399,
+"zenie": 3080
+},
+"local_start": "work/ship/real4/end.ss",
+"local_end": "work/ship/real4b/c15_after_buu.ss"
+},
+{
+"n": 2,
+"chapter": "fat",
+"name": "d04_bandana",
+"frames": 29219,
+"start": {
+"area": [
+8,
+70,
+1
+],
+"p": [
+204,
+222,
+2
+],
+"scene": 0,
+"lf": 570405,
+"hp": 399,
+"zenie": 3080
+},
+"end": {
+"area": [
+0,
+50,
+1
+],
+"p": null,
+"scene": 1,
+"lf": 597591,
+"hp": 90,
+"zenie": 80
+},
+"local_start": "work/ship/real4b/c15_after_buu.ss",
+"local_end": "work/ship/fat/d04_bandana.ss"
+},
+{
+"n": 3,
+"chapter": "fat",
+"name": "d06_thieves",
+"frames": 93659,
+"start": {
+"area": [
+0,
+50,
+1
+],
+"p": null,
+"scene": 1,
+"lf": 597591,
+"hp": 90,
+"zenie": 80
+},
+"end": {
+"area": [
+9,
+1,
+1
+],
+"p": [
+40,
+152,
+0
+],
+"scene": 0,
+"lf": 686107,
+"hp": 598,
+"zenie": 2770
+},
+"local_start": "work/ship/fat/d04_bandana.ss",
+"local_end": "work/ship/fat/d06_thieves.ss"
+},
+{
+"n": 4,
+"chapter": "fat",
+"name": "d10_map",
+"frames": 19855,
+"start": {
+"area": [
+9,
+1,
+1
+],
+"p": [
+40,
+152,
+0
+],
+"scene": 0,
+"lf": 686107,
+"hp": 598,
+"zenie": 2770
+},
+"end": {
+"area": [
+9,
+1,
+1
+],
+"p": [
+41,
+140,
+1
+],
+"scene": 1,
+"lf": 705008,
+"hp": 577,
+"zenie": 3500
+},
+"local_start": "work/ship/fat/d06_thieves.ss",
+"local_end": "work/ship/fat/d10_map.ss"
+},
+{
+"n": 5,
+"chapter": "fat",
+"name": "d11_pilaf",
+"frames": 1005,
+"start": {
+"area": [
+9,
+1,
+1
+],
+"p": [
+41,
+140,
+1
+],
+"scene": 1,
+"lf": 705008,
+"hp": 577,
+"zenie": 3500
+},
+"end": {
+"area": [
+10,
+1,
+1
+],
+"p": [
+96,
+80,
+0
+],
+"scene": 0,
+"lf": 705961,
+"hp": 577,
+"zenie": 3500
+},
+"local_start": "work/ship/fat/d10_map.ss",
+"local_end": "work/ship/fat/d11_pilaf.ss"
+},
+{
+"n": 6,
+"chapter": "fat",
+"name": "d11b_rock",
+"frames": 1195,
+"start": {
+"area": [
+10,
+1,
+1
+],
+"p": [
+96,
+80,
+0
+],
+"scene": 0,
+"lf": 705961,
+"hp": 577,
+"zenie": 3500
+},
+"end": {
+"area": [
+10,
+1,
+1
+],
+"p": [
+197,
+118,
+1
+],
+"scene": 0,
+"lf": 706896,
+"hp": 577,
+"zenie": 3500
+},
+"local_start": "work/ship/fat/d11_pilaf.ss",
+"local_end": "work/ship/fat/d11b_rock.ss"
+},
+{
+"n": 7,
+"chapter": "fat",
+"name": "d13_pilaf_won",
+"frames": 11326,
+"start": {
+"area": [
+10,
+1,
+1
+],
+"p": [
+197,
+118,
+1
+],
+"scene": 0,
+"lf": 706896,
+"hp": 577,
+"zenie": 3500
+},
+"end": {
+"area": [
+10,
+31,
+1
+],
+"p": [
+178,
+171,
+0
+],
+"scene": 0,
+"lf": 717266,
+"hp": 675,
+"zenie": 3695
+},
+"local_start": "work/ship/fat/d11b_rock.ss",
+"local_end": "work/ship/fat/d13_pilaf_won.ss"
+},
+{
+"n": 8,
+"chapter": "fat",
+"name": "d15_map",
+"frames": 9264,
+"start": {
+"area": [
+10,
+31,
+1
+],
+"p": [
+178,
+171,
+0
+],
+"scene": 0,
+"lf": 717266,
+"hp": 675,
+"zenie": 3695
+},
+"end": {
+"area": [
+10,
+1,
+1
+],
+"p": [
+89,
+-6,
+1
+],
+"scene": 1,
+"lf": 725822,
+"hp": 308,
+"zenie": 3915
+},
+"local_start": "work/ship/fat/d13_pilaf_won.ss",
+"local_end": "work/ship/fat/d15_map.ss"
+},
+{
+"n": 9,
+"chapter": "fat",
+"name": "d16_desert",
+"frames": 12826,
+"start": {
+"area": [
+10,
+1,
+1
+],
+"p": [
+89,
+-6,
+1
+],
+"scene": 1,
+"lf": 725822,
+"hp": 308,
+"zenie": 3915
+},
+"end": {
+"area": [
+11,
+1,
+1
+],
+"p": [
+232,
+272,
+0
+],
+"scene": 0,
+"lf": 737930,
+"hp": 695,
+"zenie": 315
+},
+"local_start": "work/ship/fat/d15_map.ss",
+"local_end": "work/ship/fat/d16_desert.ss"
+},
+{
+"n": 10,
+"chapter": "fat",
+"name": "db2_desert",
+"frames": 19972,
+"start": {
+"area": [
+11,
+1,
+1
+],
+"p": [
+232,
+272,
+0
+],
+"scene": 0,
+"lf": 737930,
+"hp": 695,
+"zenie": 315
+},
+"end": {
+"area": [
+0,
+50,
+1
+],
+"p": [
+1844,
+1480,
+1
+],
+"scene": 0,
+"lf": 756855,
+"hp": 739,
+"zenie": 1270
+},
+"local_start": "work/ship/fat/d16_desert.ss",
+"local_end": "work/ship/fat/db2/end.ss"
+},
+{
+"n": 11,
+"chapter": "fat",
+"name": "d20_airship",
+"frames": 685,
+"start": {
+"area": [
+0,
+50,
+1
+],
+"p": [
+1844,
+1480,
+1
+],
+"scene": 0,
+"lf": 756855,
+"hp": 739,
+"zenie": 1270
+},
+"end": {
+"area": [
+12,
+1,
+1
+],
+"p": [
+40,
+120,
+0
+],
+"scene": 0,
+"lf": 757521,
+"hp": 739,
+"zenie": 1270
+},
+"local_start": "work/ship/fat/db2/end.ss",
+"local_end": "work/ship/fat/d20_airship.ss"
+},
+{
+"n": 12,
+"chapter": "fat",
+"name": "db5_a01",
+"frames": 14045,
+"start": {
+"area": [
+12,
+1,
+1
+],
+"p": [
+40,
+120,
+0
+],
+"scene": 0,
+"lf": 757521,
+"hp": 739,
+"zenie": 1270
+},
+"end": {
+"area": [
+12,
+27,
+1
+],
+"p": [
+24,
+370,
+1
+],
+"scene": 0,
+"lf": 770656,
+"hp": 785,
+"zenie": 2140
+},
+"local_start": "work/ship/fat/d20_airship.ss",
+"local_end": "work/ship/fat/db5/a01_12-27.ss"
+},
+{
+"n": 13,
+"chapter": "fat",
+"name": "db5_a02",
+"frames": 1379,
+"start": {
+"area": [
+12,
+27,
+1
+],
+"p": [
+24,
+370,
+1
+],
+"scene": 0,
+"lf": 770656,
+"hp": 785,
+"zenie": 2140
+},
+"end": {
+"area": [
+12,
+28,
+1
+],
+"p": [
+56,
+216,
+1
+],
+"scene": 0,
+"lf": 771976,
+"hp": 785,
+"zenie": 2140
+},
+"local_start": "work/ship/fat/db5/a01_12-27.ss",
+"local_end": "work/ship/fat/db5/a02_warlord.ss"
+},
+{
+"n": 14,
+"chapter": "fat",
+"name": "db5_a04",
+"frames": 1279,
+"start": {
+"area": [
+12,
+28,
+1
+],
+"p": [
+56,
+216,
+1
+],
+"scene": 0,
+"lf": 771976,
+"hp": 785,
+"zenie": 2140
+},
+"end": {
+"area": [
+12,
+28,
+1
+],
+"p": [
+214,
+102,
+0
+],
+"scene": 0,
+"lf": 773221,
+"hp": 728,
+"zenie": 2145
+},
+"local_start": "work/ship/fat/db5/a02_warlord.ss",
+"local_end": "work/ship/fat/db5/a04_escape.ss"
+},
+{
+"n": 15,
+"chapter": "fat",
+"name": "db5_end",
+"frames": 12862,
+"start": {
+"area": [
+12,
+28,
+1
+],
+"p": [
+214,
+102,
+0
+],
+"scene": 0,
+"lf": 773221,
+"hp": 728,
+"zenie": 2145
+},
+"end": {
+"area": [
+0,
+50,
+1
+],
+"p": [
+1984,
+480,
+1
+],
+"scene": 0,
+"lf": 785311,
+"hp": 586,
+"zenie": 2910
+},
+"local_start": "work/ship/fat/db5/a04_escape.ss",
+"local_end": "work/ship/fat/db5/end.ss"
+},
+{
+"n": 16,
+"chapter": "fat",
+"name": "d30_fukurou",
+"frames": 888,
+"start": {
+"area": [
+0,
+50,
+1
+],
+"p": [
+1984,
+480,
+1
+],
+"scene": 0,
+"lf": 785311,
+"hp": 586,
+"zenie": 2910
+},
+"end": {
+"area": [
+13,
+1,
+1
+],
+"p": [
+88,
+248,
+0
+],
+"scene": 0,
+"lf": 786144,
+"hp": 586,
+"zenie": 2910
+},
+"local_start": "work/ship/fat/db5/end.ss",
+"local_end": "work/ship/fat/d30_fukurou.ss"
+},
+{
+"n": 17,
+"chapter": "fat",
+"name": "db6_fukurou",
+"frames": 18522,
+"start": {
+"area": [
+13,
+1,
+1
+],
+"p": [
+88,
+248,
+0
+],
+"scene": 0,
+"lf": 786144,
+"hp": 586,
+"zenie": 2910
+},
+"end": {
+"area": [
+0,
+50,
+1
+],
+"p": [
+800,
+880,
+1
+],
+"scene": 0,
+"lf": 803371,
+"hp": 804,
+"zenie": 3835
+},
+"local_start": "work/ship/fat/d30_fukurou.ss",
+"local_end": "work/ship/fat/db6/end.ss"
+},
+{
+"n": 18,
+"chapter": "fat",
+"name": "d40_pyramid",
+"frames": 1134,
+"start": {
+"area": [
+0,
+50,
+1
+],
+"p": [
+800,
+880,
+1
+],
+"scene": 0,
+"lf": 803371,
+"hp": 804,
+"zenie": 3835
+},
+"end": {
+"area": [
+14,
+1,
+1
+],
+"p": [
+152,
+216,
+0
+],
+"scene": 0,
+"lf": 804468,
+"hp": 804,
+"zenie": 3835
+},
+"local_start": "work/ship/fat/db6/end.ss",
+"local_end": "work/ship/fat/d40_pyramid.ss"
+},
+{
+"n": 19,
+"chapter": "fat",
+"name": "db7_p01",
+"frames": 1213,
+"start": {
+"area": [
+14,
+1,
+1
+],
+"p": [
+152,
+216,
+0
+],
+"scene": 0,
+"lf": 804468,
+"hp": 804,
+"zenie": 3835
+},
+"end": {
+"area": [
+14,
+2,
+1
+],
+"p": [
+72,
+292,
+1
+],
+"scene": 0,
+"lf": 805585,
+"hp": 804,
+"zenie": 3835
+},
+"local_start": "work/ship/fat/d40_pyramid.ss",
+"local_end": "work/ship/fat/db7/p01_challenger.ss"
+},
+{
+"n": 20,
+"chapter": "fat",
+"name": "db7_p05",
+"frames": 9141,
+"start": {
+"area": [
+14,
+2,
+1
+],
+"p": [
+72,
+292,
+1
+],
+"scene": 0,
+"lf": 805585,
+"hp": 804,
+"zenie": 3835
+},
+"end": {
+"area": [
+14,
+16,
+1
+],
+"p": [
+144,
+137,
+1
+],
+"scene": 0,
+"lf": 814407,
+"hp": 694,
+"zenie": 3965
+},
+"local_start": "work/ship/fat/db7/p01_challenger.ss",
+"local_end": "work/ship/fat/db7/p05_sw1.ss"
+},
+{
+"n": 21,
+"chapter": "fat",
+"name": "db7_p05p",
+"frames": 399,
+"start": {
+"area": [
+14,
+16,
+1
+],
+"p": [
+144,
+137,
+1
+],
+"scene": 0,
+"lf": 814407,
+"hp": 694,
+"zenie": 3965
+},
+"end": {
+"area": [
+14,
+16,
+1
+],
+"p": [
+144,
+137,
+1
+],
+"scene": 0,
+"lf": 814806,
+"hp": 694,
+"zenie": 3965
+},
+"local_start": "work/ship/fat/db7/p05_sw1.ss",
+"local_end": "work/ship/fat/db7/p05_sw1_punched.ss"
+},
+{
+"n": 22,
+"chapter": "fat",
+"name": "db7_p08",
+"frames": 4215,
+"start": {
+"area": [
+14,
+16,
+1
+],
+"p": [
+144,
+137,
+1
+],
+"scene": 0,
+"lf": 814806,
+"hp": 694,
+"zenie": 3965
+},
+"end": {
+"area": [
+14,
+22,
+1
+],
+"p": [
+166,
+120,
+2
+],
+"scene": 0,
+"lf": 818902,
+"hp": 645,
+"zenie": 3965
+},
+"local_start": "work/ship/fat/db7/p05_sw1_punched.ss",
+"local_end": "work/ship/fat/db7/p08_sw4.ss"
+},
+{
+"n": 23,
+"chapter": "fat",
+"name": "db7_end",
+"frames": 12578,
+"start": {
+"area": [
+14,
+22,
+1
+],
+"p": [
+166,
+120,
+2
+],
+"scene": 0,
+"lf": 818902,
+"hp": 645,
+"zenie": 3965
+},
+"end": {
+"area": [
+0,
+50,
+1
+],
+"p": [
+2200,
+1216,
+1
+],
+"scene": 0,
+"lf": 831093,
+"hp": 455,
+"zenie": 4130
+},
+"local_start": "work/ship/fat/db7/p08_sw4.ss",
+"local_end": "work/ship/fat/db7/end.ss"
+},
+{
+"n": 24,
+"chapter": "fat",
+"name": "d41_pyramid",
+"frames": 322,
+"start": {
+"area": [
+0,
+50,
+1
+],
+"p": [
+2200,
+1216,
+1
+],
+"scene": 0,
+"lf": 831093,
+"hp": 455,
+"zenie": 4130
+},
+"end": {
+"area": [
+14,
+1,
+1
+],
+"p": [
+152,
+216,
+0
+],
+"scene": 0,
+"lf": 831390,
+"hp": 455,
+"zenie": 4130
+},
+"local_start": "work/ship/fat/db7/end.ss",
+"local_end": "work/ship/fat/d41_pyramid.ss"
+},
+{
+"n": 25,
+"chapter": "fat",
+"name": "db7fix",
+"frames": 6803,
+"start": {
+"area": [
+14,
+1,
+1
+],
+"p": [
+152,
+216,
+0
+],
+"scene": 0,
+"lf": 831390,
+"hp": 455,
+"zenie": 4130
+},
+"end": {
+"area": [
+15,
+1,
+1
+],
+"p": [
+350,
+342,
+1
+],
+"scene": 0,
+"lf": 837820,
+"hp": 900,
+"zenie": 4150
+},
+"local_start": "work/ship/fat/d41_pyramid.ss",
+"local_end": "work/ship/fat/db7fix/end.ss"
+},
+{
+"n": 26,
+"chapter": "fat",
+"name": "d50_nataday",
+"frames": 914,
+"start": {
+"area": [
+15,
+1,
+1
+],
+"p": [
+350,
+342,
+1
+],
+"scene": 0,
+"lf": 837820,
+"hp": 900,
+"zenie": 4150
+},
+"end": {
+"area": [
+15,
+1,
+1
+],
+"p": [
+350,
+342,
+1
+],
+"scene": 0,
+"lf": 838351,
+"hp": 900,
+"zenie": 4150
+},
+"local_start": "work/ship/fat/db7fix/end.ss",
+"local_end": "work/ship/fat/d50_nataday.ss"
+},
+{
+"n": 27,
+"chapter": "fat",
+"name": "db4_j_down",
+"frames": 37789,
+"start": {
+"area": [
+15,
+1,
+1
+],
+"p": [
+350,
+342,
+1
+],
+"scene": 0,
+"lf": 838351,
+"hp": 900,
+"zenie": 4150
+},
+"end": {
+"area": [
+15,
+19,
+1
+],
+"p": [
+58,
+583,
+0
+],
+"scene": 0,
+"lf": 874559,
+"hp": 1008,
+"zenie": 5925
+},
+"local_start": "work/ship/fat/d50_nataday.ss",
+"local_end": "work/ship/fat/db4/j_down.ss"
+},
+{
+"n": 28,
+"chapter": "fat",
+"name": "db4b_end",
+"frames": 13893,
+"start": {
+"area": [
+15,
+19,
+1
+],
+"p": [
+58,
+583,
+0
+],
+"scene": 0,
+"lf": 874559,
+"hp": 1008,
+"zenie": 5925
+},
+"end": {
+"area": [
+0,
+50,
+1
+],
+"p": [
+2200,
+896,
+1
+],
+"scene": 0,
+"lf": 887625,
+"hp": 1120,
+"zenie": 6440
+},
+"local_start": "work/ship/fat/db4/j_down.ss",
+"local_end": "work/ship/fat/db4b/end.ss"
+},
+{
+"n": 29,
+"chapter": "fat",
+"name": "x01_city",
+"frames": 2411,
+"start": {
+"area": [
+0,
+50,
+1
+],
+"p": [
+2200,
+896,
+1
+],
+"scene": 0,
+"lf": 887625,
+"hp": 1120,
+"zenie": 6440
+},
+"end": {
+"area": [
+4,
+1,
+1
+],
+"p": [
+415,
+256,
+1
+],
+"scene": 1,
+"lf": 889707,
+"hp": 1120,
+"zenie": 440
+},
+"local_start": "work/ship/fat/db4b/end.ss",
+"local_end": "work/ship/fat/dbx/x01_city.ss"
+},
+{
+"n": 30,
+"chapter": "fat",
+"name": "x01_map",
+"frames": 225,
+"start": {
+"area": [
+4,
+1,
+1
+],
+"p": [
+415,
+256,
+1
+],
+"scene": 1,
+"lf": 889707,
+"hp": 1120,
+"zenie": 440
+},
+"end": {
+"area": [
+0,
+50,
+1
+],
+"p": [
+949,
+1092,
+1
+],
+"scene": 0,
+"lf": 889913,
+"hp": 1120,
+"zenie": 440
+},
+"local_start": "work/ship/fat/dbx/x01_city.ss",
+"local_end": "work/ship/fat/dbx/x01_map.ss"
+},
+{
+"n": 31,
+"chapter": "fat",
+"name": "x03_goku_pre",
+"frames": 18282,
+"start": {
+"area": [
+0,
+50,
+1
+],
+"p": [
+949,
+1092,
+1
+],
+"scene": 0,
+"lf": 889913,
+"hp": 1120,
+"zenie": 440
+},
+"end": {
+"area": [
+6,
+1,
+1
+],
+"p": [
+108,
+242,
+0
+],
+"scene": 0,
+"lf": 906937,
+"hp": 399,
+"zenie": 440
+},
+"local_start": "work/ship/fat/dbx/x01_map.ss",
+"local_end": "work/ship/fat/dbx/x03_goku_pre.ss"
+},
+{
+"n": 32,
+"chapter": "fat",
+"name": "x03_goku",
+"frames": 965,
+"start": {
+"area": [
+6,
+1,
+1
+],
+"p": [
+108,
+242,
+0
+],
+"scene": 0,
+"lf": 906937,
+"hp": 399,
+"zenie": 440
+},
+"end": {
+"area": [
+6,
+1,
+1
+],
+"p": [
+108,
+242,
+0
+],
+"scene": 0,
+"lf": 907472,
+"hp": 399,
+"zenie": 440
+},
+"local_start": "work/ship/fat/dbx/x03_goku_pre.ss",
+"local_end": "work/ship/fat/dbx/x03_goku.ss"
+},
+{
+"n": 33,
+"chapter": "fat",
+"name": "x05_s026",
+"frames": 1177,
+"start": {
+"area": [
+6,
+1,
+1
+],
+"p": [
+108,
+242,
+0
+],
+"scene": 0,
+"lf": 907472,
+"hp": 399,
+"zenie": 440
+},
+"end": {
+"area": [
+0,
+50,
+1
+],
+"p": [
+1353,
+1169,
+3
+],
+"scene": 1,
+"lf": 908541,
+"hp": 399,
+"zenie": 440
+},
+"local_start": "work/ship/fat/dbx/x03_goku.ss",
+"local_end": "work/ship/fat/dbx/x05_s026.ss"
+},
+{
+"n": 34,
+"chapter": "fat",
+"name": "dbx_end",
+"frames": 29206,
+"start": {
+"area": [
+0,
+50,
+1
+],
+"p": [
+1353,
+1169,
+3
+],
+"scene": 1,
+"lf": 908541,
+"hp": 399,
+"zenie": 440
+},
+"end": {
+"area": [
+0,
+96,
+1
+],
+"p": null,
+"scene": 2,
+"lf": 936024,
+"hp": 926,
+"zenie": 440
+},
+"local_start": "work/ship/fat/dbx/x05_s026.ss",
+"local_end": "work/ship/fat/dbx/end.ss"
+},
+{
+"n": 35,
+"chapter": "janemba",
+"name": "j00_yemma",
+"frames": 6143,
+"start": {
+"area": [
+0,
+96,
+1
+],
+"p": null,
+"scene": 2,
+"lf": 936024,
+"hp": 926,
+"zenie": 440
+},
+"end": {
+"area": [
+1,
+1,
+1
+],
+"p": [
+144,
+152,
+3
+],
+"scene": 0,
+"lf": 941835,
+"hp": 430,
+"zenie": 440
+},
+"local_start": "work/ship/fat/dbx/end.ss",
+"local_end": "work/ship/jan/j00_yemma.ss"
+},
+{
+"n": 36,
+"chapter": "janemba",
+"name": "j01_hfil",
+"frames": 3969,
+"start": {
+"area": [
+1,
+1,
+1
+],
+"p": [
+144,
+152,
+3
+],
+"scene": 0,
+"lf": 941835,
+"hp": 430,
+"zenie": 440
+},
+"end": {
+"area": [
+18,
+1,
+1
+],
+"p": [
+192,
+264,
+0
+],
+"scene": 0,
+"lf": 945593,
+"hp": 430,
+"zenie": 440
+},
+"local_start": "work/ship/jan/j00_yemma.ss",
+"local_end": "work/ship/jan/j01_hfil.ss"
+},
+{
+"n": 37,
+"chapter": "janemba",
+"name": "j02_goku90",
+"frames": 44792,
+"start": {
+"area": [
+18,
+1,
+1
+],
+"p": [
+192,
+264,
+0
+],
+"scene": 0,
+"lf": 945593,
+"hp": 430,
+"zenie": 440
+},
+"end": {
+"area": [
+18,
+12,
+1
+],
+"p": [
+131,
+123,
+0
+],
+"scene": 0,
+"lf": 988072,
+"hp": 550,
+"zenie": 440
+},
+"local_start": "work/ship/jan/j01_hfil.ss",
+"local_end": "work/ship/jan/j02_goku90.ss"
+},
+{
+"n": 38,
+"chapter": "janemba",
+"name": "j03_goku120",
+"frames": 48693,
+"start": {
+"area": [
+18,
+12,
+1
+],
+"p": [
+131,
+123,
+0
+],
+"scene": 0,
+"lf": 988072,
+"hp": 550,
+"zenie": 440
+},
+"end": {
+"area": [
+18,
+2,
+1
+],
+"p": [
+118,
+131,
+0
+],
+"scene": 0,
+"lf": 1032952,
+"hp": 1236,
+"zenie": 2170
+},
+"local_start": "work/ship/jan/j02_goku90.ss",
+"local_end": "work/ship/jan/j03_goku120.ss"
+},
+{
+"n": 39,
+"chapter": "janemba",
+"name": "h_switch",
+"frames": 761,
+"start": {
+"area": [
+18,
+2,
+1
+],
+"p": [
+118,
+131,
+0
+],
+"scene": 0,
+"lf": 1032952,
+"hp": 1236,
+"zenie": 2170
+},
+"end": {
+"area": [
+18,
+2,
+1
+],
+"p": [
+269,
+97,
+1
+],
+"scene": 0,
+"lf": 1033670,
+"hp": 1236,
+"zenie": 2405
+},
+"local_start": "work/ship/jan/j03_goku120.ss",
+"local_end": "work/ship/jan/h_switch.ss"
+},
+{
+"n": 40,
+"chapter": "janemba",
+"name": "h_maze",
+"frames": 10203,
+"start": {
+"area": [
+18,
+2,
+1
+],
+"p": [
+269,
+97,
+1
+],
+"scene": 0,
+"lf": 1033670,
+"hp": 1236,
+"zenie": 2405
+},
+"end": {
+"area": [
+18,
+10,
+1
+],
+"p": [
+339,
+40,
+2
+],
+"scene": 0,
+"lf": 1043317,
+"hp": 1338,
+"zenie": 2445
+},
+"local_start": "work/ship/jan/h_switch.ss",
+"local_end": "work/ship/jan/h_maze.ss"
+},
+{
+"n": 41,
+"chapter": "janemba",
+"name": "h_maze_punched",
+"frames": 291,
+"start": {
+"area": [
+18,
+10,
+1
+],
+"p": [
+339,
+40,
+2
+],
+"scene": 0,
+"lf": 1043317,
+"hp": 1338,
+"zenie": 2445
+},
+"end": {
+"area": [
+18,
+10,
+1
+],
+"p": [
+328,
+40,
+3
+],
+"scene": 0,
+"lf": 1043608,
+"hp": 1291,
+"zenie": 2445
+},
+"local_start": "work/ship/jan/h_maze.ss",
+"local_end": "work/ship/jan/h_maze_punched.ss"
+},
+{
+"n": 42,
+"chapter": "janemba",
+"name": "h_statues",
+"frames": 7259,
+"start": {
+"area": [
+18,
+10,
+1
+],
+"p": [
+328,
+40,
+3
+],
+"scene": 0,
+"lf": 1043608,
+"hp": 1291,
+"zenie": 2445
+},
+"end": {
+"area": [
+18,
+11,
+1
+],
+"p": [
+31,
+64,
+3
+],
+"scene": 0,
+"lf": 1050849,
+"hp": 698,
+"zenie": 2775
+},
+"local_start": "work/ship/jan/h_maze_punched.ss",
+"local_end": "work/ship/jan/h_statues.ss"
+},
+{
+"n": 43,
+"chapter": "janemba",
+"name": "h_vegeta",
+"frames": 9694,
+"start": {
+"area": [
+18,
+11,
+1
+],
+"p": [
+31,
+64,
+3
+],
+"scene": 0,
+"lf": 1050849,
+"hp": 698,
+"zenie": 2775
+},
+"end": {
+"area": [
+18,
+11,
+1
+],
+"p": [
+197,
+132,
+2
+],
+"scene": 0,
+"lf": 1060010,
+"hp": 698,
+"zenie": 2775
+},
+"local_start": "work/ship/jan/h_statues.ss",
+"local_end": "work/ship/jan/h_vegeta.ss"
+},
+{
+"n": 44,
+"chapter": "janemba",
+"name": "h_back1",
+"frames": 10082,
+"start": {
+"area": [
+18,
+11,
+1
+],
+"p": [
+197,
+132,
+2
+],
+"scene": 0,
+"lf": 1060010,
+"hp": 698,
+"zenie": 2775
+},
+"end": {
+"area": [
+18,
+1,
+1
+],
+"p": [
+104,
+269,
+0
+],
+"scene": 0,
+"lf": 1069648,
+"hp": 1363,
+"zenie": 3230
+},
+"local_start": "work/ship/jan/h_vegeta.ss",
+"local_end": "work/ship/jan/h_back1.ss"
+},
+{
+"n": 45,
+"chapter": "janemba",
+"name": "h_veg0",
+"frames": 356,
+"start": {
+"area": [
+18,
+1,
+1
+],
+"p": [
+104,
+269,
+0
+],
+"scene": 0,
+"lf": 1069648,
+"hp": 1363,
+"zenie": 3230
+},
+"end": {
+"area": [
+18,
+1,
+1
+],
+"p": [
+104,
+258,
+1
+],
+"scene": 0,
+"lf": 1069971,
+"hp": 621,
+"zenie": 3230
+},
+"local_start": "work/ship/jan/h_back1.ss",
+"local_end": "work/ship/jan/h_veg0.ss"
+},
+{
+"n": 46,
+"chapter": "janemba",
+"name": "h_veg1",
+"frames": 44918,
+"start": {
+"area": [
+18,
+1,
+1
+],
+"p": [
+104,
+258,
+1
+],
+"scene": 0,
+"lf": 1069971,
+"hp": 621,
+"zenie": 3230
+},
+"end": {
+"area": [
+18,
+1,
+1
+],
+"p": [
+104,
+271,
+0
+],
+"scene": 0,
+"lf": 1111451,
+"hp": 1357,
+"zenie": 4855
+},
+"local_start": "work/ship/jan/h_veg0.ss",
+"local_end": "work/ship/jan/h_veg1.ss"
+},
+{
+"n": 47,
+"chapter": "janemba",
+"name": "h_h13",
+"frames": 2238,
+"start": {
+"area": [
+18,
+1,
+1
+],
+"p": [
+104,
+271,
+0
+],
+"scene": 0,
+"lf": 1111451,
+"hp": 1357,
+"zenie": 4855
+},
+"end": {
+"area": [
+18,
+13,
+1
+],
+"p": [
+120,
+171,
+2
+],
+"scene": 0,
+"lf": 1113457,
+"hp": 1357,
+"zenie": 4855
+},
+"local_start": "work/ship/jan/h_veg1.ss",
+"local_end": "work/ship/jan/h_h13.ss"
+},
+{
+"n": 48,
+"chapter": "janemba",
+"name": "j10_arena",
+"frames": 1061,
+"start": {
+"area": [
+18,
+13,
+1
+],
+"p": [
+120,
+171,
+2
+],
+"scene": 0,
+"lf": 1113457,
+"hp": 1357,
+"zenie": 4855
+},
+"end": {
+"area": [
+18,
+13,
+1
+],
+"p": [
+123,
+193,
+1
+],
+"scene": 0,
+"lf": 1114213,
+"hp": 1444,
+"zenie": 4855
+},
+"local_start": "work/ship/jan/h_h13.ss",
+"local_end": "work/ship/jan/j10_arena.ss"
+},
+{
+"n": 49,
+"chapter": "janemba",
+"name": "j_sj2",
+"frames": 7119,
+"start": {
+"area": [
+18,
+13,
+1
+],
+"p": [
+123,
+193,
+1
+],
+"scene": 0,
+"lf": 1114213,
+"hp": 1444,
+"zenie": 4855
+},
+"end": {
+"area": [
+18,
+14,
+1
+],
+"p": [
+144,
+217,
+1
+],
+"scene": 0,
+"lf": 1121154,
+"hp": 1302,
+"zenie": 4855
+},
+"local_start": "work/ship/jan/j10_arena.ss",
+"local_end": "work/ship/jan/j_sj2.ss"
+},
+{
+"n": 50,
+"chapter": "janemba",
+"name": "j_arena_end",
+"frames": 2124,
+"start": {
+"area": [
+18,
+14,
+1
+],
+"p": [
+144,
+217,
+1
+],
+"scene": 0,
+"lf": 1121154,
+"hp": 1302,
+"zenie": 4855
+},
+"end": {
+"area": [
+18,
+14,
+1
+],
+"p": [
+160,
+260,
+2
+],
+"scene": 0,
+"lf": 1123246,
+"hp": 1335,
+"zenie": 4855
+},
+"local_start": "work/ship/jan/j_sj2.ss",
+"local_end": "work/ship/jan/j_arena_end.ss"
+},
+{
+"n": 51,
+"chapter": "superbuu",
+"name": "sb_start",
+"frames": 125,
+"start": {
+"area": [
+18,
+14,
+1
+],
+"p": [
+160,
+260,
+2
+],
+"scene": 0,
+"lf": 1123246,
+"hp": 1335,
+"zenie": 4855
+},
+"end": {
+"area": [
+18,
+13,
+1
+],
+"p": [
+94,
+44,
+0
+],
+"scene": 0,
+"lf": 1123356,
+"hp": 1335,
+"zenie": 4855
+},
+"local_start": "work/ship/jan/j_arena_end.ss",
+"local_end": "work/ship/sb/sb_start.ss"
+},
+{
+"n": 52,
+"chapter": "superbuu",
+"name": "m_gotenks",
+"frames": 33492,
+"start": {
+"area": [
+18,
+13,
+1
+],
+"p": [
+94,
+44,
+0
+],
+"scene": 0,
+"lf": 1123356,
+"hp": 1335,
+"zenie": 4855
+},
+"end": {
+"area": [
+6,
+9,
+1
+],
+"p": [
+176,
+136,
+1
+],
+"scene": 0,
+"lf": 1154828,
+"hp": 937,
+"zenie": 4855
+},
+"local_start": "work/ship/sb/sb_start.ss",
+"local_end": "work/ship/sb/m_gotenks.ss"
+},
+{
+"n": 53,
+"chapter": "superbuu",
+"name": "m_gotenks_punched",
+"frames": 75,
+"start": {
+"area": [
+6,
+9,
+1
+],
+"p": [
+176,
+136,
+1
+],
+"scene": 0,
+"lf": 1154828,
+"hp": 937,
+"zenie": 4855
+},
+"end": {
+"area": [
+6,
+9,
+1
+],
+"p": [
+176,
+136,
+1
+],
+"scene": 0,
+"lf": 1154903,
+"hp": 937,
+"zenie": 4855
+},
+"local_start": "work/ship/sb/m_gotenks.ss",
+"local_end": "work/ship/sb/m_gotenks_punched.ss"
+},
+{
+"n": 54,
+"chapter": "superbuu",
+"name": "m_ult_gohan",
+"frames": 14807,
+"start": {
+"area": [
+6,
+9,
+1
+],
+"p": [
+176,
+136,
+1
+],
+"scene": 0,
+"lf": 1154903,
+"hp": 937,
+"zenie": 4855
+},
+"end": {
+"area": [
+8,
+1,
+1
+],
+"p": [
+300,
+240,
+2
+],
+"scene": 0,
+"lf": 1168880,
+"hp": 1183,
+"zenie": 4855
+},
+"local_start": "work/ship/sb/m_gotenks_punched.ss",
+"local_end": "work/ship/sb/m_ult_gohan.ss"
+},
+{
+"n": 55,
+"chapter": "superbuu",
+"name": "g01_nataday",
+"frames": 3006,
+"start": {
+"area": [
+8,
+1,
+1
+],
+"p": [
+300,
+240,
+2
+],
+"scene": 0,
+"lf": 1168880,
+"hp": 1183,
+"zenie": 4855
+},
+"end": {
+"area": [
+15,
+1,
+1
+],
+"p": [
+392,
+632,
+0
+],
+"scene": 0,
+"lf": 1171002,
+"hp": 1183,
+"zenie": 4855
+},
+"local_start": "work/ship/sb/m_ult_gohan.ss",
+"local_end": "work/ship/sb/g01_nataday.ss"
+},
+{
+"n": 56,
+"chapter": "superbuu",
+"name": "g02_pyramid",
+"frames": 1212,
+"start": {
+"area": [
+15,
+1,
+1
+],
+"p": [
+392,
+632,
+0
+],
+"scene": 0,
+"lf": 1171002,
+"hp": 1183,
+"zenie": 4855
+},
+"end": {
+"area": [
+14,
+1,
+1
+],
+"p": [
+224,
+84,
+1
+],
+"scene": 0,
+"lf": 1172166,
+"hp": 1183,
+"zenie": 4855
+},
+"local_start": "work/ship/sb/g01_nataday.ss",
+"local_end": "work/ship/sb/g02_pyramid.ss"
+},
+{
+"n": 57,
+"chapter": "superbuu",
+"name": "g03_gohan141",
+"frames": 39116,
+"start": {
+"area": [
+14,
+1,
+1
+],
+"p": [
+224,
+84,
+1
+],
+"scene": 0,
+"lf": 1172166,
+"hp": 1183,
+"zenie": 4855
+},
+"end": {
+"area": [
+14,
+1,
+1
+],
+"p": [
+232,
+28,
+0
+],
+"scene": 0,
+"lf": 1207159,
+"hp": 1532,
+"zenie": 7545
+},
+"local_start": "work/ship/sb/g02_pyramid.ss",
+"local_end": "work/ship/sb/g03_gohan141.ss"
+},
+{
+"n": 58,
+"chapter": "superbuu",
+"name": "g04_forest",
+"frames": 1432,
+"start": {
+"area": [
+14,
+1,
+1
+],
+"p": [
+232,
+28,
+0
+],
+"scene": 0,
+"lf": 1207159,
+"hp": 1532,
+"zenie": 7545
+},
+"end": {
+"area": [
+8,
+1,
+1
+],
+"p": [
+288,
+264,
+0
+],
+"scene": 0,
+"lf": 1208534,
+"hp": 1532,
+"zenie": 7545
+},
+"local_start": "work/ship/sb/g03_gohan141.ss",
+"local_end": "work/ship/sb/g04_forest.ss"
+},
+{
+"n": 59,
+"chapter": "superbuu",
+"name": "m_gohan_vs_buu",
+"frames": 1888,
+"start": {
+"area": [
+8,
+1,
+1
+],
+"p": [
+288,
+264,
+0
+],
+"scene": 0,
+"lf": 1208534,
+"hp": 1532,
+"zenie": 7545
+},
+"end": {
+"area": [
+6,
+16,
+1
+],
+"p": [
+372,
+150,
+2
+],
+"scene": 0,
+"lf": 1210310,
+"hp": 1532,
+"zenie": 7545
+},
+"local_start": "work/ship/sb/g04_forest.ss",
+"local_end": "work/ship/sb/m_gohan_vs_buu.ss"
+},
+{
+"n": 60,
+"chapter": "superbuu",
+"name": "m_wasteland",
+"frames": 3827,
+"start": {
+"area": [
+6,
+16,
+1
+],
+"p": [
+372,
+150,
+2
+],
+"scene": 0,
+"lf": 1210310,
+"hp": 1532,
+"zenie": 7545
+},
+"end": {
+"area": [
+20,
+1,
+1
+],
+"p": [
+151,
+160,
+1
+],
+"scene": 0,
+"lf": 1213942,
+"hp": 1205,
+"zenie": 7545
+},
+"local_start": "work/ship/sb/m_gohan_vs_buu.ss",
+"local_end": "work/ship/sb/m_wasteland.ss"
+},
+{
+"n": 61,
+"chapter": "superbuu",
+"name": "g05_goku141",
+"frames": 48083,
+"start": {
+"area": [
+20,
+1,
+1
+],
+"p": [
+151,
+160,
+1
+],
+"scene": 0,
+"lf": 1213942,
+"hp": 1205,
+"zenie": 7545
+},
+"end": {
+"area": [
+20,
+5,
+1
+],
+"p": [
+257,
+259,
+0
+],
+"scene": 0,
+"lf": 1258988,
+"hp": 1724,
+"zenie": 8760
+},
+"local_start": "work/ship/sb/m_wasteland.ss",
+"local_end": "work/ship/sb/g05_goku141.ss"
+},
+{
+"n": 62,
+"chapter": "superbuu",
+"name": "m_inside_buu",
+"frames": 25599,
+"start": {
+"area": [
+20,
+5,
+1
+],
+"p": [
+257,
+259,
+0
+],
+"scene": 0,
+"lf": 1258988,
+"hp": 1724,
+"zenie": 8760
+},
+"end": {
+"area": [
+21,
+1,
+1
+],
+"p": [
+433,
+268,
+3
+],
+"scene": 0,
+"lf": 1284208,
+"hp": 1357,
+"zenie": 8760
+},
+"local_start": "work/ship/sb/g05_goku141.ss",
+"local_end": "work/ship/sb/m_inside_buu.ss"
+},
+{
+"n": 63,
+"chapter": "superbuu",
+"name": "i01_21-2",
+"frames": 863,
+"start": {
+"area": [
+21,
+1,
+1
+],
+"p": [
+433,
+268,
+3
+],
+"scene": 0,
+"lf": 1284208,
+"hp": 1357,
+"zenie": 8760
+},
+"end": {
+"area": [
+21,
+2,
+1
+],
+"p": [
+80,
+272,
+1
+],
+"scene": 0,
+"lf": 1285058,
+"hp": 1357,
+"zenie": 8760
+},
+"local_start": "work/ship/sb/m_inside_buu.ss",
+"local_end": "work/ship/sb/i01_21-2.ss"
+},
+{
+"n": 64,
+"chapter": "superbuu",
+"name": "m_kid_buu_saga",
+"frames": 27479,
+"start": {
+"area": [
+21,
+2,
+1
+],
+"p": [
+80,
+272,
+1
+],
+"scene": 0,
+"lf": 1285058,
+"hp": 1357,
+"zenie": 8760
+},
+"end": {
+"area": [
+0,
+50,
+1
+],
+"p": [
+656,
+1008,
+1
+],
+"scene": 0,
+"lf": 1311427,
+"hp": 1268,
+"zenie": 8760
+},
+"local_start": "work/ship/sb/i01_21-2.ss",
+"local_end": "work/ship/sb/m_kid_buu_saga.ss"
+},
+{
+"n": 65,
+"chapter": "superbuu",
+"name": "k01_rested",
+"frames": 7678,
+"start": {
+"area": [
+0,
+50,
+1
+],
+"p": [
+656,
+1008,
+1
+],
+"scene": 0,
+"lf": 1311427,
+"hp": 1268,
+"zenie": 8760
+},
+"end": {
+"area": [
+4,
+1,
+1
+],
+"p": [
+416,
+259,
+1
+],
+"scene": 1,
+"lf": 1318665,
+"hp": 2133,
+"zenie": 8760
+},
+"local_start": "work/ship/sb/m_kid_buu_saga.ss",
+"local_end": "work/ship/sb/k01_rested.ss"
+},
+{
+"n": 66,
+"chapter": "superbuu",
+"name": "k02_pyramid",
+"frames": 974,
+"start": {
+"area": [
+4,
+1,
+1
+],
+"p": [
+416,
+259,
+1
+],
+"scene": 1,
+"lf": 1318665,
+"hp": 2133,
+"zenie": 8760
+},
+"end": {
+"area": [
+14,
+1,
+1
+],
+"p": [
+152,
+216,
+0
+],
+"scene": 0,
+"lf": 1319586,
+"hp": 2133,
+"zenie": 8760
+},
+"local_start": "work/ship/sb/k01_rested.ss",
+"local_end": "work/ship/sb/k02_pyramid.ss"
+},
+{
+"n": 67,
+"chapter": "superbuu",
+"name": "k03_goku158",
+"frames": 77983,
+"start": {
+"area": [
+14,
+1,
+1
+],
+"p": [
+152,
+216,
+0
+],
+"scene": 0,
+"lf": 1319586,
+"hp": 2133,
+"zenie": 8760
+},
+"end": {
+"area": [
+14,
+1,
+1
+],
+"p": [
+232,
+28,
+0
+],
+"scene": 0,
+"lf": 1391466,
+"hp": 2842,
+"zenie": 15965
+},
+"local_start": "work/ship/sb/k02_pyramid.ss",
+"local_end": "work/ship/sb/k03_goku158.ss"
+},
+{
+"n": 68,
+"chapter": "superbuu",
+"name": "k04_vegeta",
+"frames": 814,
+"start": {
+"area": [
+14,
+1,
+1
+],
+"p": [
+232,
+28,
+0
+],
+"scene": 0,
+"lf": 1391466,
+"hp": 2842,
+"zenie": 15965
+},
+"end": {
+"area": [
+14,
+1,
+1
+],
+"p": [
+98,
+241,
+1
+],
+"scene": 0,
+"lf": 1392107,
+"hp": 1357,
+"zenie": 15965
+},
+"local_start": "work/ship/sb/k03_goku158.ss",
+"local_end": "work/ship/sb/k04_vegeta.ss"
+},
+{
+"n": 69,
+"chapter": "superbuu",
+"name": "k05_vegeta150",
+"frames": 110161,
+"start": {
+"area": [
+14,
+1,
+1
+],
+"p": [
+98,
+241,
+1
+],
+"scene": 0,
+"lf": 1392107,
+"hp": 1357,
+"zenie": 15965
+},
+"end": {
+"area": [
+14,
+1,
+1
+],
+"p": [
+232,
+28,
+0
+],
+"scene": 0,
+"lf": 1494253,
+"hp": 2846,
+"zenie": 24365
+},
+"local_start": "work/ship/sb/k04_vegeta.ss",
+"local_end": "work/ship/sb/k05_vegeta150.ss"
+},
+{
+"n": 70,
+"chapter": "superbuu",
+"name": "m_kid_buu",
+"frames": 10616,
+"start": {
+"area": [
+14,
+1,
+1
+],
+"p": [
+232,
+28,
+0
+],
+"scene": 0,
+"lf": 1494253,
+"hp": 2846,
+"zenie": 24365
+},
+"end": {
+"area": [
+19,
+3,
+1
+],
+"p": [
+140,
+338,
+2
+],
+"scene": 0,
+"lf": 1504313,
+"hp": 2991,
+"zenie": 24365
+},
+"local_start": "work/ship/sb/k05_vegeta150.ss",
+"local_end": "work/ship/sb/m_kid_buu.ss"
+},
+{
+"n": 71,
+"chapter": "superbuu",
+"name": "m_kid_buu_punched",
+"frames": 39,
+"start": {
+"area": [
+19,
+3,
+1
+],
+"p": [
+140,
+338,
+2
+],
+"scene": 0,
+"lf": 1504313,
+"hp": 2991,
+"zenie": 24365
+},
+"end": {
+"area": [
+19,
+3,
+1
+],
+"p": [
+140,
+338,
+2
+],
+"scene": 0,
+"lf": 1504352,
+"hp": 2991,
+"zenie": 24365
+},
+"local_start": "work/ship/sb/m_kid_buu.ss",
+"local_end": "work/ship/sb/m_kid_buu_punched.ss"
+},
+{
+"n": 72,
+"chapter": "superbuu",
+"name": "the_end",
+"frames": 69460,
+"start": {
+"area": [
+19,
+3,
+1
+],
+"p": [
+140,
+338,
+2
+],
+"scene": 0,
+"lf": 1504352,
+"hp": 2991,
+"zenie": 24365
+},
+"end": {
+"area": [
+0,
+2,
+1
+],
+"p": null,
+"scene": 0,
+"lf": 1568554,
+"hp": 2991,
+"zenie": 24365
+},
+"local_start": "work/ship/sb/m_kid_buu_punched.ss",
+"local_end": "work/ship/sb/the_end.ss"
+}
+]

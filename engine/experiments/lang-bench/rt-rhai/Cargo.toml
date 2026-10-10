@@ -1,0 +1,12 @@
+[package]
+name = "rt-rhai"
+edition.workspace = true
+version.workspace = true
+publish.workspace = true
+
+[dependencies]
+host = { path = "../host" }
+rhai = { version = "1.26", default-features = false, features = ["std", "no_float", "no_time", "no_module", "no_custom_syntax", "only_i64"] }
+
+[features]
+slim = []

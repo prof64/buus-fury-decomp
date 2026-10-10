@@ -1,0 +1,9 @@
+[package]
+name = "rt-boa"
+edition.workspace = true
+version.workspace = true
+publish.workspace = true
+
+[dependencies]
+host = { path = "../host" }
+boa_engine = { version = "0.22", default-features = false }

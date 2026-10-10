@@ -1,0 +1,12 @@
+[package]
+name = "wasm-mini"
+edition.workspace = true
+version.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+host = { path = "../host" }
+rt-mini = { path = "../rt-mini" }

@@ -1,0 +1,244 @@
+{
+ "plays": [
+  {
+   "fight": "4x Majin Fighter (Goku Lv60)",
+   "how": "step-by-step",
+   "outcome": "won",
+   "frames": 1866,
+   "hp": [
+    118,
+    135
+   ],
+   "tool_calls": 16,
+   "replay_hash": "e26da1e7c89513db",
+   "replay_ok": true,
+   "wall_s": 0.15
+  },
+  {
+   "fight": "4x Majin Fighter (Goku Lv60)",
+   "how": "controller melee.rhai",
+   "outcome": "won",
+   "frames": 1814,
+   "hp": [
+    135,
+    135
+   ],
+   "tool_calls": 2,
+   "replay_hash": "f423fa9ece1da3da",
+   "replay_ok": true,
+   "wall_s": 0.07
+  },
+  {
+   "fight": "6x Majin Fighter (Goku Lv70)",
+   "how": "step-by-step",
+   "outcome": "won",
+   "frames": 1880,
+   "hp": [
+    247,
+    247
+   ],
+   "tool_calls": 8,
+   "replay_hash": "88da632f5278e359",
+   "replay_ok": true,
+   "wall_s": 0.02
+  },
+  {
+   "fight": "6x Majin Fighter (Goku Lv70)",
+   "how": "controller melee.rhai",
+   "outcome": "won",
+   "frames": 1359,
+   "hp": [
+    247,
+    247
+   ],
+   "tool_calls": 2,
+   "replay_hash": "8c5fe94f689026b5",
+   "replay_ok": true,
+   "wall_s": 0.06
+  },
+  {
+   "fight": "Dabura (Goku Lv80)",
+   "how": "step-by-step",
+   "outcome": "won",
+   "frames": 1578,
+   "hp": [
+    383,
+    383
+   ],
+   "tool_calls": 4,
+   "replay_hash": "ff21edaa1b064484",
+   "replay_ok": true,
+   "wall_s": 0.01
+  },
+  {
+   "fight": "Dabura (Goku Lv80)",
+   "how": "controller melee.rhai",
+   "outcome": "won",
+   "frames": 3817,
+   "hp": [
+    379,
+    383
+   ],
+   "tool_calls": 2,
+   "replay_hash": "c96b0195fa1b8b11",
+   "replay_ok": true,
+   "wall_s": 0.12
+  },
+  {
+   "fight": "Janemba -> Super Janemba (Goku Lv110)",
+   "how": "step-by-step",
+   "outcome": "won",
+   "frames": 4274,
+   "hp": [
+    645,
+    993
+   ],
+   "tool_calls": 32,
+   "replay_hash": "3a72cea0e32ae99f",
+   "replay_ok": true,
+   "wall_s": 0.02
+  },
+  {
+   "fight": "Janemba -> Super Janemba (Goku Lv110)",
+   "how": "controller melee.rhai",
+   "outcome": "won",
+   "frames": 4253,
+   "hp": [
+    898,
+    993
+   ],
+   "tool_calls": 2,
+   "replay_hash": "a0134d46fe4df12e",
+   "replay_ok": true,
+   "wall_s": 0.14
+  },
+  {
+   "fight": "Yakon (Goku Lv100, skill lv 2)",
+   "how": "step-by-step",
+   "outcome": "won",
+   "frames": 844,
+   "hp": [
+    741,
+    748
+   ],
+   "tool_calls": 120,
+   "replay_hash": "fc6a71feef50dddd",
+   "replay_ok": true,
+   "wall_s": 0.01
+  },
+  {
+   "fight": "Yakon (Goku Lv100, skill lv 2)",
+   "how": "controller yakon.rhai",
+   "outcome": "won",
+   "frames": 609,
+   "hp": [
+    723,
+    748
+   ],
+   "tool_calls": 2,
+   "replay_hash": "9948dfadbe9b1c15",
+   "replay_ok": true,
+   "wall_s": 0.02
+  },
+  {
+   "fight": "Yakon (Goku Lv80, skill lv 1)",
+   "how": "controller yakon.rhai",
+   "outcome": "won",
+   "frames": 3815,
+   "hp": [
+    307,
+    383
+   ],
+   "tool_calls": 2,
+   "replay_hash": "62b122fdf9267912",
+   "replay_ok": true,
+   "wall_s": 0.27
+  }
+ ],
+ "evaluations": [
+  {
+   "runs": 32,
+   "wins": 32,
+   "win_rate": 1.0,
+   "mean_hp_lost": 2.8,
+   "mean_frames_to_win": 1693.6,
+   "mean_dealt": 1959.7,
+   "errors": 0,
+   "wall_ms": 390.0,
+   "frames_simulated": 54196,
+   "threads": 18,
+   "fight": "4x Majin Fighter (Goku Lv60)",
+   "controller": "melee.rhai"
+  },
+  {
+   "runs": 32,
+   "wins": 32,
+   "win_rate": 1.0,
+   "mean_hp_lost": 3.2,
+   "mean_frames_to_win": 1284.3,
+   "mean_dealt": 2971.6,
+   "errors": 0,
+   "wall_ms": 355.0,
+   "frames_simulated": 41097,
+   "threads": 18,
+   "fight": "6x Majin Fighter (Goku Lv70)",
+   "controller": "melee.rhai"
+  },
+  {
+   "runs": 32,
+   "wins": 32,
+   "win_rate": 1.0,
+   "mean_hp_lost": 4.1,
+   "mean_frames_to_win": 2789.9,
+   "mean_dealt": 9950.5,
+   "errors": 0,
+   "wall_ms": 501.0,
+   "frames_simulated": 89277,
+   "threads": 18,
+   "fight": "Dabura (Goku Lv80)",
+   "controller": "melee.rhai"
+  },
+  {
+   "runs": 32,
+   "wins": 32,
+   "win_rate": 1.0,
+   "mean_hp_lost": 142.6,
+   "mean_frames_to_win": 4778.8,
+   "mean_dealt": 34651.6,
+   "errors": 0,
+   "wall_ms": 885.0,
+   "frames_simulated": 152923,
+   "threads": 18,
+   "fight": "Janemba -> Super Janemba (Goku Lv110)",
+   "controller": "melee.rhai"
+  },
+  {
+   "runs": 32,
+   "wins": 30,
+   "win_rate": 0.938,
+   "mean_hp_lost": 22.6,
+   "mean_frames_to_win": 696.3,
+   "mean_dealt": 1606.0,
+   "errors": 0,
+   "wall_ms": 2815.0,
+   "frames_simulated": 44889,
+   "threads": 18,
+   "fight": "Yakon (Goku Lv100, skill lv 2)",
+   "controller": "yakon.rhai"
+  },
+  {
+   "runs": 32,
+   "wins": 9,
+   "win_rate": 0.281,
+   "mean_hp_lost": 47.3,
+   "mean_frames_to_win": 3790.7,
+   "mean_dealt": 5669.1,
+   "errors": 0,
+   "wall_ms": 11955.0,
+   "frames_simulated": 310116,
+   "threads": 18,
+   "fight": "Yakon (Goku Lv80, skill lv 1)",
+   "controller": "yakon.rhai"
+  }
+ ]
+}

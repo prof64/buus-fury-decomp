@@ -1,0 +1,8 @@
+{
+  "id": "shadow_goku",
+  "name": "Shadow Goku",
+  "character": 9,
+  "forms": [54],
+  "default_form": 54,
+  "skills": [7, 15, 14]
+}

@@ -1,0 +1,11 @@
+[package]
+name = "wf-modscript"
+description = "Rhai backend of wf-core's mod hooks (scripted skills, projectiles, AI nodes): pure, integer-only, deterministic on every target"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+wf-core = { path = "../wf-core" }
+# the same configuration as wf-script-rhai: integer-only (i32), no clock, no modules
+rhai = { version = "1.26", default-features = false, features = ["std", "no_float", "no_time", "no_module", "no_custom_syntax", "only_i32"] }

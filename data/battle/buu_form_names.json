@@ -1,0 +1,383 @@
+{
+ "source": "tools/battle/gen_buu_names.py (ROM: form table 0x086B82EC, Dojo roster 0x0872BFCC, strings 116..147)",
+ "forms": {
+  "0": {
+   "name": "Goku",
+   "char": "Goku",
+   "hud": "GOKU",
+   "gfx": 115,
+   "source": "Dojo roster entry 0 (gfx 115) -> string 116"
+  },
+  "1": {
+   "name": "Goku",
+   "char": "Goku",
+   "hud": "GOKU",
+   "gfx": 116,
+   "source": "form +2 string 158 (no Dojo entry for gfx 116)"
+  },
+  "2": {
+   "name": "Goku",
+   "char": "Goku",
+   "hud": "GOKU",
+   "gfx": 117,
+   "source": "gfx 117 = the halo variant of Dojo entry 0 (gfx 115)"
+  },
+  "3": {
+   "name": "SS Goku",
+   "char": "Goku",
+   "hud": "GOKU",
+   "gfx": 118,
+   "source": "Dojo roster entry 1 (gfx 118) -> string 117"
+  },
+  "4": {
+   "name": "SS Goku",
+   "char": "Goku",
+   "hud": "GOKU",
+   "gfx": 119,
+   "source": "gfx 119 = the halo variant of Dojo entry 1 (gfx 118)"
+  },
+  "5": {
+   "name": "SS3 Goku",
+   "char": "Goku",
+   "hud": "GOKU",
+   "gfx": 120,
+   "source": "Dojo roster entry 2 (gfx 120) -> string 118"
+  },
+  "6": {
+   "name": "SS3 Goku",
+   "char": "Goku",
+   "hud": "GOKU",
+   "gfx": 121,
+   "source": "gfx 121 = the halo variant of Dojo entry 2 (gfx 120)"
+  },
+  "7": {
+   "name": "SS3 Goku",
+   "char": "Goku",
+   "hud": "GOKU",
+   "gfx": 121,
+   "source": "gfx 121 = the halo variant of Dojo entry 2 (gfx 120)"
+  },
+  "8": {
+   "name": "SS3 Goku",
+   "char": "Goku",
+   "hud": "GOKU",
+   "gfx": 120,
+   "source": "Dojo roster entry 2 (gfx 120) -> string 118"
+  },
+  "9": {
+   "name": "Gohan",
+   "char": "Gohan",
+   "hud": "GOHAN",
+   "gfx": 106,
+   "source": "form +2 string 159 (no Dojo entry for gfx 106)"
+  },
+  "10": {
+   "name": "Teen Gohan",
+   "char": "Gohan",
+   "hud": "GOHAN",
+   "gfx": 107,
+   "source": "Dojo roster entry 3 (gfx 107) -> string 119"
+  },
+  "11": {
+   "name": "Gohan",
+   "char": "Gohan",
+   "hud": "GOHAN",
+   "gfx": 108,
+   "source": "form +2 string 159 (no Dojo entry for gfx 108)"
+  },
+  "12": {
+   "name": "Gohan",
+   "char": "Gohan",
+   "hud": "GOHAN",
+   "gfx": 109,
+   "source": "form +2 string 159 (no Dojo entry for gfx 109)"
+  },
+  "13": {
+   "name": "Mystic Gohan",
+   "char": "Gohan",
+   "hud": "GOHAN",
+   "gfx": 110,
+   "source": "Dojo roster entry 5 (gfx 110) -> string 121"
+  },
+  "14": {
+   "name": "Great Saiyaman",
+   "char": "Gohan",
+   "hud": "GOHAN",
+   "gfx": 111,
+   "source": "Dojo roster entry 6 (gfx 111) -> string 122"
+  },
+  "15": {
+   "name": "Gohan",
+   "char": "Gohan",
+   "hud": "GOHAN",
+   "gfx": 112,
+   "source": "Dojo roster entry 7 (gfx 112) -> string 123"
+  },
+  "16": {
+   "name": "SS Teen Gohan",
+   "char": "Gohan",
+   "hud": "GOHAN",
+   "gfx": 113,
+   "source": "Dojo roster entry 4 (gfx 113) -> string 120"
+  },
+  "17": {
+   "name": "SS Teen Gohan",
+   "char": "Gohan",
+   "hud": "GOHAN",
+   "gfx": 113,
+   "source": "Dojo roster entry 4 (gfx 113) -> string 120"
+  },
+  "18": {
+   "name": "SS Gohan",
+   "char": "Gohan",
+   "hud": "GOHAN",
+   "gfx": 114,
+   "source": "Dojo roster entry 8 (gfx 114) -> string 124"
+  },
+  "19": {
+   "name": "Goten",
+   "char": "Goten",
+   "hud": "GOTEN",
+   "gfx": 123,
+   "source": "Dojo roster entry 13 (gfx 123) -> string 129"
+  },
+  "20": {
+   "name": "SS Goten",
+   "char": "Goten",
+   "hud": "GOTEN",
+   "gfx": 124,
+   "source": "Dojo roster entry 14 (gfx 124) -> string 130"
+  },
+  "21": {
+   "name": "Trunks",
+   "char": "Trunks",
+   "hud": "TRUNKS",
+   "gfx": 269,
+   "source": "Dojo roster entry 9 (gfx 269) -> string 125"
+  },
+  "22": {
+   "name": "SS Trunks",
+   "char": "Trunks",
+   "hud": "TRUNKS",
+   "gfx": 270,
+   "source": "Dojo roster entry 10 (gfx 270) -> string 126"
+  },
+  "23": {
+   "name": "Trunks",
+   "char": "Trunks",
+   "hud": "TRUNKS",
+   "gfx": 271,
+   "source": "form +2 string 161 (no Dojo entry for gfx 271)"
+  },
+  "24": {
+   "name": "Trunks",
+   "char": "Trunks",
+   "hud": "TRUNKS",
+   "gfx": 269,
+   "source": "Dojo roster entry 9 (gfx 269) -> string 125"
+  },
+  "25": {
+   "name": "SS Trunks",
+   "char": "Trunks",
+   "hud": "TRUNKS",
+   "gfx": 270,
+   "source": "Dojo roster entry 10 (gfx 270) -> string 126"
+  },
+  "26": {
+   "name": "Vegeta",
+   "char": "Vegeta",
+   "hud": "VEGETA",
+   "gfx": 279,
+   "source": "Dojo roster entry 11 (gfx 279) -> string 127"
+  },
+  "27": {
+   "name": "Vegeta",
+   "char": "Vegeta",
+   "hud": "VEGETA",
+   "gfx": 280,
+   "source": "gfx 280 = the halo variant of Dojo entry 11 (gfx 279)"
+  },
+  "28": {
+   "name": "SS Vegeta",
+   "char": "Vegeta",
+   "hud": "VEGETA",
+   "gfx": 282,
+   "source": "Dojo roster entry 12 (gfx 282) -> string 128"
+  },
+  "29": {
+   "name": "SS Vegeta",
+   "char": "Vegeta",
+   "hud": "VEGETA",
+   "gfx": 283,
+   "source": "gfx 283 = the halo variant of Dojo entry 12 (gfx 282)"
+  },
+  "30": {
+   "name": "SS Vegeta",
+   "char": "Vegeta",
+   "hud": "VEGETA",
+   "gfx": 282,
+   "source": "Dojo roster entry 12 (gfx 282) -> string 128"
+  },
+  "31": {
+   "name": "Gotenks",
+   "char": "Gotenks",
+   "hud": "GOTENKS",
+   "gfx": 126,
+   "source": "Dojo roster entry 15 (gfx 126) -> string 131"
+  },
+  "32": {
+   "name": "Gotenks",
+   "char": "Gotenks",
+   "hud": "GOTENKS",
+   "gfx": 127,
+   "source": "form +2 string 163 (no Dojo entry for gfx 127)"
+  },
+  "33": {
+   "name": "Gotenks",
+   "char": "Gotenks",
+   "hud": "GOTENKS",
+   "gfx": 128,
+   "source": "form +2 string 163 (no Dojo entry for gfx 128)"
+  },
+  "34": {
+   "name": "SS Gotenks",
+   "char": "Gotenks",
+   "hud": "GOTENKS",
+   "gfx": 129,
+   "source": "Dojo roster entry 16 (gfx 129) -> string 132"
+  },
+  "35": {
+   "name": "SS3 Gotenks",
+   "char": "Gotenks",
+   "hud": "GOTENKS",
+   "gfx": 130,
+   "source": "Dojo roster entry 17 (gfx 130) -> string 133"
+  },
+  "36": {
+   "name": "Gotenks",
+   "char": "Gotenks",
+   "hud": "GOTENKS",
+   "gfx": 126,
+   "source": "Dojo roster entry 15 (gfx 126) -> string 131"
+  },
+  "37": {
+   "name": "SS Gotenks",
+   "char": "Gotenks",
+   "hud": "GOTENKS",
+   "gfx": 129,
+   "source": "Dojo roster entry 16 (gfx 129) -> string 132"
+  },
+  "38": {
+   "name": "SS3 Gotenks",
+   "char": "Gotenks",
+   "hud": "GOTENKS",
+   "gfx": 130,
+   "source": "Dojo roster entry 17 (gfx 130) -> string 133"
+  },
+  "39": {
+   "name": "Vegito",
+   "char": "Vegito",
+   "hud": "VEGITO",
+   "gfx": 284,
+   "source": "Dojo roster entry 18 (gfx 284) -> string 134"
+  },
+  "40": {
+   "name": "SS Vegito",
+   "char": "Vegito",
+   "hud": "VEGITO",
+   "gfx": 285,
+   "source": "Dojo roster entry 19 (gfx 285) -> string 135"
+  },
+  "41": {
+   "name": "SS Gogeta",
+   "char": "Gogeta",
+   "hud": "GOGETA",
+   "gfx": 102,
+   "source": "Dojo roster entry 20 (gfx 102) -> string 136"
+  },
+  "42": {
+   "name": "Gogeta",
+   "char": "Gogeta",
+   "hud": "GOGETA",
+   "gfx": 104,
+   "source": "form +2 string 165 (no Dojo entry for gfx 104)"
+  },
+  "43": {
+   "name": "Gogeta",
+   "char": "Gogeta",
+   "hud": "GOGETA",
+   "gfx": 105,
+   "source": "form +2 string 165 (no Dojo entry for gfx 105)"
+  },
+  "44": {
+   "name": "SS Gogeta",
+   "char": "Gogeta",
+   "hud": "GOGETA",
+   "gfx": 102,
+   "source": "Dojo roster entry 20 (gfx 102) -> string 136"
+  },
+  "45": {
+   "name": "",
+   "char": "",
+   "hud": "",
+   "gfx": 0,
+   "source": "form +2 string 0 (no Dojo entry for gfx 0)"
+  },
+  "46": {
+   "name": "Android 18",
+   "char": "Android 18",
+   "hud": "ANDROID 18",
+   "gfx": 16,
+   "source": "form +2 string 166 (no Dojo entry for gfx 16)"
+  },
+  "47": {
+   "name": "Hercule",
+   "char": "Hercule",
+   "hud": "HERCULE",
+   "gfx": 138,
+   "source": "Dojo roster entry 21 (gfx 138) -> string 137"
+  },
+  "48": {
+   "name": "Krillin",
+   "char": "Krillin",
+   "hud": "KRILLIN",
+   "gfx": 166,
+   "source": "form +2 string 168 (no Dojo entry for gfx 166)"
+  },
+  "49": {
+   "name": "Piccolo",
+   "char": "Piccolo",
+   "hud": "PICCOLO",
+   "gfx": 222,
+   "source": "Dojo roster entry 24 (gfx 222) -> string 140"
+  },
+  "50": {
+   "name": "Pikkon",
+   "char": "Pikkon",
+   "hud": "PIKKON",
+   "gfx": 224,
+   "source": "Dojo roster entry 23 (gfx 224) -> string 139"
+  },
+  "51": {
+   "name": "Tien",
+   "char": "Tien",
+   "hud": "TIEN",
+   "gfx": 264,
+   "source": "form +2 string 171 (no Dojo entry for gfx 264)"
+  },
+  "52": {
+   "name": "Videl",
+   "char": "Videl",
+   "hud": "VIDEL",
+   "gfx": 287,
+   "source": "Dojo roster entry 22 (gfx 287) -> string 138"
+  },
+  "53": {
+   "name": "Yamcha",
+   "char": "Yamcha",
+   "hud": "YAMCHA",
+   "gfx": 302,
+   "source": "form +2 string 173 (no Dojo entry for gfx 302)"
+  }
+ }
+}

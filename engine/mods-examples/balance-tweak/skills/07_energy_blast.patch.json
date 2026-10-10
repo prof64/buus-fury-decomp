@@ -1,0 +1,7 @@
+{
+  "description": "Press the B Button to shoot a concentrated missile of internal energy. (Balance tweak: costs a flat 20 EP and hits twice as hard.)",
+  "engine": {
+    "cost": [20],
+    "damage": [2048]
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "id": "homing_orb",
+  "sheet": "effects/mod_orb",
+  "frames": [[0, 1], [4, 5], [8], [9, 10]],
+  "rate": 4,
+  "end_frames": [12],
+  "end_time": 8,
+  "speed": 640,
+  "accel": 24,
+  "max_speed": 1280,
+  "homing": 28,
+  "homing_range": 180,
+  "homing_delay": 6,
+  "life": 110,
+  "hit_box": [12, 12],
+  "pierce": 0,
+  "wall": "explode",
+  "damage": 700,
+  "attack_sub": 4,
+  "sfx_hit": 48
+}

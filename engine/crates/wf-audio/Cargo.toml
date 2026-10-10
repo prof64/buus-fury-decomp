@@ -1,0 +1,11 @@
+[package]
+name = "wf-audio"
+description = "Webfoot sound driver: song/SFX data from the ROM, software synthesizer (sequence + samples -> PCM)"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+wf-rom.workspace = true
+serde_json.workspace = true
+serde.workspace = true

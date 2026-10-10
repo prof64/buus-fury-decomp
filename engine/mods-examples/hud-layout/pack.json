@@ -1,0 +1,6 @@
+{
+  "id": "hud-layout",
+  "name": "HUD layout: the HUD in the bottom-right corner, a recoloured skill-icon set",
+  "format_version": 1,
+  "depends": ["base"]
+}

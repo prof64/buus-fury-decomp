@@ -1,0 +1,1798 @@
+{
+ "meta": {
+  "generator": "re/buu/extract_ai.py (library re/buu/ai_decode.py)",
+  "state_table": "0x870f514",
+  "enemy_table": "0x8711274",
+  "enemy_initial_state_offset": "+0x08",
+  "node_def_layout": "[create_fn, f1, f2, params from +0xC..., child def pointers]",
+  "execution": "each enemy runs the tree of the state on top of its AI stack (obj+0x238) once per frame; update returns 0 = running, non-zero = finished; GotoState replaces the state, PushState pushes; SubState inlines another state tree",
+  "units": {
+   "dist2": "squared px (radius = sqrt)",
+   "frames": "frames (1/60 s)",
+   "prob16": "probability p/65536 per frame",
+   "speed256": "1/256 px per frame",
+   "frac16": "fraction p/65536",
+   "count": "integer",
+   "state": "AI state id",
+   "px": "pixels",
+   "enemy_type": "enemy type index (0x08711274)",
+   "raw": "raw value (meaning in sem)"
+  },
+  "verified": [
+   {
+    "enemy": "Majin Fighter 0x44",
+    "scene": "buu_fight_swforest.ss (8,3)",
+    "checks": [
+     "aggro: leaves state 0x14B at dx<=100, not at 104 (IfPlayerWithin2 r2=10000 -> 100 px)",
+     "ChasePlayer 153/256: 0.5977 px/frame is the modal per-frame step",
+     "attack state 0x14E (MeleeAttack + Wait 18) lasts 41-47 frames; one hit object spawned on entry"
+    ]
+   },
+   {
+    "enemy": "Gunman 0x2C",
+    "scene": "warp East District 439 (2,10)",
+    "checks": [
+     "aggro 88 px (yes at 88, no at 92)",
+     "ChasePlayer 256/256: 1.0 px/frame over 589 frames",
+     "shot state 0xF4 (Align, Wait 30, GunShot 16 f) lasts 50-51 f; bullet spawned 35 f after entry",
+     "melee state 0xEF lasts 29 f"
+    ]
+   },
+   {
+    "enemy": "Mercenary 0x4B",
+    "scene": "warp East District 439 (2,14)",
+    "checks": [
+     "aggro 72 px (IfPlayerWithin r2=5184; yes at 72, no at 76)",
+     "state 0x178 (RifleShot 32 f + Wait 90) lasts exactly 123 f, bullet 8 f after entry",
+     "MISMATCH: while AlignWithPlayer(153) runs the enemy moves 0.5 px/frame, so that node speed unit is unconfirmed"
+    ]
+   },
+   {
+    "enemy": "Ghost 0x20",
+    "scene": "warp Pilaf's Castle (10,8)",
+    "checks": [
+     "Wander speed 128/256: 0.5 px/frame for 848 frames",
+     "state 0xD8 -> 0xD9 unconditional (SpawnPuff)"
+    ]
+   },
+   {
+    "enemy": "Spopovich 0x6D (transplant)",
+    "scene": "buu_fight_swforest.ss",
+    "checks": [
+     "aggro 100 px",
+     "WalkToPlayer 153/256: 0.5977 px/frame over 316 frames"
+    ]
+   },
+   {
+    "enemy": "Yakon 0x91 (transplant)",
+    "scene": "buu_fight_swforest.ss",
+    "checks": [
+     "no aggro radius (MarkTime -> wander state immediately)",
+     "Wander 204/256: 0.7969 px/frame",
+     "combo state 0x322: 6 MeleeAttacks (6 hit objects ~20 f apart) over 161 f"
+    ]
+   },
+   {
+    "enemy": "Dabura 0x12 / Pui Pui 0x60 (transplant)",
+    "scene": "buu_fight_swforest.ss",
+    "checks": [
+     "Dabura melee state 0x71 lasts 28-34 f; no aggro radius",
+     "Pui Pui runs the generic fighter tree (identical timings to Majin Fighter, aggro 100 px)"
+    ]
+   }
+  ],
+  "status_legend": {
+   "VERIFIED": "measured in the emulator",
+   "DISASM": "read from the code",
+   "INFERRED": "semantics guessed from partial reading",
+   "AUTO": "automatic analysis only"
+  }
+ },
+ "registry": {
+  "0x8018f91": {
+   "name": "Sequence",
+   "kind": "composite",
+   "status": "DISASM",
+   "sem": "run children one at a time in order; finished when the last child finishes",
+   "children": "list"
+  },
+  "0x80191c7": {
+   "name": "ParallelAll",
+   "kind": "composite",
+   "status": "DISASM",
+   "sem": "update every child each frame; finished when all children have finished",
+   "children": "list"
+  },
+  "0x80191e9": {
+   "name": "ParallelAny",
+   "kind": "composite",
+   "status": "DISASM",
+   "sem": "update every child each frame; finished as soon as any child finishes",
+   "children": "list"
+  },
+  "0x801920f": {
+   "name": "Selector",
+   "kind": "composite",
+   "status": "DISASM",
+   "sem": "each frame update children in order until one returns non-zero (then return 1); typically a list of guarded decorators = priority list",
+   "children": "list"
+  },
+  "0x801890b": {
+   "name": "GotoState",
+   "kind": "transition",
+   "status": "VERIFIED",
+   "sem": "replace the current AI state (enemy vfunc +0x68 -> 0x0800AA4A); returns 1",
+   "params": [
+    [
+     12,
+     "state",
+     "state"
+    ]
+   ]
+  },
+  "0x8019285": {
+   "name": "SubState",
+   "kind": "inline",
+   "status": "DISASM",
+   "sem": "run state <state>'s behaviour tree in place (a reusable sub-tree)",
+   "params": [
+    [
+     12,
+     "state",
+     "state"
+    ]
+   ]
+  },
+  "0x80188a9": {
+   "name": "Chance",
+   "kind": "cond",
+   "status": "DISASM",
+   "sem": "each frame: rand16 < p -> run child (p/65536 per frame)",
+   "params": [
+    [
+     12,
+     "p",
+     "prob16"
+    ]
+   ],
+   "children": [
+    16
+   ]
+  },
+  "0x8029661": {
+   "name": "IfPlayerFarther",
+   "kind": "cond",
+   "status": "DISASM",
+   "sem": "player centre further than sqrt(r2) px",
+   "params": [
+    [
+     12,
+     "r2",
+     "dist2"
+    ]
+   ],
+   "children": [
+    16
+   ]
+  },
+  "0x8029c65": {
+   "name": "IfPlayerWithin",
+   "kind": "cond",
+   "status": "VERIFIED",
+   "sem": "player centre within sqrt(r2) px (aggro radius)",
+   "params": [
+    [
+     12,
+     "r2",
+     "dist2"
+    ]
+   ],
+   "children": [
+    16
+   ]
+  },
+  "0x8029d15": {
+   "name": "IfPlayerWithin2",
+   "kind": "cond",
+   "status": "VERIFIED",
+   "sem": "player within sqrt(r2) px (variant using bbox centres)",
+   "params": [
+    [
+     12,
+     "r2",
+     "dist2"
+    ]
+   ],
+   "children": [
+    16
+   ]
+  },
+  "0x8039855": {
+   "name": "IfTimeInState",
+   "kind": "cond",
+   "status": "DISASM",
+   "sem": "frames since obj+0x210 stamp (state entry / end of block) > frames",
+   "params": [
+    [
+     12,
+     "frames",
+     "frames"
+    ]
+   ],
+   "children": [
+    16
+   ]
+  },
+  "0x802aa3d": {
+   "name": "IfCooldownOver",
+   "kind": "cond",
+   "status": "DISASM",
+   "sem": "now - obj+0x1E8 (set by MarkTime) > frames",
+   "params": [
+    [
+     12,
+     "frames",
+     "frames"
+    ]
+   ],
+   "children": [
+    16
+   ]
+  },
+  "0x8029e7d": {
+   "name": "IfCounterEq",
+   "kind": "cond",
+   "status": "DISASM",
+   "sem": "obj+0x1E4 counter == n",
+   "params": [
+    [
+     12,
+     "n",
+     "count"
+    ]
+   ],
+   "children": [
+    16
+   ]
+  },
+  "0x802aad1": {
+   "name": "IfGlobalFlag",
+   "kind": "cond",
+   "status": "DISASM",
+   "sem": "global [0x03002FE4] > 0 (arena/boss event flag)",
+   "children": [
+    12
+   ]
+  },
+  "0x80299dd": {
+   "name": "IfHpBelow",
+   "kind": "cond",
+   "status": "DISASM",
+   "sem": "on enter threshold = frac*maxHP>>16; true while HP (obj+0x28C) < threshold",
+   "params": [
+    [
+     12,
+     "frac",
+     "frac16"
+    ]
+   ],
+   "children": [
+    16
+   ]
+  },
+  "0x8029bb7": {
+   "name": "IfPlayerAttackingMe",
+   "kind": "cond",
+   "status": "DISASM",
+   "sem": "player in an attack state (0x03001B50) and player bbox (+8 px) overlaps the enemy",
+   "children": [
+    12
+   ]
+  },
+  "0x8029b31": {
+   "name": "IfInPlayerBeamLine",
+   "kind": "cond",
+   "status": "DISASM",
+   "sem": "player faces the enemy, player state vfunc[0x1C] true (charging/firing) and the enemy is in a 240 px corridor (+-4 px) in front of the player -> used to dodge beams",
+   "children": [
+    12
+   ]
+  },
+  "0x802692d": {
+   "name": "IfAxisAligned",
+   "kind": "cond",
+   "status": "DISASM",
+   "sem": "player attackable (+0x1CC) and |dx| < 16 or |dy| < 16 px (lined up for a shot)",
+   "children": [
+    12
+   ]
+  },
+  "0x8029fe7": {
+   "name": "IfPlayerInMeleeRange",
+   "kind": "cond",
+   "status": "DISASM",
+   "sem": "player attackable and player bbox touches the enemy bbox grown by ~3-6 px; turns the enemy (obj+0x10) toward the player on the dominant axis",
+   "children": [
+    12
+   ]
+  },
+  "0x803d479": {
+   "name": "IfPlayerInFront",
+   "kind": "cond",
+   "status": "INFERRED",
+   "sem": "player attackable and inside a box in front of the enemy (sets facing)",
+   "children": [
+    12
+   ]
+  },
+  "0x8037a05": {
+   "name": "IfPlayerInZone",
+   "kind": "cond",
+   "status": "DISASM",
+   "sem": "player bbox inside the area rectangle at [[0x0876BA3C]+0x18] (sniper zone)",
+   "children": [
+    12
+   ]
+  },
+  "0x8033f05": {
+   "name": "IfPlayerInRoomZone",
+   "kind": "cond",
+   "status": "INFERRED",
+   "sem": "player inside the trigger region of global object [0x087593C8]+0x80 (vampire lair)",
+   "children": [
+    12
+   ]
+  },
+  "0x8018c09": {
+   "name": "Wait",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "do nothing for <frames> frames, then finish",
+   "params": [
+    [
+     12,
+     "frames",
+     "frames"
+    ]
+   ]
+  },
+  "0x801d09d": {
+   "name": "Succeed",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "returns 1 immediately (singleton 0x03002BD0)"
+  },
+  "0x800a9b1": {
+   "name": "Idle",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "returns 0 forever (singleton 0x03001AF4)"
+  },
+  "0x8019269": {
+   "name": "StandStill",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "switch to the idle anim/state 0 (singleton 0x03002BA8); returns 1"
+  },
+  "0x8018837": {
+   "name": "Block",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "guard pose (anim state 7) with obj+0x1C8=1 (blocking) while running; exit clears it and stamps obj+0x210"
+  },
+  "0x802aa1b": {
+   "name": "MarkTime",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "obj+0x1E8 = frame counter (starts a cooldown)"
+  },
+  "0x8029ec1": {
+   "name": "IncCounter",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "obj+0x1E4 += 1; returns 1"
+  },
+  "0x802968d": {
+   "name": "SetCounter",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "obj+0x1E4 = n",
+   "params": [
+    [
+     12,
+     "n",
+     "count"
+    ]
+   ]
+  },
+  "0x801d047": {
+   "name": "FacePlayer",
+   "kind": "action",
+   "status": "INFERRED",
+   "sem": "sends event vt 0x0804AE70 {player} to the enemy (obj+0x18C) -> turn toward player; returns 1"
+  },
+  "0x802a09f": {
+   "name": "ChasePlayer",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "path-find toward the player (0x0803BB00/0x0803BB48, re-path every 8 frames); stops (state 0, returns 0) within ~2 px; footstep sounds for some gfx ids",
+   "params": [
+    [
+     12,
+     "speed",
+     "speed256"
+    ]
+   ]
+  },
+  "0x8018e29": {
+   "name": "StepTowardPlayer",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "face the player and walk straight at it (walk anim state 1)",
+   "params": [
+    [
+     12,
+     "speed",
+     "speed256"
+    ]
+   ]
+  },
+  "0x801cda1": {
+   "name": "StepAwayFromPlayer",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "walk directly away from the player (keep distance / flee)",
+   "params": [
+    [
+     12,
+     "speed",
+     "speed256"
+    ]
+   ]
+  },
+  "0x801cfdb": {
+   "name": "AlignWithPlayer",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "strafe on the minor axis (the axis with the smaller player offset) by exactly speed/256 px per frame (pos += (0, +-speed) then collision try-move vfunc +0x54), facing up/down while moving; when the minor offset < 3 px it faces the player on the major axis and returns 1. Footstep sound for gfx 0x4E/0x11/0x4C at counter 0/16. VERIFIED bv_regular_align.py: Mercenary 153 -> 153/256 px/f (53 frames), Majin/Shield Soldier 204 -> 204/256 px/f; the earlier 0.5 px/f reading was contaminated by other movement",
+   "params": [
+    [
+     12,
+     "speed",
+     "speed256"
+    ]
+   ]
+  },
+  "0x802b7c7": {
+   "name": "Wander",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "walk in a random direction (0..3, table 0x08752EB4); each frame rand16 < turn_p picks a new direction",
+   "params": [
+    [
+     12,
+     "turn_p",
+     "prob16"
+    ],
+    [
+     16,
+     "speed",
+     "speed256"
+    ]
+   ]
+  },
+  "0x802a289": {
+   "name": "MeleeAttack",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "punch/kick: anim 0..3 chosen from the gfx def (+0x64/+0x68/+0x6C); hit box in front built from attack data 0x086B8098 (melee, mult 0x400 = x1.0 of the enemy STR formula); finishes when the anim ends"
+  },
+  "0x802b89d": {
+   "name": "KiBlast",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "controller 0x03003068: anim state 3; frame 16 fires projectile 0x08019858 (3 px/frame, dir table 0x08719C40); frame 32 back to idle"
+  },
+  "0x80299a3": {
+   "name": "RunMotionController",
+   "kind": "action",
+   "status": "INFERRED",
+   "sem": "ticks the controller object at obj+0x22C forever (never finishes)"
+  },
+  "0x8033bb3": {
+   "name": "VampireSummon",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "if the pool [0x08759360] has room spawn data 0x086FD9D0 at the enemy centre (bats / minions, random 0x1000..0x1FFF param); exit restores the gfx anim; finishes immediately"
+  },
+  "0x803396f": {
+   "name": "VampireSummon2",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "like VampireSummon with pool [0x08759320]"
+  },
+  "0x8018877": {
+   "name": "PushState",
+   "kind": "transition",
+   "status": "DISASM",
+   "sem": "push AI state <state> on the enemy AI stack (vfunc +0x6C); returns 0",
+   "params": [
+    [
+     12,
+     "state",
+     "state"
+    ]
+   ]
+  },
+  "0x802d091": {
+   "name": "WalkToPlayer",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "Spopovich: straight-line move toward the player at speed (normalised vector, collision checked); faces the player on the dominant axis; finished within 8 px",
+   "params": [
+    [
+     12,
+     "speed",
+     "speed256"
+    ]
+   ]
+  },
+  "0x8035051": {
+   "name": "FlyToPlayer",
+   "kind": "action",
+   "status": "INFERRED",
+   "sem": "vampires: normalised move toward the player ignoring walls (same maths as WalkToPlayer)",
+   "params": [
+    [
+     12,
+     "speed",
+     "speed256"
+    ]
+   ]
+  },
+  "0x80265e9": {
+   "name": "GunShot",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "face player; controller 0x03002FC4: anim 0x12, frame 4 spawns a bullet (data 0x0874CA38, builder 0x080274B4, sound 0x083193F8) if the pool has room; frame 16 back to idle"
+  },
+  "0x8026869": {
+   "name": "RifleShot",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "face player; controller 0x03002FD8: anim 0x12, frame 8 spawns a bullet (data 0x0874CA9C); frame 32 back to idle"
+  },
+  "0x8026739": {
+   "name": "SoldierThrow",
+   "kind": "action",
+   "status": "INFERRED",
+   "sem": "face player; controller 0x03002FCC: anim 0x13, spawns projectile data 0x0874CA6C (frame thresholds 2/8/32)"
+  },
+  "0x802e037": {
+   "name": "GhostAnimA",
+   "kind": "action",
+   "status": "INFERRED",
+   "sem": "ghosts: anim 0x12 then a gfx-specific one-shot anim (0x60->0x5E, 0xDC->0xDB, 0xE5->0xE4) -- vanish/appear"
+  },
+  "0x802e09f": {
+   "name": "GhostAnimB",
+   "kind": "action",
+   "status": "INFERRED",
+   "sem": "ghosts: counterpart of GhostAnimA"
+  },
+  "0x802f21d": {
+   "name": "SpawnPuff",
+   "kind": "action",
+   "status": "INFERRED",
+   "sem": "enter: one-shot visual effect at the enemy centre (0x0800F924, flag obj+0x291); returns 1"
+  },
+  "0x802ad35": {
+   "name": "BuuStretchPunch",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "needs player HP > 0 and player+0x1CC != 0 (player in a normal idle/walk/attack state, set by player state enters e.g. 0x08012FE6 when record+0x67 == 0); else finishes at once. Faces player, anim 0x13, controller 0x03003004: frames 0-7 wind-up, 8-55 charge (anim frames 1/2 alternate), 56-71 release; frame 64 spawns the stretch-arm hitbox (builder 0x08028C04, vtable 0x0804CDD4) at the per-facing offset table 0x08752D6C (other table +0x28 when the sprite is gfx 0x2B); from frame 72 waits until that object is gone, then idle",
+   "timing": {
+    "spawn_frame": 64,
+    "hit_frame_at_80px": 71,
+    "arm_life": 15,
+    "state_total_frames": 81
+   },
+   "projectile": "buu_stretch"
+  },
+  "0x802b3b5": {
+   "name": "CandyBeam",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "same player-state precondition as BuuStretchPunch. Faces player, anim 0x12, controller 0x0300304C: frame 16 spawns the candy beam (builder 0x080286D4, vtable 0x0804B3AC, offsets 0x08752E28 / +0x24 for gfx 0x2B); from frame 32 waits for the beam to vanish. The beam hit uses attack type 0x086B8090 (energy, sub 1) with multiplier 0 -> 0 damage, and turns the player into candy: global [0x03002FE4] = 300 (frames, counts down 1/frame), player controller vtable 0x0804BE60",
+   "timing": {
+    "spawn_frame": 16,
+    "hit_frame_at_80px": 25,
+    "beam_life": 19,
+    "state_total_frames": 36
+   },
+   "projectile": "buu_candy_beam"
+  },
+  "0x802b1fd": {
+   "name": "EatCandy",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "used when the player is candy and within 24 px. Faces player, anim 0x14, controller 0x0300303C (120 frames): frame 0 stores the player position (0x03003044/48) and takes the player out of play (player controller -> 12-byte holder 0x0804C2CC); frames 24..111, every 8th frame: d = min(POW_boss >> 2, playerHP); active character HP -= d (never below 1: at 0 it is set to 1 and flag 0x03003038 = 1) and the boss heals d (enemy vfunc +0x60 with d<<10); frame 120 puts the player back at the stored position in the normal state",
+   "timing": {
+    "total": 120,
+    "first_tick": 24,
+    "tick_every": 8,
+    "ticks": 11
+   }
+  },
+  "0x802b5b1": {
+   "name": "IfBuuPacified",
+   "kind": "cond",
+   "status": "DISASM",
+   "sem": "true while the word [0x0300302C] != 0 (Majin Buu then wanders: state 0xC2/0xA2). The only literal writer found stores 0 (Babidi hover enter 0x0802AD88); the setter is probably a story script [INFERRED]. Never set during force-spawned fights (VERIFIED: stays 0)",
+   "children": [
+    12
+   ]
+  },
+  "0x8030157": {
+   "name": "IfPlayerBlastIncoming",
+   "kind": "cond",
+   "status": "DISASM",
+   "sem": "object [0x03001B94] (the player's current projectile) exists, flies opposite to the boss facing (dir ^ 1 == boss dir), its vfunc +0x20 returns 4 (Energy Blast kind) and its bbox overlaps a 240 px long, 8 px wider corridor in front of the boss",
+   "children": [
+    12
+   ]
+  },
+  "0x802ff97": {
+   "name": "AbsorbStance",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "anim 0x15, controller 0x03003128: 8 pose frames, then 0x0800EE78 parks the boss in the hold controller 0x03001BA4. Followed in the tree by Wait 180 + StandStill. The state's on-hit tree (aux 0x0870A378) catches Energy Blast hits (attack byte 4): no HP loss (VERIFIED: 29716 computed, HP unchanged), goes to state 0x256 (AbsorbPose + Wait 60); a 2nd Energy Blast there -> 0x257 (AbsorbPose2 + Wait 24) -> 0x258. Melee still hurts (VERIFIED -40 HP) and triggers Block"
+  },
+  "0x802ffd9": {
+   "name": "AbsorbPose",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "anim 0x15 with controller 0x03003130 (frame marks 4/12). on_hit (f1 0x0802FFDD): broadcasts world message 0x1D to all objects (0x08011C70; the player blast accepts it and vanishes) and returns 1 (hit absorbed)",
+   "on_hit": "message 0x1D: absorb the blast"
+  },
+  "0x802ff51": {
+   "name": "AbsorbPose2",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "anim 0x15, controller 0x03003120. on_hit (f1 0x0802FF55): world message 0x1E, returns 1",
+   "on_hit": "message 0x1E: absorb the 2nd blast"
+  },
+  "0x802fff9": {
+   "name": "AbsorbRecover",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "anim 0x0E played once (controller 0x03001B20); used in state 0x258 together with a 180-frame cooldown"
+  },
+  "0x803017d": {
+   "name": "RevertPalette",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "if the palette (obj+0x38) is not gfx 0x31's, switch back to it (0x0800EECC); returns at once. Phase-2 Super Buu uses it after absorbing 2 blasts (state 0x269) -> back to the phase-1 states"
+  },
+  "0x8030185": {
+   "name": "SuperBuuPowerUp",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "switch palette to gfx 0x32's (0x0800EECC) and play anim 0x0C once (idle controller 0x03001B30). Stats/resists unchanged (VERIFIED 50/65/55/55, 128/128); the tree then jumps to the faster phase-2 state set",
+   "timing": {
+    "total": 55
+   }
+  },
+  "0x803923b": {
+   "name": "IfChildCount",
+   "kind": "cond",
+   "status": "DISASM",
+   "sem": "counts the boss's summoned children (linked list obj+0x1F0, next = child+0x1F8); true when count == n",
+   "params": [
+    [
+     12,
+     "n",
+     "count"
+    ]
+   ],
+   "children": [
+    16
+   ]
+  },
+  "0x803934b": {
+   "name": "SummonMinion",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "anim 0x12, controller 0x030032A0: frame 40 creates enemy type 0x0D (enemy def 0x087113E0: 100 HP, 0 XP) at the per-facing offset table 0x0877AE58 ((8,12),(8,-12),(-12,8),(12,8)), links it as a child (child+0x1F4 = parent); frame 72 back to idle",
+   "timing": {
+    "spawn_frame": 40,
+    "total": 72
+   }
+  },
+  "0x8039473": {
+   "name": "StaggerMinions",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "r = rand(8); every child in list order gets child+0x204 = (r + k) & 7 for k = 1, 2, ...; returns 1 (staggers the minions' kamikaze timing)"
+  },
+  "0x803c07b": {
+   "name": "GlideToWaypoint",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "Super Buu 0x77: waypoint index [0x030032EC] steps +-1 at random (rand(2)), wraps 0..4; target = table 0x0877B1BC (absolute map coords, 24.8: (224,104) (344,128) (120,128) (264,112) (144,144)); velocity = delta/60 per frame (60-frame glide, anim 0x0F, controller 0x03001B20, obj+8 = 0x24); boss+0x214 = index; faces the move direction. on_hit (f1 0x0803C08D): accepted (1) only when the player's current anim is slot 0x13 of its set, else 2 [INFERRED: player must be in a specific swing, i.e. bat the ball back]",
+   "timing": {
+    "glide": 60
+   },
+   "on_hit": "phase advance when accepted"
+  },
+  "0x803bf0f": {
+   "name": "ThrowBigBall",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "anim 0x10, controller object 0x0804D6CC: on enter spawns the ball (builder 0x08021280, data 0x0872A6A8, offsets 0x0877B180) 40 px above the boss; 60-frame charge; then aims at the player (0x080214DA) and throws; 32 frames later back to idle",
+   "timing": {
+    "charge": 60,
+    "recovery": 32
+   },
+   "projectile": "superbuu_ball"
+  },
+  "0x803c0bd": {
+   "name": "SuperBuuAnim0C",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "anim 0x0C played once (controller 0x03001B30); used between Super Buu 0x77 phases"
+  },
+  "0x80331b5": {
+   "name": "KidBuuKamehameha",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "faces player, anim 3, allocates motion controller vtable 0x0804C690: on enter creates the player beam class 0x080206B8 with level definition 0x0871DA68 (= Kamehameha level 0: 32x32, mult 41, attack sub 5) at offset table 0x0875925C; frame 8 fires (0x080207D2); ends after frame 90",
+   "timing": {
+    "fire_frame": 8,
+    "first_hit_at_40px": 10,
+    "end": 91
+   },
+   "projectile": "kidbuu_beam"
+  },
+  "0x8032f7d": {
+   "name": "KidBuuSplitAnim",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "anim 0x0C played once with the idle controller (55 frames) before the split"
+  },
+  "0x8032d2b": {
+   "name": "KidBuuSplit",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "up to 16 tries: d = (rand(192)-96, rand(192)-96); needs free ground at boss+d and boss-d (0x08009904); on success: effect 0x086FD9D0, boss moves to +d, HP<<10 = (HP<<10 + 1024) >> 1, and a new enemy type 0x3D (Kid Buu copy, 0 XP, starts in state 0x12A) appears at -d with the same HP. VERIFIED 125000 -> 62500.5 + 62500.5"
+  },
+  "0x8032f6d": {
+   "name": "KidBuuMerge",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "finds the other Kid Buu (gfx 0x2F, list 0x0875922C); HP += other HP; moves to the midpoint (if free), two effects 0x086FD9D0, removes the other. VERIFIED 62500.5 + 62500.5 -> 125001"
+  },
+  "0x80327ff": {
+   "name": "IfLastKidBuu",
+   "kind": "cond",
+   "status": "DISASM",
+   "sem": "0x08011CCA(list 0x087591D8, 5, gfx 0x2F) == 1, i.e. only one Kid Buu body is left",
+   "children": [
+    12
+   ]
+  },
+  "0x802aeab": {
+   "name": "BabidiGesture",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "if the sprite is in its default anim set: anim 0x13 looping (controller 0x03003024, frame counter wraps at 32); finished when the controller changes"
+  },
+  "0x802adaf": {
+   "name": "BabidiHover",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "enter clears [0x0300302C]; height (s16 obj+0x176) rises 1 px/frame to -50 (50 px up) and stays; anim frames 1/2 alternate every 8 frames; never finishes. VERIFIED: height -50; player punches do not connect while hovering"
+  },
+  "0x802b591": {
+   "name": "FollowMajinBuu",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "on enter finds Majin Buu (gfx 0x2B in list 0x08752E74); each frame, if the dominant-axis distance between their bbox centres is > dist, steps 1 px/frame toward him (wall-checked per axis) and faces him; never finishes",
+   "params": [
+    [
+     12,
+     "dist",
+     "px"
+    ]
+   ]
+  },
+  "0x8039d7b": {
+   "name": "JanembaSpawnParts",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "singleton 0x030032C4.  Creates the three body-part enemies from the spawn records at 0x0877AFDC (+0x20 each): type 0x34 (gfx 0x93), 0x35 (gfx 0x94), 0x37 (gfx 0x98) and links them boss+0x1F0 -> 0x37, 0x37+0x1F8 -> 0x34, 0x34+0x1F8 -> 0x35.  Measured offsets from the boss position: 0x34 (-12,-22), 0x35 (+44,-22), 0x37 (+16,-41) px.  Parts have 0 HP, Idle AI; 0x37 mirrors the body animation (node 0x0803D0FB).  Returns 1 the same frame.",
+   "timing": {
+    "parts_created_frame": 2
+   }
+  },
+  "0x803a2b7": {
+   "name": "JanembaHandStrikeA",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "Arm strike with part 0x34 (boss+0x1F0 -> +0x1F8; screen-left part).  Part gets anim 0x12 and controller 0x0804D738: on controller frame 16 a Janemba Hand enemy (type 0x36, gfx 0x96, spawn record 0x0877B050) is created at the PLAYER position + (4, 0) px, facing 2, with anim 0x13 and controller 0x0804C338 (rising hand): one hit, tested on hand frames 16..55 inclusive, box = the hand body box (0x0800FE78), attack type 0x086B8098 (melee sub 2, can crit), multiplier 0x400, attacker = the hand (type 0x36 STR 22).  The hand is removed when its vfunc+0x34 reports done.  Node finishes when the part animation ends.",
+   "timing": {
+    "hand_spawn_frame": 16,
+    "hand_hit_window": [
+     32,
+     71
+    ],
+    "first_player_hit_measured": 33,
+    "node_length_measured": 57,
+    "status": "VERIFIED (state 0xFE: 10 strikes in 573 f, hits every 57 f)"
+   },
+   "projectile": "janemba_hand_36"
+  },
+  "0x803a475": {
+   "name": "JanembaHandStrikeB",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "Same as JanembaHandStrikeA but drives part 0x35 (boss+0x1F0 -> +0x1F8 -> +0x1F8; screen-right part) through controller 0x0804D98C: hand created at the PLAYER position + (-20, 0) px, facing 3, hand anim 0x12.  Same hit window / damage.",
+   "timing": {
+    "hand_spawn_frame": 16,
+    "hand_hit_window": [
+     32,
+     71
+    ],
+    "node_length_measured": 57
+   },
+   "projectile": "janemba_hand_36"
+  },
+  "0x8039983": {
+   "name": "JanembaAscend",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "anim 0x13 + controller 0x030032B8 (vt 0x0804CC34): from controller frame 8 the height offset obj+0x176 of the body and all three parts is set to max(24 - 3*frame, -200) px (rises off the top of the screen at 3 px/frame).  Finishes when the controller frame counter exceeds 128.  While airborne the boss takes no damage (VERIFIED: 6 punches, 0 HP lost, +0x176 = -132).",
+   "timing": {
+    "length": 129,
+    "rise_px_per_frame": 3,
+    "max_height": -200
+   }
+  },
+  "0x8039bbb": {
+   "name": "JanembaDescendSummon",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "anim 0x13 + controller 0x0804D3C8: height starts at -200 and rises +3 px/frame back to 0 (67 f), then a 16-frame countdown; when it reaches 0: screen effect 0x0800797C(0x46, 0x1E), count the living Mini-Janembas (world message 5 with the gfx-0x99 def) and create (5 - count) Mini-Janembas (type 0x38, record 0x0877AF78) at the fixed map positions 0x0877AF98: (104,112) (120,136) (152,144) (184,136) (200,112) px - i.e. tops the swarm up to 5.  Finishes when the body animation ends.",
+   "timing": {
+    "ascend_plus_summon_state_length": 230,
+    "minis_created_at": 229
+   }
+  },
+  "0x80398c5": {
+   "name": "WaitMinisDefeated",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "singleton 0x030032B4.  Each frame sends world message 5 with the gfx-0x99 (Mini-Janemba) def (0x08011CCA) and returns 1 when no object answers, i.e. when every Mini-Janemba is dead.  VERIFIED: Janemba stayed in state 0x104 for 2000+ frames while minis lived, left it on the frame the last one was killed."
+  },
+  "0x803d0fb": {
+   "name": "PartMirrorAnim",
+   "kind": "action",
+   "status": "INFERRED",
+   "sem": "Janemba part 0x37: each frame compares the linked boss (obj+0x1F4) animation pointer with two entries of its anim def (+0x78 / +0xA0) and switches its own animation to match (0x0803CF46 / 0x0803D046 / 0x0803CFC2).  Cosmetic; never finishes."
+  },
+  "0x8034817": {
+   "name": "MiniHopToward",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "anim 0x12 + hop controller 0x0300322C (vt 0x0804D968): counter +8/frame, 32-frame cycle; airborne in the second half (counter 0x80..0xFF, height = -sin>>13 arc).  At each landing (counter 0) with chance 0x4000 (25%) it re-aims at the player diagonal quadrant (facing 0 (+,+), 1 (-,-), 2 (-,+), 3 (+,-), vectors 0x087593F8).  While airborne it moves 0.5 px/frame on both axes along that diagonal (0.25 px/frame average).  Never finishes (returns 0).  Measured: 6.5-7 px per 30 frames per axis.",
+   "timing": {
+    "cycle": 32,
+    "airborne": 16,
+    "speed_px_per_frame_airborne": 0.5
+   }
+  },
+  "0x8034a0b": {
+   "name": "MiniHopFlee",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "Low-HP Mini-Janemba (state 0x111): same 32-frame hop, but at each landing the facing is set from the dominant axis and a normalised vector of length 0.5 px/frame from the mini TO the player is computed; while airborne the mini moves by MINUS that vector (flees)."
+  },
+  "0x80345fd": {
+   "name": "IfPlayerNearAndHittable",
+   "kind": "cond",
+   "status": "DISASM",
+   "sem": "true when the player object ([0x03001B94]) has its hittable word +0x1CC set and the centres of the two collision boxes (0x0800FE78) are within 47 px on both axes (|dx|,|dy| <= 47).",
+   "children": [
+    12
+   ]
+  },
+  "0x8034ec1": {
+   "name": "MiniRollAttack",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "singleton 0x0300324C; anim 0x12 + controller 0x03003248 (vt 0x0804E170), counter +8/frame.  Counter 0x81..0xFF (frames 16-31): dash along its diagonal facing at 1.5 px/frame per axis (table 0x0875947C (+-3 px) * 0.5).  Counter 0x100 (frame 32): one area hit broadcast to the world (0x08011C0C kind 0) with box = own body box, attack type 0x086B8088 (melee sub 0), multiplier 0x400, attacker = the mini (STR 20); returns 1.  VERIFIED: player hit 32 frames after entering state 0x112 (then Wait 120).",
+   "timing": {
+    "windup": 16,
+    "dash": [
+     16,
+     31
+    ],
+    "hit_frame": 32,
+    "dash_px_per_frame_per_axis": 1.5
+   }
+  },
+  "0x803b4c9": {
+   "name": "HandAmbush",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "rand(2): teleport to the player position + (4,0) px facing 2, or + (-20,0) px facing 3; anim 0x12 + controller 0x0804D714: one hit tested on frames 80..103 (box = own body, attack type 0x086B8098 melee sub 2, multiplier 0x400, attacker = this hand, STR 35).  Finishes when the controller ends.  Measured: player hit 81 f after entering state 0x115, state lasts 106 f.",
+   "timing": {
+    "hit_window": [
+     80,
+     103
+    ],
+    "length_measured": 106
+   }
+  },
+  "0x803b357": {
+   "name": "HandSink",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "waits for the current animation to end, then controller 0x0804DBA8 (sink into the ground); finishes when the hand leaves that controller.  State 0x117 (this + Wait 180) measured 287 f.",
+   "timing": {
+    "length_measured": 107
+   }
+  },
+  "0x8034ba7": {
+   "name": "SuperJanembaWave",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "singleton 0x03003240: face the player (event 0x0804AE70), anim 0x13, controller 0x0300323C (vt 0x0804DBCC).  Controller frame 24: if pool room (0x080116FC) >= 0x800, spawn an energy wave (builder 0x080359D4) at bbox-origin + per-facing offset (0x0875943C+4: down (4,4), up (13,-24), left (-8,-8), right (24,-8)).  Frame 40: back to idle (node done).",
+   "timing": {
+    "spawn_frame": 24,
+    "length": 40,
+    "measured_spawn_after_state_entry": 25
+   },
+   "projectile": "super_janemba_wave"
+  },
+  "0x8034ce3": {
+   "name": "TeleportNearPlayer",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "singleton 0x03003244.  enter: save position at obj+0x208, side = rand(4), controller 0x0804D3EC (anim 0x12).  Controller frame 36: anim 0x14 and the boss is moved to the player position + side offset ((0,+32), (0,-32), (-32,0), (+32,0) px; wall-corrected with 0x08009816).  Finishes once the animation is no longer 0x11/0x13.  VERIFIED: jump on frame 36, landed (-32.8,-0.8) px from the player; state 0x2DB (this + FacePlayer + MeleeAttack) lasted 90 f.",
+   "timing": {
+    "teleport_frame": 36,
+    "distance_px": 32
+   }
+  },
+  "0x803455d": {
+   "name": "TeleportChain4",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "singleton 0x03003224 with a persistent counter at 0x03003228.  Teleports (controller 0x0804DF9C, same as TeleportNearPlayer) to side = counter & 3 (0 below, 1 above, 2 left, 3 right of the player, 32 px), counter += 1 (mod 12) after each; finishes after the teleport that makes counter % 4 == 0, i.e. 4 teleports per run.  VERIFIED: teleports every 72 f to (0,+31) (0,-33) (-38,-8) (+32,-1) px, then FacePlayer + MeleeAttack, loop 306 f.",
+   "timing": {
+    "teleport_every": 72,
+    "teleports": 4,
+    "loop_measured": 306
+   }
+  },
+  "0x8036f45": {
+   "name": "IfPlayerOnTop",
+   "kind": "cond",
+   "status": "DISASM",
+   "sem": "true when the player position is within 16 px of this object on both axes (and a height test on obj+0x1A8, >>10).  Used by enemy type 0x8D (12 placements on map 0/50, 0 HP).",
+   "children": [
+    12
+   ]
+  },
+  "0x8036e77": {
+   "name": "TriggerSelf",
+   "kind": "action",
+   "status": "INFERRED",
+   "sem": "singleton 0x03003280: calls the object's own vfunc +0x74 with 1 (the same call the boss death handler 0x0800A9B9 makes) and returns 1 - the object triggers / removes itself."
+  },
+  "0x80369fb": {
+   "name": "StepTowardPlayerThroughRocks",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "StepTowardPlayer update (0x08018C3A) wrapped by world broadcast msg 0x22 = 1 before / 0 after (0x08011C70): Broly's arena rocks (vt 0x0804AF50) clear their collision tiles while he moves, so he walks through them; the player cannot",
+   "params": [
+    [
+     12,
+     "speed",
+     "speed256"
+    ]
+   ]
+  },
+  "0x80369b3": {
+   "name": "ChasePlayerThroughRocks",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "ChasePlayer (enter 0x0802A00C, update 0x0802A028, pathfinding) wrapped by msg 0x22 like 0x080369FB",
+   "params": [
+    [
+     12,
+     "speed",
+     "speed256"
+    ]
+   ]
+  },
+  "0x8035f81": {
+   "name": "BrolySpawnRocks",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "enter: spawns 3 rock obstacles (ctor 0x08036A44, vt 0x0804AF50, 32x32 solid block, collision box +16..+48) at map px (200,136), (112,272), (296,240) if the object pool has room; returns 1 (Broly 0x0A initial state 0x33 only)"
+  },
+  "0x8036193": {
+   "name": "ChargedPunch",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "face player, anim 0x12, controller 0x03003278: frames 4..139 wind-up (own obj+0x1CC=1), frame 140 one melee hit on the rect adjacent to the facing side (attack type 0x086B8098, mult 0x600 = x1.5) if the player is hittable (player+0x1CC != 0); obj+0x1CC=0 from frame 140 (no hits taken during the strike); finished when the anim ends (~149 f). Emulator: hit exactly 140 f after state entry, mult 1536; only lands if the player is inside the rect at that frame (1 of 8 in a free fight)",
+   "timing": {
+    "windup_frames": 140,
+    "hit_frame": 140,
+    "state_frames": 149
+   }
+  },
+  "0x8035dcb": {
+   "name": "JumpSmash",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "anim 0x13, controller 0x0300325C: f0-7 crouch; f8-55 height obj+0x176 -= 8/f (leaves the screen); f56-199 x and y each move 1 px/f toward the player centre (independent axes); f200-247 height += 8/f; f248 three dust clouds (0x0802A81C, visual only), done. Damage comes from the following IfMeleeHit (x1.0)",
+   "timing": {
+    "crouch": [
+     0,
+     7
+    ],
+    "rise": [
+     8,
+     55
+    ],
+    "home": [
+     56,
+     199
+    ],
+    "descend": [
+     200,
+     247
+    ],
+    "land": 248
+   }
+  },
+  "0x8035ee3": {
+   "name": "IfLandedOnRock",
+   "kind": "cond",
+   "status": "DISASM",
+   "sem": "broadcast msg 0x21 with Broly's bbox to world objects; an overlapping rock goes intact -> cracked (def 0x0875F7B8) -> destroyed (def 0x0875F7C4) per landing and answers true only when destroyed; Broly is snapped onto the rock. True -> state 0x4D (120 f stun)",
+   "children": [
+    12
+   ]
+  },
+  "0x8036303": {
+   "name": "IfMeleeHit",
+   "kind": "cond",
+   "status": "VERIFIED",
+   "sem": "one melee hit (attack type 0x086B8098, mult obj+0xC<<10 = x1.0) on the rect adjacent to the side facing the player; child runs if it connected. Broly landing hit observed at f248 of the jump, mult 1024",
+   "children": [
+    12
+   ]
+  },
+  "0x8035e83": {
+   "name": "FinishLandingAnim",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "if still in the jump anim: controller 0x0300326C plays the remaining frames from frame 6 (4 f each), then idle; observed 0x4E -> 0x43 after 11 f"
+  },
+  "0x8035bd1": {
+   "name": "StunnedAnim",
+   "kind": "action",
+   "status": "INFERRED",
+   "sem": "anim 21 on the generic hold controller 0x03001B20 (used for the 120 f rock stun)"
+  },
+  "0x8035e35": {
+   "name": "RecoverAnim",
+   "kind": "action",
+   "status": "INFERRED",
+   "sem": "anim 20, controller 0x03003264; finished when the anim ends (get-up after the stun)"
+  },
+  "0x803ae65": {
+   "name": "IfPlayerPetrified",
+   "kind": "cond",
+   "status": "VERIFIED",
+   "sem": "player obj+0x50 (current anim) == player type anim table +0xA8 (stone pose)",
+   "children": [
+    12
+   ]
+  },
+  "0x803ae83": {
+   "name": "IfPlayerNotPetrified",
+   "kind": "cond",
+   "status": "DISASM",
+   "sem": "negation of IfPlayerPetrified",
+   "children": [
+    12
+   ]
+  },
+  "0x802de67": {
+   "name": "PlayAnim12",
+   "kind": "action",
+   "status": "INFERRED",
+   "sem": "anim 0x12 on the hold controller 0x03001B20 (Dabura sphere wind-up)"
+  },
+  "0x803b2a9": {
+   "name": "DarkSphere",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "enter: byte 0x030032E4 = 0, spawn the dark sphere (ctor 0x0803AEA8, vt 0x0804A884) at Dabura centre + (2,-17); finished when 0x030032E4 becomes 1 (sphere destroyed) or 3 (sphere expired); exit sets obj+0x1CC = 1. See boss_facts_fighters PROJECTILES dabura_sphere"
+  },
+  "0x803b2bb": {
+   "name": "IfSphereDestroyed",
+   "kind": "cond",
+   "status": "DISASM",
+   "sem": "byte 0x030032E4 == 1 -> child (GotoState 0x80: 300 f stun)",
+   "children": [
+    12
+   ]
+  },
+  "0x802e33b": {
+   "name": "PlayAnim12b",
+   "kind": "action",
+   "status": "INFERRED",
+   "sem": "anim 0x12 on 0x03001B20"
+  },
+  "0x803ae5d": {
+   "name": "StunnedAnim21",
+   "kind": "action",
+   "status": "INFERRED",
+   "sem": "anim 21 on 0x03001B20"
+  },
+  "0x802e105": {
+   "name": "MoveToPoint",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "pathfind (0x0803B6EA / 0x0803BB48) to the fixed map point (x,y); finished within 8 px on both axes. Dabura: speed 1.0 px/f to (192,80); Yakon: to his arena point",
+   "params": [
+    [
+     12,
+     "speed",
+     "speed256"
+    ],
+    [
+     16,
+     "x",
+     "px"
+    ],
+    [
+     20,
+     "y",
+     "px"
+    ]
+   ]
+  },
+  "0x802de75": {
+   "name": "PlayAnim13",
+   "kind": "action",
+   "status": "INFERRED",
+   "sem": "anim 0x13 on 0x03001B20"
+  },
+  "0x802dfcb": {
+   "name": "AimAtPlayer",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "anim 20; controller 0x030030D0 turns to face the player on the dominant axis"
+  },
+  "0x802df33": {
+   "name": "StoneSpit",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "anim 20, controller 0x030030C8: frame 0 spawns the petrifying spit (ctor 0x0802E444, vt 0x0804AC5C) from mouth offset 0x087572C8[dir] aimed at the player centre (needs pool room >= 0x100); frame 8 anim step",
+   "projectile": "dabura_spit"
+  },
+  "0x803ce53": {
+   "name": "FinalFlash",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "anim 0x13, controller vt 0x0804D7D0: frame 24 spawns the beam (0x08036FA2, vt 0x0804AF24) from offset 0x0877C4D4[dir] if pool room >= 0x600; controller ends after frame 180",
+   "timing": {
+    "fire_frame": 24,
+    "state_frames": 181
+   },
+   "projectile": "final_flash_beam"
+  },
+  "0x803333d": {
+   "name": "InlineScript",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "runs the bytecode stored inline at def+0xC through the script VM (0x08004038) each update; result = script return (1 = done). Vegeta 0x88: natives 0x38, 0x3C(0,12)x3, 0x47(0,282), 0x45(282,152,176,60), 0x3A (scripted escape / cutscene, INFERRED)"
+  },
+  "0x803bd65": {
+   "name": "WanderToRandomPoint",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "enter: pick a reachable random map point x = 96+rand(296), y = 112+rand(240) at least ~9 px away; update pathfinds there (like MoveToPoint); Vegeta 0x89 NPC"
+  },
+  "0x803a585": {
+   "name": "PlayAnim13Yakon",
+   "kind": "action",
+   "status": "INFERRED",
+   "sem": "anim 0x13, controller 0x030032CC (post-combo pose)"
+  },
+  "0x803a77f": {
+   "name": "MouthBeamDown",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "controller vt 0x0804D438: when the first anim cycle ends (frame == frames*8) fire the beam class 0x08036FA2 straight down from (x+32, y-16) if pool room >= 0x600; controller ends after frame 301. Emulator: beam hits x328 energy sub 11 every frame for ~253 f",
+   "projectile": "final_flash_beam"
+  },
+  "0x803a61b": {
+   "name": "PlayAnim12Yakon",
+   "kind": "action",
+   "status": "INFERRED",
+   "sem": "anim 0x12, ctrl 0x030032D0"
+  },
+  "0x803a68f": {
+   "name": "SummonMiniYakons",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "spawns 5 enemies from the spawn template 0x0877B0B0 (type 0x92 Mini-Yakon) at map px (192,96), (212,96), (232,96), (252,96), (272,96) via enemy ctor 0x0800F68C"
+  },
+  "0x803a7ef": {
+   "name": "WaitSummonsDead",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "finished when the world holds no object of class 0x12E (Mini-Yakon)"
+  },
+  "0x803a511": {
+   "name": "PlayAnim12Yakon2",
+   "kind": "action",
+   "status": "INFERRED",
+   "sem": "anim 0x12, ctrl 0x030032C8"
+  },
+  "0x80353d1": {
+   "name": "Hop",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "anim 14, controller 0x03003254: phase += 8/f (32 f cycle): 16 f rest, 16 f hop with height obj+0x176 = -sin >> 13 (table 0x087B6EEC)"
+  },
+  "0x8035205": {
+   "name": "MiniYakonLunge",
+   "kind": "action",
+   "status": "INFERRED",
+   "sem": "if the player is alive and hittable: face player, anim 4 with its own controller (vt 0x0804CD3C); an object vt 0x0804C098 appears 16 f in (no damage observed)"
+  },
+  "0x802c4b3": {
+   "name": "GrabWindup",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "face player, anim 0x12 on the play-once controller 0x0300308C; finished when idle again"
+  },
+  "0x802c673": {
+   "name": "BearHug",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "player anim 0x14 + frozen controller 0x03001B00, held at Spopovich pos + (8,-16); partner = first world object of class 0x130 (Yamu). Ends when the partner answers msg 9 (drain finished) or after 5 D-pad presses (0x08040284 mask 0xF0, 20, 90) -> release, then 60 f. Without a partner it ends at once (observed 2 f)"
+  },
+  "0x802f977": {
+   "name": "IfPartnerHolding",
+   "kind": "cond",
+   "status": "VERIFIED",
+   "sem": "first world object of class 0xFC (Spopovich) is on its hold controller 0x03001B30 with anim 0x12 check (0x0800EEB0) -> child (Yamu GotoState 0x334); fired on the grab frame",
+   "children": [
+    12
+   ]
+  },
+  "0x802fc8b": {
+   "name": "EnergyDrain",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "phase 0: pathfind to the held player; phase 1: player EP -1 every 8 f until it has lost maxEP/4 (only if EP > maxEP/4), sound every 32 f; then msg 9 to the partner and 60 f countdown. Observed: 400 maxEP player lost 100 EP at 1 per 8 f, released at f1096"
+  },
+  "0x8039103": {
+   "name": "IfContactExplode",
+   "kind": "cond",
+   "status": "DISASM",
+   "sem": "each frame: energy hit (attack type 0x086B8090, mult 0x1000 = x4.0, dir = facing) with the object bbox against the world (0x08011C0C); if anything was hit -> child (self-destruct state 0x57)",
+   "children": [
+    12
+   ]
+  },
+  "0x803935d": {
+   "name": "PlayAnim12Swarm",
+   "kind": "action",
+   "status": "INFERRED",
+   "sem": "anim 0x12 on ctrl 0x03001B38"
+  },
+  "0x803943d": {
+   "name": "WaitFormationSlot",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "singleton vt 0x0804CB00: finished once obj+0x204 (formation slot) != 0"
+  },
+  "0x80393bf": {
+   "name": "MoveToFormationA",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "MoveToPoint to player position + offset table 0x0877AE80[slot] (8 slots)"
+  },
+  "0x803942b": {
+   "name": "MoveToFormationB",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "MoveToPoint to player position + offset table 0x0877AECC[slot]"
+  },
+  "0x80189e9": {
+   "name": "SelfDestruct",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "death effect (vfunc +0x74 with def+0xC) and removal from the world (0x08011944)"
+  },
+  "0x803084d": {
+   "name": "PlayAnim0",
+   "kind": "action",
+   "status": "INFERRED",
+   "sem": "anim 0, controller 0x03003158 (frame thresholds 48 / 80)"
+  },
+  "0x80305ff": {
+   "name": "FreezePlayer",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "player anim 0 + frozen controller 0x03001B00 and input handler 0x03003144 while this enemy plays anim 0x12 (ctrl 0x0300314C); exit restores the player input handler 0x03001C3C"
+  },
+  "0x802aa81": {
+   "name": "IfCooldown2Over",
+   "kind": "cond",
+   "status": "DISASM",
+   "sem": "now(0x03000F94) - obj+0x1EC > frames (second cooldown timer, set by MarkTime2); cond fn 0x0804EDB8",
+   "params": [
+    [
+     12,
+     "frames",
+     "frames"
+    ]
+   ],
+   "children": [
+    16
+   ]
+  },
+  "0x802aa2d": {
+   "name": "MarkTime2",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "obj+0x1EC = frame counter; returns 1 (singleton 0x03003000, update 0x0804FFC8)"
+  },
+  "0x802c18f": {
+   "name": "NinjaStarThrow",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "face player; controller 0x03003074 (update 0x0802C08A): anim 0x13, at controller frame 8 spawns one ninja star (builder 0x0802C790, spawn data 0x087548E8: per-facing offset +8+8*dir) if pool room >= 0x80, sound 0x083192A8+0x2DC; frame 32 back to idle. VERIFIED: star spawned 7 frames after the AI state entry, 1.75 px/frame",
+   "timing": {
+    "fire_frame": 8,
+    "end_frame": 32,
+    "anim": 19
+   },
+   "projectile": "ninja_star"
+  },
+  "0x802c33d": {
+   "name": "NinjaTeleport",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "instant teleport (update 0x0802C1DC): up to 16 tries of a random offset dx,dy = rand(201)-100 px each, rejected unless max(|dx|,|dy|) >= 70; candidate tested with enemy vfunc +0x54 (free placement); on success smoke puffs (effect 0x086FD9D0, random 1024..2047 lifetime) at the old and the new bbox centre, then moves; returns 1. VERIFIED: jump of (+59,+85) px observed"
+  },
+  "0x802c1d1": {
+   "name": "NinjaDisguise",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "enter 0x0802C1B0: anim 0x12 with a random start frame (rand(anim length)), motion controller = 0x03001B00 (static); update returns 1 at once -> the ninja sits disguised as a prop until its next state"
+  },
+  "0x802c447": {
+   "name": "NinjaReveal",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "enter: controller object 0x0804BECC: every 2nd frame jitter position by rand(3)-1 px on both axes around the stored spot for 64 frames, then back to idle; update (0x0802C3D2) then spawns a smoke puff (0x086FD9D0) and returns 1",
+   "timing": {
+    "shake_frames": 64
+   }
+  },
+  "0x802d1cd": {
+   "name": "MummyWrapShot",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "face player; controller 0x030030A8 (update 0x0802D0DC): anim 0x12, at frame 8 one mummy wrap (builder 0x0802D79C variant 0 = straight, spawn data 0x08756A70 per-facing offset) if pool room >= 0x80; frame 24 back to idle",
+   "timing": {
+    "fire_frame": 8,
+    "end_frame": 24,
+    "anim": 18
+   },
+   "projectile": "mummy_wrap"
+  },
+  "0x802d319": {
+   "name": "MummyWrapBurst",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "controller 0x030030B0 (update 0x0802D214): at frame 8 (pool room >= 0x100) spawns 8 wraps: for each facing 0..3 one straight (variant 0) and one diagonal (variant 1, rotated 45 deg) from spawn data 0x08756AA0 offsets; frame 24 idle. VERIFIED: 8 objects (vtable 0x0804A830) per burst, burst state period 26 frames",
+   "timing": {
+    "fire_frame": 8,
+    "end_frame": 24,
+    "anim": 18,
+    "count": 8
+   },
+   "projectile": "mummy_wrap"
+  },
+  "0x802f919": {
+   "name": "HeavyStrike",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "enter 0x0802F74C: if the player exists and is active (player+0x1CC) -> enemy vfunc +0x30(4) (wind-up action 4), timer 60. update 0x0802F8DA: at timer 0 performs the strike 0x0802F77C: sound 0x083192A8+0x2E8, faces the player on the dominant axis, builds a rect from its body edge towards the player and delivers a melee hit {mult 0x400, attack type 0x086B8098 (melee sub 2)} through the player vfunc +0x24; random hit sound on success; then vfunc +0x28(4) ends the action; finished when the enemy controller is back to idle. VERIFIED (Pilaf's Guardian): hit 58 frames after state entry, state left at 76; hits at dx <= 60 px (centre to centre), misses at 65",
+   "timing": {
+    "windup_frames": 60,
+    "hit_frame": 58,
+    "total_frames": 76,
+    "reach_px": 60
+   }
+  },
+  "0x802f5c5": {
+   "name": "SpawnEnzymes",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "Blister: enter timer=120, spawned=0 (obj+0x204). Every frame: timer-1; at 0 spawn enemy type 0x18 (Enzyme, template 0x08757A4C) at the Blister position or +(16,-8) (rand(2)) if the spot is free (0x08009904; else retry next frame), spawned+1, timer=120. Stops for good after 8 spawns. Never finishes. VERIFIED: +1 Enzyme every 120 frames up to 8",
+   "timing": {
+    "interval_frames": 120,
+    "max_spawns": 8
+   }
+  },
+  "0x8037b97": {
+   "name": "IfLatchOverlap",
+   "kind": "cond",
+   "status": "VERIFIED",
+   "sem": "Enzyme: player body rect (0x0800FE78, rect table at obj+0x58 + 16*facing + 0x10) shrunk by 6 px on the left and right overlaps the enzyme body rect. The enzyme rect is non-empty (7x7 px) only when it faces down. VERIFIED: fires for the player 6-8 px left of the enzyme, dy -8..+8",
+   "children": [
+    12
+   ]
+  },
+  "0x802995f": {
+   "name": "LatchDrain",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "Enzyme latched: anim 1, motion controller 0x0804C314 that keeps the enzyme glued to the player; every 64 frames ((now & 63) == 0) calls player vfunc +0x5C (0x08010BF2 HP loss) with 0x400 (= 1 HP); finished when the player is gone or HP <= 0. VERIFIED: -1 HP every 64 frames, player held in place",
+   "timing": {
+    "drain_period_frames": 64,
+    "drain_hp": 1
+   }
+  },
+  "0x80363fb": {
+   "name": "IfButtonMashed",
+   "kind": "cond",
+   "status": "DISASM",
+   "sem": "counts new presses of A/B/d-pad (mask 0xF3 of the pressed-edge word of input [0x0875A738]); a gap longer than <gap> frames resets the count; true once the count exceeds <presses>. Enzyme: >8 presses with gaps <= 15 frames",
+   "params": [
+    [
+     12,
+     "presses",
+     "count"
+    ],
+    [
+     16,
+     "gap",
+     "frames"
+    ]
+   ],
+   "children": [
+    20
+   ]
+  },
+  "0x802c77b": {
+   "name": "DriftContact",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "Blood Cell. create 0x0802C69C (node obj vtable 0x0804B640): random direction a = rand(256)/256 turn, speed s = rand(3)+1; velocity = (cos a, sin a)*s*64/256 px (sin table 0x087B6EEC) = 0.25/0.5/0.75 px/frame. update 0x0802C6EC: moves by the velocity every frame (straight line), contact hit {melee 0x086B8098, mult 0x400} via player vfunc +0x24; after a hit moves backwards for 16 frames. Never finishes. VERIFIED: 0.5 px/frame drift, melee x1.0 contact hit"
+  },
+  "0x802ccff": {
+   "name": "WormSpawnBody",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "Worm Head enter 0x0802CBD4: spawns 5 enemies of type 0x8F (Worm Body, template 0x08756A2C) at y-12, -24 ... -60 px and links them: obj+0x1F0 = next segment, obj+0x1F4 = previous (head +0x1F4 = 0, tail +0x1F0 = 0). VERIFIED: 5 segments"
+  },
+  "0x802d62d": {
+   "name": "WormHeadMove",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "update 0x0802D4B0: every frame: with rand(200)==0 turn 90 deg (dir ^= 2, then 50% dir ^= 1); step 1 px (table 0x08756B0C) in the facing; if the spot is blocked (vfunc +0x54) try the next direction (dir+1 mod 4, up to 4); passes dir|0x80 to the next segment (+0x1E4). Contact: melee hit 0x086B8098 x1.0 vs the player, then 20 frames without contact damage. VERIFIED: 1.0 px/frame every frame",
+   "timing": {
+    "speed_px": 1.0,
+    "turn_chance_per_frame": 0.005,
+    "rehit_cooldown_frames": 20
+   }
+  },
+  "0x802d76d": {
+   "name": "WormBodyFollow",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "update 0x0802D650: a 12-slot ring buffer of move commands received from the previous segment (+0x1E4): each command is replayed 12 frames later as a 1 px step (table 0x08756B38, no collision test) and forwarded to the next segment -> the body traces the head path 12 px behind. Tail (no next) uses anim 0x12B. Contact melee x1.0, 20-frame re-hit cooldown. VERIFIED: segment copies a head turn ~12 frames later",
+   "timing": {
+    "delay_frames": 12,
+    "speed_px": 1.0,
+    "rehit_cooldown_frames": 20
+   }
+  },
+  "0x802e255": {
+   "name": "EnergyBarrage",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "Pikkon: face player, sound 0x083192A8+0x2F4; controller 0x030030E0 (update 0x0802E146): anim 3, every frame until 48 spawns an energy shot object (0x080249E0 -> builder 0x080246B4, vtable 0x0804BFCC, needs pool room >= 0x1400) at the facing offset (0x08757324). VERIFIED: one energy hit (attack type 0x086B80A8, sub 4, mult 51 = 0.05) per frame on a player 24 px away",
+   "timing": {
+    "frames": 48,
+    "anim": 3
+   },
+   "projectile": "pikkon_barrage"
+  },
+  "0x8033ee9": {
+   "name": "TauntAnim",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "Goten (East District tag game): face player, anim 4 played once by controller 0x0804E030; finished at the end of the animation"
+  },
+  "0x80338c5": {
+   "name": "RunScript",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "queues the bytecode script whose header is <script> (event object vtable 0x08049264 appended to the event list [0x0875931C]+0x610), returns 1. Goten: script #121 (header 0x08783150)",
+   "params": [
+    [
+     12,
+     "script",
+     "raw"
+    ]
+   ]
+  },
+  "0x802b6e5": {
+   "name": "TurretFire",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "Atomizer / Ion Cannon / Laser Turret: face player (event 0x0804AE70), fire one energy wave (class 0x08049C98) from the per-facing muzzle; finished when the controller ends (72 f)",
+   "timing": "controller 0x0300305C: anim 0x14; frame 8 spawns the wave (pool room >= 0x80, spawn data 0x08752E78); anim frame 2 from f64; ends at f72",
+   "projectile": "energy_wave"
+  },
+  "0x802b701": {
+   "name": "TurretOpen",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "turrets: anim 0x13 on the idle controller; finished when the anim frame (obj+0x11) reaches 3 (deploy / pop-up)"
+  },
+  "0x802b8b5": {
+   "name": "TurretClose",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "turrets: anim 0x12 on the idle controller; finished at anim frame 3 (retract)"
+  },
+  "0x802f709": {
+   "name": "CyborgShot",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "Cyborg / Hyper Cyborg / Mega Cyborg: fire one energy wave straight ahead; blocks until it disappears (hit, wall, off-screen or 240-frame cap)",
+   "timing": "controller 0x03003108: frame 1 spawns the wave (spawn data 0x08757A80); afterwards the controller holds until the wave object is gone AND >= 16 frames elapsed",
+   "projectile": "energy_wave"
+  },
+  "0x8026b2d": {
+   "name": "BombThrow",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "Bomber / Grenadier / Mad Bomber: face the player; aim offset d = player - enemy (px), the component across the facing axis zeroed, each clamped to +-128; bomb velocity = d * 0x71D >> 8 (1/256 px/f) so it lands on the target point after ~36 frames",
+   "timing": "controller (heap, vtable 0x0804B230): frame 16 throws (pool room >= 0x100, spawn data 0x0874CAD0); ends at f24",
+   "projectile": "bomb"
+  },
+  "0x8024025": {
+   "name": "FlameBreath",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "Annihilator / Death Machine / Destroyer: face player, sound, emit a continuous flame stream from the per-facing nozzle offset (0x0872C358: down (46,10), up (16,-48), left (-6,-12), right (74,-12)); finished when the controller ends",
+   "timing": "controller 0x03002FA8: anim 0x12, 128 frames; from frame 4 one flame per frame (124 flames) if pool room >= 0x1400; anim alternates 1/2",
+   "projectile": "flame"
+  },
+  "0x8037e8d": {
+   "name": "GrappleArm",
+   "kind": "action",
+   "status": "INFERRED",
+   "sem": "Bio Mech family: face player and shoot an extending arm (class 0x0804B380)",
+   "timing": "controller 0x03003294: frames 0-23 anim flicker 0/1, 24-27 anim 2, 28 spawns the arm (pool room >= 0x700, spawn data 0x0876CCB0), then holds until the arm is gone (VERIFIED: spawn 28 frames after node entry)",
+   "projectile": "grapple_arm"
+  },
+  "0x803d34b": {
+   "name": "LineUpForShot",
+   "kind": "action",
+   "status": "INFERRED",
+   "sem": "Bio Mech: strafe toward the player's row/column at speed (0x73 = 0.449 px/f) before GrappleArm; finishes when lined up (VERIFIED: enemy y moved 32 px then fired)",
+   "params": [
+    [
+     12,
+     "speed",
+     "speed256"
+    ]
+   ]
+  },
+  "0x803cd1f": {
+   "name": "HeavyPunch",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "Bruiser / Goon / Thug: face player, 48-frame wind-up, then one melee hit with the standard enemy melee box (0x0802A0C4 pattern), attack type 0x086B8098, multiplier 0x600 (x1.5; VERIFIED 27/27 hits mult 1536 exact); random punch sound",
+   "timing": "controller 0x030032F4: anim 4, frame 0 held for 48 frames (wind-up), then +1 anim frame every 8 frames; the hit test runs when the counter reaches 48"
+  },
+  "0x8033d61": {
+   "name": "WindupMelee",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "Bones / Lich / Skeleton: slow overhead swing (VERIFIED 12/12 hits mult 1024 exact)",
+   "timing": "controller 0x03003214: anim 4, first 32 frames hold frame 0, then the anim advances; the hit (0x08033BC4, standard melee box, 0x086B8098 x1.0) fires once when the anim reaches frame 1"
+  },
+  "0x803cb15": {
+   "name": "BioMechPunch",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "Bio Mech family: face the player on the dominant axis, anim 4 on a per-instance controller (vtable 0x0804C6B4) that performs one standard melee hit (0x086B8098 x1.0, VERIFIED 18/18 exact); finished when the anim ends"
+  },
+  "0x803634f": {
+   "name": "IfContactHit",
+   "kind": "cond",
+   "status": "VERIFIED",
+   "sem": "every frame performs the standard melee hit test in front of the enemy (auto-facing, attack type 0x086B8098, multiplier = node field +0xC << 10 = x1.0 for tanks); true (runs the child) on the frame a hit lands. Tanks keep it running as a sub-state = contact/crush damage every frame (VERIFIED 1950/1950 exact; the player's 24-frame hurt i-frames make most of them 0)",
+   "children": [
+    12
+   ]
+  },
+  "0x8037b2f": {
+   "name": "LungeStep",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "Ronin / Samurai / Shogun: face the player and move 4 px/frame in the facing direction (table 0x0876BA40) with collision, for the duration of anim 4; finished when the anim ends"
+  },
+  "0x802f435": {
+   "name": "CirclePlayer",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "Cyborgs: face the player on the dominant axis and move perpendicular to the line to the player (strafe / orbit) at speed (0x100 = 1 px/f); never finishes on its own",
+   "params": [
+    [
+     12,
+     "speed",
+     "speed256"
+    ]
+   ]
+  },
+  "0x8031229": {
+   "name": "HoverDrift",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "Mechanoid family: velocity (node +4/+8, 1/256 px/f) accelerates toward the player by int(38.4f)=38 per frame per axis, clamped to +-128 (0.5 px/f); hits received add an impulse of +-0x400 along the hit direction; position integrated with collision"
+  },
+  "0x80314a7": {
+   "name": "BackStep",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "Mechanoid family: hop away from the facing direction for 48 frames: s = (rand(64)+96)*k>>7, speed = 8*s/256 px/f backwards (k=16: 0.375-0.59 px/f) plus a random sideways drift of (rand(32768)-16384)*s>>12; anim 1 on controller 0x03002B9C; collision-checked",
+   "params": [
+    [
+     12,
+     "k",
+     "raw"
+    ]
+   ]
+  },
+  "0x80315a5": {
+   "name": "MechTransform",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "Mechanoid family: anim 0x14 on the idle controller; when it ends, swap the graphics set between paired forms (gfx 0xBB<->0xBC, 0xE6<->0xE7, 0x85<->0x86); returns 1"
+  },
+  "0x8032b7d": {
+   "name": "TankDrive",
+   "kind": "action",
+   "status": "INFERRED",
+   "sem": "Juggernaut / Tank / War Machine: tank-style steering toward the player (turn helpers 0x08032948 / 0x0803287E / 0x0803282A, axis-aligned movement); never finishes (run in ParallelAll with the fire check)"
+  },
+  "0x80332e1": {
+   "name": "IfPlayerInLineOfFire",
+   "kind": "cond",
+   "status": "DISASM",
+   "sem": "true when the player is in front of the tank along its facing axis with the perpendicular offset < 16 px (centre to centre)",
+   "children": [
+    12
+   ]
+  },
+  "0x802e2f3": {
+   "name": "TankShoot",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "tanks: fire one shell straight ahead (class 0x0804A368)",
+   "timing": "controller 0x030030EC: shell spawned at frame 0-2 (spawn data 0x08757350); the tree then waits 12 frames",
+   "projectile": "tank_shell"
+  },
+  "0x8033b21": {
+   "name": "VampireGrab",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "Vampire / Nosferatu / Vlad: player anim 9, faces the vampire, player controller -> 0x03001B00 (held), player pinned at the per-facing offset table 0x08759334; vampire anim 0x12. Every 16 frames (global frame counter & 15 == 0): player HP -= vampire POW (obj+0x1B2) and the vampire heals the same (vfuncs +0x5C/+0x60, bypasses the damage formula). Escape: each frame with any of A/B/d-pad held (mask 0xF3) counts 1 and stamps the time; >10 frames without input resets the count; count > 8 releases. Ends when the player HP <= 0 or the player leaves the held controller. VERIFIED bv_regular_vamp.py: -10 HP every 16 frames (vampire POW 10) for 900+ frames with no input"
+  },
+  "0x8018bcb": {
+   "name": "KnockbackSlide",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "move by the knockback velocity (0x08018A08: dir * ((rand(64)+96)*K)>>7) for <frames> frames with wall collision; if the enemy was launched (obj+0x294/+0x298 set) and hits a wall it emits a hit (attack type 0x086B80A0 melee-no-crit, mult int(409.6f)=409, its own box) to the other actors",
+   "params": [
+    [
+     12,
+     "frames",
+     "frames"
+    ]
+   ]
+  },
+  "0x802cd7d": {
+   "name": "RaiseShield",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "shield soldiers: swap graphics to the shield-up set (0xB0->0xAF, 0x102->0xB2, 0x56->0xAC); returns 1"
+  },
+  "0x802cde1": {
+   "name": "LowerShield",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "shield soldiers: swap back to the shield-down set (0xAF->0xB0, 0xB2->0x102, 0xAC->0x56); returns 1"
+  },
+  "0x802d49f": {
+   "name": "ShieldBreak",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "shield soldiers: switch to the no-shield graphics (0xB0/0xAF->0xB1, 0x102/0xB2->0x100, 0x56/0xAC->0x55) and spawn a spark (0x0802A81C, anim 0x086FD9D0); returns 1. The tree calls it when the counter obj+0x1E4 reaches 5 and then runs the plain fighter tree (state 0x153)"
+  },
+  "0x80264cd": {
+   "name": "SelfMessage11",
+   "kind": "action",
+   "status": "INFERRED",
+   "sem": "sends message 0x11 to the enemy itself (vfunc +0x28) and returns 1 at once"
+  },
+  "0x8018e5f": {
+   "name": "PopState",
+   "kind": "transition",
+   "status": "DISASM",
+   "sem": "pop the enemy AI stack (vfunc +0x70); returns 2 (singleton runtime 0x03002BA4)"
+  },
+  "0x8029837": {
+   "name": "BeamDodge",
+   "kind": "action",
+   "status": "VERIFIED",
+   "sem": "Pyramid 14-2 (state 0x15A, pushed by IfInPlayerBeamLine): sidestep out of the player's line - the player faces down/up: left if the player is right of the enemy (obj+0x1A0), else right; faces left/right: up if the player is below (+0x1A4), else down; SetAnim(0x12), controller vt 0x0804A758 (tick + 1; from tick 8 cel 1 and a 2 px step (table 0x0875021C) through vfunc +0x54, a blocked step or tick 24 ends it with vfunc +0x28(0)); finished when the enemy leaves that state. VERIFIED real run 14-2 r057_015 f340.."
+  },
+  "0x802f743": {
+   "name": "ParentCountDown",
+   "kind": "action",
+   "status": "DISASM",
+   "sem": "Enzyme state 0x91 (pushed, before SelfDestruct): the parent object's child count (obj+0x1F4 -> parent +0x204) - 1 when it has a parent; returns 1 (singleton runtime 0x03003114, update 0x0802F724)"
+  }
+ },
+ "unit_desc": {
+  "dist2": "squared px (radius = sqrt)",
+  "frames": "frames (1/60 s)",
+  "prob16": "probability p/65536 per frame",
+  "speed256": "1/256 px per frame",
+  "frac16": "fraction p/65536",
+  "count": "integer",
+  "state": "AI state id",
+  "px": "pixels",
+  "enemy_type": "enemy type index (0x08711274)",
+  "raw": "raw value (meaning in sem)"
+ },
+ "attack_nodes": [
+  "GunShot",
+  "KiBlast",
+  "MeleeAttack",
+  "RifleShot",
+  "SoldierThrow"
+ ],
+ "move_nodes": [
+  "AlignWithPlayer",
+  "ChasePlayer",
+  "FlyToPlayer",
+  "StepAwayFromPlayer",
+  "StepTowardPlayer",
+  "WalkToPlayer",
+  "Wander"
+ ]
+}

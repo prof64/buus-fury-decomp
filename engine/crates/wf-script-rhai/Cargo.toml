@@ -1,0 +1,15 @@
+[package]
+name = "wf-script-rhai"
+description = "Runtime for decompiled / modded Buu's Fury scripts in Rhai: action-queue model, plain-data thread state (rollback-safe), host trait shared with the bytecode VM"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+wf-script = { path = "../wf-script" }
+serde.workspace = true
+serde_json.workspace = true
+wf-rom.workspace = true
+# integer-only (i32 like the GBA), no clock, no modules: deterministic and wasm32-unknown-unknown friendly
+rhai = { version = "1.26", default-features = false, features = ["std", "no_float", "no_time", "no_module", "no_custom_syntax", "only_i32"] }
+

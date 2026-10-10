@@ -1,0 +1,11 @@
+{
+  "$extends": "forms/51_tien.json",
+  "id": "56_tien",
+  "index": 56,
+  "name": "Tien",
+  "char_index": 10,
+  "character": "tien",
+  "transform_up": 255,
+  "transform_down": 255,
+  "measured_bonus": { "STR": 6, "POW": 0, "END": 4, "END_energy": 0, "walk_speed": 0, "dash_speed": 0, "note": "mod: form bonus" }
+}

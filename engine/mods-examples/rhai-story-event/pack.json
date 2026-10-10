@@ -1,0 +1,6 @@
+{
+  "id": "rhai-story-event",
+  "name": "Rhai story event: Chiaotzu's challenge in the Southwest Forest teaches the Dodon Ray (a scripted move)",
+  "format_version": 1,
+  "depends": ["base"]
+}

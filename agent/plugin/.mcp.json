@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "buu-battle": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/buu-mcp",
+      "args": [],
+      "env": { "WF_AGENT": "1" }
+    }
+  }
+}

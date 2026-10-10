@@ -1,0 +1,8 @@
+{
+ "id": "skill_no_icon",
+ "name": "skill_no_icon",
+ "format_version": 1,
+ "depends": [
+  "base"
+ ]
+}

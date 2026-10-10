@@ -1,0 +1,2919 @@
+{
+ "meta": {
+  "generator": "re/buu/extract_bosses.py",
+  "groups": {
+   "buu": {
+    "bosses": 15,
+    "projectiles": 5
+   },
+   "janemba": {
+    "bosses": 9,
+    "projectiles": 2
+   },
+   "fighters": {
+    "bosses": 20,
+    "projectiles": 4
+   },
+   "others": {
+    "bosses": 27,
+    "projectiles": 3
+   },
+   "regular": {
+    "bosses": 0,
+    "projectiles": 9
+   }
+  },
+  "force_spawn": "re/buu/forcespawn.py: patch a SW-forest spawn record in ROM with the target's own record, warp in from buu_snakeway_start.ss",
+  "units": {
+   "speed": "px per frame unless suffixed _256 (1/256 px)",
+   "time": "frames (60/s)",
+   "distance": "px",
+   "chance": "percent per frame unless stated"
+  },
+  "status_tags": "VERIFIED = observed in the emulator; DISASM = read from code; INFERRED = interpretation"
+ },
+ "group_order": [
+  "buu",
+  "janemba",
+  "fighters",
+  "others",
+  "regular"
+ ],
+ "groups": {
+  "buu": {
+   "bosses": {
+    "0x1a": {
+     "name": "Majin Buu (Giant Crater, with Babidi)",
+     "stats": "HP 7320, STR 37, POW 40, END 55, resist melee 64/128 (x0.5), energy 25/128 (x0.2) [DISASM enemies.json]",
+     "spawn": "Giant Crater w8 m71 (224,232), cond 1; Babidi 0x1D and 0x04 in the same area [DISASM]",
+     "phases": [
+      {
+       "name": "idle",
+       "state": "0xB4",
+       "trigger": "player within 72 px (IfPlayerWithin2) -> 0xB5 [DISASM]"
+      },
+      {
+       "name": "fight",
+       "state": "0xB5",
+       "loop": "Majin/Super Buu fight loop (main state M, per frame, Selector order): 1) defence sub-state: after 90 frames in M, if the player attacks -> 20%/f Block state, if Buu is in the player beam line -> 80%/f Block (Block: guard while attacked, leaves at 5%/f otherwise); 2) player is candy (IfGlobalFlag) -> candy-chase state; 3) player > 120 px -> approach (ChasePlayer until within 80 px or 1%/f); 4) player > 50 px -> ranged roll; 5) else 100% close roll.  Every attack/move state returns to M."
+      },
+      {
+       "name": "pacified",
+       "state": "0xC2",
+       "trigger": "[0x0300302C] != 0 (IfBuuPacified): wander 0.5 px/f (turn 2%/f) until it clears [DISASM; setter not found, INFERRED story script]"
+      }
+     ],
+     "attacks": [
+      {
+       "name": "ranged roll (player 50-120 px)",
+       "chances": "90%/f: Selector[33% candy beam 0xBB, 50% stretch 0xBC, ki blast 0xBD] = 33% / 33.5% / 33.5% [DISASM]",
+       "pre": "each first runs AlignWithPlayer 0.898 px/f (0.8%/f bail-out) [DISASM]"
+      },
+      {
+       "name": "Candy beam",
+       "state": "0xBB",
+       "node": "CandyBeam 0x0802B3B5",
+       "startup": "16 frames to spawn, hit at frame 25 for 80 px [VERIFIED]",
+       "total": "36 frames [VERIFIED]",
+       "projectile": "buu_candy_beam",
+       "follow": "if the player became candy -> 0xBE: ChasePlayer 1.199 px/f; within 24 px -> 0xBF EatCandy [VERIFIED chase 46 f from 80 px]"
+      },
+      {
+       "name": "Eat (candy)",
+       "state": "0xBF",
+       "node": "EatCandy 0x0802B1FD",
+       "total": "120 controller frames; state 161 frames [VERIFIED]",
+       "damage": "11 ticks (frames 24..104, every 8): player HP -= min(POW/4 = 10, HP), never below 1; boss heals the same (+10 x 11 = 110 HP) [VERIFIED]"
+      },
+      {
+       "name": "Stretch punch",
+       "state": "0xBC",
+       "node": "BuuStretchPunch 0x0802AD35",
+       "startup": "spawn at frame 64 (charge 8..55), hit at frame 71 at 80 px [VERIFIED]",
+       "total": "81 frames [VERIFIED]",
+       "projectile": "buu_stretch"
+      },
+      {
+       "name": "Ki blast",
+       "state": "0xBD",
+       "node": "KiBlast 0x0802B89D",
+       "total": "34 frames [VERIFIED]",
+       "projectile": "enemy_kiblast"
+      },
+      {
+       "name": "close roll (< 50 px)",
+       "chances": "Selector[80% 0xB7 melee approach, 70% 0xB9 step-in 0.797 px/f (6%/f stop), 0xBA step 1 px/f] [DISASM]"
+      },
+      {
+       "name": "Melee",
+       "state": "0xB8 (from 0xB7 when IfPlayerInMeleeRange: 50%/f)",
+       "node": "MeleeAttack + Wait 1, 70% chance to chain another punch while in range",
+       "damage": "attack 0x086B8098 (melee sub 2), multiplier 1024, STR [VERIFIED]",
+       "timing": "18-19 frames per punch [VERIFIED]"
+      }
+     ],
+     "movement": "ChasePlayer 0.898 px/f (approach/melee), 1.199 px/f (candy chase); StepToward 0.797 / 1.0 px/f [DISASM; chase step VERIFIED ~1.08 px/f average with pathfinding]",
+     "on_hit": "aux of 0xC1 for main states: 10% -> 0xBA; after 90 f in state 80% -> Block + 0xC0; then the common reaction (state 0 aux) [DISASM]",
+     "verified": [
+      "candy beam -> candy 300 f -> chase -> eat 11x10 HP heal (bv_buu_majin.py 0x1a 80 0 260 0xbb)",
+      "stretch punch hit at 80 px frame 71 (bv_buu_series.py 0x1a 80 0 90 0xbc)",
+      "melee/ki-blast attack types and multipliers"
+     ]
+    },
+    "0x1b": {
+     "name": "Majin Buu (Giant Crater, 2nd encounter)",
+     "stats": "HP 14640 (double 0x1A), same STR/POW/END/resists",
+     "same_as": "0x1A tree with: ranged roll 80%/f; close roll 50% melee-approach; melee 10%/f when in range (4% step-in), Wait 6 after a punch and 50% chain; chase speeds 0.699 (approach/melee), 1.0 (candy chase) [DISASM]",
+     "phases": "idle 0x94 (72 px) -> fight 0x95; pacified 0xA2 [DISASM]"
+    },
+    "0x1c": {
+     "name": "Majin Buu (West City etc.)",
+     "stats": "HP 45000, STR 42, POW 38, END 65, resists 64/25",
+     "spawn": "w0 m12/m15/m21 (cond 0, story-placed) [DISASM]",
+     "same_as": "0x1B tree WITHOUT candy beam / eat / pacify: ranged roll Selector[50% stretch 0xB0, ki blast 0xB1] at 80%/f [DISASM]",
+     "phases": "idle 0xA9 (72 px) -> fight 0xAA"
+    },
+    "0x73": {
+     "name": "Super Buu (Hyperbolic Time Chamber)",
+     "stats": "HP 35330, STR 50, POW 65, END 55, resists 128/128",
+     "phases": "idle 0x23A (72 px) -> fight 0x23B",
+     "same_as": "fight loop with candy beam + eat; ranged roll 80%/f Selector[33% candy 0x241, 40% stretch 0x242, ki 0x243] = 33/26.8/40.2%; close roll Selector[50% melee approach 0x23D (80%/f punch when in range, Wait 6, 50% chain; IfPlayerInFront -> step-in), 70% step-in, step 1.098 px/f]; chase 0.898 / 1.199 (melee) / 1.297 (candy) [DISASM]",
+     "no_power_up": true
+    },
+    "0x74": {
+     "name": "Super Buu (Giant Crater / Kami's Lookout) - two-phase",
+     "stats": "as 0x73",
+     "phases": [
+      {
+       "name": "phase 1",
+       "states": "0x249..",
+       "trigger": "idle 0x248 until player within 110 px",
+       "loop": "as 0x73"
+      },
+      {
+       "name": "absorb stance",
+       "state": "0x255",
+       "trigger": "IfPlayerBlastIncoming (player Energy Blast flying at him within 240 px) -> 20%/f [DISASM]",
+       "behaviour": "AbsorbStance 180 f: Energy Blast hits do 0 HP (VERIFIED), 1st -> 0x256 (60 f), 2nd -> 0x257 (24 f) -> 0x258; melee still hurts and triggers Block [VERIFIED]"
+      },
+      {
+       "name": "power-up",
+       "state": "0x259",
+       "trigger": "Chance 0.8%/f inside the defence sub-state (i.e. ~0.8%/f during the fight loop) [DISASM; VERIFIED fired at frame 107 of a test]",
+       "behaviour": "SuperBuuPowerUp: palette -> gfx 0x32, 55 frames, stats unchanged [VERIFIED]"
+      },
+      {
+       "name": "phase 2",
+       "states": "0x25B..0x26A",
+       "loop": "faster: melee approach chase 1.5 px/f, 90%/f punch, Wait 3, 70% chain; step-in 1.0; step 1.297; candy chase 2.0 px/f; AlignWithPlayer 1.0; absorb stance at 100%/f when a blast comes; Block 40%/f (attacked) / 90%/f (beam line), leaves Block at 2%/f [DISASM]",
+       "revert": "absorbing 2 blasts in phase 2 (0x268/0x269) runs RevertPalette and returns to phase-1 states [DISASM]"
+      }
+     ],
+     "verified": [
+      "absorb vs Energy Blast (bv_buu_reflect2.py)",
+      "power-up stats unchanged",
+      "phase-2 punch raw 229995 one-shot Goku L60"
+     ]
+    },
+    "0x75": {
+     "name": "Super Buu (no map spawn; script-created)",
+     "stats": "as 0x73",
+     "same_as": "0x74 (states 0x26B..0x28D, identical structure) [DISASM]"
+    },
+    "0x76": {
+     "name": "Super Buu (Barren Wasteland w20 m5)",
+     "stats": "HP 105300, STR 55, POW 75, END 65",
+     "phases": [
+      {
+       "name": "fight",
+       "states": "0x28E (110 px) -> 0x28F",
+       "loop": "no candy; ranged roll 80%/f: Selector[33% ki 0x295, IfChildCount(0) -> 40% summon 0x296, ki 0x298] [DISASM]"
+      },
+      {
+       "name": "summon",
+       "state": "0x296",
+       "behaviour": "7x SummonMinion (enemy 0x0D, 100 HP, 0 XP each), 86 frames apart (first at frame 39) [VERIFIED]; then 0x297 StaggerMinions + Wait 60 [VERIFIED 62 f]; only when he has no living children [DISASM]",
+       "minions": "type 0x0D tree (fighters group): puff, wander 0.398 px/f, wait 120, then a kamikaze node; +0x204 = stagger index [INFERRED]"
+      }
+     ]
+    },
+    "0x77": {
+     "name": "Super Buu (Barren Wasteland w20 m7, scripted 3-phase)",
+     "stats": "HP 125000, STR 60, POW 85, END 65",
+     "spawn": "record cond 0x20095 (story) at (214,255); 0x78 shares the map at (0,0) [DISASM]",
+     "phases": [
+      {
+       "name": "phase A",
+       "states": "0x29B-0x29E",
+       "loop": "GlideToWaypoint (60 f, 5 absolute waypoints), face, Wait 12; then 50% glide again / 50% ThrowBigBall + Wait 180 [DISASM; glide VERIFIED]"
+      },
+      {
+       "name": "phase advance",
+       "trigger": "hit while in a ball state (0x29E/0x2A3/0x2A8 aux): the glide on-hit handler accepts only when the player is in its anim slot 0x13 [DISASM; INFERRED = bat the ball back], then cutscene script #474 / #475 / #476 (actors 52 = Super Buu, 5) [DISASM]"
+      },
+      {
+       "name": "phase B",
+       "states": "0x2A1-0x2A3",
+       "loop": "50% glide / 50% ball (no Wait 180)"
+      },
+      {
+       "name": "phase C",
+       "states": "0x2A6-0x2A8",
+       "loop": "same"
+      },
+      {
+       "name": "end",
+       "state": "0x2AA Idle after script #476 [DISASM]"
+      }
+     ],
+     "attacks": [
+      {
+       "name": "Big ball",
+       "projectile": "superbuu_ball",
+       "timing": "60 f charge, 43 f flight, then explosion [VERIFIED on 0x78]"
+      }
+     ],
+     "verified": [
+      "glide target table, 60-frame glide",
+      "off its own map the scripted fight removes the boss ~180 frames after the ball state [VERIFIED symptom, cause INFERRED]"
+     ]
+    },
+    "0x78": {
+     "name": "Super Buu (Barren Wasteland m7 fighter, 0 XP)",
+     "stats": "HP 125000, STR 60, POW 85, END 65",
+     "phases": "idle 0x2AB (110 px) -> fight 0x2AC",
+     "same_as": "fight loop without candy; ranged roll 80%/f: Selector[33% approach-then-ball 0x2B2 (chase 0.699 until within 80 px, then ThrowBigBall), IfChildCount(0) -> 33% summon 0x2B3 (7 minions), ki 0x2B5]; absorb stance 20%/f; on hit 10% -> fighter handler 0x0803044D [DISASM]",
+     "verified": [
+      "ball: 1 hit, attack 0x086B80C0 mult 16589 (bv_buu_ball.py)"
+     ]
+    },
+    "0x79": {
+     "name": "Super Buu (Brain w21 m26)",
+     "stats": "HP 100000, STR 63, POW 90, END 70",
+     "same_as": "0x73-style loop with candy beam/eat + absorb stance (no power-up): states 0x2BC..0x2CD; melee approach also steps in when the player is within 20 px [DISASM]"
+    },
+    "0x3c": {
+     "name": "Kid Buu (Planet of the Kais)",
+     "stats": "HP 125000, STR 66, POW 110, END 100, resist melee 96/128 (x0.75), energy 128",
+     "spawn": "w19 m3 (45,319) cond 1 [DISASM]",
+     "phases": [
+      {
+       "name": "idle",
+       "state": "0x11D",
+       "trigger": "player within 100 px"
+      },
+      {
+       "name": "phase 1",
+       "state": "0x11E",
+       "loop": "Selector: defence sub-state 0x127 (after 90 f, 20%/f Block when attacked); player > 60 px: 2%/f -> split 0x128; within 50 px: 40%/f punch if in melee range; within 70 px: 4%/f step-in 0.598; within 130 px: 3%/f beam 0x125; 1%/f align 0x126; > 90 px: 8%/f chase 0x121 (0.598 px/f, 12%/f punch); 0.8%/f back off 0x122 (0.797 px/f); 12%/f chase; else stand+face [DISASM]"
+      },
+      {
+       "name": "split",
+       "states": "0x128 -> 0x129 -> 0x12A",
+       "behaviour": "55-frame anim, then KidBuuSplit: HP halved between him and a type-0x3D copy at the mirrored random offset (<=96 px each axis) [VERIFIED]"
+      },
+      {
+       "name": "phase 2 (two bodies)",
+       "state": "0x12B",
+       "loop": "same attack table (states 0x12B-0x133); sub-state 0x135: only one Kid Buu body left -> back to 0x11E (can split again); 1800 frames after the split -> 0x134 KidBuuMerge (remaining HP of the other body added back) [DISASM; merge VERIFIED]",
+       "on_hit": "10% teleport 0x131 (NinjaTeleport), 10% back off, melee hit after 90 f: 40% Block [DISASM]"
+      }
+     ],
+     "attacks": [
+      {
+       "name": "Kamehameha",
+       "state": "0x125/0x132",
+       "pre": "AlignWithPlayer 0.797 px/f (0.5%/f bail), SetCounter 0",
+       "node": "KidBuuKamehameha 0x080331B5",
+       "projectile": "kidbuu_beam",
+       "timing": "fires at frame 8, lasts to ~91 [VERIFIED]"
+      },
+      {
+       "name": "Punch",
+       "state": "0x120/0x12D",
+       "node": "MeleeAttack + Wait 6",
+       "damage": "0x086B8098 x1024 STR [DISASM]"
+      }
+     ],
+     "verified": [
+      "split 125000 -> 2 x 62500.5 (bv_buu_batch.py kid_split)",
+      "merge -> 125001",
+      "beam reach/timing (bv_buu_reach.py 0x3c 0x125 ...)"
+     ]
+    },
+    "0x3d": {
+     "name": "Kid Buu copy (created by the split, 0 XP)",
+     "stats": "as 0x3C",
+     "phases": "starts at 0x12A (phase 2 tree); identical behaviour, can merge into the other body [DISASM/VERIFIED]"
+    },
+    "0x4": {
+     "name": "Babidi (Giant Crater, script-placed at (0,0))",
+     "stats": "HP 4300, POW 85, END 5, 0 XP",
+     "behaviour": "BabidiGesture then Idle forever; no attacks [DISASM]"
+    },
+    "0x19": {
+     "name": "Babidi (West City)",
+     "stats": "as 0x04",
+     "behaviour": "MarkTime; BabidiHover (50 px up) + FollowMajinBuu(50 px) forever; untouchable by punches while hovering; no attacks [VERIFIED hover]"
+    },
+    "0x1d": {
+     "name": "Babidi (Giant Crater)",
+     "stats": "as 0x04",
+     "behaviour": "hover + follow Majin Buu; after 1200 frames 5%/f -> gesture (0xC6), then wander 0.297 px/f (turn 8%/f) until 300 frames + 5%/f -> back (0xC7->0xC5) [DISASM; hover VERIFIED]"
+    }
+   },
+   "projectiles": {
+    "buu_stretch": {
+     "what": "Majin/Super Buu stretch-arm punch hitbox",
+     "builder": "0x08028C04",
+     "vtable": "0x0804CDD4",
+     "size_bytes": 68,
+     "origin": "boss + per-facing offset (0x08752D6C: down (9,16), up (15,-56), left (-24,-16), right (48,-16); gfx 0x2B variant y -26) [DISASM]",
+     "length_px": "8,12,...,32 (+4/frame, 7 frames), 32 for 1 frame, then 28..4 (-4/frame) [VERIFIED +0x34 series]",
+     "reach_px": "origin + 32 along the facing: hit a player 80 px right of the boss centre [VERIFIED]",
+     "lifetime_frames": "15 [VERIFIED]",
+     "speed": "static (grows/shrinks)",
+     "damage": {
+      "attack_type": "0x086B8088 (melee kind, sub 0)",
+      "multiplier": 1024,
+      "stat": "boss STR",
+      "hits": "once (hit at frame 7 of 15 on the player at 80 px) [VERIFIED]"
+     },
+     "status": "VERIFIED"
+    },
+    "buu_candy_beam": {
+     "what": "Majin Buu candy beam",
+     "builder": "0x080286D4",
+     "vtable": "0x0804B3AC",
+     "size_bytes": 80,
+     "origin": "boss + 0x08752E28[facing] (right: +40,-26) [DISASM/VERIFIED]",
+     "length_px": "8 -> 40 (+4/frame, 9 frames), then the tail retracts 4 px/frame [VERIFIED +0x40/+0x20]",
+     "reach_px": "80 from the boss centre [VERIFIED]",
+     "lifetime_frames": "19 [VERIFIED]",
+     "damage": {
+      "attack_type": "0x086B8090 (energy sub 1)",
+      "multiplier": 0,
+      "stat": "POW",
+      "effect": "no HP damage; player becomes candy for 300 frames (global 0x03002FE4 counts down 1/frame, player controller vtable 0x0804BE60); IfGlobalFlag in Buu's trees tests it [VERIFIED]"
+     },
+     "status": "VERIFIED"
+    },
+    "kidbuu_beam": {
+     "what": "Kid Buu Kamehameha (player beam class)",
+     "builder": "0x080206B8",
+     "vtable": "0x0804AEF8",
+     "level_def": "0x0871DA68 (Kamehameha level 0: 32x32, mult 41, attack sub 5) [DISASM]",
+     "origin": "boss + 0x0875925C[facing] (x,y): down (8,-2), up (12,-2), left (12,-2), right (4,-2) [DISASM]",
+     "growth": "head advances ~3 px/frame: first hit at frame 10 (40 px), 12 (60), 16 (70), 19 (80), 21 (85); no hit at 90 px [VERIFIED]",
+     "reach_px": "85-90 [VERIFIED]",
+     "thickness": "hits at dy = +8 and -12 [VERIFIED]",
+     "lifetime_frames": "fires at controller frame 8, beam ends with the state at ~frame 91-94 [VERIFIED]",
+     "damage": {
+      "attack_type": "0x086B80B0 (energy sub 5)",
+      "multiplier": 41,
+      "stat": "boss POW",
+      "hits": "1-2 damage events per frame while overlapping (player i-frames zero most) [VERIFIED]"
+     },
+     "status": "VERIFIED"
+    },
+    "superbuu_ball": {
+     "what": "Super Buu lobbed energy ball",
+     "builder": "0x08021280",
+     "vtable": "0x0804A33C",
+     "data": "0x0872A6A8; launch 0x080214DA",
+     "size_bytes": ">=0x60",
+     "origin": "above the boss: (x+8, y-40) facing right [VERIFIED (433,393) for boss (425,433)]",
+     "charge_frames": "60 at the origin [VERIFIED]",
+     "flight": "aimed at the player position at launch; horizontal speed = distance/43 per frame (1.625 px/f for 70 px) ; height arc z0 = 32 px, vz0 = +2 px/f, gravity 1/8 px/f^2 (+0x50 += 32), lands after 43 frames [VERIFIED]",
+     "explosion": "on landing becomes an explosion box 32 px wide growing to 64 px [VERIFIED bbox]",
+     "damage": {
+      "attack_type": "0x086B80C0 (energy sub 7, Masenko)",
+      "multiplier": 16589,
+      "stat": "boss POW",
+      "hits": "1 (one-shot 135 HP Goku L60) [VERIFIED]"
+     },
+     "status": "VERIFIED"
+    },
+    "enemy_kiblast": {
+     "what": "standard enemy ki blast (registered node KiBlast 0x0802B89D)",
+     "vtable": "0x0804B454",
+     "speed_px_per_frame": 3,
+     "lifetime_frames": "~25-28 if nothing hit [VERIFIED]",
+     "damage": {
+      "attack_type": "0x086B80A8 (energy sub 4)",
+      "multiplier": 1024,
+      "stat": "boss POW"
+     },
+     "status": "VERIFIED"
+    }
+   },
+   "specials": {},
+   "projectile_base": null
+  },
+  "janemba": {
+   "bosses": {
+    "0x33": {
+     "name": "Janemba",
+     "stats": {
+      "hp": 8880,
+      "exp": 20500,
+      "STR": 0,
+      "POW": 0,
+      "END": 70,
+      "resist_melee": 64,
+      "resist_energy": 128,
+      "flinch": false,
+      "note": "resist_melee 64 = takes half melee damage; STR 0: all its damage comes from the hand objects (type 0x36, STR 22)"
+     },
+     "spawn": {
+      "area": "HFIL world 18 map 14",
+      "pos": [
+       128,
+       88
+      ],
+      "record": "0x0808CB70",
+      "condition": "story flag 123 set and flag 125 not set (cond script 0x0808CB5C)",
+      "per_spawn_script": "script #450 (0x08793934): defeat cutscene - actor 149 (Janemba) becomes actor 154 (Super Janemba) [INFERRED from the script; killing Janemba in the emulator starts a white-out transition, VERIFIED]",
+      "status": "DISASM"
+     },
+     "body_parts": {
+      "types": {
+       "0x34": "screen-left part (arm A), offset (-12,-22)",
+       "0x35": "screen-right part (arm B), offset (+44,-22)",
+       "0x37": "upper part, offset (+16,-41), mirrors body anim"
+      },
+      "hp": 0,
+      "status": "VERIFIED (offsets measured)"
+     },
+     "phases": [
+      {
+       "state": "0xFC",
+       "what": "create body parts 0x34/0x35/0x37",
+       "length": 4,
+       "status": "VERIFIED"
+      },
+      {
+       "state": "0xFD",
+       "what": "idle until 240 f after spawn (IfCooldownOver 240)",
+       "length": 239,
+       "status": "VERIFIED"
+      },
+      {
+       "state": "0xFE",
+       "what": "10 hand strikes back to back, 57 f each",
+       "pattern": "BABAABABAA",
+       "length": 573,
+       "status": "VERIFIED"
+      },
+      {
+       "state": "0x101 / 0x102 / 0x103",
+       "what": "JanembaAscend (129 f, invulnerable) + JanembaDescendSummon (tops Mini-Janembas up to 5 at fixed arena positions) - 230 f total; then HP check",
+       "length": 230,
+       "status": "VERIFIED"
+      },
+      {
+       "state": "0x104 / 0x105 / 0x106",
+       "what": "HP >= 10%: wait (attackable, standing) until every Mini-Janemba is dead",
+       "status": "VERIFIED"
+      },
+      {
+       "state": "0xFF",
+       "what": "then 10 strikes AABABBBABA",
+       "pattern": "AABABBBABA",
+       "length": 571,
+       "status": "VERIFIED"
+      },
+      {
+       "state": "0x100",
+       "what": "(third cycle) 10 strikes AAABABABBB",
+       "pattern": "AAABABABBB",
+       "status": "DISASM"
+      },
+      {
+       "state": "0x108 / 0x109 / 0x107",
+       "what": "HP < 10% (IfHpBelow 0x1999): after the summon it does NOT wait for the minis; 10 strikes each followed by Wait 24 (81 f per strike) - patterns 0x108 AABABBBABA, 0x109 AAABABABBB, 0x107 BABAABABAA",
+       "length": 812,
+       "status": "VERIFIED (0x108 lasted 812 f; minis kept spawning up to 5)"
+      }
+     ],
+     "cycle": "0xFE strikes -> 0x101 summon -> [wait minis | <10%: 0x108 strikes] -> 0xFF/0x108 strikes -> 0x102 summon -> [wait | 0x109] -> 0x100/0x109 strikes -> 0x103 summon -> [wait | 0x107] -> 0xFE ...",
+     "attacks": [
+      {
+       "name": "hand strike A/B",
+       "attacker": "Janemba Hand object (type 0x36): STR 22",
+       "attack_type": "0x086B8098 melee sub 2 (can crit)",
+       "multiplier": 1024,
+       "hits": 1,
+       "hit_window_hand_frames": [
+        16,
+        55
+       ],
+       "hand_position": "player position at hand creation + (4,0) [A] or (-20,0) [B]",
+       "status": "VERIFIED (hit 33 f after strike start; hand 0x36 created every 57 f)"
+      }
+     ],
+     "movement": "none (stationary); rises off-screen at 3 px/frame during JanembaAscend and descends at 3 px/frame during the summon",
+     "invulnerability": "no damage while airborne (JanembaAscend); VERIFIED (ComputeDamage called, HP unchanged)",
+     "summons": {
+      "type": "0x38 Mini-Janemba",
+      "count": "top-up to 5 each summon",
+      "positions": [
+       [
+        104,
+        112
+       ],
+       [
+        120,
+        136
+       ],
+       [
+        152,
+        144
+       ],
+       [
+        184,
+        136
+       ],
+       [
+        200,
+        112
+       ]
+      ],
+      "status": "VERIFIED"
+     },
+     "heals": "none",
+     "verified": [
+      "bv_janemba_early.py 0x33 (timeline, part chain)",
+      "bv_janemba_early.py 0x33 2400 1100 (kill minis -> leaves 0x104)",
+      "bv_janemba_early.py 0x33 2400 - 0.05 (<10% branch)",
+      "bv_janemba_vuln.py (airborne invulnerable, attackable while minis live)",
+      "bv_janemba_death.py 0x33 (death -> white-out transition)"
+     ]
+    },
+    "0x7a": {
+     "name": "Super Janemba",
+     "stats": {
+      "hp": 25840,
+      "exp": 20500,
+      "STR": 47,
+      "POW": 70,
+      "END": 55,
+      "resist_melee": 128,
+      "resist_energy": 128,
+      "flinch": false
+     },
+     "spawn": {
+      "area": "HFIL world 18 map 14",
+      "records": [
+       "0x0808CB98",
+       "0x0808CBC0"
+      ],
+      "condition": "always (1); placed by cutscene scripts #451 / #452 (records at (0,0))",
+      "status": "DISASM/INFERRED"
+     },
+     "phases": [
+      {
+       "state": "0x2D2",
+       "what": "idle until player within 72 px (IfPlayerWithin2 r2=5184)",
+       "status": "DISASM"
+      },
+      {
+       "state": "0x2D3 (decision, every frame)",
+       "what": "SubState 0x2DE (reactions) first; player > 120 px -> 0x2D4 chase 0.8984 px/f; 50 < d <= 120: Chance 80%/f -> {15%/f: 0x2DB teleport+melee, 20%/f: 0x2DA wave}; else (d <= 50 or the rolls fail) 100%: {50%: 0x2D5 melee approach, 70% of rest: 0x2D7 step 0.7969 px/f, else 0x2D8 step 1.0977 px/f}",
+       "status": "DISASM"
+      },
+      {
+       "state": "0x2DE (reactions, checked inside 0x2D3/0x2D4/0x2D5/0x2D7)",
+       "what": "HP < 25% -> 0x2DC berserk (permanent).  After 90 f in a state: player attacking me -> 20%/f block (0x2D9); I am in the player beam line -> 80%/f block",
+       "status": "DISASM"
+      },
+      {
+       "state": "0x2DC berserk (HP < 25%)",
+       "what": "TeleportChain4 (4 teleports 72 f apart: below, above, left, right of the player, 32 px) + FacePlayer + MeleeAttack, loop forever",
+       "loop_frames": 306,
+       "status": "VERIFIED"
+      }
+     ],
+     "attacks": [
+      {
+       "name": "melee (0x2D5 approach -> 0x2D6)",
+       "node": "MeleeAttack",
+       "attack_type": "0x086B8098 melee sub 2",
+       "multiplier": 1024,
+       "attacker": "STR 47",
+       "follow_up": "Wait 6, then 50% chance to repeat if the player is still in melee range",
+       "measured": "~191-196 HP per hit on Goku L60 (END 26)",
+       "status": "VERIFIED"
+      },
+      {
+       "name": "teleport + melee (0x2DB)",
+       "sequence": "TeleportNearPlayer (frame 36 reappears 32 px from the player, random side) -> FacePlayer -> MeleeAttack",
+       "state_length": 90,
+       "status": "VERIFIED"
+      },
+      {
+       "name": "energy wave (0x2DA)",
+       "sequence": "AlignWithPlayer(179/256 px/f) until aligned (0.8%/f abort) -> SuperJanembaWave: spawn at frame 24, done at 40",
+       "projectile": "super_janemba_wave",
+       "status": "VERIFIED"
+      },
+      {
+       "name": "block (0x2D9)",
+       "sequence": "ParallelAll(Block, until player stops attacking or 5%/f)",
+       "status": "DISASM"
+      }
+     ],
+     "movement": {
+      "chase_far": 0.8984,
+      "chase_melee": 1.1992,
+      "step_slow": 0.7969,
+      "step_fast": 1.0977,
+      "align": 0.6992,
+      "unit": "px/frame (speed/256)",
+      "status": "DISASM (node params)"
+     },
+     "teleports": "TeleportNearPlayer / TeleportChain4: 32 px from the player, frame 36 of each teleport",
+     "invulnerability": "none special (normal enemy; does not flinch)",
+     "heals": "none",
+     "verified": [
+      "bv_janemba_super.py (state log, teleports, melee damage)",
+      "bv_janemba_super.py 900 0.2 (berserk loop)",
+      "bv_janemba_shot.py (wave speed, box, damage)"
+     ]
+    },
+    "0x38": {
+     "name": "Mini-Janemba",
+     "stats": {
+      "hp": 1475,
+      "exp": 1250,
+      "STR": 20,
+      "POW": 0,
+      "END": 56,
+      "resist_melee": 128,
+      "resist_energy": 128,
+      "flinch": true,
+      "hit_reaction": "standard (knockback + flinch, behaviour def 0x08708920)"
+     },
+     "spawn": {
+      "how": "summoned by Janemba (JanembaDescendSummon), 5 at fixed positions",
+      "status": "VERIFIED"
+     },
+     "phases": [
+      {
+       "state": "0x10F",
+       "what": "HP < 10% -> 0x111 (flee hops) else 0x110 (hop toward)",
+       "status": "VERIFIED"
+      },
+      {
+       "state": "0x110",
+       "what": "MiniHopToward; each frame 4% chance, if player within 47 px box and hittable -> 0x112",
+       "status": "DISASM"
+      },
+      {
+       "state": "0x112",
+       "what": "MiniRollAttack (dash frames 16-31 at 1.5 px/f/axis, hit on frame 32) + Wait 120",
+       "length": 153,
+       "status": "VERIFIED"
+      }
+     ],
+     "attacks": [
+      {
+       "name": "roll attack",
+       "attack_type": "0x086B8088 melee sub 0",
+       "multiplier": 1024,
+       "attacker": "STR 20",
+       "hit_frame": 32,
+       "box": "own body box",
+       "status": "VERIFIED (timing)"
+      }
+     ],
+     "movement": {
+      "hop_cycle": 32,
+      "airborne": 16,
+      "speed_airborne": 0.5,
+      "average": 0.25,
+      "re_aim_chance": 0.25,
+      "status": "VERIFIED"
+     }
+    },
+    "0x39": {
+     "name": "Janemba Hand (HFIL field enemy)",
+     "stats": {
+      "hp": 50,
+      "exp": 1125,
+      "STR": 35,
+      "END": 0,
+      "flinch": true
+     },
+     "spawn": {
+      "area": "HFIL world 18 maps 1-13",
+      "condition": "inline 0x2007D",
+      "status": "DISASM"
+     },
+     "phases": [
+      {
+       "state": "0x114",
+       "what": "SpawnPuff + Wait 120",
+       "length": 122,
+       "status": "VERIFIED"
+      },
+      {
+       "state": "0x118",
+       "what": "idle, Chance 1%/f -> 0x115 (mean 100 f)",
+       "status": "VERIFIED"
+      },
+      {
+       "state": "0x115",
+       "what": "HandAmbush: teleport under the player (x+4 or x-20), hit frames 80-103",
+       "length": 106,
+       "status": "VERIFIED"
+      },
+      {
+       "state": "0x117",
+       "what": "HandSink + Wait 180",
+       "length": 287,
+       "status": "VERIFIED"
+      }
+     ],
+     "attacks": [
+      {
+       "name": "ambush",
+       "attack_type": "0x086B8098 melee sub 2",
+       "multiplier": 1024,
+       "attacker": "STR 35",
+       "hit_window": [
+        80,
+        103
+       ],
+       "status": "VERIFIED"
+      }
+     ]
+    },
+    "0x36": {
+     "name": "Janemba Hand (boss-spawned)",
+     "stats": {
+      "hp": 50,
+      "exp": 0,
+      "STR": 22,
+      "flinch": false
+     },
+     "notes": "created by JanembaHandStrikeA/B under the player; Idle AI; its rising controller 0x0804C338 does the hit (see HAND_HIT); removed after its animation",
+     "status": "VERIFIED"
+    },
+    "0x34": {
+     "name": "Janemba part (arm A)",
+     "notes": "0 HP, Idle; animated by JanembaHandStrikeA",
+     "status": "VERIFIED"
+    },
+    "0x35": {
+     "name": "Janemba part (arm B)",
+     "notes": "0 HP, Idle; animated by JanembaHandStrikeB",
+     "status": "VERIFIED"
+    },
+    "0x37": {
+     "name": "Janemba part (upper)",
+     "notes": "0 HP; PartMirrorAnim",
+     "status": "INFERRED"
+    },
+    "0x8d": {
+     "name": "floor trigger object (map 0/50, 12 placements)",
+     "notes": "IfPlayerOnTop (16 px) -> TriggerSelf (own vfunc +0x74(1)); not a combatant; spawn conditions are story-flag scripts",
+     "status": "INFERRED"
+    }
+   },
+   "projectiles": {
+    "janemba_hand_36": {
+     "kind": "enemy object (not a projectile class): Janemba Hand type 0x36 created under the player",
+     "ctor": "0x0800F68C via spawn record 0x0877B050 (type 0x36, gfx 0x96)",
+     "speed_px_per_frame": 0,
+     "lifetime_frames": "until its rising animation ends (strike node ~57 f)",
+     "hitbox": "hand collision box (0x0800FE78)",
+     "hit_window_frames": [
+      16,
+      55
+     ],
+     "hits": 1,
+     "damage": {
+      "attack_type": "0x086B8098 (melee, sub 2, can crit)",
+      "multiplier": 1024,
+      "stat": "hand STR 22 vs player END"
+     },
+     "status": "VERIFIED (timing), DISASM (damage fields)"
+    },
+    "super_janemba_wave": {
+     "ctor": "builder 0x080359D4 (base ctor 0x08019B04, gfx arg 0x800)",
+     "vtable": "0x0804B9B4",
+     "update": "0x08035A81",
+     "speed_px_per_frame": 2.625,
+     "velocity_table": "0x08759688: down (0,672) up (0,-672) left (-672,0) right (672,0) /256",
+     "hitbox": {
+      "table": "0x0875A6A8 + 12*dir (s8 ox, s8 oy, u8 w, u8 h)",
+      "down_up": "x-8 .. x+56, y-32 .. y (64 wide, 32 tall)",
+      "left_right": "x-32 .. x, y-8 .. y+56 (32 wide, 64 tall)",
+      "measured_right": [
+       -32,
+       -8,
+       0,
+       56
+      ]
+     },
+     "spawn": "controller frame 24 of SuperJanembaWave; muzzle = boss bbox origin + (4,4)/(13,-24)/(-8,-8)/(24,-8) for down/up/left/right",
+     "lifetime_frames": "no timer: until off-screen, wall (projectile passability map) or a hit",
+     "damage": {
+      "attack_type": "0x086B8090 (energy, sub 1)",
+      "multiplier": 1024,
+      "stat": "owner POW 70 vs player END2 / energy resist",
+      "measured": "157 HP on Goku L60 (END2 26); model range 151-166"
+     },
+     "status": "VERIFIED (speed, box, spawn frame, damage), DISASM (tables)"
+    }
+   },
+   "specials": {},
+   "projectile_base": null
+  },
+  "fighters": {
+   "bosses": {
+    "0xa": {
+     "name": "Broly (Volcano Summit)",
+     "hp": 20240,
+     "exp": 30000,
+     "STR": 32,
+     "POW": 27,
+     "END": 70,
+     "resist": [
+      128,
+      128
+     ],
+     "flinch": "pushes hit-stun state 2 on every hit (VERIFIED: punches every 20 f keep him in state 2); table byte says no knockback",
+     "initial_state": 51,
+     "spawn": {
+      "area": "Volcano Summit (world 15, map 32)",
+      "pos": [
+       224,
+       200
+      ],
+      "gfx": 38,
+      "record": "0x0808BD6C",
+      "condition_word": "0x0002006F (inline; story-flag gate, INFERRED)",
+      "defeat_script": "0x0879321C (record+0x14 -> 0x0800424F run_script; fires on death, VERIFIED)"
+     },
+     "phases": [
+      {
+       "phase": 1,
+       "states": "0x33-0x3C, 0x41",
+       "status": "DISASM",
+       "enter": "state 0x33: BrolySpawnRocks (3 x 32x32 rocks at (200,136), (112,272), (296,240)) -> 0x34"
+      },
+      {
+       "phase": 2,
+       "trigger": "HP < 10 % (IfHpBelow 0x1999 checked every frame via SubState 0x41)",
+       "states": "0x43-0x50 (identical to type 0x0B)",
+       "status": "VERIFIED",
+       "evidence": "HP set to 9 % -> GotoState 0x43 on the first frame"
+      }
+     ],
+     "attacks": [
+      {
+       "state": 55,
+       "name": "punch",
+       "trigger": "player in melee range in state 0x36: 40 %/f",
+       "node": "MeleeAttack",
+       "hit_frame": 0,
+       "mult": 1024,
+       "atype": "0x086B8098 melee",
+       "recovery": "Wait 6",
+       "chain": "20 %/f re-enter 0x37 if still in range (40 % in phase 2)",
+       "status": "VERIFIED"
+      },
+      {
+       "state": 60,
+       "name": "charged punch",
+       "trigger": "player in melee range in state 0x36: 40 %/f",
+       "node": "ChargedPunch",
+       "windup_frames": 140,
+       "hit_frame": 140,
+       "mult": 1536,
+       "state_frames": 149,
+       "hitbox": "rect adjacent to the facing side (dominant axis)",
+       "invulnerable": "from frame 140 (obj+0x1CC=0)",
+       "status": "VERIFIED"
+      },
+      {
+       "state": 58,
+       "name": "ki blast",
+       "trigger": "player farther than 50 px: 15 %/f",
+       "node": "AlignWithPlayer 0.699 px/f then KiBlast",
+       "projectile": "enemy KiBlast (regular group), energy sub 4, mult 1024; spawned ~15 f after the shot starts",
+       "status": "VERIFIED"
+      },
+      {
+       "state": 59,
+       "name": "block",
+       "trigger": "after 60 f in a state: player attacking or Broly in the player beam line: 20 %/f",
+       "node": "Block",
+       "exit": "player stops attacking, or 5 %/f",
+       "status": "DISASM"
+      }
+     ],
+     "attacks_phase2": [
+      {
+       "state": 70,
+       "name": "punch",
+       "mult": 1024,
+       "chain": "40 %/f",
+       "status": "VERIFIED"
+      },
+      {
+       "state": 75,
+       "name": "charged punch",
+       "mult": 1536,
+       "windup_frames": 140,
+       "state_frames": 149,
+       "status": "VERIFIED"
+      },
+      {
+       "state": 73,
+       "name": "ki blast",
+       "trigger": "farther than 50 px: 15 %/f",
+       "align_speed": 1.098,
+       "status": "VERIFIED"
+      },
+      {
+       "state": 76,
+       "name": "jump smash",
+       "trigger": "farther than 50 px and no ki blast: 5 %/f",
+       "node": "JumpSmash",
+       "timeline": "crouch f0-7, rise f8-55 (off screen), home f56-199 at 1 px/f per axis toward the player, descend f200-247, land f248",
+       "landing_hit": {
+        "frame": 248,
+        "mult": 1024,
+        "atype": "0x086B8098 melee",
+        "hitbox": "rect on the side facing the player (IfMeleeHit)"
+       },
+       "after_landing": "state 0x4E: finish anim (~11 f) -> 0x43; if the landing destroyed a rock (2nd landing on the same rock) -> state 0x4D: stunned 120 f (IfCooldownOver 120) -> 0x4F get-up",
+       "status": "VERIFIED"
+      },
+      {
+       "state": 74,
+       "name": "block",
+       "trigger": "after 90 f in a state: 20 %/f if attacked / in beam line",
+       "status": "DISASM"
+      }
+     ],
+     "movement": {
+      "phase1": {
+       "step": 0.797,
+       "chase": 0.797
+      },
+      "phase2": {
+       "step": 1.098,
+       "chase": 1.098
+      },
+      "note": "StepToward/ChaseThroughRocks: rocks are passable for Broly only (msg 0x22)",
+      "choice": "state 0x34/0x43: farther 120 px -> chase state; else 70 %/f approach, 70 %/f step, else wander-step; 0.8 %/f re-decide",
+      "status": "DISASM"
+     },
+     "specials": [
+      "arena rocks: 3 solid 32x32 blocks; Broly's jump landing cracks then destroys a rock; landing on a rock that breaks stuns him 120 f (the intended opening)",
+      "no healing, no teleports"
+     ],
+     "verified": [
+      "charged punch hit 140 f after entry, mult 1536 (bv_fighters_batch broly_free/broly2_free)",
+      "phase change at HP < 10 % (broly_hp10)",
+      "jump smash timeline 248 f + landing hit x1.0 (bv_fighters_broly2.py, donor gfx 0x0A)",
+      "ki blast energy sub 4 x1.0 (broly_3a)",
+      "no damage gate: punches land in any state (bv_fighters_vuln.py)",
+      "defeat script fires on death (bv_fighters_death.py)"
+     ]
+    },
+    "0xb": {
+     "name": "Broly (phase-2 type)",
+     "hp": 20240,
+     "exp": 30000,
+     "STR": 35,
+     "POW": 30,
+     "END": 75,
+     "resist": [
+      128,
+      128
+     ],
+     "initial_state": 66,
+     "note": "starts directly in the phase-2 tree (0x42 -> 0x43); has no spawn record of its own (script-created, INFERRED); no rocks are spawned by this type",
+     "same_as": "0x0A phase 2",
+     "status": "VERIFIED"
+    },
+    "0x12": {
+     "name": "Dabura",
+     "hp": 10000,
+     "exp": 7850,
+     "STR": 22,
+     "POW": 5,
+     "END": 51,
+     "resist": [
+      128,
+      128
+     ],
+     "flinch": "hit-stun pushes state 2; every push increments obj+0x1E4 (VERIFIED: 3 hits -> counter 3)",
+     "initial_state": 110,
+     "spawn": {
+      "area": "Demon World (8, 68)",
+      "pos": [
+       144,
+       200
+      ],
+      "gfx": 73,
+      "defeat_script": "0x0878F33C"
+     },
+     "phases": [
+      {
+       "name": "melee",
+       "states": "0x6E-0x77",
+       "status": "DISASM",
+       "desc": "0x6E: MarkTime, counter=0 -> 0x6F priority: melee range 20 %/f -> 0x71 punch (Wait 6); within 70 px 4 %/f step 0.598; farther 90 px 8 %/f chase 0.598; 2 %/f AlignWithPlayer 0.699; 0.8 %/f back off 0.797; 12 %/f chase; else stand/face. SubState 0x77 each frame: player petrified -> 0x7D; after 90 f: player attacking / beam line -> 0x75 Block (5 %/f -> 0x76 Wait 60); counter == 3 -> 0x78"
+      },
+      {
+       "name": "dark sphere",
+       "trigger": "3rd hit-stun (obj+0x1E4 == 3)",
+       "states": "0x78 -> 0x79",
+       "status": "VERIFIED",
+       "desc": "0x78 anim 0x12; 0x79 DarkSphere: sphere spawned (see PROJECTILES dabura_sphere). Sphere destroyed (byte 0x030032E4 = 1) -> 0x80: anim 21 + Wait 300 (stunned 300 f, VULNERABLE) -> 0x6E; sphere expired (= 3, after ~444 f) -> 0x7A"
+      },
+      {
+       "name": "spit barrage",
+       "states": "0x7A-0x7C",
+       "status": "VERIFIED",
+       "desc": "0x7A anim, counter=0 -> 0x7B MoveToPoint(1.0 px/f -> map (192,80)), anim 0x13, Wait 180 -> 0x7C x10: AimAtPlayer, ParallelAny(Wait 42 | player petrified -> 0x7D), StoneSpit, IncCounter; after 10 spits -> 0x6E"
+      },
+      {
+       "name": "punish petrified player",
+       "states": "0x7D-0x7F",
+       "status": "VERIFIED",
+       "desc": "0x7D Chase 1.0 px/f until in melee range -> 0x7E; 0x7E: player no longer petrified -> 0x6E; in range -> 0x7F MeleeAttack + Wait 24 (one punch per 42 f observed); else chase 0.199 px/f"
+      }
+     ],
+     "attacks": [
+      {
+       "name": "punch",
+       "state": 113,
+       "mult": 1024,
+       "recovery": "Wait 6",
+       "status": "VERIFIED"
+      },
+      {
+       "name": "stone spit",
+       "state": 124,
+       "projectile": "dabura_spit",
+       "cadence": "aim + 42 f + spit, x10",
+       "status": "VERIFIED"
+      },
+      {
+       "name": "dark sphere",
+       "state": 121,
+       "projectile": "dabura_sphere",
+       "status": "VERIFIED"
+      }
+     ],
+     "verified": [
+      "sphere: grows 315 f, global 0->2 at f339, ->3 at f464 when not shrunk (bv_fighters_dabura.py)",
+      "spit: 2.0 px/f, energy sub 1 x1.0, petrifies the player ~297 f (bv_fighters_dabura2.py)",
+      "counter increments per hit-stun, sphere at 3 (bv_fighters_dabura3.py)"
+     ],
+     "gaps": [
+      "MoveToPoint (192,80) is unreachable on the test map, so the barrage start was forced"
+     ]
+    },
+    "0x46": {
+     "name": "Majin Vegeta",
+     "hp": 8500,
+     "exp": 7850,
+     "STR": 22,
+     "POW": 25,
+     "END": 36,
+     "resist": [
+      128,
+      128
+     ],
+     "initial_state": 348,
+     "spawn": {
+      "area": "Rocky Canyon (8, 70)",
+      "pos": [
+       274,
+       303
+      ],
+      "gfx": 282,
+      "note": "4 spawn records with different defeat scripts 0x0878E4D0 / 0x0878F534 / 0x0878F87C / 0x0878FE10 (story variants, INFERRED)"
+     },
+     "phases": [
+      {
+       "phase": 1,
+       "note": "single phase; no HP thresholds",
+       "status": "DISASM"
+      }
+     ],
+     "tree": "generic fighter (aggro 100 px) plus: farther than 50 px 4 %/f -> 0x160 Align 0.598 + KiBlast; farther than 50 px 4 %/f -> 0x161 Align 0.598 + FinalFlash; after 90 f block check (attacked: 20 %/f)",
+     "attacks": [
+      {
+       "name": "punch",
+       "state": 351,
+       "mult": 1024,
+       "recovery": "Wait 18",
+       "status": "VERIFIED"
+      },
+      {
+       "name": "ki blast",
+       "state": 352,
+       "projectile": "enemy KiBlast, energy sub 4, x1.0",
+       "status": "VERIFIED"
+      },
+      {
+       "name": "Final Flash",
+       "state": 353,
+       "projectile": "final_flash_beam",
+       "fire_frame": 24,
+       "state_frames": 181,
+       "observed": "155 hits (one per frame) x328 energy sub 11 on a player standing in the beam",
+       "status": "VERIFIED"
+      }
+     ],
+     "movement": {
+      "step": 0.598,
+      "chase": 0.598,
+      "back_off": 0.797,
+      "align": 0.598,
+      "status": "DISASM"
+     }
+    },
+    "0x88": {
+     "name": "Vegeta (Gravity Chamber)",
+     "hp": 5,
+     "initial_state": 783,
+     "status": "DISASM",
+     "behaviour": "aggro 100 px; stands facing the player; player within 60 px -> 0x311: ParallelAll(StepAwayFromPlayer 2.0 px/f + InlineScript (natives 0x38, 0x3C x3, 0x47(0,282), 0x45(282,152,176,60), 0x3A) | player farther than 80 px -> back); no attacks (training NPC)"
+    },
+    "0x89": {
+     "name": "Vegeta (Barren Wasteland NPC)",
+     "hp": 1,
+     "initial_state": 787,
+     "status": "VERIFIED",
+     "behaviour": "WanderToRandomPoint (x 96..391, y 112..351) then Wait 60, loop (~176 f per cycle observed)"
+    },
+    "0x60": {
+     "name": "Pui Pui",
+     "hp": 50,
+     "exp": 3170,
+     "STR": 15,
+     "POW": 15,
+     "END": 10,
+     "initial_state": 460,
+     "tree": "generic fighter",
+     "note": "50 HP in the type table (dies in a few hits)",
+     "status": "VERIFIED"
+    },
+    "0x91": {
+     "name": "Yakon",
+     "hp": 1725,
+     "exp": 5300,
+     "STR": 20,
+     "POW": 68,
+     "END": 41,
+     "resist": [
+      7,
+      128
+     ],
+     "resist_note": "melee resist 7/128 = 5.5 % of melee damage: effectively energy-only (type table, enemies.json)",
+     "initial_state": 796,
+     "spawn": {
+      "area": "Yakon's Planet (8, 40)",
+      "pos": [
+       205,
+       96
+      ],
+      "gfx": 300,
+      "defeat_script": "0x0878EAE4"
+     },
+     "loop": [
+      "0x31C MarkTime -> 0x31D: Wander (4 %/f turn, 0.797 px/f) / 0x31E: MoveToPoint 0.797 px/f to map (216,96), alternating 4 %/f; SubState 0x320 each frame: after 300 f cooldown, 0.7 %/f -> 0x321",
+      "0x321 StandStill, Wait 30, chase 1.398 px/f until in melee range -> 0x322",
+      "0x322 combo: 6 x (chase 1.398 until in range, MeleeAttack x1.0); observed 6 hits ~17-32 f apart over ~161-175 f; then anim 0x13, counter = 0 -> 0x323",
+      "0x323 Wait 60; counter == 0 (not hit during the wait) -> 0x326 beam, else -> 0x324",
+      "0x326 MouthBeamDown: beam straight down from (x+32, y-16), ~253 f of x328 energy sub 11 hits; state ~271 f -> 0x324",
+      "0x324 MoveToPoint 0.797 px/f to map (216,96) -> 0x325: anim, SummonMiniYakons (5 x type 0x92 at y 96, x 192..272 step 20), WaitSummonsDead (stands until all 5 die), anim -> 0x31C"
+     ],
+     "attacks": [
+      {
+       "name": "combo punch",
+       "state": 802,
+       "hits": 6,
+       "mult": 1024,
+       "chase_speed": 1.398,
+       "status": "VERIFIED"
+      },
+      {
+       "name": "mouth beam",
+       "state": 806,
+       "projectile": "final_flash_beam",
+       "direction": "down",
+       "status": "VERIFIED"
+      },
+      {
+       "name": "summon",
+       "state": 805,
+       "count": 5,
+       "type": 146,
+       "status": "VERIFIED"
+      }
+     ],
+     "verified": [
+      "combo 6 hits (yakon_free)",
+      "beam hits x328 sub 11 for ~253 f (bv_fighters_yakon2.py)",
+      "5 Mini-Yakons spawned at y 96 (bv_fighters_yakon.py)"
+     ]
+    },
+    "0x92": {
+     "name": "Mini-Yakon",
+     "hp": 850,
+     "exp": 950,
+     "STR": 20,
+     "POW": 16,
+     "END": 38,
+     "initial_state": 807,
+     "status": "VERIFIED",
+     "behaviour": "loop: Hop (32 f cycle) then 10 %/f -> 0x32A MiniYakonLunge (anim 4) + Wait 24 (~100 f per cycle observed); damage only by touching: contact attack type 0x086B8088 (sub 0) x1.0",
+     "flinch": "standard knockback + flinch"
+    },
+    "0x6f": {
+     "name": "Spopovich (with Yamu)",
+     "hp": 1855,
+     "exp": 450,
+     "STR": 22,
+     "POW": 0,
+     "END": 25,
+     "initial_state": 550,
+     "spawn": {
+      "area": "World Tournament Stadium (7, 6)",
+      "pos": [
+       392,
+       366
+      ],
+      "gfx": 252,
+      "defeat_script": "0x0878CBA8"
+     },
+     "tree": "generic fighter (no aggro check, WalkToPlayer 0.598 instead of chase) plus: player within 16 px: 20 %/f -> 0x22E GrabWindup -> 0x22F BearHug",
+     "attacks": [
+      {
+       "name": "punch",
+       "mult": 1024,
+       "recovery": "Wait 18",
+       "status": "VERIFIED"
+      },
+      {
+       "name": "bear hug",
+       "state": 559,
+       "effect": "player frozen, held at (+8,-16); released when Yamu finishes draining or after 5 D-pad presses (DISASM); no damage",
+       "status": "VERIFIED"
+      }
+     ],
+     "partner": "Yamu 0x93 (class 0x130)",
+     "status": "VERIFIED"
+    },
+    "0x93": {
+     "name": "Yamu (with Spopovich)",
+     "hp": 1476,
+     "exp": 350,
+     "STR": 20,
+     "POW": 0,
+     "END": 23,
+     "initial_state": 812,
+     "spawn": {
+      "area": "World Tournament Stadium (7, 6)",
+      "pos": [
+       300,
+       366
+      ],
+      "gfx": 303,
+      "defeat_script": "0x0878CBE4"
+     },
+     "tree": "generic fighter (melee 20 %/f within 50 px, step 8 %/f, chase 2 %/f) plus SubState 0x333: partner Spopovich holding the player -> 0x334: Wait 60, EnergyDrain",
+     "attacks": [
+      {
+       "name": "energy drain",
+       "state": 820,
+       "rate": "1 EP per 8 f",
+       "amount": "maxEP/4 (only if EP > maxEP/4)",
+       "then": "msg 9 -> Spopovich releases; 60 f",
+       "status": "VERIFIED"
+      }
+     ],
+     "verified": [
+      "grab + drain: 400 maxEP player drained 100 EP at 1/8 f, release at f1096 (bv_fighters_duo.py)"
+     ]
+    },
+    "0x6d": {
+     "name": "Spopovich (225 HP variant)",
+     "hp": 225,
+     "tree": "generic fighter, WalkToPlayer 0.598",
+     "status": "DISASM"
+    },
+    "0x6e": {
+     "name": "Spopovich (225 HP variant)",
+     "hp": 225,
+     "tree": "generic fighter, WalkToPlayer 0.598",
+     "status": "DISASM"
+    },
+    "0x70": {
+     "name": "Spopovich (1855 HP, no grab)",
+     "hp": 1855,
+     "tree": "generic fighter, WalkToPlayer 0.598",
+     "status": "DISASM"
+    },
+    "0x94": {
+     "name": "Yamu (no drain)",
+     "hp": 1476,
+     "tree": "generic fighter",
+     "status": "DISASM"
+    },
+    "0xd": {
+     "name": "swarm unit (gfx 44, unnamed)",
+     "hp": 100,
+     "POW": 46,
+     "initial_state": 82,
+     "status": "DISASM",
+     "behaviour": "SpawnPuff on entry; Wander 10 %/f 0.398 px/f; slot shuffle; MoveToFormationA/B (player + table offsets 0x0877AE80 / 0x0877AECC); Wait 120; every state checks IfContactExplode: touching anything = energy hit x4.0 (attack type 0x086B8090) then SelfDestruct"
+    },
+    "0xe": {
+     "name": "freeze helper (gfx 45, unnamed)",
+     "hp": 4450,
+     "STR": 50,
+     "END": 60,
+     "initial_state": 88,
+     "status": "DISASM",
+     "behaviour": "Wait 90, anim 0, FreezePlayer (player frozen while it plays anim 0x12), loop"
+    },
+    "0x22": {
+     "name": "inert helper",
+     "initial_state": 224,
+     "behaviour": "Idle forever",
+     "status": "DISASM"
+    },
+    "0x72": {
+     "name": "inert helper",
+     "initial_state": 569,
+     "behaviour": "Idle forever",
+     "status": "DISASM"
+    },
+    "0x7e": {
+     "name": "inert helper",
+     "initial_state": 226,
+     "behaviour": "Idle forever",
+     "status": "DISASM"
+    }
+   },
+   "projectiles": {
+    "final_flash_beam": {
+     "ctor": "0x08036FA2",
+     "vtable": "0x0804AF24",
+     "size_bytes": 72,
+     "users": [
+      "Majin Vegeta 0x161",
+      "Yakon 0x326"
+     ],
+     "shape": "24 px wide (origin +-12), extends from the origin in the facing direction in 8 px steps until a wall tile (0x08009324 collision test)",
+     "status": "DISASM",
+     "damage": {
+      "atype": "0x086B80E0 (energy, sub 11 Final Flash)",
+      "mult": 328,
+      "stat": "attacker POW",
+      "rate": "one hit per frame while the player overlaps",
+      "status": "VERIFIED"
+     },
+     "lifetime": {
+      "majin_vegeta": "spawned at state frame 24, ~166 f (155 hits observed)",
+      "yakon": "~253 f of hits observed",
+      "status": "VERIFIED"
+     }
+    },
+    "dabura_spit": {
+     "ctor": "0x0802E444",
+     "vtable": "0x0804AC5C",
+     "size_bytes": 84,
+     "base": "enemy projectile base 0x08019B04",
+     "speed_px_per_frame": 2.0,
+     "aim": "at the player centre at spawn; velocity normalised on the dominant axis (major axis 2.0 px/f)",
+     "status": "VERIFIED",
+     "damage": {
+      "atype": "0x086B8090 (energy, sub 1)",
+      "mult": 1024,
+      "stat": "Dabura POW (5)",
+      "status": "VERIFIED"
+     },
+     "effect": "petrifies the player (stone anim); lasted ~297 f with no input (VERIFIED); while petrified Dabura chases and punches",
+     "lifetime": "until it hits (39 f to cover ~78 px observed)"
+    },
+    "dabura_sphere": {
+     "ctor": "0x0803AEA8",
+     "vtable": "0x0804A884",
+     "size_bytes": 32,
+     "shape": "circle around Dabura (centre +2,-17)",
+     "status": "VERIFIED",
+     "growth": "radius (1/256 px) starts 256 (1 px), +51 per frame (float 51.2) to 64 px (~315 f); then byte 0x030032E4 = 2 and it expands +128/f (0.5 px/f) while fading (alpha (128-r)*50/64); at alpha 0 -> byte = 3 (expired, ~125 f later)",
+     "damage": {
+      "method": "world broadcast msg 0x28 with the circle every frame (player inside takes it)",
+      "atype": "0x086B8098 (melee sub 2)",
+      "mult": 1024,
+      "stat": "Dabura STR",
+      "status": "VERIFIED"
+     },
+     "counterplay": "each player ENERGY hit (attack kind 1) on the sphere while byte == 0 shrinks it by 102/256 px; radius < 1 px -> byte = 1, 4 dust puffs, Dabura stunned 300 f (DISASM)"
+    },
+    "broly_rocks": {
+     "ctor": "0x08036A44",
+     "vtable": "0x0804AF50",
+     "size_bytes": 60,
+     "status": "DISASM",
+     "shape": "32x32 solid block (collision tiles), 3 at (200,136), (112,272), (296,240)",
+     "states": "intact -> cracked -> destroyed (def 0x0875F7AC / +0xC / +0x18), one step per Broly landing; msg 0x22 toggles passability for Broly"
+    }
+   },
+   "specials": {},
+   "projectile_base": null
+  },
+  "others": {
+   "bosses": {
+    "0x0": {
+     "name": "Airship Warlord",
+     "archetype": "slow brute",
+     "phases": [
+      {
+       "states": [
+        "0x12",
+        "0x13",
+        "0x14"
+       ],
+       "trigger": "spawn",
+       "pattern": "idle until within 72 px; chase 0.1992 px/f; in melee range 10%/f -> MeleeAttack + Wait 36"
+      }
+     ],
+     "attacks": [
+      {
+       "name": "punch",
+       "node": "MeleeAttack",
+       "damage": "melee sub 2 x1.0",
+       "recovery_frames": 36
+      }
+     ],
+     "movement": {
+      "chase_px_per_frame": 0.1992
+     },
+     "spawn": "Control Room (12,28); cond 0x20095 = while flag 0x95 clear",
+     "status": "DISASM"
+    },
+    "0x6": {
+     "name": "Blister",
+     "archetype": "stationary spawner",
+     "phases": [
+      {
+       "states": [
+        "0x25"
+       ],
+       "trigger": "spawn",
+       "pattern": "SpawnEnzymes: one Enzyme (0x18) every 120 frames at its position or +(16,-8), 8 in total, then idle forever"
+      }
+     ],
+     "attacks": [],
+     "movement": "none",
+     "specials": [
+      "summons Enzyme x8 (VERIFIED)"
+     ],
+     "spawn": "Stomach (21,4/6/8/13), cond 0 (always)",
+     "status": "VERIFIED"
+    },
+    "0x7": {
+     "name": "Blood Cell",
+     "archetype": "drifting contact hazard",
+     "phases": [
+      {
+       "states": [
+        "0x26",
+        "0x27"
+       ],
+       "trigger": "player within 300 px",
+       "pattern": "DriftContact: straight-line drift in a random direction at 0.25/0.5/0.75 px/f (rand(3)+1); contact melee x1.0; backs off 16 frames after a hit"
+      }
+     ],
+     "attacks": [
+      {
+       "name": "contact",
+       "damage": "melee sub 2 x1.0 (attacker STR 55)"
+      }
+     ],
+     "movement": {
+      "drift_px_per_frame": [
+       0.25,
+       0.5,
+       0.75
+      ]
+     },
+     "spawn": "Stomach / Intestines, cond 0",
+     "verified": [
+      "drift 0.5 px/f straight line",
+      "contact hit melee x1.0"
+     ],
+     "status": "VERIFIED"
+    },
+    "0x18": {
+     "name": "Enzyme",
+     "archetype": "latcher (spawned by Blister)",
+     "phases": [
+      {
+       "states": [
+        "0x8d",
+        "0x8e"
+       ],
+       "trigger": "spawn",
+       "pattern": "chase 0.5 px/f until latched"
+      },
+      {
+       "states": [
+        "0x8f"
+       ],
+       "trigger": "IfLatchOverlap (body rects overlap; enzyme facing down)",
+       "pattern": "LatchDrain: glued to the player, -1 HP every 64 frames"
+      },
+      {
+       "states": [
+        "0x90"
+       ],
+       "trigger": "IfButtonMashed: >8 presses (A/B/d-pad) with gaps <= 15 f",
+       "pattern": "retreat 1.0 px/f while within 56 px, then chase again (0x8e)"
+      }
+     ],
+     "attacks": [
+      {
+       "name": "drain",
+       "damage": "1 HP / 64 frames (fixed, not the damage formula)"
+      }
+     ],
+     "movement": {
+      "chase": 0.5,
+      "retreat": 1.0
+     },
+     "status": "VERIFIED (latch, drain); mash escape DISASM"
+    },
+    "0x3f": {
+     "name": "Pilaf's Guardian",
+     "archetype": "brute",
+     "tree": "BRUTE_TREE",
+     "resist": {
+      "melee": 64,
+      "energy": 128
+     },
+     "phases": [
+      {
+       "states": [
+        "0x13c",
+        "0x136"
+       ],
+       "trigger": "spawn",
+       "pattern": "face the player until within 88 px"
+      },
+      {
+       "states": [
+        "0x137",
+        "0x138",
+        "0x139",
+        "0x13a",
+        "0x13b"
+       ],
+       "trigger": "player within 88 px",
+       "pattern": "see BRUTE_TREE"
+      }
+     ],
+     "attacks": [
+      {
+       "name": "heavy strike",
+       "node": "HeavyStrike",
+       "windup_frames": 58,
+       "total_frames": 76,
+       "reach_px": 60,
+       "cooldown_frames": 120,
+       "chance": "4%/f in melee range",
+       "damage": "melee sub 2 x1.0 (STR 38)"
+      }
+     ],
+     "movement": {
+      "chase": 0.1484
+     },
+     "specials": [
+      "blocks while standing in the player beam line"
+     ],
+     "spawn": "Pilaf's Castle (10,31) cond 0x2005e (while flag 0x5e clear); rec extra script #365",
+     "verified": [
+      "HeavyStrike timing and reach"
+     ],
+     "status": "VERIFIED/DISASM"
+    },
+    "0x64": {
+     "name": "Shadow Colossus",
+     "archetype": "brute",
+     "tree": "BRUTE_TREE (same states 0x136..0x13b as the Guardian)",
+     "resist": {
+      "melee": 96,
+      "energy": 64
+     },
+     "attacks": [
+      {
+       "name": "heavy strike",
+       "node": "HeavyStrike",
+       "damage": "melee x1.0 (STR 130)"
+      }
+     ],
+     "spawn": "late-game overworld; cond 0x10095 / 0x100b4 (after flag 0x95 / 0xb4)",
+     "status": "DISASM"
+    },
+    "0x50": {
+     "name": "Ninja Boss",
+     "archetype": "ninja fighter",
+     "phases": [
+      {
+       "states": [
+        "0x198"
+       ],
+       "trigger": "spawn",
+       "pattern": "idle until within 100 px"
+      },
+      {
+       "states": [
+        "0x199",
+        "0x19a",
+        "0x19b",
+        "0x19c",
+        "0x19d",
+        "0x19e",
+        "0x19f",
+        "0x1a0",
+        "0x1a1"
+       ],
+       "trigger": "aggro",
+       "pattern": [
+        "block check 0x1a1 (as generic: >90 f, player attacking 20%/f -> block)",
+        "within 60 px: 9%/f NinjaTeleport (70..100 px jump)",
+        "within 50 px: 12%/f melee (MeleeAttack + Wait 18)",
+        "within 60 px: 8%/f step toward 1.0 px/f (ends 6%/f)",
+        "70..130 px: 13%/f -> 0x19c align 1.0 px/f (ends 0.5%/f) + NinjaStarThrow + Wait 90",
+        "beyond 90 px: 5%/f chase 1.0 px/f (ends 2%/f)",
+        "3%/f align 1.0 px/f; 0.8%/f back off 0.7969 px/f; else stand"
+       ]
+      }
+     ],
+     "attacks": [
+      {
+       "name": "punch",
+       "damage": "melee sub 2 x1.0",
+       "recovery_frames": 18
+      },
+      {
+       "name": "ninja star",
+       "projectile": "ninja_star",
+       "fire_frame": 8,
+       "end_frame": 32,
+       "post_wait_frames": 90
+      }
+     ],
+     "specials": [
+      "teleport (NinjaTeleport, VERIFIED jump (59,85))"
+     ],
+     "movement": {
+      "step": 1.0,
+      "chase": 1.0,
+      "align": 1.0,
+      "back_off": 0.7969
+     },
+     "spawn": "Ninja Stronghold (13,53) cond 1 (scripted encounter); rec extra script #398",
+     "verified": [
+      "star spawn +7 f after state entry, 1.75 px/f, energy x1.0",
+      "teleport jump"
+     ],
+     "status": "VERIFIED/DISASM"
+    },
+    "0x51": {
+     "name": "Ninja Boss (variant)",
+     "archetype": "disguised ninja",
+     "phases": [
+      {
+       "states": [
+        "0x1a2"
+       ],
+       "trigger": "spawn",
+       "pattern": "NinjaDisguise (sits as a prop)"
+      },
+      {
+       "states": [
+        "0x1a3",
+        "0x1a4"
+       ],
+       "trigger": "player within 60 px",
+       "pattern": "NinjaReveal: shakes 64 frames, smoke puff"
+      },
+      {
+       "states": [
+        "0x1a5..0x1ad"
+       ],
+       "trigger": "after reveal",
+       "pattern": "same as Ninja Boss 0x50"
+      }
+     ],
+     "status": "DISASM"
+    },
+    "0x81": {
+     "name": "Pharoah Totenhotep",
+     "archetype": "caster (no melee)",
+     "phases": [
+      {
+       "states": [
+        "0x2ec"
+       ],
+       "trigger": "spawn",
+       "pattern": "idle until within 100 px"
+      },
+      {
+       "states": [
+        "0x2ed",
+        "0x2ee",
+        "0x2ef",
+        "0x2f0",
+        "0x2f1",
+        "0x2f2",
+        "0x2f3",
+        "0x2f6"
+       ],
+       "trigger": "aggro (MarkTime starts the 1200-frame burst timer)",
+       "pattern": [
+        "burst check 0x2f6: 1200 f since MarkTime -> burst phase; player attacking me: 40%/f -> step toward",
+        "within 50 px: 8%/f step toward 0.3984 (ends 6%/f)",
+        "within 30 px: 8%/f back off 0.5977 until beyond 65 px (or 0.4%/f)",
+        "40..130 px and >90 f since the last shot (IfCooldown2Over 90): 13%/f -> 0x2f0 align 0.3984 (ends 0.5%/f), MummyWrapShot, MarkTime2, Wait 24",
+        "beyond 70 px: 5%/f chase 0.3984; 3%/f align 0.3984; else stand"
+       ]
+      },
+      {
+       "states": [
+        "0x2f4",
+        "0x2f5"
+       ],
+       "trigger": "1200 frames after the last burst phase",
+       "pattern": "0x2f4: 80% -> 0x2f5 MummyWrapBurst (8 wraps, 24 f) -> 0x2f4 again; 20% -> 0x2ed (restart the 1200 f timer). Mean 4 bursts, one every 26 frames"
+      }
+     ],
+     "attacks": [
+      {
+       "name": "wrap shot",
+       "projectile": "mummy_wrap",
+       "fire_frame": 8,
+       "end_frame": 24,
+       "cooldown_frames": 90,
+       "post_wait_frames": 24
+      },
+      {
+       "name": "wrap burst",
+       "projectile": "mummy_wrap",
+       "count": 8,
+       "period_frames": 26,
+       "phase_interval_frames": 1200
+      }
+     ],
+     "movement": {
+      "step": 0.3984,
+      "chase": 0.3984,
+      "align": 0.3984,
+      "back_off": 0.5977
+     },
+     "specials": [
+      "mummy wraps slow the player 48/256 px/f each (stack up to 8); mash d-pad x8 to escape"
+     ],
+     "spawn": "Totenhotep's Chamber (14,24) cond 1 (scripted); rec extra script #420",
+     "verified": [
+      "burst = 8 wraps, period 26 f",
+      "slow -48 per wrap, escape on 8th press"
+     ],
+     "status": "VERIFIED/DISASM"
+    },
+    "0x8e": {
+     "name": "Worm Head",
+     "archetype": "segmented snake",
+     "phases": [
+      {
+       "states": [
+        "0x318"
+       ],
+       "trigger": "spawn",
+       "pattern": "WormSpawnBody: 5 Worm Body (0x8F) behind it (12 px apart)"
+      },
+      {
+       "states": [
+        "0x319"
+       ],
+       "trigger": "immediately",
+       "pattern": "WormHeadMove forever"
+      }
+     ],
+     "attacks": [
+      {
+       "name": "contact",
+       "damage": "melee sub 2 x1.0 (STR 35)",
+       "rehit_cooldown_frames": 20
+      }
+     ],
+     "movement": {
+      "speed": 1.0,
+      "turn": "0.5%/f 90-degree turn (left/right 50/50); turns when blocked"
+     },
+     "specials": [
+      "segments are separate enemies (type 0x8F, 5170 HP each) that replay the head path 12 frames late; head resist melee 64 / energy 192"
+     ],
+     "spawn": "Stomach (21,9/11/14) cond 0",
+     "verified": [
+      "5 segments",
+      "1.0 px/f",
+      "follow lag ~12 f"
+     ],
+     "status": "VERIFIED"
+    },
+    "0x8f": {
+     "name": "Worm Body",
+     "archetype": "segment (spawned by Worm Head)",
+     "phases": [
+      {
+       "states": [
+        "0x31a"
+       ],
+       "trigger": "spawned by the head",
+       "pattern": "WormBodyFollow"
+      }
+     ],
+     "attacks": [
+      {
+       "name": "contact",
+       "damage": "melee x1.0",
+       "rehit_cooldown_frames": 20
+      }
+     ],
+     "status": "VERIFIED"
+    },
+    "0x90": {
+     "name": "(unnamed worm part)",
+     "phases": [
+      {
+       "states": [
+        "0x31b"
+       ],
+       "pattern": "Idle"
+      }
+     ],
+     "notes": "same stats block as the worm; never spawned by the head code; no spawn record. INFERRED unused",
+     "status": "DISASM"
+    },
+    "0x5b": {
+     "name": "Pikkon",
+     "archetype": "fighter with ranged options",
+     "phases": [
+      {
+       "states": [
+        "0x1bd"
+       ],
+       "trigger": "spawn",
+       "pattern": "idle until within 72 px"
+      },
+      {
+       "states": [
+        "0x1be",
+        "0x1bf",
+        "0x1c0",
+        "0x1c1",
+        "0x1c2",
+        "0x1c3",
+        "0x1c4",
+        "0x1c5",
+        "0x1c6",
+        "0x1c7"
+       ],
+       "trigger": "aggro",
+       "pattern": [
+        "block check 0x1c7: >90 f in state; player attacking 20%/f or player beam line 80%/f -> block (generic block state)",
+        "beyond 120 px -> 0x1bf chase 0.6992 until within 80 px (or 1%/f)",
+        "beyond 50 px: 50%/f -> ranged: 70% 0x1c5 align 0.6992 + KiBlast, else 0x1c4 align + EnergyBarrage",
+        "close: 50% -> 0x1c0 (chase 0.6992; in melee range 5%/f punch (re-punch 10%), 2%/f step-in), 70% -> 0x1c2 step toward, else 0x1c3"
+       ]
+      }
+     ],
+     "attacks": [
+      {
+       "name": "punch",
+       "damage": "melee x1.0",
+       "recovery_frames": 18,
+       "chain_chance": "10%"
+      },
+      {
+       "name": "ki blast",
+       "node": "KiBlast",
+       "note": "fires at frame 16, 3 px/f (AI worker)"
+      },
+      {
+       "name": "energy barrage",
+       "projectile": "pikkon_barrage",
+       "frames": 48,
+       "damage": "energy sub 4 x0.05 per hit, 1 hit/frame"
+      }
+     ],
+     "movement": {
+      "speed": 0.6992
+     },
+     "spawn": "Other World Stadium (1,20) cond 1; rec extra script #102",
+     "verified": [
+      "barrage: 1 hit/frame, mult 51"
+     ],
+     "status": "VERIFIED/DISASM"
+    },
+    "0x26": {
+     "name": "Goten (tag game)",
+     "archetype": "story actor, harmless (all stats 0)",
+     "phases": [
+      {
+       "states": [
+        "0xe6",
+        "0xe7",
+        "0xe8"
+       ],
+       "trigger": "spawn",
+       "pattern": "repeat 10x: wait (30%/f), TauntAnim, face player; then Wait 120 and RunScript #121"
+      }
+     ],
+     "attacks": [],
+     "status": "DISASM"
+    },
+    "0x23": {
+     "name": "Gohan",
+     "archetype": "generic fighter",
+     "tree": "GENERIC_FIGHTER",
+     "attacks": [
+      {
+       "name": "punch",
+       "node": "MeleeAttack",
+       "damage": "melee sub 2 x1.0",
+       "recovery_frames": 18,
+       "chance": "12%/f within 50 px and in melee range"
+      }
+     ],
+     "movement": {
+      "chase": 0.5977,
+      "step": 0.5977,
+      "back_off": 0.7969
+     },
+     "specials": [
+      "blocks (20%/f when attacked after 90 f in state)"
+     ],
+     "notes": "melee only; differences between these opponents are stats only (enemies.json)",
+     "status": "DISASM"
+    },
+    "0x25": {
+     "name": "Goten",
+     "archetype": "generic fighter",
+     "tree": "GENERIC_FIGHTER",
+     "attacks": [
+      {
+       "name": "punch",
+       "node": "MeleeAttack",
+       "damage": "melee sub 2 x1.0",
+       "recovery_frames": 18,
+       "chance": "12%/f within 50 px and in melee range"
+      }
+     ],
+     "movement": {
+      "chase": 0.5977,
+      "step": 0.5977,
+      "back_off": 0.7969
+     },
+     "specials": [
+      "blocks (20%/f when attacked after 90 f in state)"
+     ],
+     "notes": "melee only; differences between these opponents are stats only (enemies.json)",
+     "status": "DISASM"
+    },
+    "0x27": {
+     "name": "Goten (HTC sparring)",
+     "archetype": "generic fighter",
+     "tree": "GENERIC_FIGHTER",
+     "attacks": [
+      {
+       "name": "punch",
+       "node": "MeleeAttack",
+       "damage": "melee sub 2 x1.0",
+       "recovery_frames": 18,
+       "chance": "12%/f within 50 px and in melee range"
+      }
+     ],
+     "movement": {
+      "chase": 0.5977,
+      "step": 0.5977,
+      "back_off": 0.7969
+     },
+     "specials": [
+      "blocks (20%/f when attacked after 90 f in state)"
+     ],
+     "notes": "melee only; differences between these opponents are stats only (enemies.json)",
+     "status": "DISASM"
+    },
+    "0x28": {
+     "name": "Gotenks",
+     "archetype": "generic fighter",
+     "tree": "GENERIC_FIGHTER",
+     "attacks": [
+      {
+       "name": "punch",
+       "node": "MeleeAttack",
+       "damage": "melee sub 2 x1.0",
+       "recovery_frames": 18,
+       "chance": "12%/f within 50 px and in melee range"
+      }
+     ],
+     "movement": {
+      "chase": 0.5977,
+      "step": 0.5977,
+      "back_off": 0.7969
+     },
+     "specials": [
+      "blocks (20%/f when attacked after 90 f in state)"
+     ],
+     "notes": "melee only; differences between these opponents are stats only (enemies.json)",
+     "status": "DISASM"
+    },
+    "0x2d": {
+     "name": "Hercule",
+     "archetype": "generic fighter",
+     "tree": "GENERIC_FIGHTER",
+     "attacks": [
+      {
+       "name": "punch",
+       "node": "MeleeAttack",
+       "damage": "melee sub 2 x1.0",
+       "recovery_frames": 18,
+       "chance": "12%/f within 50 px and in melee range"
+      }
+     ],
+     "movement": {
+      "chase": 0.5977,
+      "step": 0.5977,
+      "back_off": 0.7969
+     },
+     "specials": [
+      "blocks (20%/f when attacked after 90 f in state)"
+     ],
+     "notes": "melee only; differences between these opponents are stats only (enemies.json)",
+     "status": "DISASM"
+    },
+    "0x31": {
+     "name": "Idasa",
+     "archetype": "generic fighter",
+     "tree": "GENERIC_FIGHTER",
+     "attacks": [
+      {
+       "name": "punch",
+       "node": "MeleeAttack",
+       "damage": "melee sub 2 x1.0",
+       "recovery_frames": 18,
+       "chance": "12%/f within 50 px and in melee range"
+      }
+     ],
+     "movement": {
+      "chase": 0.5977,
+      "step": 0.5977,
+      "back_off": 0.7969
+     },
+     "specials": [
+      "blocks (20%/f when attacked after 90 f in state)"
+     ],
+     "notes": "melee only; differences between these opponents are stats only (enemies.json)",
+     "status": "DISASM"
+    },
+    "0x55": {
+     "name": "Olibu",
+     "archetype": "generic fighter",
+     "tree": "GENERIC_FIGHTER",
+     "attacks": [
+      {
+       "name": "punch",
+       "node": "MeleeAttack",
+       "damage": "melee sub 2 x1.0",
+       "recovery_frames": 18,
+       "chance": "12%/f within 50 px and in melee range"
+      }
+     ],
+     "movement": {
+      "chase": 0.5977,
+      "step": 0.5977,
+      "back_off": 0.7969
+     },
+     "specials": [
+      "blocks (20%/f when attacked after 90 f in state)"
+     ],
+     "notes": "melee only; differences between these opponents are stats only (enemies.json)",
+     "status": "DISASM"
+    },
+    "0x5a": {
+     "name": "Piccolo",
+     "archetype": "generic fighter",
+     "tree": "GENERIC_FIGHTER",
+     "attacks": [
+      {
+       "name": "punch",
+       "node": "MeleeAttack",
+       "damage": "melee sub 2 x1.0",
+       "recovery_frames": 18,
+       "chance": "12%/f within 50 px and in melee range"
+      }
+     ],
+     "movement": {
+      "chase": 0.5977,
+      "step": 0.5977,
+      "back_off": 0.7969
+     },
+     "specials": [
+      "blocks (20%/f when attacked after 90 f in state)"
+     ],
+     "notes": "melee only; differences between these opponents are stats only (enemies.json)",
+     "status": "DISASM"
+    },
+    "0x82": {
+     "name": "Trunks (HTC)",
+     "archetype": "generic fighter",
+     "tree": "GENERIC_FIGHTER",
+     "attacks": [
+      {
+       "name": "punch",
+       "node": "MeleeAttack",
+       "damage": "melee sub 2 x1.0",
+       "recovery_frames": 18,
+       "chance": "12%/f within 50 px and in melee range"
+      }
+     ],
+     "movement": {
+      "chase": 0.5977,
+      "step": 0.5977,
+      "back_off": 0.7969
+     },
+     "specials": [
+      "blocks (20%/f when attacked after 90 f in state)"
+     ],
+     "notes": "melee only; differences between these opponents are stats only (enemies.json)",
+     "status": "DISASM"
+    },
+    "0x84": {
+     "name": "(tournament opponent 0x84)",
+     "archetype": "generic fighter",
+     "tree": "GENERIC_FIGHTER",
+     "attacks": [
+      {
+       "name": "punch",
+       "node": "MeleeAttack",
+       "damage": "melee sub 2 x1.0",
+       "recovery_frames": 18,
+       "chance": "12%/f within 50 px and in melee range"
+      }
+     ],
+     "movement": {
+      "chase": 0.5977,
+      "step": 0.5977,
+      "back_off": 0.7969
+     },
+     "specials": [
+      "blocks (20%/f when attacked after 90 f in state)"
+     ],
+     "notes": "melee only; differences between these opponents are stats only (enemies.json)",
+     "status": "DISASM"
+    },
+    "0x87": {
+     "name": "(unnamed fighter 0x87)",
+     "archetype": "generic fighter",
+     "tree": "GENERIC_FIGHTER",
+     "attacks": [
+      {
+       "name": "punch",
+       "node": "MeleeAttack",
+       "damage": "melee sub 2 x1.0",
+       "recovery_frames": 18,
+       "chance": "12%/f within 50 px and in melee range"
+      }
+     ],
+     "movement": {
+      "chase": 0.5977,
+      "step": 0.5977,
+      "back_off": 0.7969
+     },
+     "specials": [
+      "blocks (20%/f when attacked after 90 f in state)"
+     ],
+     "notes": "melee only; differences between these opponents are stats only (enemies.json)",
+     "status": "DISASM"
+    },
+    "0x3b": {
+     "name": "Human (tournament)",
+     "archetype": "generic fighter without block",
+     "tree": "GENERIC_FIGHTER (states 0x1b2..0x1b8, block state = Idle)",
+     "status": "DISASM"
+    },
+    "0x54": {
+     "name": "(placeholder 0x54)",
+     "phases": [
+      {
+       "states": [
+        "0x1b0"
+       ],
+       "pattern": "Idle"
+      }
+     ],
+     "notes": "0 HP/0 stats; INFERRED unused/dummy",
+     "status": "DISASM"
+    }
+   },
+   "projectiles": {
+    "ninja_star": {
+     "builder": "0x0802C790",
+     "vtable": "0x0804BAA0",
+     "size": 76,
+     "update": "0x0802C7EA",
+     "speed_px_per_frame": 1.75,
+     "velocity_table": "0x0875497C (per facing 0 down,1 up,2 left,3 right: +-448/256)",
+     "hitbox": {
+      "rect_table": "0x08754A1C",
+      "x_off": -4,
+      "y_off": -4,
+      "w": 8,
+      "h": 8,
+      "note": "two rect frames alternating every 8 frames (spin); rect = pos - (b0,b1), size (b2,b3)"
+     },
+     "lifetime_frames": null,
+     "lifetime": "until its rect leaves the room bounds, it hits a wall (map collision 0x08009324) or it hits",
+     "damage": {
+      "attack_type": "0x086B8090",
+      "kind": "energy",
+      "sub": 1,
+      "mult": 1024,
+      "stat": "owner POW vs END2",
+      "path": "hit test 0x08011C70 against the player list"
+     },
+     "spawn": "controller frame 8; offset per facing from 0x087548E8+8",
+     "status": "VERIFIED (speed 448/256 px/frame, energy sub 1 x1.0 hit for 28.5 HP on Goku L60); hitbox DISASM"
+    },
+    "mummy_wrap": {
+     "builder": "0x0802D79C(variant 0 straight | 1 diagonal)",
+     "vtable": "0x0804A830",
+     "size": 96,
+     "update": "0x0802D940",
+     "speed_px_per_frame": 1.75,
+     "velocity_table": "0x08756B74: per facing {straight vx,vy, diagonal vx,vy}: down (0,448)/(-316,316), up (0,-448)/(316,-316), left (-448,0)/(-316,-316), right (448,0)/(316,316)",
+     "hitbox": {
+      "rect_table": "0x087571F4 (12 B per frame, 3 anim frames per kind)",
+      "straight_vertical": "8x16",
+      "straight_horizontal": "16x8",
+      "diagonal": "16x16"
+     },
+     "lifetime": "until off the room or into a wall; anim cycle 24 frames",
+     "damage": {
+      "attack_type": "0x086B8090",
+      "kind": "energy",
+      "sub": 1,
+      "mult": 1024,
+      "stat": "owner POW"
+     },
+     "on_hit": "if fewer than 8 wraps are already attached and it overlaps the player: attach after 4 frames (+0x50=1, follows the player at a fixed offset); while attached every wrap lowers the player walk (player+0x238) and dash (+0x23C) speed by 48/256 px/frame (count of attached wraps x 48, recomputed each frame 0x0802D8E6); else it bursts (puff 0x08712FDC)",
+     "escape": "8 new d-pad presses within 60 frames (0x08040284(input, 0xF0, 8, 60)) frees the player from all wraps",
+     "status": "VERIFIED: 8 per burst; walk 352 -> 304 -> 256 with 1 and 2 wraps; freed on the 8th d-pad press"
+    },
+    "pikkon_barrage": {
+     "builder": "0x080246B4 (via 0x080249E0)",
+     "vtable": "0x0804BFCC",
+     "size": 88,
+     "damage": {
+      "attack_type": "0x086B80A8",
+      "kind": "energy",
+      "sub": 4,
+      "mult": 51,
+      "stat": "owner POW"
+     },
+     "rate": "one object per frame for 48 frames",
+     "status": "VERIFIED: one hit per frame (~0.75 HP each on Goku L60 from Pikkon POW 14) at 24 px; flight path/hitbox not decoded (INFERRED short-range spray)"
+    }
+   },
+   "specials": {},
+   "projectile_base": null
+  },
+  "regular": {
+   "bosses": {},
+   "projectiles": {
+    "gun_bullet": {
+     "status": "VERIFIED",
+     "ctor": "0x080274B4",
+     "vtable": "0x08049F0C",
+     "update": "0x08027562",
+     "message": "0x0802764E",
+     "node": "GunShot 0x080265E9",
+     "spawn_data": "0x0874CA38",
+     "fire_frame": 4,
+     "controller_frames": 16,
+     "muzzle_by_dir": [
+      [
+       4,
+       4
+      ],
+      [
+       13,
+       -24
+      ],
+      [
+       -8,
+       -8
+      ],
+      [
+       24,
+       -8
+      ]
+     ],
+     "speed_px_per_frame": 2.625,
+     "velocity_raw_by_dir": [
+      [
+       0,
+       672
+      ],
+      [
+       0,
+       -672
+      ],
+      [
+       -672,
+       0
+      ],
+      [
+       672,
+       0
+      ]
+     ],
+     "direction": "straight along the facing (4-way, enemy turns to face the player first)",
+     "box_by_dir": [
+      [
+       3,
+       10,
+       8,
+       16
+      ],
+      [
+       3,
+       5,
+       8,
+       16
+      ],
+      [
+       5,
+       4,
+       16,
+       8
+      ],
+      [
+       10,
+       4,
+       16,
+       8
+      ]
+     ],
+     "box_table": "0x0874E968",
+     "lifetime": "until off-screen / wall / hit (measured 25-28 f at 60 px)",
+     "on_end": "explosion effect 0x0802A81C(anim 0x08712FDC, 32 f, no damage)",
+     "damage": {
+      "attack_type": "0x086B8090",
+      "kind": "energy",
+      "sub": 1,
+      "mult": 1024,
+      "stat": "owner POW vs END2",
+      "note": "VERIFIED e.g. Gunman POW 13 -> Goku END2 26: 14340/1024 HP"
+     },
+     "users": [
+      "0x02 Assassin",
+      "0x2C Gunman",
+      "0x6C Sniper"
+     ]
+    },
+    "rifle_bullet": {
+     "status": "VERIFIED",
+     "ctor": "0x080276A8",
+     "vtable": "0x08049FC0",
+     "update": "0x0802776E",
+     "message": "0x080278E2",
+     "node": "RifleShot 0x08026869",
+     "spawn_data": "0x0874CA9C",
+     "fire_frame": 8,
+     "controller_frames": 32,
+     "muzzle_by_dir": [
+      [
+       4,
+       4
+      ],
+      [
+       13,
+       -24
+      ],
+      [
+       -8,
+       -8
+      ],
+      [
+       24,
+       -8
+      ]
+     ],
+     "speed_px_per_frame": 1.75,
+     "velocity_raw_by_dir": [
+      [
+       0,
+       448
+      ],
+      [
+       0,
+       -448
+      ],
+      [
+       -448,
+       0
+      ],
+      [
+       448,
+       0
+      ]
+     ],
+     "direction": "straight along the facing",
+     "box": [
+      8,
+      14,
+      16,
+      16
+     ],
+     "box_table": "0x0874E614 (16x16, offset per dir)",
+     "lifetime": "until off-screen / wall / hit (23-26 f at 60 px)",
+     "trail": "smoke effect every 4 frames",
+     "damage": {
+      "attack_type": "0x086B8090",
+      "kind": "energy",
+      "sub": 1,
+      "mult": 1024,
+      "stat": "owner POW vs END2"
+     },
+     "users": [
+      "0x2E Hessian",
+      "0x47 Marauder",
+      "0x4B Mercenary"
+     ]
+    },
+    "energy_wave": {
+     "status": "VERIFIED (speed/lifetime/damage) / DISASM (shape)",
+     "ctor": "0x0802A2EC",
+     "vtable": "0x08049C98",
+     "update": "0x0802A3D2",
+     "message": "0x0802A704",
+     "nodes": [
+      "SoldierThrow 0x08026739 (fire f8, controller waits for the wave, min 32 f)",
+      "TurretFire 0x0802B6E5 (fire f8, 72 f)",
+      "CyborgShot 0x0802F709 (fire f1, min 16 f)"
+     ],
+     "spawn_data": {
+      "SoldierThrow": "0x0874CA6C",
+      "TurretFire": "0x08752E78",
+      "CyborgShot": "0x08757A80"
+     },
+     "muzzle_by_dir": {
+      "SoldierThrow/CyborgShot": [
+       [
+        2,
+        8
+       ],
+       [
+        9,
+        -28
+       ],
+       [
+        -16,
+        -11
+       ],
+       [
+        24,
+        -11
+       ]
+      ],
+      "TurretFire": [
+       [
+        4,
+        4
+       ],
+       [
+        4,
+        -25
+       ],
+       [
+        -13,
+        -14
+       ],
+       [
+        22,
+        -13
+       ]
+      ]
+     },
+     "shape": "a segment from tail (pos, px) to head = pos + dir*len; len starts 8 and grows 4/frame to 48 (12 frames), then the whole segment moves 4 px/frame. Hit box = segment bounding box +-4 px",
+     "speed_px_per_frame": 4,
+     "direction": "straight along the facing, unit vectors table 0x0807268C",
+     "lifetime": "mode 0 max 240 frames (+0x1C > 0xF0); on hit / wall / timeout -> mode 1: tail catches up 4 px/frame (len -= 4) and the object is removed at len <= 0",
+     "on_hit": "spark effect 0x0802A81C(anim 0x086FD9D0, rate 0x1000+rand(0x1000)); enters mode 1",
+     "damage": {
+      "attack_type": "0x086B8090",
+      "kind": "energy",
+      "sub": 1,
+      "mult": 1024,
+      "stat": "owner (+0x4C) POW vs END2",
+      "sent_with": "0x08011C0C"
+     },
+     "users": [
+      "0x03 Atomizer",
+      "0x32 Ion Cannon",
+      "0x40 Laser Turret",
+      "0x11 Cyborg",
+      "0x30 Hyper Cyborg",
+      "0x4A Mega Cyborg",
+      "0x45 Majin Soldier",
+      "0x16 Elite Majin Soldier",
+      "0x7C Super Majin Soldier",
+      "0x67 Majin Shield Soldier",
+      "0x17 Elite Shield Soldier",
+      "0x7D Super Shield Soldier"
+     ]
+    },
+    "flame": {
+     "status": "VERIFIED",
+     "ctor": "0x080246B4",
+     "emitter": "0x080249E0",
+     "vtable": "0x0804BFCC",
+     "update": "0x080247BE",
+     "node": "FlameBreath 0x08024025",
+     "per_frame": "one flame per frame for frames 4..127 of the 128-frame action",
+     "nozzle_by_dir": [
+      [
+       46,
+       10
+      ],
+      [
+       16,
+       -48
+      ],
+      [
+       -6,
+       -12
+      ],
+      [
+       74,
+       -12
+      ]
+     ],
+     "speed_px_per_frame": "2.0 along the facing + uniform jitter rand(192)-96 raw per axis (+-0.375 px/f)",
+     "velocity_raw_by_dir": [
+      [
+       0,
+       512
+      ],
+      [
+       0,
+       -512
+      ],
+      [
+       -512,
+       0
+      ],
+      [
+       512,
+       0
+      ]
+     ],
+     "box": "16x16 centred (pos +-8)",
+     "lifetime": 20,
+     "hits": "at most once per flame (+0x40 flag); direct ComputeDamage call, not a message",
+     "damage": {
+      "attack_type": "0x086B80A8",
+      "kind": "energy",
+      "sub": 4,
+      "mult": 51,
+      "mult_note": "int(51.2f) = 0.05x",
+      "stat": "owner POW vs END2",
+      "note": "VERIFIED 372/372 exact"
+     },
+     "after_hit": "message 0x17 to the player (knockback/hurt request)",
+     "users": [
+      "0x01 Annihilator",
+      "0x13 Death Machine",
+      "0x14 Destroyer"
+     ]
+    },
+    "bomb": {
+     "status": "VERIFIED (lifetime 71 f, damage) / DISASM (arc)",
+     "ctor": "0x0801C6E4",
+     "vtable": "0x0804A2E8",
+     "update": "0x0801C80A",
+     "node": "BombThrow 0x08026B2D",
+     "spawn_data": "0x0874CAD0",
+     "throw_frame": 16,
+     "muzzle_by_dir": [
+      [
+       12,
+       -8
+      ],
+      [
+       12,
+       -8
+      ],
+      [
+       16,
+       -16
+      ],
+      [
+       0,
+       -16
+      ]
+     ],
+     "flight": "velocity v = clamp(player-enemy, +-128 px, facing axis only) * 0x71D >> 8 raw; vy starts at v.y - 0x200 and gains +0x20 per frame (gravity); height z = 0x800 + vz with vz from 0x200 decreasing 0x20/frame; lands when z < -0xC00 (~40 frames)",
+     "fuse": "30 frames (blinking), then explodes",
+     "lifetime": 71,
+     "explosion": "one message kind 2 with the bomb box (16x16 centred, 0x0871E984) to world 0x0871E200+4 (0x08011C0C), then 0x0801C750 spawns 4 debris (0x08049F38, 32 f) + a blast effect (0x0804A2C0) - cosmetic (INFERRED: no hit sends)",
+     "damage": {
+      "attack_type": "0x086B8090",
+      "kind": "energy",
+      "sub": 1,
+      "mult": 1024,
+      "stat": "owner POW vs END2",
+      "note": "VERIFIED 15/15 exact"
+     },
+     "users": [
+      "0x08 Bomber",
+      "0x2B Grenadier",
+      "0x43 Mad Bomber"
+     ]
+    },
+    "tank_shell": {
+     "status": "VERIFIED",
+     "ctor": "0x0801C900",
+     "vtable": "0x0804A368",
+     "update": "0x0801C9C4",
+     "node": "TankShoot 0x0802E2F3",
+     "spawn_data": "0x08757350",
+     "speed_px_per_frame": 1.75,
+     "velocity_raw_by_dir": [
+      [
+       0,
+       448
+      ],
+      [
+       0,
+       -448
+      ],
+      [
+       -448,
+       0
+      ],
+      [
+       448,
+       0
+      ]
+     ],
+     "box": [
+      8,
+      14,
+      16,
+      16
+     ],
+     "box_table": "0x0871E630",
+     "trail": "smoke every 4 frames",
+     "on_end": "explosion 0x0801C978",
+     "damage": {
+      "attack_type": "0x086B8090",
+      "kind": "energy",
+      "sub": 1,
+      "mult": 1024,
+      "stat": "owner POW vs END2",
+      "note": "VERIFIED 30/30 exact"
+     },
+     "users": [
+      "0x3A Juggernaut",
+      "0x7F Tank",
+      "0x8C War Machine"
+     ]
+    },
+    "shuriken": {
+     "status": "VERIFIED",
+     "ctor": "0x0802C790",
+     "vtable": "0x0804BAA0",
+     "update": "0x0802C7EA",
+     "message": "0x0802C8AE",
+     "node": "0x0802C18F family (ninja throw; node owned by the bosses/others group)",
+     "spawn_site": "0x0802C116",
+     "speed_px_per_frame": 1.75,
+     "velocity_raw_by_dir": [
+      [
+       0,
+       448
+      ],
+      [
+       0,
+       -448
+      ],
+      [
+       -448,
+       0
+      ],
+      [
+       448,
+       0
+      ]
+     ],
+     "box": [
+      4,
+      4,
+      8,
+      8
+     ],
+     "anim": "2 frames, swap every 8 frames",
+     "on_hit": "removed (no explosion)",
+     "damage": {
+      "attack_type": "0x086B8090",
+      "kind": "energy",
+      "sub": 1,
+      "mult": 1024,
+      "stat": "owner POW vs END2",
+      "note": "VERIFIED 31/31 exact"
+     },
+     "users": [
+      "0x4E Ninja",
+      "0x65/0x66 Shadow Warrior",
+      "0x68/0x69 Shinobi"
+     ]
+    },
+    "mummy_bandage": {
+     "status": "VERIFIED (flight, damage) / INFERRED (wrap effect)",
+     "ctor": "0x0802D79C",
+     "vtable": "0x0804A830",
+     "update": "0x0802D940",
+     "node": "0x0802D1CD (owned by the others group)",
+     "spawn_site": "0x0802D16A",
+     "speed_px_per_frame": 1.75,
+     "velocity_raw_by_dir": {
+      "straight": [
+       [
+        0,
+        448
+       ],
+       [
+        0,
+        -448
+       ],
+       [
+        -448,
+        0
+       ],
+       [
+        448,
+        0
+       ]
+      ],
+      "diagonal": [
+       [
+        -316,
+        316
+       ],
+       [
+        316,
+        -316
+       ],
+       [
+        -316,
+        -316
+       ],
+       [
+        316,
+        316
+       ]
+      ]
+     },
+     "box_by_axis": [
+      [
+       8,
+       4,
+       16,
+       8
+      ],
+      [
+       4,
+       8,
+       8,
+       16
+      ]
+     ],
+     "box_table": "0x087571F4",
+     "on_hit": "damage, then message 0x25 counts attached bandages (0x08011CCA); if < 8, after 4 frames the bandage sticks to the player at slot offset table 0x08756BB4 (global slot counter 0x030030BC, 8 slots) and follows the player; it is shaken off by d-pad wiggling (0x08040284(mask 0xF0, 8, 60)). Measured: stuck bandages lived 212-401 frames with no input",
+     "damage": {
+      "attack_type": "0x086B8090",
+      "kind": "energy",
+      "sub": 1,
+      "mult": 1024,
+      "stat": "owner POW vs END2",
+      "note": "VERIFIED 18/18 exact"
+     },
+     "users": [
+      "0x10 Cursed One",
+      "0x4D Mummy",
+      "0x59 Pharoah"
+     ]
+    },
+    "grapple_arm": {
+     "status": "INFERRED (spawn timing VERIFIED)",
+     "ctor": "0x08037EA8",
+     "vtable": "0x0804B380",
+     "update": "0x08037FB4",
+     "node": "GrappleArm 0x08037E8D",
+     "spawn_data": "0x0876CCB0",
+     "fire_frame": 28,
+     "shape": "extending arm like energy_wave (start len 8, unit vectors 0x0876CCE8), max reach 0x50 = 80 px",
+     "damage": {
+      "attack_type": "0x086B8088",
+      "kind": "melee",
+      "sub": 0,
+      "mult": 1024,
+      "stat": "owner STR (can crit)"
+     },
+     "on_hit": "player controller -> 0x03001B00 (held) and pulled toward the Bio Mech",
+     "users": [
+      "0x05 Bio Mech",
+      "0x71 Super Bio Mech",
+      "0x83 Ultra Bio Mech"
+     ]
+    }
+   },
+   "specials": {
+    "vampire_grab": "see boss_nodes_regular VampireGrab: POW HP drain every 16 frames + equal self-heal; escape = 9 inputs with gaps <= 10 frames (VERIFIED drain)",
+    "tank_crush": "IfContactHit every frame: standard melee hit x1.0 STR (VERIFIED)",
+    "heavy_punch": "Bruiser/Goon/Thug: 48-frame wind-up, x1.5 melee (VERIFIED)",
+    "shield_soldier": "shield up/down at random (2%/5% per frame); 5th counter tick breaks the shield -> plain fighter tree 0x153; the shield graphics carry no stat change (block mechanism INFERRED)"
+   },
+   "projectile_base": {
+    "status": "VERIFIED (field use and movement traced; damage reproduced exactly)",
+    "ctor": "0x08019B04 base(obj, gfx_id, owner): vtable, +0x0C sprite slot, +0x0E gfx id, +0x10 dir = owner+0x10, +0x11 = owner+0x1D0, +0x14 = 0, +0x1C = owner",
+    "box_update": "0x08019B4E: x0 = (x>>8) - ox, y0 = (y>>8) - oy, x1 = x0 + w, y1 = y0 + h -> +0x28..+0x34; +0x04 = y>>8 (sort key). Box def = s8 ox, s8 oy, u8 w, u8 h, u32 OAM attrs, ptr gfx (12 bytes)",
+    "fields": {
+     "+0x18": "box/frame def pointer (table + 12*dir, stepped +-0x30 for animation)",
+     "+0x1C": "owner enemy (cleared by message 0x11/0x12 when the owner dies -> no more damage)",
+     "+0x20/+0x24": "position, 24.8 fixed point",
+     "+0x28..+0x34": "hit box x0,y0,x1,y1 (px)",
+     "+0x40/+0x44": "velocity (1/256 px per frame)",
+     "+0x48": "frame counter"
+    },
+    "spawning": "controller frame N: needs 0x080116FC(world) >= 0x80 (pool room; some 0x100/0x400/0x700/0x1400), builder(0, &muzzle_xy, dir, owner) then 0x0801191A(world 0x03001C4C, obj). muzzle = enemy pixel position + per-dir (dx,dy) from the spawn-data block",
+    "removal": "no lifetime timer for straight shots: removed when the box leaves the camera rect at 0x030019BC (240x160 view), explodes when any 8x8 tile under the box is blocked in the projectile passability bitmap [0x03001A50] (0x08009324) or the box leaves 0..2048, and explodes/vanishes when a hit lands",
+    "hit_message": "0x08011C70(world, 0, msg) / 0x08011C0C / 0x08011CCA: msg+0 u8 kind (0 attack, 2 explosion), +4..+0x10 box, +0x14 hit struct {u8 dir, u32 mult (0x400=1.0), attack type ptr, attacker=owner}, +0x30 sender. The player handler runs ComputeDamage(player, hit)",
+    "vs_player_attacks": "bullets, rifle shots, shuriken, tank shells: a player attack message (kind 0) whose box overlaps destroys them (their vfunc +0x24) - INFERRED from code; energy waves only when the attack comes head-on (msg dir == wave dir ^ 1) and overlaps the head +-12 px",
+    "block": "normal block rule: R held and (hit dir ^ 1) == player facing -> damage x 1/16 (0x1000>>16)",
+    "iframes": "during the player hurt state (24 frames) resist = 0 -> damage 0, the projectile is still consumed",
+    "enemy_melee": {
+     "status": "VERIFIED (14/14 Majin Fighter hits on the first frame of the punch controller; 2000+ exact)",
+     "hit_fn": "0x0802A0C4 (copies: 0x08033BC4, 0x0803CBD0 path, 0x080361B8)",
+     "timing": "MeleeAttack switches to controller 0x03001B50 (16-frame punch); hit test once on frame 0",
+     "requires": "player obj+0x1CC != 0 (hittable)",
+     "facing": "turns to face the player on the dominant axis (|dx|>|dy| -> left/right)",
+     "box": {
+      "right": "(cx, cy) .. (B.x1+3, B.y1+3)",
+      "left": "(B.x0-4, cy) .. (cx, B.y1+3)",
+      "down": "(B.x0, B.y0) .. (B.x1, B.y1-6) with B = pos..pos+(w,h) at obj+0x19C/0x19D",
+      "up": "(B.x0, B.y0) .. (B.x1, cy)"
+     },
+     "box_note": "B = enemy collision box from 0x0800FE78, (cx,cy) its centre",
+     "damage": "attack type 0x086B8098 (melee sub 2), multiplier 0x400 (HeavyPunch 0x600), attacker STR"
+    }
+   }
+  }
+ },
+ "stat_keys": [
+  "exp",
+  "hp",
+  "ai_state",
+  "STR",
+  "POW",
+  "END",
+  "resist_melee",
+  "resist_energy",
+  "hit_reaction"
+ ],
+ "stats_units": {
+  "hp": "HP (stored <<10 at obj+0x28C)",
+  "exp": "XP before multiplier",
+  "resist": "128 = x1.0"
+ }
+}

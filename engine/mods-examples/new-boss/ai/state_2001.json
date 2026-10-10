@@ -1,0 +1,26 @@
+{
+  "id": "state_2001",
+  "state": 8193,
+  "note": "Shadow Brute, phase 2: a scripted volley of homing dark orbs (ModAction), then 70 frames of a faster chase that punches when in reach, again.",
+  "tree": {
+    "name": "Sequence",
+    "children": [
+      {"name": "ModAction", "call": "hooks/ai/brute.rhai:volley", "args": [3, 140]},
+      {
+        "name": "ParallelAny",
+        "children": [
+          {"name": "Wait", "params": {"frames": {"raw": 70}}},
+          {
+            "name": "Selector",
+            "children": [
+              {"name": "IfPlayerInMeleeRange", "children": [{"name": "GotoState", "params": {"state": {"raw": 8194}}}]},
+              {"name": "ChasePlayer", "params": {"speed": {"raw": 240}}}
+            ]
+          }
+        ]
+      },
+      {"name": "GotoState", "params": {"state": {"raw": 8193}}}
+    ]
+  },
+  "aux": {"name": "SubState", "params": {"state": {"raw": 12}}}
+}

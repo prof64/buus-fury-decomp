@@ -1,0 +1,104 @@
+{
+ "table": "0x0879B704 (522 u32 pointers to graph headers; the only code references are natives 0xB5..0xB9 and 0xD6..0xD8)",
+ "model": "Each entry is an EVENT GRAPH, not a single script. Header = array of u32 step words, indexed by step number (step 0 = entry). A step word < 0x10000 is END: the graph finishes with that value (written to the runner's result halfword unless cancelled via 0x03002A58). Otherwise it points to a node blob {u16 next_step (LE, bytes 0-1), u8 kind (byte 2), u8 arg (byte 3), payload}. The step runner 0x080124F8 (thread struct 0x2C bytes from 0x0801246E: +0 header, +4 &result, +8 u16 current step, +0x14 params, +0x18 own params, +0x28 active node object) sets step = next_step, builds the node object via handler table 0x080728AC[kind], calls its start (vtable+4) and then polls vtable+8 every frame until done. VERIFIED: emulator trace of run_scene natives hits handler kind 5 for #37 and kind 0 for #516 from 0x08012563.",
+ "branching": "Bytecode nodes (kind 0/4) override next_step with their return value: if the interpreter stack holds exactly one value at `end`, current step = that value (0x08011F90..0x08011F9A). Choice nodes (kind 3) store the selected option index in 0x03002A60 (read by native 0x18); the following bytecode node branches on it. VERIFIED by reading graph #28 (Z-Mart shop): choice -> native 0x18 == 0 -> return 4.",
+ "synchronous_runner": "0x08004098 (natives 0xD6..0xD8, item/equipment/loot callers) runs ONLY node 0, which must be kind 0 or 4 (byte 2 checked; anything else = assertion 0x0803DF14).",
+ "node_stats": {
+  "entries_by_node0_kind": {
+   "0": 236,
+   "3": 2,
+   "4": 141,
+   "5": 139,
+   "6": 2,
+   "7": 2
+  },
+  "nodes_reached_via_next_by_kind": {
+   "0": 1074,
+   "3": 12,
+   "4": 379,
+   "5": 2148,
+   "6": 13,
+   "7": 56
+  },
+  "other_header_nodes_by_kind (reached only through bytecode return values / choices; heuristic header scan)": {
+   "0": 105,
+   "3": 5,
+   "4": 39,
+   "5": 244,
+   "6": 17,
+   "7": 16
+  }
+ },
+ "kinds": [
+  {
+   "kind": 0,
+   "name": "bytecode",
+   "handler": "0x080123E8",
+   "payload": "raw bytecode at blob+3 (byte 3 is the first opcode, not an arg)",
+   "consumer": "0x08011F5A: runs the interpreter 0x08004038 inside a world entity (vtable 0x08049E84) with the thread's params; natives may block (nested loops); return value -> next step",
+   "status": "VERIFIED"
+  },
+  {
+   "kind": 1,
+   "name": "dialog_inline",
+   "handler": "0x0801240A",
+   "payload": "UTF-16 text inline at blob+4; arg = speaker portrait",
+   "consumer": "0x08012012 text box (vtable 0x08049E90)",
+   "status": "INFERRED",
+   "note": "no reachable node in the table"
+  },
+  {
+   "kind": 2,
+   "name": "dialog_inline_format",
+   "handler": "0x0801241C",
+   "payload": "u32 pointer to a UTF-16 printf format at blob+4, bytecode at blob+8 computing the arguments (interpreter stack = argument list, %s takes a string POINTER, %d an int), formatted by 0x0803DB7C; arg = portrait",
+   "consumer": "0x080121D8 -> 0x08012012",
+   "status": "INFERRED",
+   "note": "no reachable node in the table"
+  },
+  {
+   "kind": 3,
+   "name": "choice",
+   "handler": "0x08012464",
+   "payload": "UTF-16 text inline at blob+4: prompt, blank line, then \"-Option\" lines",
+   "consumer": "0x0801236E -> 0x08030C16 choice-box entity (vtable 0x0804A7C4, added to the world); selection index -> 0x03002A60",
+   "status": "VERIFIED",
+   "example": "graph #28 step 1: \"Welcome to the Hercule City Z-Mart! How can I help you?\\n\\n-Buy\\n-Sell\\n\\n-End\""
+  },
+  {
+   "kind": 4,
+   "name": "bytecode_lz",
+   "handler": "0x080123FA",
+   "payload": "Webfoot-LZ bitstream at blob+4 WITHOUT the 8-byte {type,size} container (byte 3 = 0); inflated by 0x08049120 into a 0x800-byte buffer. Decodes with engine/crates/wf-rom/src/lz.rs as if it were a type-1 container stream (initial literal width 1; stops at the end code) - VERIFIED equal to the game's output for graphs #2 #3 #6 #13 #450. NOTE: Rom::lz(blob+4) is wrong here (it would parse the first 8 stream bytes as a container header).",
+   "consumer": "0x08011FD6 -> 0x08011F5A (as kind 0)",
+   "status": "VERIFIED"
+  },
+  {
+   "kind": 5,
+   "name": "dialog",
+   "handler": "0x0801242C",
+   "payload": "u32 text ref at blob+4: bank = ref & 0x3F (container pointer table 0x087B5B64; 7 LZ banks), start = ((ref >> 6) & 0x7FFF) * 2 bytes, length = ref >> 21 UTF-16 units (no terminator in the bank); arg = speaker portrait id (0x08011F20: 0 or 7 = none, 1..6 = expression of the current character's form (form def +0x0F+id), >= 8 = portrait table 0x086F393C index)",
+   "consumer": "0x0801227E -> 0x08012230 (inflate bank, copy) -> 0x08012012 text box",
+   "status": "VERIFIED",
+   "example": "graph #37: ref 0x04EECA00 -> \"The game will not run on this hardware.\" (shown in the emulator)"
+  },
+  {
+   "kind": 6,
+   "name": "dialog_format",
+   "handler": "0x0801243A",
+   "payload": "u32 text ref at blob+4 (as kind 5) = printf format; bytecode at blob+8 computes the arguments",
+   "consumer": "0x08012334 -> 0x080122B4 -> 0x08012012",
+   "status": "VERIFIED",
+   "example": "graph #3 step 1: \"%s has reached level %d!\" with args (form_name native 0x16, get_level native 0xC8)"
+  },
+  {
+   "kind": 7,
+   "name": "goto_graph",
+   "handler": "0x0801244A",
+   "payload": "u32 pointer to another graph header at blob+4",
+   "consumer": "thread.header = that header, step = 0 (tail call); trivial node object vtable 0x0804AEB0",
+   "status": "INFERRED"
+  }
+ ],
+ "text_format": "UTF-16LE; \"\\n\" = line break; {xxxx} = control codes (see strtab.py); printf %s/%d in kinds 2/6."
+}

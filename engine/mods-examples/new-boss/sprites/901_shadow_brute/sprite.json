@@ -1,0 +1,9 @@
+{
+  "$extends": "sprites/164_majin_fighter/sprite.json",
+  "id": "901_shadow_brute",
+  "sprite_index": 901,
+  "name": "Shadow Brute",
+  "name_confidence": "mod",
+  "notes": "new-boss example mod: the Majin Fighter's frames and animations, recoloured sheet (sheet.png.derive.json)",
+  "rom": null
+}

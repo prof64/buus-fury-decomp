@@ -1,0 +1,122 @@
+//! The game's sound driver as an output device: commands in (from [`wf_view::AudioEvent`]s), float PCM out at the
+//! device rate. Runs on the audio thread (cpal callback natively, an AudioWorklet on the web).
+//!
+//! Like the game, the driver is updated once per video frame (≈267.5 samples at 15 978.3 Hz) and commands take
+//! effect at the start of the next update (SFX voices start on update boundaries; a request when all 16 SFX voices
+//! are busy is dropped by the driver itself). The exact 8-bit FIFO stream is then resampled to the device rate.
+
+use std::collections::VecDeque;
+
+use wf_audio::bank::SoundBank;
+use wf_audio::driver::{Driver, MIX_RATE};
+use wf_view::{AudioEvent, GBA_FPS};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Resample {
+    /// Sample-and-hold (what the GBA DAC does before analogue filtering; harsh).
+    Hold,
+    /// Linear interpolation between FIFO samples (default).
+    Linear,
+}
+
+pub struct AudioEngine {
+    driver: Driver<'static>,
+    step: f64,
+    t: f64,
+    src: VecDeque<(i8, i8)>,
+    chunk: Vec<(i8, i8)>,
+    frame_acc: f64,
+    pending: VecDeque<AudioEvent>,
+    pub gain: f32,
+    pub resample: Resample,
+    pub muted: bool,
+}
+
+impl AudioEngine {
+    /// The bank must outlive the engine; hosts leak it once per content load (`Box::leak`).
+    pub fn new(bank: &'static SoundBank, out_rate: u32) -> AudioEngine {
+        AudioEngine {
+            driver: Driver::new(bank),
+            step: MIX_RATE / out_rate.max(1) as f64,
+            t: 0.0,
+            src: VecDeque::new(),
+            chunk: Vec::new(),
+            frame_acc: 0.0,
+            pending: VecDeque::new(),
+            gain: 1.0,
+            resample: Resample::Linear,
+            muted: false,
+        }
+    }
+
+    pub fn set_out_rate(&mut self, out_rate: u32) {
+        self.step = MIX_RATE / out_rate.max(1) as f64;
+    }
+
+    pub fn push(&mut self, e: AudioEvent) {
+        self.pending.push_back(e);
+    }
+
+    fn apply(&mut self, e: AudioEvent) {
+        let d = &mut self.driver;
+        match e {
+            AudioEvent::PlaySong(id) => {
+                if (id as usize) < d.bank.songs.len() {
+                    d.play_song(id as usize)
+                }
+            }
+            AudioEvent::StopSong => d.stop_song(),
+            AudioEvent::PlaySfx { id, volume, pan } => {
+                if (id as usize) < d.bank.sfx.len() {
+                    d.play_sfx(id, volume, pan);
+                }
+            }
+            AudioEvent::StopSfx(id) => d.stop_sfx(id),
+            AudioEvent::StopAllSfx => d.stop_all_sfx(),
+            AudioEvent::SetMasterVolumes { music, sfx } => d.set_master_volumes(music, sfx),
+        }
+    }
+
+    /// One driver update (one game frame of samples).
+    fn update(&mut self) {
+        while let Some(e) = self.pending.pop_front() {
+            self.apply(e);
+        }
+        self.frame_acc += MIX_RATE / GBA_FPS;
+        let n = self.frame_acc as usize;
+        self.frame_acc -= n as f64;
+        self.chunk.clear();
+        self.driver.render_into(&mut self.chunk, n);
+        self.src.extend(self.chunk.iter().copied());
+    }
+
+    /// Fill interleaved stereo `out` (`[l, r, l, r, ...]`) at the device rate.
+    pub fn render(&mut self, out: &mut [f32]) {
+        let g = if self.muted { 0.0 } else { self.gain / 128.0 };
+        for o in out.chunks_exact_mut(2) {
+            while self.src.len() < self.t as usize + 2 {
+                self.update();
+            }
+            let i = self.t as usize;
+            let (a, b) = (self.src[i], self.src[i + 1]);
+            let (l, r) = match self.resample {
+                Resample::Hold => (a.0 as f32, a.1 as f32),
+                Resample::Linear => {
+                    let f = (self.t - i as f64) as f32;
+                    (a.0 as f32 + (b.0 as f32 - a.0 as f32) * f, a.1 as f32 + (b.1 as f32 - a.1 as f32) * f)
+                }
+            };
+            o[0] = l * g;
+            o[1] = r * g;
+            self.t += self.step;
+            while self.t >= 1.0 {
+                self.src.pop_front();
+                self.t -= 1.0;
+            }
+        }
+    }
+
+    pub fn busy_sfx_voices(&self) -> usize {
+        self.driver.busy_voices()
+    }
+}

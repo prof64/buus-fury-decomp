@@ -1,0 +1,22 @@
+{
+  "id": "24_rapid_blast",
+  "skill": 24,
+  "name": "Rapid Blast",
+  "description": "Press the B Button to snap off a fast, light ki blast. Keep pressing B to fire a stream of them.",
+  "max_level": null,
+  "ep": {
+    "rule": "mod skill: a flat 12 EP per shot (engine.cost)"
+  },
+  "engine": {
+    "base": 7,
+    "check": [12],
+    "cost": [12],
+    "damage": [640],
+    "attack_sub": 4,
+    "fire_frame": 6,
+    "recovery": 18,
+    "speed": 1280,
+    "hit_box": [12, 12],
+    "anim": ["kiblast"]
+  }
+}

@@ -1,0 +1,4055 @@
+{
+ "source": "LoG1 (USA) enemy templates 0x086B6094 (0x40 bytes each), decoded by re/log1/extract_enemies.py",
+ "units": {
+  "hp": "hit points (char+0x4C current / +0x50 max)",
+  "ki": "ki points (char+0x54/+0x58)",
+  "defense": "flat value used by apply_damage 0x08007352",
+  "exp_reward": "added to player exp on kill",
+  "speed": "SPEED_TABLE 0x080116A4 value in 1/16 px per frame (60 fps)",
+  "aggro_tiles": "8-px tiles, Manhattan distance for target acquisition; also wander radius",
+  "hurtbox": "pixels relative to entity position (top-left of the 16x8 foot box), per facing"
+ },
+ "notes": [
+  "Names come from the ROM template table (developer labels); sprite names from 0x080109F0. Labels and sprites disagree in places (sprite \"trex\" uses template \"strong trex\", sprite \"burter\" uses template \"jeice\", sprite \"ginyu\" uses template \"burter\", oozaru1/2 use template 6).",
+  "Boss actors are placed as NPCs and converted to enemies by scripts (0x0800573A / 0x0800DB00).",
+  "devil_2 has HP 0x7FFFFFFF (effectively unkillable)."
+ ],
+ "enemies": [
+  {
+   "id": 0,
+   "rom_addr": "0x086B6094",
+   "name": "squirrel",
+   "raw": "0000000054696b080200000005000000040004000000000000000000020000000000000000000000050000000000000000000000000000000100000000000000",
+   "field_08_char02": 2,
+   "exp_reward": 5,
+   "move_type": 4,
+   "target_type": 4,
+   "fight_style": 0,
+   "field_16": 0,
+   "group_flag": 0,
+   "flying": 0,
+   "aggro_tiles": 2,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 5,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 0,
+   "hp": 1,
+   "defense": 0,
+   "sprites": [
+    {
+     "sprite_id": 97,
+     "sprite_name": "squirrel",
+     "sprite_def": {
+      "def_addr": "0x085C1F38",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": 4,
+        "y0": -2,
+        "x1": 12,
+        "y1": 7
+       },
+       "up": {
+        "x0": 4,
+        "y0": -2,
+        "x1": 12,
+        "y1": 7
+       },
+       "left": {
+        "x0": 2,
+        "y0": -1,
+        "x1": 18,
+        "y1": 8
+       },
+       "right": {
+        "x0": -2,
+        "y0": -1,
+        "x1": 14,
+        "y1": 8
+       }
+      },
+      "palette_ptr": "0x0853B3B4",
+      "anim_table": "0x080123F0",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 1.125,
+   "speed_raw_sixteenths": 18,
+   "wake_radius_sq_px": 384,
+   "wake_radius_px": 19.6,
+   "ki_regen_per_16_frames": 0,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 0,
+    "max_at_full_hp": 0
+   },
+   "ki_blast": {
+    "usable": false
+   },
+   "move_type_desc": "random wander within aggro_tiles (max 14) of current tile",
+   "target_type_desc": "always flees from its target (0x0800F9AC)",
+   "fight_style_desc": "always attack",
+   "roams": true,
+   "appears": [
+    {
+     "map": 2,
+     "placed_enemies": 6,
+     "scripted_npc_actors": 0
+    },
+    {
+     "map": 5,
+     "placed_enemies": 5,
+     "scripted_npc_actors": 0
+    },
+    {
+     "map": 9,
+     "placed_enemies": 8,
+     "scripted_npc_actors": 0
+    },
+    {
+     "map": 16,
+     "placed_enemies": 2,
+     "scripted_npc_actors": 0
+    },
+    {
+     "map": 17,
+     "placed_enemies": 3,
+     "scripted_npc_actors": 0
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 1,
+   "rom_addr": "0x086B60D4",
+   "name": "snake",
+   "raw": "010000005d696b080200000005000000040003000200000002000000040000000000000000000000000000000000000000000000000000000300000000000000",
+   "field_08_char02": 2,
+   "exp_reward": 5,
+   "move_type": 4,
+   "target_type": 3,
+   "fight_style": 2,
+   "field_16": 0,
+   "group_flag": 2,
+   "flying": 0,
+   "aggro_tiles": 4,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 0,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 0,
+   "hp": 3,
+   "defense": 0,
+   "sprites": [
+    {
+     "sprite_id": 90,
+     "sprite_name": "snake",
+     "sprite_def": {
+      "def_addr": "0x085C1EE0",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": 4,
+        "y0": -6,
+        "x1": 12,
+        "y1": 8
+       },
+       "up": {
+        "x0": 4,
+        "y0": -3,
+        "x1": 12,
+        "y1": 8
+       },
+       "left": {
+        "x0": 0,
+        "y0": 0,
+        "x1": 15,
+        "y1": 8
+       },
+       "right": {
+        "x0": 0,
+        "y0": 0,
+        "x1": 15,
+        "y1": 8
+       }
+      },
+      "palette_ptr": "0x0853B3B4",
+      "anim_table": "0x08017120",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 0.5,
+   "speed_raw_sixteenths": 8,
+   "wake_radius_sq_px": 1536,
+   "wake_radius_px": 39.2,
+   "ki_regen_per_16_frames": 0,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 0,
+    "max_at_full_hp": 1
+   },
+   "ki_blast": {
+    "usable": false
+   },
+   "move_type_desc": "random wander within aggro_tiles (max 14) of current tile",
+   "target_type_desc": "opportunist: attacks only if the player is already engaged (player char+0x25C != 0), else flees",
+   "fight_style_desc": "attack only if own HP > target HP, else flee",
+   "roams": true,
+   "appears": [
+    {
+     "map": 2,
+     "placed_enemies": 26,
+     "scripted_npc_actors": 0
+    },
+    {
+     "map": 4,
+     "placed_enemies": 7,
+     "scripted_npc_actors": 0
+    },
+    {
+     "map": 5,
+     "placed_enemies": 6,
+     "scripted_npc_actors": 0
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 2,
+   "rom_addr": "0x086B6114",
+   "name": "wolf",
+   "raw": "0200000063696b0803000000460000000300010003000000030000000a0000000000000000000000060000000000000000000000000000005e010000c8000000",
+   "field_08_char02": 3,
+   "exp_reward": 70,
+   "move_type": 3,
+   "target_type": 1,
+   "fight_style": 3,
+   "field_16": 0,
+   "group_flag": 3,
+   "flying": 0,
+   "aggro_tiles": 10,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 6,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 0,
+   "hp": 350,
+   "defense": 200,
+   "sprites": [
+    {
+     "sprite_id": 107,
+     "sprite_name": "wolf",
+     "sprite_def": {
+      "def_addr": "0x085C211C",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": 2,
+        "y0": -10,
+        "x1": 14,
+        "y1": 8
+       },
+       "up": {
+        "x0": 2,
+        "y0": -10,
+        "x1": 14,
+        "y1": 8
+       },
+       "left": {
+        "x0": -3,
+        "y0": -10,
+        "x1": 18,
+        "y1": 8
+       },
+       "right": {
+        "x0": -3,
+        "y0": -10,
+        "x1": 18,
+        "y1": 8
+       }
+      },
+      "palette_ptr": "0x0853B3B4",
+      "anim_table": "0x08017F60",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 1.1875,
+   "speed_raw_sixteenths": 19,
+   "wake_radius_sq_px": 9600,
+   "wake_radius_px": 98.0,
+   "ki_regen_per_16_frames": 0,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 87,
+    "max_at_full_hp": 262
+   },
+   "ki_blast": {
+    "usable": false
+   },
+   "move_type_desc": "patrol up to 5 waypoints (char+0x240), else random wander",
+   "target_type_desc": "aggressive: targets player when Manhattan tile distance <= aggro_tiles",
+   "fight_style_desc": "attack; when own HP < maxHP/2, 6/101 chance per decision to flee",
+   "roams": true,
+   "appears": [
+    {
+     "map": 2,
+     "placed_enemies": 2,
+     "scripted_npc_actors": 0
+    },
+    {
+     "map": 4,
+     "placed_enemies": 11,
+     "scripted_npc_actors": 0
+    },
+    {
+     "map": 5,
+     "placed_enemies": 5,
+     "scripted_npc_actors": 0
+    },
+    {
+     "map": 16,
+     "placed_enemies": 6,
+     "scripted_npc_actors": 0
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 3,
+   "rom_addr": "0x086B6154",
+   "name": "piccolo",
+   "raw": "0300000068696b080200000000000000010000000000000000000000080000000000000000000000060000000000000000000000580200006400000032000000",
+   "field_08_char02": 2,
+   "exp_reward": 0,
+   "move_type": 1,
+   "target_type": 0,
+   "fight_style": 0,
+   "field_16": 0,
+   "group_flag": 0,
+   "flying": 0,
+   "aggro_tiles": 8,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 6,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 600,
+   "hp": 100,
+   "defense": 50,
+   "sprites": [
+    {
+     "sprite_id": 78,
+     "sprite_name": "piccolo",
+     "sprite_def": {
+      "def_addr": "0x085C1D80",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "up": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "left": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "right": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853B094",
+      "anim_table": "0x080167A0",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2",
+       "Ki"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 1.1875,
+   "speed_raw_sixteenths": 19,
+   "wake_radius_sq_px": 6144,
+   "wake_radius_px": 78.4,
+   "ki_regen_per_16_frames": 9,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 25,
+    "max_at_full_hp": 75
+   },
+   "ki_blast": {
+    "usable": true,
+    "damage": "max_hp//3",
+    "damage_at_full": 33,
+    "requires": "ki > max_ki//16 and target in line",
+    "power_spent": "rand(ki//2) + ki//4"
+   },
+   "move_type_desc": "guard: return to guard tile (template +0x24/+0x26) when idle, else stand",
+   "target_type_desc": "never acquires the player by itself (only retaliates)",
+   "fight_style_desc": "always attack",
+   "roams": false,
+   "appears": [
+    {
+     "map": 9,
+     "placed_enemies": 0,
+     "scripted_npc_actors": 1
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 4,
+   "rom_addr": "0x086B6194",
+   "name": "raditz",
+   "raw": "0400000070696b0802000000000000000100010000000000000000000a000000000000000000000004000000000000000000000046050000401f0000bc020000",
+   "field_08_char02": 2,
+   "exp_reward": 0,
+   "move_type": 1,
+   "target_type": 1,
+   "fight_style": 0,
+   "field_16": 0,
+   "group_flag": 0,
+   "flying": 0,
+   "aggro_tiles": 10,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 4,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 1350,
+   "hp": 8000,
+   "defense": 700,
+   "sprites": [
+    {
+     "sprite_id": 84,
+     "sprite_name": "raditz",
+     "sprite_def": {
+      "def_addr": "0x085C1E30",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "up": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "left": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "right": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853B114",
+      "anim_table": "0x08016C60",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2",
+       "Ki",
+       "Raditz"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 1.0,
+   "speed_raw_sixteenths": 16,
+   "wake_radius_sq_px": 9600,
+   "wake_radius_px": 98.0,
+   "ki_regen_per_16_frames": 21,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 2000,
+    "max_at_full_hp": 6000
+   },
+   "ki_blast": {
+    "usable": true,
+    "damage": "max_hp//3",
+    "damage_at_full": 2666,
+    "requires": "ki > max_ki//16 and target in line",
+    "power_spent": "rand(ki//2) + ki//4"
+   },
+   "move_type_desc": "guard: return to guard tile (template +0x24/+0x26) when idle, else stand",
+   "target_type_desc": "aggressive: targets player when Manhattan tile distance <= aggro_tiles",
+   "fight_style_desc": "always attack",
+   "roams": false,
+   "appears": [
+    {
+     "map": 9,
+     "placed_enemies": 0,
+     "scripted_npc_actors": 1
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 5,
+   "rom_addr": "0x086B61D4",
+   "name": "nappa",
+   "raw": "0500000077696b0802000000000000000100010000000000000000000a0000000000000000000000040000000000000000000000f4010000b0360000b80b0000",
+   "field_08_char02": 2,
+   "exp_reward": 0,
+   "move_type": 1,
+   "target_type": 1,
+   "fight_style": 0,
+   "field_16": 0,
+   "group_flag": 0,
+   "flying": 0,
+   "aggro_tiles": 10,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 4,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 500,
+   "hp": 14000,
+   "defense": 3000,
+   "sprites": [
+    {
+     "sprite_id": 73,
+     "sprite_name": "nappa",
+     "sprite_def": {
+      "def_addr": "0x085C1CA4",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "up": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "left": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "right": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853AFF4",
+      "anim_table": "0x080161B0",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2",
+       "Ki"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 1.0,
+   "speed_raw_sixteenths": 16,
+   "wake_radius_sq_px": 9600,
+   "wake_radius_px": 98.0,
+   "ki_regen_per_16_frames": 7,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 3500,
+    "max_at_full_hp": 10500
+   },
+   "ki_blast": {
+    "usable": true,
+    "damage": "max_hp//3",
+    "damage_at_full": 4666,
+    "requires": "ki > max_ki//16 and target in line",
+    "power_spent": "rand(ki//2) + ki//4"
+   },
+   "move_type_desc": "guard: return to guard tile (template +0x24/+0x26) when idle, else stand",
+   "target_type_desc": "aggressive: targets player when Manhattan tile distance <= aggro_tiles",
+   "fight_style_desc": "always attack",
+   "roams": false,
+   "appears": [
+    {
+     "map": 23,
+     "placed_enemies": 0,
+     "scripted_npc_actors": 1
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 6,
+   "rom_addr": "0x086B6214",
+   "name": "strong trex",
+   "raw": "060000007d696b0802000000a00f00000100010000000000000000000a0000000000000000000000010000000000000000000000000000005046000058020000",
+   "field_08_char02": 2,
+   "exp_reward": 4000,
+   "move_type": 1,
+   "target_type": 1,
+   "fight_style": 0,
+   "field_16": 0,
+   "group_flag": 0,
+   "flying": 0,
+   "aggro_tiles": 10,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 1,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 0,
+   "hp": 18000,
+   "defense": 600,
+   "sprites": [
+    {
+     "sprite_id": 76,
+     "sprite_name": "oozaru1",
+     "sprite_def": {
+      "def_addr": "0x085C1D28",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": -6,
+        "y0": -54,
+        "x1": 22,
+        "y1": 6
+       },
+       "up": {
+        "x0": -6,
+        "y0": -54,
+        "x1": 22,
+        "y1": 6
+       },
+       "left": {
+        "x0": -6,
+        "y0": -54,
+        "x1": 22,
+        "y1": 6
+       },
+       "right": {
+        "x0": -6,
+        "y0": -54,
+        "x1": 22,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853B054",
+      "anim_table": "0x08016540",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Ki"
+      ]
+     }
+    },
+    {
+     "sprite_id": 77,
+     "sprite_name": "oozaru2",
+     "sprite_def": {
+      "def_addr": "0x085C1D54",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": -6,
+        "y0": -54,
+        "x1": 22,
+        "y1": 6
+       },
+       "up": {
+        "x0": -6,
+        "y0": -54,
+        "x1": 22,
+        "y1": 6
+       },
+       "left": {
+        "x0": -6,
+        "y0": -54,
+        "x1": 22,
+        "y1": 6
+       },
+       "right": {
+        "x0": -6,
+        "y0": -54,
+        "x1": 22,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853B074",
+      "anim_table": "0x08016670",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Ki"
+      ]
+     }
+    },
+    {
+     "sprite_id": 100,
+     "sprite_name": "trex",
+     "sprite_def": {
+      "def_addr": "0x085C1FE8",
+      "footprint": {
+       "w": 32,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": -6,
+        "y0": -22,
+        "x1": 22,
+        "y1": 6
+       },
+       "up": {
+        "x0": -6,
+        "y0": -22,
+        "x1": 22,
+        "y1": 6
+       },
+       "left": {
+        "x0": -22,
+        "y0": -22,
+        "x1": 27,
+        "y1": 6
+       },
+       "right": {
+        "x0": -11,
+        "y0": -22,
+        "x1": 38,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853B1F4",
+      "anim_table": "0x08017710",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 0.625,
+   "speed_raw_sixteenths": 10,
+   "wake_radius_sq_px": 9600,
+   "wake_radius_px": 98.0,
+   "ki_regen_per_16_frames": 0,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 4500,
+    "max_at_full_hp": 13500
+   },
+   "ki_blast": {
+    "usable": false
+   },
+   "move_type_desc": "guard: return to guard tile (template +0x24/+0x26) when idle, else stand",
+   "target_type_desc": "aggressive: targets player when Manhattan tile distance <= aggro_tiles",
+   "fight_style_desc": "always attack",
+   "roams": false,
+   "appears": [
+    {
+     "map": 16,
+     "placed_enemies": 1,
+     "scripted_npc_actors": 0
+    },
+    {
+     "map": 24,
+     "placed_enemies": 3,
+     "scripted_npc_actors": 0
+    },
+    {
+     "map": 28,
+     "placed_enemies": 2,
+     "scripted_npc_actors": 0
+    },
+    {
+     "map": 30,
+     "placed_enemies": 4,
+     "scripted_npc_actors": 0
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 7,
+   "rom_addr": "0x086B6254",
+   "name": "trex",
+   "raw": "0700000089696b0802000000580200000100010000000000000000000a000000000000000000000001000000000000000000000000000000581b00002c010000",
+   "field_08_char02": 2,
+   "exp_reward": 600,
+   "move_type": 1,
+   "target_type": 1,
+   "fight_style": 0,
+   "field_16": 0,
+   "group_flag": 0,
+   "flying": 0,
+   "aggro_tiles": 10,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 1,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 0,
+   "hp": 7000,
+   "defense": 300,
+   "sprites": [
+    {
+     "sprite_id": 101,
+     "sprite_name": "trex2",
+     "sprite_def": {
+      "def_addr": "0x085C1FE8",
+      "footprint": {
+       "w": 32,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": -6,
+        "y0": -22,
+        "x1": 22,
+        "y1": 6
+       },
+       "up": {
+        "x0": -6,
+        "y0": -22,
+        "x1": 22,
+        "y1": 6
+       },
+       "left": {
+        "x0": -22,
+        "y0": -22,
+        "x1": 27,
+        "y1": 6
+       },
+       "right": {
+        "x0": -11,
+        "y0": -22,
+        "x1": 38,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853B1F4",
+      "anim_table": "0x08017710",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 0.625,
+   "speed_raw_sixteenths": 10,
+   "wake_radius_sq_px": 9600,
+   "wake_radius_px": 98.0,
+   "ki_regen_per_16_frames": 0,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 1750,
+    "max_at_full_hp": 5250
+   },
+   "ki_blast": {
+    "usable": false
+   },
+   "move_type_desc": "guard: return to guard tile (template +0x24/+0x26) when idle, else stand",
+   "target_type_desc": "aggressive: targets player when Manhattan tile distance <= aggro_tiles",
+   "fight_style_desc": "always attack",
+   "roams": false,
+   "appears": [
+    {
+     "map": 4,
+     "placed_enemies": 1,
+     "scripted_npc_actors": 0
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 8,
+   "rom_addr": "0x086B6294",
+   "name": "pterodactyl_1",
+   "raw": "080000008e696b08020000002c01000004000100000000000000010008000000000000000000000002000000000000000000000000000000d0070000c8000000",
+   "field_08_char02": 2,
+   "exp_reward": 300,
+   "move_type": 4,
+   "target_type": 1,
+   "fight_style": 0,
+   "field_16": 0,
+   "group_flag": 0,
+   "flying": 1,
+   "aggro_tiles": 8,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 2,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 0,
+   "hp": 2000,
+   "defense": 200,
+   "sprites": [
+    {
+     "sprite_id": 80,
+     "sprite_name": "ptero1",
+     "sprite_def": {
+      "def_addr": "0x085C1DAC",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": -6,
+        "y0": -22,
+        "x1": 22,
+        "y1": 6
+       },
+       "up": {
+        "x0": -6,
+        "y0": -22,
+        "x1": 22,
+        "y1": 6
+       },
+       "left": {
+        "x0": -6,
+        "y0": -22,
+        "x1": 22,
+        "y1": 6
+       },
+       "right": {
+        "x0": -6,
+        "y0": -22,
+        "x1": 22,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853B0B4",
+      "anim_table": "0x080168D0",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2",
+       "Excited",
+       "Sad",
+       "Flying"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 0.75,
+   "speed_raw_sixteenths": 12,
+   "wake_radius_sq_px": 6144,
+   "wake_radius_px": 78.4,
+   "ki_regen_per_16_frames": 0,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 500,
+    "max_at_full_hp": 1500
+   },
+   "ki_blast": {
+    "usable": false
+   },
+   "move_type_desc": "random wander within aggro_tiles (max 14) of current tile",
+   "target_type_desc": "aggressive: targets player when Manhattan tile distance <= aggro_tiles",
+   "fight_style_desc": "always attack",
+   "roams": true,
+   "appears": [
+    {
+     "map": 4,
+     "placed_enemies": 1,
+     "scripted_npc_actors": 0
+    },
+    {
+     "map": 5,
+     "placed_enemies": 1,
+     "scripted_npc_actors": 0
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 9,
+   "rom_addr": "0x086B62D4",
+   "name": "pterodactyl_2",
+   "raw": "090000009c696b0802000000d007000002000000000000000000010008000000000000000000000002000000000000000000000000000000401f000090010000",
+   "field_08_char02": 2,
+   "exp_reward": 2000,
+   "move_type": 2,
+   "target_type": 0,
+   "fight_style": 0,
+   "field_16": 0,
+   "group_flag": 0,
+   "flying": 1,
+   "aggro_tiles": 8,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 2,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 0,
+   "hp": 8000,
+   "defense": 400,
+   "sprites": [
+    {
+     "sprite_id": 81,
+     "sprite_name": "ptero2",
+     "sprite_def": {
+      "def_addr": "0x085C1DAC",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": -6,
+        "y0": -22,
+        "x1": 22,
+        "y1": 6
+       },
+       "up": {
+        "x0": -6,
+        "y0": -22,
+        "x1": 22,
+        "y1": 6
+       },
+       "left": {
+        "x0": -6,
+        "y0": -22,
+        "x1": 22,
+        "y1": 6
+       },
+       "right": {
+        "x0": -6,
+        "y0": -22,
+        "x1": 22,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853B0B4",
+      "anim_table": "0x080168D0",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2",
+       "Excited",
+       "Sad",
+       "Flying"
+      ]
+     }
+    },
+    {
+     "sprite_id": 82,
+     "sprite_name": "ptero3",
+     "sprite_def": {
+      "def_addr": "0x085C1DAC",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": -6,
+        "y0": -22,
+        "x1": 22,
+        "y1": 6
+       },
+       "up": {
+        "x0": -6,
+        "y0": -22,
+        "x1": 22,
+        "y1": 6
+       },
+       "left": {
+        "x0": -6,
+        "y0": -22,
+        "x1": 22,
+        "y1": 6
+       },
+       "right": {
+        "x0": -6,
+        "y0": -22,
+        "x1": 22,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853B0B4",
+      "anim_table": "0x080168D0",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2",
+       "Excited",
+       "Sad",
+       "Flying"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 0.75,
+   "speed_raw_sixteenths": 12,
+   "wake_radius_sq_px": 6144,
+   "wake_radius_px": 78.4,
+   "ki_regen_per_16_frames": 0,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 2000,
+    "max_at_full_hp": 6000
+   },
+   "ki_blast": {
+    "usable": false
+   },
+   "move_type_desc": "guard (same jump-table entry as 1, roams)",
+   "target_type_desc": "never acquires the player by itself (only retaliates)",
+   "fight_style_desc": "always attack",
+   "roams": true,
+   "appears": [
+    {
+     "map": 4,
+     "placed_enemies": 0,
+     "scripted_npc_actors": 1
+    },
+    {
+     "map": 24,
+     "placed_enemies": 6,
+     "scripted_npc_actors": 0
+    },
+    {
+     "map": 28,
+     "placed_enemies": 3,
+     "scripted_npc_actors": 0
+    },
+    {
+     "map": 31,
+     "placed_enemies": 5,
+     "scripted_npc_actors": 0
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 10,
+   "rom_addr": "0x086B6314",
+   "name": "robber_1",
+   "raw": "0a000000aa696b0802000000e803000002000000000000000000000008000000000000000000000002000000000000000000000000000000581b000064000000",
+   "field_08_char02": 2,
+   "exp_reward": 1000,
+   "move_type": 2,
+   "target_type": 0,
+   "fight_style": 0,
+   "field_16": 0,
+   "group_flag": 0,
+   "flying": 0,
+   "aggro_tiles": 8,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 2,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 0,
+   "hp": 7000,
+   "defense": 100,
+   "sprites": [
+    {
+     "sprite_id": 86,
+     "sprite_name": "robber1",
+     "sprite_def": {
+      "def_addr": "0x085C1E88",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "up": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "left": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "right": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853B154",
+      "anim_table": "0x08016EC0",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2"
+      ]
+     }
+    },
+    {
+     "sprite_id": 88,
+     "sprite_name": "robber3",
+     "sprite_def": {
+      "def_addr": "0x085C1E88",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "up": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "left": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "right": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853B154",
+      "anim_table": "0x08016EC0",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 0.75,
+   "speed_raw_sixteenths": 12,
+   "wake_radius_sq_px": 6144,
+   "wake_radius_px": 78.4,
+   "ki_regen_per_16_frames": 0,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 1750,
+    "max_at_full_hp": 5250
+   },
+   "ki_blast": {
+    "usable": false
+   },
+   "move_type_desc": "guard (same jump-table entry as 1, roams)",
+   "target_type_desc": "never acquires the player by itself (only retaliates)",
+   "fight_style_desc": "always attack",
+   "roams": true,
+   "appears": [
+    {
+     "map": 17,
+     "placed_enemies": 2,
+     "scripted_npc_actors": 0
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 11,
+   "rom_addr": "0x086B6354",
+   "name": "robber_2",
+   "raw": "0b000000b3696b0802000000e803000002000000000000000000000008000000000000000000000002000000000000000000000000000000581b000064000000",
+   "field_08_char02": 2,
+   "exp_reward": 1000,
+   "move_type": 2,
+   "target_type": 0,
+   "fight_style": 0,
+   "field_16": 0,
+   "group_flag": 0,
+   "flying": 0,
+   "aggro_tiles": 8,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 2,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 0,
+   "hp": 7000,
+   "defense": 100,
+   "sprites": [
+    {
+     "sprite_id": 87,
+     "sprite_name": "robber2",
+     "sprite_def": {
+      "def_addr": "0x085C1E88",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "up": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "left": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "right": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853B154",
+      "anim_table": "0x08016EC0",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 0.75,
+   "speed_raw_sixteenths": 12,
+   "wake_radius_sq_px": 6144,
+   "wake_radius_px": 78.4,
+   "ki_regen_per_16_frames": 0,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 1750,
+    "max_at_full_hp": 5250
+   },
+   "ki_blast": {
+    "usable": false
+   },
+   "move_type_desc": "guard (same jump-table entry as 1, roams)",
+   "target_type_desc": "never acquires the player by itself (only retaliates)",
+   "fight_style_desc": "always attack",
+   "roams": true,
+   "appears": [
+    {
+     "map": 17,
+     "placed_enemies": 1,
+     "scripted_npc_actors": 0
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 12,
+   "rom_addr": "0x086B6394",
+   "name": "devil_1",
+   "raw": "0c000000bc696b08020000006400000001000400000000000000000008000000000000000000000004000000000000000000000000000000f401000000000000",
+   "field_08_char02": 2,
+   "exp_reward": 100,
+   "move_type": 1,
+   "target_type": 4,
+   "fight_style": 0,
+   "field_16": 0,
+   "group_flag": 0,
+   "flying": 0,
+   "aggro_tiles": 8,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 4,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 0,
+   "hp": 500,
+   "defense": 0,
+   "sprites": [
+    {
+     "sprite_id": 30,
+     "sprite_name": "devil1",
+     "sprite_def": {
+      "def_addr": "0x085C1648",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "up": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "left": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "right": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853AC34",
+      "anim_table": "0x08013A80",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Excited"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 1.0,
+   "speed_raw_sixteenths": 16,
+   "wake_radius_sq_px": 6144,
+   "wake_radius_px": 78.4,
+   "ki_regen_per_16_frames": 0,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 125,
+    "max_at_full_hp": 375
+   },
+   "ki_blast": {
+    "usable": false
+   },
+   "move_type_desc": "guard: return to guard tile (template +0x24/+0x26) when idle, else stand",
+   "target_type_desc": "always flees from its target (0x0800F9AC)",
+   "fight_style_desc": "always attack",
+   "roams": false,
+   "appears": [
+    {
+     "map": 12,
+     "placed_enemies": 0,
+     "scripted_npc_actors": 1
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 13,
+   "rom_addr": "0x086B63D4",
+   "name": "devil_2",
+   "raw": "0d000000c4696b08020000000100000001000400000000000000000008000000000000000000000007000000000000000000000000000000ffffff7f00000000",
+   "field_08_char02": 2,
+   "exp_reward": 1,
+   "move_type": 1,
+   "target_type": 4,
+   "fight_style": 0,
+   "field_16": 0,
+   "group_flag": 0,
+   "flying": 0,
+   "aggro_tiles": 8,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 7,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 0,
+   "hp": 2147483647,
+   "defense": 0,
+   "sprites": [
+    {
+     "sprite_id": 31,
+     "sprite_name": "devil2",
+     "sprite_def": {
+      "def_addr": "0x085C1674",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "up": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "left": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "right": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853AC54",
+      "anim_table": "0x08013BB0",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Excited"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 1.25,
+   "speed_raw_sixteenths": 20,
+   "wake_radius_sq_px": 6144,
+   "wake_radius_px": 78.4,
+   "ki_regen_per_16_frames": 0,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 536870911,
+    "max_at_full_hp": 1610612734
+   },
+   "ki_blast": {
+    "usable": false
+   },
+   "move_type_desc": "guard: return to guard tile (template +0x24/+0x26) when idle, else stand",
+   "target_type_desc": "always flees from its target (0x0800F9AC)",
+   "fight_style_desc": "always attack",
+   "roams": false,
+   "appears": [
+    {
+     "map": 12,
+     "placed_enemies": 0,
+     "scripted_npc_actors": 1
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 14,
+   "rom_addr": "0x086B6414",
+   "name": "crab",
+   "raw": "0e000000cc696b08020000004600000003000100000000000200000002000000000000000000000002000000000000000000000000000000f000000000000000",
+   "field_08_char02": 2,
+   "exp_reward": 70,
+   "move_type": 3,
+   "target_type": 1,
+   "fight_style": 0,
+   "field_16": 0,
+   "group_flag": 2,
+   "flying": 0,
+   "aggro_tiles": 2,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 2,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 0,
+   "hp": 240,
+   "defense": 0,
+   "sprites": [
+    {
+     "sprite_id": 28,
+     "sprite_name": "crab",
+     "sprite_def": {
+      "def_addr": "0x085C15F0",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": -2,
+        "y0": -13,
+        "x1": 18,
+        "y1": 6
+       },
+       "up": {
+        "x0": -2,
+        "y0": -13,
+        "x1": 18,
+        "y1": 7
+       },
+       "left": {
+        "x0": 0,
+        "y0": -10,
+        "x1": 20,
+        "y1": 6
+       },
+       "right": {
+        "x0": -4,
+        "y0": -10,
+        "x1": 16,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853ABF4",
+      "anim_table": "0x08013820",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 0.75,
+   "speed_raw_sixteenths": 12,
+   "wake_radius_sq_px": 384,
+   "wake_radius_px": 19.6,
+   "ki_regen_per_16_frames": 0,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 60,
+    "max_at_full_hp": 180
+   },
+   "ki_blast": {
+    "usable": false
+   },
+   "move_type_desc": "patrol up to 5 waypoints (char+0x240), else random wander",
+   "target_type_desc": "aggressive: targets player when Manhattan tile distance <= aggro_tiles",
+   "fight_style_desc": "always attack",
+   "roams": true,
+   "appears": [
+    {
+     "map": 2,
+     "placed_enemies": 5,
+     "scripted_npc_actors": 0
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 15,
+   "rom_addr": "0x086B6454",
+   "name": "bubbles",
+   "raw": "0f000000d1696b0802000000000000000400040000000000000000000a0000000000000000000000060000000000000000000000000000000100000000000000",
+   "field_08_char02": 2,
+   "exp_reward": 0,
+   "move_type": 4,
+   "target_type": 4,
+   "fight_style": 0,
+   "field_16": 0,
+   "group_flag": 0,
+   "flying": 0,
+   "aggro_tiles": 10,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 6,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 0,
+   "hp": 1,
+   "defense": 0,
+   "sprites": [
+    {
+     "sprite_id": 10,
+     "sprite_name": "bubbles",
+     "sprite_def": {
+      "def_addr": "0x085C13E0",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": 2,
+        "y0": -15,
+        "x1": 14,
+        "y1": 7
+       },
+       "up": {
+        "x0": 2,
+        "y0": -14,
+        "x1": 14,
+        "y1": 8
+       },
+       "left": {
+        "x0": 2,
+        "y0": -14,
+        "x1": 14,
+        "y1": 8
+       },
+       "right": {
+        "x0": 2,
+        "y0": -14,
+        "x1": 14,
+        "y1": 8
+       }
+      },
+      "palette_ptr": "0x0853AA74",
+      "anim_table": "0x080129E0",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Excited"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 1.1875,
+   "speed_raw_sixteenths": 19,
+   "wake_radius_sq_px": 9600,
+   "wake_radius_px": 98.0,
+   "ki_regen_per_16_frames": 0,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 0,
+    "max_at_full_hp": 0
+   },
+   "ki_blast": {
+    "usable": false
+   },
+   "move_type_desc": "random wander within aggro_tiles (max 14) of current tile",
+   "target_type_desc": "always flees from its target (0x0800F9AC)",
+   "fight_style_desc": "always attack",
+   "roams": true,
+   "appears": [
+    {
+     "map": 13,
+     "placed_enemies": 0,
+     "scripted_npc_actors": 2
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 16,
+   "rom_addr": "0x086B6494",
+   "name": "gregory",
+   "raw": "10000000d9696b0802000000000000000400040000000000000000000a0000000000000000000000070000000000000000000000000000000100000000000000",
+   "field_08_char02": 2,
+   "exp_reward": 0,
+   "move_type": 4,
+   "target_type": 4,
+   "fight_style": 0,
+   "field_16": 0,
+   "group_flag": 0,
+   "flying": 0,
+   "aggro_tiles": 10,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 7,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 0,
+   "hp": 1,
+   "defense": 0,
+   "sprites": [
+    {
+     "sprite_id": 54,
+     "sprite_name": "gregory",
+     "sprite_def": {
+      "def_addr": "0x085C18DC",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": -2,
+        "y0": -22,
+        "x1": 18,
+        "y1": 6
+       },
+       "up": {
+        "x0": -2,
+        "y0": -22,
+        "x1": 18,
+        "y1": 6
+       },
+       "left": {
+        "x0": -2,
+        "y0": -22,
+        "x1": 18,
+        "y1": 6
+       },
+       "right": {
+        "x0": -2,
+        "y0": -22,
+        "x1": 18,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853AD94",
+      "anim_table": "0x08014790",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Excited"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 1.25,
+   "speed_raw_sixteenths": 20,
+   "wake_radius_sq_px": 9600,
+   "wake_radius_px": 98.0,
+   "ki_regen_per_16_frames": 0,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 0,
+    "max_at_full_hp": 0
+   },
+   "ki_blast": {
+    "usable": false
+   },
+   "move_type_desc": "random wander within aggro_tiles (max 14) of current tile",
+   "target_type_desc": "always flees from its target (0x0800F9AC)",
+   "fight_style_desc": "always attack",
+   "roams": true,
+   "appears": [
+    {
+     "map": 13,
+     "placed_enemies": 0,
+     "scripted_npc_actors": 1
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 17,
+   "rom_addr": "0x086B64D4",
+   "name": "burter",
+   "raw": "11000000e1696b0802000000000000000100010000000000000000000a0000000000000000000000040000000000000000000000c82c0100f049020010270000",
+   "field_08_char02": 2,
+   "exp_reward": 0,
+   "move_type": 1,
+   "target_type": 1,
+   "fight_style": 0,
+   "field_16": 0,
+   "group_flag": 0,
+   "flying": 0,
+   "aggro_tiles": 10,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 4,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 77000,
+   "hp": 150000,
+   "defense": 10000,
+   "sprites": [
+    {
+     "sprite_id": 46,
+     "sprite_name": "ginyu",
+     "sprite_def": {
+      "def_addr": "0x085C17A8",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "up": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "left": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "right": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853B354",
+      "anim_table": "0x08018550",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2",
+       "Ki"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 1.0,
+   "speed_raw_sixteenths": 16,
+   "wake_radius_sq_px": 9600,
+   "wake_radius_px": 98.0,
+   "ki_regen_per_16_frames": 1203,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 37500,
+    "max_at_full_hp": 112500
+   },
+   "ki_blast": {
+    "usable": true,
+    "damage": "max_hp//3",
+    "damage_at_full": 50000,
+    "requires": "ki > max_ki//16 and target in line",
+    "power_spent": "rand(ki//2) + ki//4"
+   },
+   "move_type_desc": "guard: return to guard tile (template +0x24/+0x26) when idle, else stand",
+   "target_type_desc": "aggressive: targets player when Manhattan tile distance <= aggro_tiles",
+   "fight_style_desc": "always attack",
+   "roams": false,
+   "appears": [
+    {
+     "map": 30,
+     "placed_enemies": 0,
+     "scripted_npc_actors": 1
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 18,
+   "rom_addr": "0x086B6514",
+   "name": "reccome",
+   "raw": "12000000e8696b0802000000000000000100010000000000000000000a0000000000000000000000040000000000000000000000c8af000060ea0000581b0000",
+   "field_08_char02": 2,
+   "exp_reward": 0,
+   "move_type": 1,
+   "target_type": 1,
+   "fight_style": 0,
+   "field_16": 0,
+   "group_flag": 0,
+   "flying": 0,
+   "aggro_tiles": 10,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 4,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 45000,
+   "hp": 60000,
+   "defense": 7000,
+   "sprites": [
+    {
+     "sprite_id": 85,
+     "sprite_name": "recoome",
+     "sprite_def": {
+      "def_addr": "0x085C1E5C",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "up": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "left": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "right": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853B134",
+      "anim_table": "0x08016D90",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2",
+       "Ki"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 1.0,
+   "speed_raw_sixteenths": 16,
+   "wake_radius_sq_px": 9600,
+   "wake_radius_px": 98.0,
+   "ki_regen_per_16_frames": 703,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 15000,
+    "max_at_full_hp": 45000
+   },
+   "ki_blast": {
+    "usable": true,
+    "damage": "max_hp//3",
+    "damage_at_full": 20000,
+    "requires": "ki > max_ki//16 and target in line",
+    "power_spent": "rand(ki//2) + ki//4"
+   },
+   "move_type_desc": "guard: return to guard tile (template +0x24/+0x26) when idle, else stand",
+   "target_type_desc": "aggressive: targets player when Manhattan tile distance <= aggro_tiles",
+   "fight_style_desc": "always attack",
+   "roams": false,
+   "appears": [
+    {
+     "map": 30,
+     "placed_enemies": 0,
+     "scripted_npc_actors": 1
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 19,
+   "rom_addr": "0x086B6554",
+   "name": "jeice",
+   "raw": "13000000f0696b0802000000000000000100010000000000000000000a0000000000000000000000040000000000000000000000e0280100905f010028230000",
+   "field_08_char02": 2,
+   "exp_reward": 0,
+   "move_type": 1,
+   "target_type": 1,
+   "fight_style": 0,
+   "field_16": 0,
+   "group_flag": 0,
+   "flying": 0,
+   "aggro_tiles": 10,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 4,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 76000,
+   "hp": 90000,
+   "defense": 9000,
+   "sprites": [
+    {
+     "sprite_id": 12,
+     "sprite_name": "burter",
+     "sprite_def": {
+      "def_addr": "0x085C1438",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "up": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "left": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "right": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853AAB4",
+      "anim_table": "0x08012C40",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2",
+       "Ki"
+      ]
+     }
+    },
+    {
+     "sprite_id": 56,
+     "sprite_name": "jeice",
+     "sprite_def": {
+      "def_addr": "0x085C1A10",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "up": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "left": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "right": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853AE14",
+      "anim_table": "0x08014FE0",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2",
+       "Ki"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 1.0,
+   "speed_raw_sixteenths": 16,
+   "wake_radius_sq_px": 9600,
+   "wake_radius_px": 98.0,
+   "ki_regen_per_16_frames": 1187,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 22500,
+    "max_at_full_hp": 67500
+   },
+   "ki_blast": {
+    "usable": true,
+    "damage": "max_hp//3",
+    "damage_at_full": 30000,
+    "requires": "ki > max_ki//16 and target in line",
+    "power_spent": "rand(ki//2) + ki//4"
+   },
+   "move_type_desc": "guard: return to guard tile (template +0x24/+0x26) when idle, else stand",
+   "target_type_desc": "aggressive: targets player when Manhattan tile distance <= aggro_tiles",
+   "fight_style_desc": "always attack",
+   "roams": false,
+   "appears": [
+    {
+     "map": 30,
+     "placed_enemies": 0,
+     "scripted_npc_actors": 2
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 20,
+   "rom_addr": "0x086B6594",
+   "name": "henchman_1",
+   "raw": "14000000f6696b080200000010270000010001000300000000000000080000000000000000000000040000000000000000000000744000001027000064000000",
+   "field_08_char02": 2,
+   "exp_reward": 10000,
+   "move_type": 1,
+   "target_type": 1,
+   "fight_style": 3,
+   "field_16": 0,
+   "group_flag": 0,
+   "flying": 0,
+   "aggro_tiles": 8,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 4,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 16500,
+   "hp": 10000,
+   "defense": 100,
+   "sprites": [
+    {
+     "sprite_id": 38,
+     "sprite_name": "hench1",
+     "sprite_def": {
+      "def_addr": "0x085C1908",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "up": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "left": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "right": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853B394",
+      "anim_table": "0x080148C0",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2",
+       "Ki"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 1.0,
+   "speed_raw_sixteenths": 16,
+   "wake_radius_sq_px": 6144,
+   "wake_radius_px": 78.4,
+   "ki_regen_per_16_frames": 257,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 2500,
+    "max_at_full_hp": 7500
+   },
+   "ki_blast": {
+    "usable": true,
+    "damage": "max_hp//3",
+    "damage_at_full": 3333,
+    "requires": "ki > max_ki//16 and target in line",
+    "power_spent": "rand(ki//2) + ki//4"
+   },
+   "move_type_desc": "guard: return to guard tile (template +0x24/+0x26) when idle, else stand",
+   "target_type_desc": "aggressive: targets player when Manhattan tile distance <= aggro_tiles",
+   "fight_style_desc": "attack; when own HP < maxHP/2, 6/101 chance per decision to flee",
+   "roams": false,
+   "appears": [
+    {
+     "map": 24,
+     "placed_enemies": 2,
+     "scripted_npc_actors": 0
+    },
+    {
+     "map": 28,
+     "placed_enemies": 3,
+     "scripted_npc_actors": 0
+    },
+    {
+     "map": 29,
+     "placed_enemies": 7,
+     "scripted_npc_actors": 0
+    },
+    {
+     "map": 30,
+     "placed_enemies": 3,
+     "scripted_npc_actors": 0
+    },
+    {
+     "map": 31,
+     "placed_enemies": 3,
+     "scripted_npc_actors": 0
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 21,
+   "rom_addr": "0x086B65D4",
+   "name": "henchman_2",
+   "raw": "15000000016a6b080200000010270000010001000100000000000000080000000000000000000000040000000000000000000000444800001027000064000000",
+   "field_08_char02": 2,
+   "exp_reward": 10000,
+   "move_type": 1,
+   "target_type": 1,
+   "fight_style": 1,
+   "field_16": 0,
+   "group_flag": 0,
+   "flying": 0,
+   "aggro_tiles": 8,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 4,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 18500,
+   "hp": 10000,
+   "defense": 100,
+   "sprites": [
+    {
+     "sprite_id": 39,
+     "sprite_name": "hench2",
+     "sprite_def": {
+      "def_addr": "0x085C1934",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "up": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "left": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "right": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853B394",
+      "anim_table": "0x080149F0",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2",
+       "Ki"
+      ]
+     }
+    },
+    {
+     "sprite_id": 40,
+     "sprite_name": "hench3",
+     "sprite_def": {
+      "def_addr": "0x085C1960",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "up": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "left": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "right": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853ADB4",
+      "anim_table": "0x08014B20",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2",
+       "Ki"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 1.0,
+   "speed_raw_sixteenths": 16,
+   "wake_radius_sq_px": 6144,
+   "wake_radius_px": 78.4,
+   "ki_regen_per_16_frames": 289,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 2500,
+    "max_at_full_hp": 7500
+   },
+   "ki_blast": {
+    "usable": true,
+    "damage": "max_hp//3",
+    "damage_at_full": 3333,
+    "requires": "ki > max_ki//16 and target in line",
+    "power_spent": "rand(ki//2) + ki//4"
+   },
+   "move_type_desc": "guard: return to guard tile (template +0x24/+0x26) when idle, else stand",
+   "target_type_desc": "aggressive: targets player when Manhattan tile distance <= aggro_tiles",
+   "fight_style_desc": "flee while target HP >= ~8/9 of max (tHP + tHP/8 >= tMaxHP), else attack",
+   "roams": false,
+   "appears": [
+    {
+     "map": 24,
+     "placed_enemies": 4,
+     "scripted_npc_actors": 0
+    },
+    {
+     "map": 28,
+     "placed_enemies": 7,
+     "scripted_npc_actors": 0
+    },
+    {
+     "map": 29,
+     "placed_enemies": 8,
+     "scripted_npc_actors": 0
+    },
+    {
+     "map": 30,
+     "placed_enemies": 2,
+     "scripted_npc_actors": 0
+    },
+    {
+     "map": 31,
+     "placed_enemies": 2,
+     "scripted_npc_actors": 0
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 22,
+   "rom_addr": "0x086B6614",
+   "name": "henchman_3",
+   "raw": "160000000c6a6b080200000010270000040001000300000002000000080000000000000000000000050000000000000000000000e02e0000983a000064000000",
+   "field_08_char02": 2,
+   "exp_reward": 10000,
+   "move_type": 4,
+   "target_type": 1,
+   "fight_style": 3,
+   "field_16": 0,
+   "group_flag": 2,
+   "flying": 0,
+   "aggro_tiles": 8,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 5,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 12000,
+   "hp": 15000,
+   "defense": 100,
+   "sprites": [
+    {
+     "sprite_id": 41,
+     "sprite_name": "hench4",
+     "sprite_def": {
+      "def_addr": "0x085C1934",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "up": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "left": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "right": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853B394",
+      "anim_table": "0x080149F0",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2",
+       "Ki"
+      ]
+     }
+    },
+    {
+     "sprite_id": 42,
+     "sprite_name": "hench5",
+     "sprite_def": {
+      "def_addr": "0x085C1908",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "up": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "left": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "right": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853B394",
+      "anim_table": "0x080148C0",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2",
+       "Ki"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 1.125,
+   "speed_raw_sixteenths": 18,
+   "wake_radius_sq_px": 6144,
+   "wake_radius_px": 78.4,
+   "ki_regen_per_16_frames": 187,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 3750,
+    "max_at_full_hp": 11250
+   },
+   "ki_blast": {
+    "usable": true,
+    "damage": "max_hp//3",
+    "damage_at_full": 5000,
+    "requires": "ki > max_ki//16 and target in line",
+    "power_spent": "rand(ki//2) + ki//4"
+   },
+   "move_type_desc": "random wander within aggro_tiles (max 14) of current tile",
+   "target_type_desc": "aggressive: targets player when Manhattan tile distance <= aggro_tiles",
+   "fight_style_desc": "attack; when own HP < maxHP/2, 6/101 chance per decision to flee",
+   "roams": true,
+   "appears": [
+    {
+     "map": 28,
+     "placed_enemies": 7,
+     "scripted_npc_actors": 0
+    },
+    {
+     "map": 29,
+     "placed_enemies": 6,
+     "scripted_npc_actors": 0
+    },
+    {
+     "map": 31,
+     "placed_enemies": 5,
+     "scripted_npc_actors": 0
+    },
+    {
+     "map": 32,
+     "placed_enemies": 1,
+     "scripted_npc_actors": 0
+    },
+    {
+     "map": 33,
+     "placed_enemies": 1,
+     "scripted_npc_actors": 0
+    },
+    {
+     "map": 34,
+     "placed_enemies": 3,
+     "scripted_npc_actors": 0
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 23,
+   "rom_addr": "0x086B6654",
+   "name": "henchman_4",
+   "raw": "17000000176a6b080200000030750000010001000000000000000000080000000000000000000000050000000000000000000000409c00007011010064000000",
+   "field_08_char02": 2,
+   "exp_reward": 30000,
+   "move_type": 1,
+   "target_type": 1,
+   "fight_style": 0,
+   "field_16": 0,
+   "group_flag": 0,
+   "flying": 0,
+   "aggro_tiles": 8,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 5,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 40000,
+   "hp": 70000,
+   "defense": 100,
+   "sprites": [
+    {
+     "sprite_id": 43,
+     "sprite_name": "hench6",
+     "sprite_def": {
+      "def_addr": "0x085C198C",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "up": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "left": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "right": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853ADD4",
+      "anim_table": "0x08014C50",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2",
+       "Ki"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 1.125,
+   "speed_raw_sixteenths": 18,
+   "wake_radius_sq_px": 6144,
+   "wake_radius_px": 78.4,
+   "ki_regen_per_16_frames": 625,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 17500,
+    "max_at_full_hp": 52500
+   },
+   "ki_blast": {
+    "usable": true,
+    "damage": "max_hp//3",
+    "damage_at_full": 23333,
+    "requires": "ki > max_ki//16 and target in line",
+    "power_spent": "rand(ki//2) + ki//4"
+   },
+   "move_type_desc": "guard: return to guard tile (template +0x24/+0x26) when idle, else stand",
+   "target_type_desc": "aggressive: targets player when Manhattan tile distance <= aggro_tiles",
+   "fight_style_desc": "always attack",
+   "roams": false,
+   "appears": [
+    {
+     "map": 34,
+     "placed_enemies": 3,
+     "scripted_npc_actors": 0
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 24,
+   "rom_addr": "0x086B6694",
+   "name": "henchman_5",
+   "raw": "18000000226a6b080200000030750000010001000000000000000000080000000000000000000000050000000000000000000000409c00008038010064000000",
+   "field_08_char02": 2,
+   "exp_reward": 30000,
+   "move_type": 1,
+   "target_type": 1,
+   "fight_style": 0,
+   "field_16": 0,
+   "group_flag": 0,
+   "flying": 0,
+   "aggro_tiles": 8,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 5,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 40000,
+   "hp": 80000,
+   "defense": 100,
+   "sprites": [
+    {
+     "sprite_id": 44,
+     "sprite_name": "hench7",
+     "sprite_def": {
+      "def_addr": "0x085C19B8",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "up": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "left": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "right": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853ADF4",
+      "anim_table": "0x08014D80",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2",
+       "Ki"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 1.125,
+   "speed_raw_sixteenths": 18,
+   "wake_radius_sq_px": 6144,
+   "wake_radius_px": 78.4,
+   "ki_regen_per_16_frames": 625,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 20000,
+    "max_at_full_hp": 60000
+   },
+   "ki_blast": {
+    "usable": true,
+    "damage": "max_hp//3",
+    "damage_at_full": 26666,
+    "requires": "ki > max_ki//16 and target in line",
+    "power_spent": "rand(ki//2) + ki//4"
+   },
+   "move_type_desc": "guard: return to guard tile (template +0x24/+0x26) when idle, else stand",
+   "target_type_desc": "aggressive: targets player when Manhattan tile distance <= aggro_tiles",
+   "fight_style_desc": "always attack",
+   "roams": false,
+   "appears": [
+    {
+     "map": 34,
+     "placed_enemies": 3,
+     "scripted_npc_actors": 0
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 25,
+   "rom_addr": "0x086B66D4",
+   "name": "henchman_6",
+   "raw": "190000002d6a6b080200000030750000010001000000000000000000080000000000000000000000050000000000000000000000409c00007011010088130000",
+   "field_08_char02": 2,
+   "exp_reward": 30000,
+   "move_type": 1,
+   "target_type": 1,
+   "fight_style": 0,
+   "field_16": 0,
+   "group_flag": 0,
+   "flying": 0,
+   "aggro_tiles": 8,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 5,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 40000,
+   "hp": 70000,
+   "defense": 5000,
+   "sprites": [
+    {
+     "sprite_id": 45,
+     "sprite_name": "hench8",
+     "sprite_def": {
+      "def_addr": "0x085C19E4",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "up": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "left": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "right": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853B394",
+      "anim_table": "0x08014EB0",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2",
+       "Ki"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 1.125,
+   "speed_raw_sixteenths": 18,
+   "wake_radius_sq_px": 6144,
+   "wake_radius_px": 78.4,
+   "ki_regen_per_16_frames": 625,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 17500,
+    "max_at_full_hp": 52500
+   },
+   "ki_blast": {
+    "usable": true,
+    "damage": "max_hp//3",
+    "damage_at_full": 23333,
+    "requires": "ki > max_ki//16 and target in line",
+    "power_spent": "rand(ki//2) + ki//4"
+   },
+   "move_type_desc": "guard: return to guard tile (template +0x24/+0x26) when idle, else stand",
+   "target_type_desc": "aggressive: targets player when Manhattan tile distance <= aggro_tiles",
+   "fight_style_desc": "always attack",
+   "roams": false,
+   "appears": [
+    {
+     "map": 34,
+     "placed_enemies": 1,
+     "scripted_npc_actors": 0
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 26,
+   "rom_addr": "0x086B6714",
+   "name": "frieza_1",
+   "raw": "1a000000386a6b0802000000e09304000100010000000000000000000a0000000000000000000000040000000000000000000000f0490200e093040028a00000",
+   "field_08_char02": 2,
+   "exp_reward": 300000,
+   "move_type": 1,
+   "target_type": 1,
+   "fight_style": 0,
+   "field_16": 0,
+   "group_flag": 0,
+   "flying": 0,
+   "aggro_tiles": 10,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 4,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 150000,
+   "hp": 300000,
+   "defense": 41000,
+   "sprites": [
+    {
+     "sprite_id": 34,
+     "sprite_name": "frieza1",
+     "sprite_def": {
+      "def_addr": "0x085C16F8",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "up": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "left": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "right": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853ACB4",
+      "anim_table": "0x08013F40",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2",
+       "Ki",
+       "Transform"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 1.0,
+   "speed_raw_sixteenths": 16,
+   "wake_radius_sq_px": 9600,
+   "wake_radius_px": 98.0,
+   "ki_regen_per_16_frames": 2343,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 75000,
+    "max_at_full_hp": 225000
+   },
+   "ki_blast": {
+    "usable": true,
+    "damage": "max_hp//3",
+    "damage_at_full": 100000,
+    "requires": "ki > max_ki//16 and target in line",
+    "power_spent": "rand(ki//2) + ki//4"
+   },
+   "move_type_desc": "guard: return to guard tile (template +0x24/+0x26) when idle, else stand",
+   "target_type_desc": "aggressive: targets player when Manhattan tile distance <= aggro_tiles",
+   "fight_style_desc": "always attack",
+   "roams": false,
+   "appears": [
+    {
+     "map": 40,
+     "placed_enemies": 0,
+     "scripted_npc_actors": 1
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 27,
+   "rom_addr": "0x086B6754",
+   "name": "frieza_2",
+   "raw": "1b000000416a6b080200000020a107000100010000000000000000000a0000000000000000000000040000000000000000000000e0930400801a0600c8af0000",
+   "field_08_char02": 2,
+   "exp_reward": 500000,
+   "move_type": 1,
+   "target_type": 1,
+   "fight_style": 0,
+   "field_16": 0,
+   "group_flag": 0,
+   "flying": 0,
+   "aggro_tiles": 10,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 4,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 300000,
+   "hp": 400000,
+   "defense": 45000,
+   "sprites": [
+    {
+     "sprite_id": 35,
+     "sprite_name": "frieza2",
+     "sprite_def": {
+      "def_addr": "0x085C1724",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": 0,
+        "y0": -30,
+        "x1": 16,
+        "y1": 6
+       },
+       "up": {
+        "x0": 0,
+        "y0": -30,
+        "x1": 16,
+        "y1": 6
+       },
+       "left": {
+        "x0": 0,
+        "y0": -30,
+        "x1": 16,
+        "y1": 6
+       },
+       "right": {
+        "x0": 0,
+        "y0": -30,
+        "x1": 16,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853B2F4",
+      "anim_table": "0x080181C0",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2",
+       "Ki",
+       "Transform"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 1.0,
+   "speed_raw_sixteenths": 16,
+   "wake_radius_sq_px": 9600,
+   "wake_radius_px": 98.0,
+   "ki_regen_per_16_frames": 4687,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 100000,
+    "max_at_full_hp": 300000
+   },
+   "ki_blast": {
+    "usable": true,
+    "damage": "max_hp//3",
+    "damage_at_full": 133333,
+    "requires": "ki > max_ki//16 and target in line",
+    "power_spent": "rand(ki//2) + ki//4"
+   },
+   "move_type_desc": "guard: return to guard tile (template +0x24/+0x26) when idle, else stand",
+   "target_type_desc": "aggressive: targets player when Manhattan tile distance <= aggro_tiles",
+   "fight_style_desc": "always attack",
+   "roams": false,
+   "appears": [],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 28,
+   "rom_addr": "0x086B6794",
+   "name": "frieza_3",
+   "raw": "1c0000004a6a6b080200000000350c000100010000000000000000000a000000000000000000000005000000000000000000000060ae0a00c0270900a0860100",
+   "field_08_char02": 2,
+   "exp_reward": 800000,
+   "move_type": 1,
+   "target_type": 1,
+   "fight_style": 0,
+   "field_16": 0,
+   "group_flag": 0,
+   "flying": 0,
+   "aggro_tiles": 10,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 5,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 700000,
+   "hp": 600000,
+   "defense": 100000,
+   "sprites": [
+    {
+     "sprite_id": 36,
+     "sprite_name": "frieza3",
+     "sprite_def": {
+      "def_addr": "0x085C1750",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": -3,
+        "y0": -22,
+        "x1": 19,
+        "y1": 6
+       },
+       "up": {
+        "x0": -3,
+        "y0": -22,
+        "x1": 19,
+        "y1": 6
+       },
+       "left": {
+        "x0": -3,
+        "y0": -22,
+        "x1": 19,
+        "y1": 6
+       },
+       "right": {
+        "x0": -3,
+        "y0": -22,
+        "x1": 19,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853B314",
+      "anim_table": "0x080182F0",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2",
+       "Ki",
+       "Transform"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 1.125,
+   "speed_raw_sixteenths": 18,
+   "wake_radius_sq_px": 9600,
+   "wake_radius_px": 98.0,
+   "ki_regen_per_16_frames": 10937,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 150000,
+    "max_at_full_hp": 450000
+   },
+   "ki_blast": {
+    "usable": true,
+    "damage": "max_hp//3",
+    "damage_at_full": 200000,
+    "requires": "ki > max_ki//16 and target in line",
+    "power_spent": "rand(ki//2) + ki//4"
+   },
+   "move_type_desc": "guard: return to guard tile (template +0x24/+0x26) when idle, else stand",
+   "target_type_desc": "aggressive: targets player when Manhattan tile distance <= aggro_tiles",
+   "fight_style_desc": "always attack",
+   "roams": false,
+   "appears": [],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 29,
+   "rom_addr": "0x086B67D4",
+   "name": "frieza_4",
+   "raw": "1d000000536a6b0802000000000000000100010000000000000000000a0000000000000000000000060000000000000000000000804f120040420f0010270000",
+   "field_08_char02": 2,
+   "exp_reward": 0,
+   "move_type": 1,
+   "target_type": 1,
+   "fight_style": 0,
+   "field_16": 0,
+   "group_flag": 0,
+   "flying": 0,
+   "aggro_tiles": 10,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 6,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 1200000,
+   "hp": 1000000,
+   "defense": 10000,
+   "sprites": [
+    {
+     "sprite_id": 37,
+     "sprite_name": "frieza4",
+     "sprite_def": {
+      "def_addr": "0x085C177C",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "up": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "left": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "right": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853ACD4",
+      "anim_table": "0x08014070",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2",
+       "Ki"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 1.1875,
+   "speed_raw_sixteenths": 19,
+   "wake_radius_sq_px": 9600,
+   "wake_radius_px": 98.0,
+   "ki_regen_per_16_frames": 18750,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 250000,
+    "max_at_full_hp": 750000
+   },
+   "ki_blast": {
+    "usable": true,
+    "damage": "max_hp//3",
+    "damage_at_full": 333333,
+    "requires": "ki > max_ki//16 and target in line",
+    "power_spent": "rand(ki//2) + ki//4"
+   },
+   "move_type_desc": "guard: return to guard tile (template +0x24/+0x26) when idle, else stand",
+   "target_type_desc": "aggressive: targets player when Manhattan tile distance <= aggro_tiles",
+   "fight_style_desc": "always attack",
+   "roams": false,
+   "appears": [
+    {
+     "map": 41,
+     "placed_enemies": 0,
+     "scripted_npc_actors": 1
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 30,
+   "rom_addr": "0x086B6814",
+   "name": "snakequeen",
+   "raw": "1e0000005c6a6b08020000000000000004000100000000000000000008000000000000000000000002000000000000000000000000000000b80b00005e010000",
+   "field_08_char02": 2,
+   "exp_reward": 0,
+   "move_type": 4,
+   "target_type": 1,
+   "fight_style": 0,
+   "field_16": 0,
+   "group_flag": 0,
+   "flying": 0,
+   "aggro_tiles": 8,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 2,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 0,
+   "hp": 3000,
+   "defense": 350,
+   "sprites": [
+    {
+     "sprite_id": 91,
+     "sprite_name": "snkqueen",
+     "sprite_def": {
+      "def_addr": "0x085C1E04",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "up": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "left": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "right": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853B0F4",
+      "anim_table": "0x08016B30",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 0.75,
+   "speed_raw_sixteenths": 12,
+   "wake_radius_sq_px": 6144,
+   "wake_radius_px": 78.4,
+   "ki_regen_per_16_frames": 0,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 750,
+    "max_at_full_hp": 2250
+   },
+   "ki_blast": {
+    "usable": false
+   },
+   "move_type_desc": "random wander within aggro_tiles (max 14) of current tile",
+   "target_type_desc": "aggressive: targets player when Manhattan tile distance <= aggro_tiles",
+   "fight_style_desc": "always attack",
+   "roams": true,
+   "appears": [
+    {
+     "map": 11,
+     "placed_enemies": 0,
+     "scripted_npc_actors": 1
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 31,
+   "rom_addr": "0x086B6854",
+   "name": "spirit",
+   "raw": "1f000000676a6b0802000000e803000004000000000000000000000004000000000000000000000001000000000000000000000000000000a00f000090010000",
+   "field_08_char02": 2,
+   "exp_reward": 1000,
+   "move_type": 4,
+   "target_type": 0,
+   "fight_style": 0,
+   "field_16": 0,
+   "group_flag": 0,
+   "flying": 0,
+   "aggro_tiles": 4,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 1,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 0,
+   "hp": 4000,
+   "defense": 400,
+   "sprites": [
+    {
+     "sprite_id": 95,
+     "sprite_name": "spirit4",
+     "sprite_def": {
+      "def_addr": "0x085C1F0C",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": -1,
+        "y0": -6,
+        "x1": 17,
+        "y1": 6
+       },
+       "up": {
+        "x0": -1,
+        "y0": -6,
+        "x1": 17,
+        "y1": 6
+       },
+       "left": {
+        "x0": -1,
+        "y0": -6,
+        "x1": 17,
+        "y1": 6
+       },
+       "right": {
+        "x0": -1,
+        "y0": -6,
+        "x1": 17,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853B194",
+      "anim_table": "0x08017250",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2",
+       "Excited",
+       "Sad"
+      ]
+     }
+    },
+    {
+     "sprite_id": 96,
+     "sprite_name": "spirit5",
+     "sprite_def": {
+      "def_addr": "0x085C1F0C",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": -1,
+        "y0": -6,
+        "x1": 17,
+        "y1": 6
+       },
+       "up": {
+        "x0": -1,
+        "y0": -6,
+        "x1": 17,
+        "y1": 6
+       },
+       "left": {
+        "x0": -1,
+        "y0": -6,
+        "x1": 17,
+        "y1": 6
+       },
+       "right": {
+        "x0": -1,
+        "y0": -6,
+        "x1": 17,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853B194",
+      "anim_table": "0x08017250",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2",
+       "Excited",
+       "Sad"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 0.625,
+   "speed_raw_sixteenths": 10,
+   "wake_radius_sq_px": 1536,
+   "wake_radius_px": 39.2,
+   "ki_regen_per_16_frames": 0,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 1000,
+    "max_at_full_hp": 3000
+   },
+   "ki_blast": {
+    "usable": false
+   },
+   "move_type_desc": "random wander within aggro_tiles (max 14) of current tile",
+   "target_type_desc": "never acquires the player by itself (only retaliates)",
+   "fight_style_desc": "always attack",
+   "roams": true,
+   "appears": [
+    {
+     "map": 12,
+     "placed_enemies": 14,
+     "scripted_npc_actors": 0
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 32,
+   "rom_addr": "0x086B6894",
+   "name": "vegeta",
+   "raw": "200000006e6a6b0802000000000000000400010000000000000000000a000000000000000000000004000000000000000000000080380100803e0000e8030000",
+   "field_08_char02": 2,
+   "exp_reward": 0,
+   "move_type": 4,
+   "target_type": 1,
+   "fight_style": 0,
+   "field_16": 0,
+   "group_flag": 0,
+   "flying": 0,
+   "aggro_tiles": 10,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 4,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 80000,
+   "hp": 16000,
+   "defense": 1000,
+   "sprites": [
+    {
+     "sprite_id": 103,
+     "sprite_name": "vegeta1",
+     "sprite_def": {
+      "def_addr": "0x085C2098",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "up": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "left": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "right": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853B274",
+      "anim_table": "0x08017BD0",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2",
+       "Ki"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 1.0,
+   "speed_raw_sixteenths": 16,
+   "wake_radius_sq_px": 9600,
+   "wake_radius_px": 98.0,
+   "ki_regen_per_16_frames": 1250,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 4000,
+    "max_at_full_hp": 12000
+   },
+   "ki_blast": {
+    "usable": true,
+    "damage": "max_hp//3",
+    "damage_at_full": 5333,
+    "requires": "ki > max_ki//16 and target in line",
+    "power_spent": "rand(ki//2) + ki//4"
+   },
+   "move_type_desc": "random wander within aggro_tiles (max 14) of current tile",
+   "target_type_desc": "aggressive: targets player when Manhattan tile distance <= aggro_tiles",
+   "fight_style_desc": "always attack",
+   "roams": true,
+   "appears": [
+    {
+     "map": 23,
+     "placed_enemies": 0,
+     "scripted_npc_actors": 1
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  },
+  {
+   "id": 33,
+   "rom_addr": "0x086B68D4",
+   "name": "vegeta",
+   "raw": "210000006e6a6b0802000000000000000400010000000000000000000a0000000000000000000000050000000000000000000000a0860100204e0000ac0d0000",
+   "field_08_char02": 2,
+   "exp_reward": 0,
+   "move_type": 4,
+   "target_type": 1,
+   "fight_style": 0,
+   "field_16": 0,
+   "group_flag": 0,
+   "flying": 0,
+   "aggro_tiles": 10,
+   "leash_home_x": 0,
+   "leash_home_y": 0,
+   "leash_radius": 0,
+   "guard_x": 0,
+   "guard_y": 0,
+   "speed_class": 5,
+   "field_2a_char78": 0,
+   "field_2c_char7c": 0,
+   "field_2e": 0,
+   "field_30": 0,
+   "ki": 100000,
+   "hp": 20000,
+   "defense": 3500,
+   "sprites": [
+    {
+     "sprite_id": 104,
+     "sprite_name": "vegeta2",
+     "sprite_def": {
+      "def_addr": "0x085C20C4",
+      "footprint": {
+       "w": 16,
+       "h": 8
+      },
+      "hurtbox": {
+       "down": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "up": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "left": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       },
+       "right": {
+        "x0": 2,
+        "y0": -22,
+        "x1": 14,
+        "y1": 6
+       }
+      },
+      "palette_ptr": "0x0853B294",
+      "anim_table": "0x08017D00",
+      "anims_present": [
+       "Standing",
+       "Walking",
+       "Death",
+       "Melee1",
+       "Melee2",
+       "Ki",
+       "Monkey"
+      ]
+     }
+    }
+   ],
+   "speed_px_per_frame": 1.125,
+   "speed_raw_sixteenths": 18,
+   "wake_radius_sq_px": 9600,
+   "wake_radius_px": 98.0,
+   "ki_regen_per_16_frames": 1562,
+   "melee_damage": {
+    "formula": "cur_hp//4 + rand(cur_hp//2)",
+    "min_at_full_hp": 5000,
+    "max_at_full_hp": 15000
+   },
+   "ki_blast": {
+    "usable": true,
+    "damage": "max_hp//3",
+    "damage_at_full": 6666,
+    "requires": "ki > max_ki//16 and target in line",
+    "power_spent": "rand(ki//2) + ki//4"
+   },
+   "move_type_desc": "random wander within aggro_tiles (max 14) of current tile",
+   "target_type_desc": "aggressive: targets player when Manhattan tile distance <= aggro_tiles",
+   "fight_style_desc": "always attack",
+   "roams": true,
+   "appears": [
+    {
+     "map": 23,
+     "placed_enemies": 1,
+     "scripted_npc_actors": 0
+    }
+   ],
+   "drops": "none (no drop code in the death path 0x08007F4C/0x08005E12; death only notifies scripts via 0x08005478)"
+  }
+ ]
+}

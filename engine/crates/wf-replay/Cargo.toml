@@ -1,0 +1,11 @@
+[package]
+name = "wf-replay"
+description = "Replays, input logs, save states and seekable snapshot timelines for any deterministic wf_view::Sim (shared by the app, netcode and agents)"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+wf-view = { path = "../wf-view" }
+serde = { workspace = true }
+serde_json = { workspace = true }

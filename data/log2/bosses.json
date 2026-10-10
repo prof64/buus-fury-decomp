@@ -1,0 +1,5931 @@
+{
+ "source": "roms/log2.gba",
+ "rules": {
+  "phase_model": "(VERIFIED by disassembly): no AI node reads the boss's HP, so there are no mid-fight HP-threshold\nphases inside one class row. A multi-phase boss is a chain of class rows/spawns: when a phase's HP reaches 0 the\ndeath cutscene runs and spawns (or converts a cutscene actor into) the next spawn def.",
+  "hit_reactions": "Fighter bosses (ai 21/29/80/98/129/138) use on-hit state 18: damage, then attack id 9 -> stun 128+32 f (state 20, with knockback 16), id 15 -> stun 256+64 f (state 19), else knockback: wall behind -> state 16 KnockbackInvulnerable(48) = unhittable until the hurt anim ends; open ground -> state 17 Knockback(32). Cell Nonperfect/Perfect (ai 116/148) use the twin handler 113 (Knockback 24 / KnockbackInvulnerable 40). VERIFIED(disasm).",
+  "invulnerability": "Bosses have no scripted invulnerable windows inside a fight; they are unhittable only during KnockbackInvulnerable (wall case) and while not spawned/in cutscenes. VERIFIED(disasm).",
+  "heals": "Android 19/20 (ai 29): any energy attack is absorbed: no damage, heal 20% of raw damage (VERIFIED in emulator). Cell drain grab heals Cell by the damage it deals (VERIFIED(disasm); heal capped at max HP).",
+  "teleports": "No teleport node exists in the AI node set; bosses move only via Chase/Flee/Align/BackAway nodes (and cutscene actors).",
+  "summons": "Cell Juniors are not summoned by the AI: they are three separate spawn defs (map 325 objects 8, 9, 10) activated one at a time by the previous fight's death cutscene, each followed by an active-character switch.",
+  "measurement_setup": "bs_measure.py: debug Map Test Lv40 party, active Piccolo (STR 40 POW 55 END 53), boss force-spawned on map 13 (objdef 0x083ee440 patched), player stands still after placement at 30 or 100 px."
+ },
+ "attack_catalog_ref": "enemies.json -> enemy_attacks",
+ "fights": [
+  {
+   "key": "frieza_dream",
+   "name": "Frieza (Gohan's nightmare, tutorial)",
+   "classes": [
+    41
+   ],
+   "notes": "Class 41 uses gfx 48 (Frieza). Very low stats (HP 130); death cutscene: \"The phone is ringing...\" -> Gohan wakes up (map 19).",
+   "phases": [
+    {
+     "class_row": 41,
+     "names": null,
+     "map_index": 14,
+     "map_name": "East District 439",
+     "zone": 2,
+     "area": 8,
+     "object_index": 1,
+     "spawn_def": "0x83ee770",
+     "spawn_condition": 1,
+     "activation": "cutscene/script activated (condition 1)",
+     "position": [
+      112,
+      144
+     ],
+     "gfx_id": 48,
+     "stats": {
+      "hp": 130,
+      "STR": 3,
+      "POW": 2,
+      "END": 3,
+      "melee_taken_mult": 128,
+      "energy_taken_mult": 128,
+      "class_exp": 20
+     },
+     "ai_state": 21,
+     "ai_states_used": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28
+     ],
+     "detection_radius_px": 88.0,
+     "range_check_radii_px": [
+      24.0,
+      36.0,
+      40.0,
+      56.0,
+      64.0,
+      72.0,
+      80.0,
+      88.0,
+      120.0
+     ],
+     "movement_speeds_px_per_frame": {
+      "AlignWithPlayer": [
+       0.5
+      ],
+      "ChasePlayer": [
+       0.5,
+       1.0,
+       1.1992
+      ],
+      "BackAway": [
+       1.0
+      ],
+      "BackAwayUntilBlocked": [
+       0.5
+      ]
+     },
+     "attacks": [
+      "ki blast projectile (attack id 3, energy 1024; POW-based)",
+      "melee strike (attack id 2, melee, power 1024; STR-based)"
+     ],
+     "special_attacks": [],
+     "energy_absorb": false,
+     "stun_on_attack_ids": [
+      9,
+      15
+     ],
+     "on_death": {
+      "sequence": "0x83b985c",
+      "engine": "0x80106b3",
+      "effects": [
+       {
+        "op": "change_map",
+        "zone": 2,
+        "area": 22,
+        "map_index": 19,
+        "entry": 1,
+        "x": 121,
+        "y": 108
+       },
+       {
+        "op": "give_exp",
+        "amount": 20
+       },
+       {
+        "op": "set_flag",
+        "flag": 9
+       },
+       {
+        "op": "set_flag",
+        "flag": 10
+       },
+       {
+        "op": "broadcast_msg_0x10"
+       }
+      ],
+      "dialogue_excerpt": [
+       "#The phone is ringing in the living room..."
+      ]
+     },
+     "next_phase": [],
+     "active_character_after": [],
+     "measured": {
+      "frieza_dream_41@30": {
+       "cls": 41,
+       "gfx": 48,
+       "start_dist": 30,
+       "frames": 900,
+       "hits": 11,
+       "damage": [
+        2,
+        3
+       ],
+       "mean_interval": 84.0,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 10,
+         "lives": [
+          34,
+          37,
+          44,
+          47,
+          47,
+          47,
+          47,
+          54,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28
+       ]
+      },
+      "frieza_dream_41@100": {
+       "cls": 41,
+       "gfx": 48,
+       "start_dist": 100,
+       "frames": 900,
+       "hits": 13,
+       "damage": [
+        2
+       ],
+       "mean_interval": 67.2,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 13,
+         "lives": [
+          41,
+          48,
+          47,
+          54,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24
+       ]
+      }
+     },
+     "player_character": null
+    }
+   ]
+  },
+  {
+   "key": "general_tao",
+   "name": "General Tao",
+   "classes": [
+    44
+   ],
+   "notes": "",
+   "phases": [
+    {
+     "class_row": 44,
+     "names": [
+      "General Tao"
+     ],
+     "map_index": 46,
+     "map_name": "East District 439",
+     "zone": 2,
+     "area": 50,
+     "object_index": 1,
+     "spawn_def": "0x83f1250",
+     "spawn_condition": 1,
+     "activation": "cutscene/script activated (condition 1)",
+     "position": [
+      240,
+      264
+     ],
+     "gfx_id": 50,
+     "stats": {
+      "hp": 6400,
+      "STR": 50,
+      "POW": 55,
+      "END": 60,
+      "melee_taken_mult": 128,
+      "energy_taken_mult": 128,
+      "class_exp": 0
+     },
+     "ai_state": 129,
+     "ai_states_used": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      129,
+      130,
+      131,
+      132,
+      133,
+      134,
+      135,
+      136,
+      137
+     ],
+     "detection_radius_px": 88.0,
+     "range_check_radii_px": [
+      24.0,
+      36.0,
+      40.0,
+      48.0,
+      56.0,
+      64.0,
+      80.0,
+      88.0,
+      120.0
+     ],
+     "movement_speeds_px_per_frame": {
+      "AlignWithPlayer": [
+       0.5
+      ],
+      "ChasePlayer": [
+       0.5,
+       1.0,
+       1.1992
+      ],
+      "BackAway": [
+       1.0
+      ],
+      "BackAwayUntilBlocked": [
+       0.5
+      ]
+     },
+     "attacks": [
+      "beam (attack id 10 power 64, scale 12x)",
+      "ki blast projectile (attack id 3, energy 1024; POW-based)",
+      "melee strike (attack id 2, melee, power 1024; STR-based)"
+     ],
+     "special_attacks": [
+      "beam"
+     ],
+     "energy_absorb": false,
+     "stun_on_attack_ids": [
+      9,
+      15
+     ],
+     "on_death": {
+      "sequence": "0x83bbf6c",
+      "engine": "0x80106b3",
+      "effects": [
+       {
+        "op": "give_exp",
+        "amount": 50000
+       },
+       {
+        "op": "set_flag",
+        "flag": 185
+       },
+       {
+        "op": "broadcast_msg_0x10"
+       }
+      ],
+      "dialogue_excerpt": [
+       "@^You found a Dragon Ball!"
+      ]
+     },
+     "next_phase": [],
+     "active_character_after": [],
+     "measured": {
+      "general_tao@30": {
+       "cls": 44,
+       "gfx": 50,
+       "start_dist": 30,
+       "frames": 900,
+       "hits": 14,
+       "damage": [
+        48,
+        60,
+        66,
+        79,
+        81,
+        83
+       ],
+       "mean_interval": 67.2,
+       "projectiles": {
+        "beam_80143a8": {
+         "count": 4,
+         "lives": [
+          121,
+          132,
+          118,
+          118
+         ],
+         "speeds": [
+          0.004,
+          0.008,
+          0.012,
+          0.113
+         ]
+        },
+        "enemy_ki_blast": {
+         "count": 3,
+         "lives": [
+          47,
+          54,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        130,
+        131,
+        132,
+        133,
+        134,
+        135,
+        136,
+        137
+       ]
+      },
+      "general_tao@100": {
+       "cls": 44,
+       "gfx": 50,
+       "start_dist": 100,
+       "frames": 900,
+       "hits": 13,
+       "damage": [
+        48,
+        60,
+        79,
+        80,
+        83
+       ],
+       "mean_interval": 66.7,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 3,
+         "lives": [
+          41,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        },
+        "beam_80143a8": {
+         "count": 4,
+         "lives": [
+          131,
+          125,
+          117,
+          117
+         ],
+         "speeds": [
+          0.004,
+          0.008,
+          0.012,
+          0.109,
+          0.113
+         ]
+        }
+       },
+       "states_seen": [
+        130,
+        131,
+        132,
+        133
+       ]
+      }
+     },
+     "player_character": null
+    }
+   ]
+  },
+  {
+   "key": "triceratops_king",
+   "name": "Triceratops King",
+   "classes": [
+    101
+   ],
+   "notes": "Takes half damage from melee and energy (64/128).",
+   "phases": [
+    {
+     "class_row": 101,
+     "names": [
+      "Triceratops King"
+     ],
+     "map_index": 105,
+     "map_name": "Triceratops Jungle",
+     "zone": 4,
+     "area": 58,
+     "object_index": 0,
+     "spawn_def": "0x83f63d0",
+     "spawn_condition": 131132,
+     "activation": "story-flag condition 0x2003c",
+     "position": [
+      112,
+      128
+     ],
+     "gfx_id": 127,
+     "stats": {
+      "hp": 850,
+      "STR": 21,
+      "POW": 1,
+      "END": 25,
+      "melee_taken_mult": 64,
+      "energy_taken_mult": 64,
+      "class_exp": 1500
+     },
+     "ai_state": 59,
+     "ai_states_used": [
+      4,
+      5,
+      6,
+      7,
+      16,
+      17,
+      18,
+      19,
+      20,
+      59,
+      60,
+      61,
+      62,
+      63,
+      64,
+      65
+     ],
+     "detection_radius_px": 72.0,
+     "range_check_radii_px": [
+      48.0,
+      64.0,
+      72.0,
+      88.0
+     ],
+     "movement_speeds_px_per_frame": {
+      "ChasePlayer": [
+       0.6992,
+       0.7969
+      ],
+      "Pounce": [
+       2.0
+      ]
+     },
+     "attacks": [
+      "melee strike (attack id 2, melee, power 1024; STR-based)",
+      "pounce (attack id 2 on contact)"
+     ],
+     "special_attacks": [],
+     "energy_absorb": false,
+     "stun_on_attack_ids": [
+      9,
+      15
+     ],
+     "on_death": {
+      "sequence": "0x83c9bf8",
+      "engine": "0x80106b3",
+      "effects": [
+       {
+        "op": "give_exp",
+        "amount": 1500
+       },
+       {
+        "op": "broadcast_msg_0x10"
+       },
+       {
+        "op": "change_map",
+        "zone": 4,
+        "area": 56,
+        "map_index": 103,
+        "entry": 1,
+        "x": 488,
+        "y": 552
+       },
+       {
+        "op": "set_flag",
+        "flag": 60
+       }
+      ],
+      "dialogue_excerpt": [
+       "KING TRICERATOPS:  OK OK!\u000bI give up!  I'll do whatever you want!"
+      ]
+     },
+     "next_phase": [],
+     "active_character_after": [],
+     "measured": {
+      "triceratops_king@30": {
+       "cls": 101,
+       "gfx": 127,
+       "start_dist": 30,
+       "frames": 900,
+       "hits": 9,
+       "damage": [
+        21,
+        22,
+        23
+       ],
+       "mean_interval": 97.0,
+       "projectiles": {},
+       "states_seen": [
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65
+       ]
+      },
+      "triceratops_king@100": {
+       "cls": 101,
+       "gfx": 127,
+       "start_dist": 100,
+       "frames": 900,
+       "hits": 13,
+       "damage": [
+        21,
+        22
+       ],
+       "mean_interval": 62.0,
+       "projectiles": {},
+       "states_seen": [
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65
+       ]
+      }
+     },
+     "player_character": null
+    }
+   ]
+  },
+  {
+   "key": "newman",
+   "name": "Newman (Capsule Corp. intruder, uses wolf row 74 / gfx 146)",
+   "classes": [
+    74
+   ],
+   "notes": "",
+   "phases": [
+    {
+     "class_row": 74,
+     "names": [
+      "Wolf"
+     ],
+     "map_index": 155,
+     "map_name": "Capsule Corporation",
+     "zone": 6,
+     "area": 11,
+     "object_index": 1,
+     "spawn_def": "0x83fa71c",
+     "spawn_condition": 1,
+     "activation": "cutscene/script activated (condition 1)",
+     "position": [
+      272,
+      240
+     ],
+     "gfx_id": 146,
+     "stats": {
+      "hp": 400,
+      "STR": 11,
+      "POW": 1,
+      "END": 5,
+      "melee_taken_mult": 128,
+      "energy_taken_mult": 128,
+      "class_exp": 500
+     },
+     "ai_state": 74,
+     "ai_states_used": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79
+     ],
+     "detection_radius_px": 80.0,
+     "range_check_radii_px": [
+      24.0,
+      32.0,
+      48.0,
+      80.0
+     ],
+     "movement_speeds_px_per_frame": {
+      "ChasePlayer": [
+       1.0,
+       1.1992
+      ],
+      "BackAway": [
+       1.0
+      ],
+      "FleePlayer": [
+       1.0
+      ]
+     },
+     "attacks": [
+      "melee strike (attack id 2, melee, power 1024; STR-based)"
+     ],
+     "special_attacks": [],
+     "energy_absorb": false,
+     "stun_on_attack_ids": [
+      9,
+      15
+     ],
+     "on_death": {
+      "sequence": "0x83d0490",
+      "engine": "0x80106b3",
+      "effects": [
+       {
+        "op": "broadcast_msg_0x10"
+       },
+       {
+        "op": "change_map",
+        "zone": 6,
+        "area": 7,
+        "map_index": 151,
+        "entry": 1,
+        "x": 96,
+        "y": 104
+       },
+       {
+        "op": "set_flag",
+        "flag": 209
+       },
+       {
+        "op": "set_flag",
+        "flag": 210
+       }
+      ],
+      "dialogue_excerpt": [
+       "#GUARD: Newman, I should have known!  You're going to jail! ",
+       "#NEWMAN: Rats!",
+       "@^You received a Red Access Card!"
+      ]
+     },
+     "next_phase": [],
+     "active_character_after": [],
+     "measured": {
+      "newman_74@30": {
+       "cls": 74,
+       "gfx": 146,
+       "start_dist": 30,
+       "frames": 900,
+       "hits": 6,
+       "damage": [
+        10,
+        11,
+        22
+       ],
+       "mean_interval": 139.4,
+       "projectiles": {},
+       "states_seen": [
+        74,
+        75,
+        76,
+        77,
+        78,
+        79
+       ]
+      },
+      "newman_74@100": {
+       "cls": 74,
+       "gfx": 146,
+       "start_dist": 100,
+       "frames": 900,
+       "hits": 5,
+       "damage": [
+        10,
+        11
+       ],
+       "mean_interval": 96.2,
+       "projectiles": {},
+       "states_seen": [
+        74,
+        75,
+        76,
+        77,
+        78,
+        79
+       ]
+      }
+     },
+     "player_character": null
+    }
+   ]
+  },
+  {
+   "key": "cooler",
+   "name": "Cooler",
+   "classes": [
+    29
+   ],
+   "notes": "",
+   "phases": [
+    {
+     "class_row": 29,
+     "names": [
+      "Cooler"
+     ],
+     "map_index": 172,
+     "map_name": "New Namek",
+     "zone": 6,
+     "area": 61,
+     "object_index": 1,
+     "spawn_def": "0x83fb574",
+     "spawn_condition": 1,
+     "activation": "cutscene/script activated (condition 1)",
+     "position": [
+      200,
+      264
+     ],
+     "gfx_id": 34,
+     "stats": {
+      "hp": 10200,
+      "STR": 75,
+      "POW": 85,
+      "END": 79,
+      "melee_taken_mult": 128,
+      "energy_taken_mult": 128,
+      "class_exp": 0
+     },
+     "ai_state": 21,
+     "ai_states_used": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28
+     ],
+     "detection_radius_px": 88.0,
+     "range_check_radii_px": [
+      24.0,
+      36.0,
+      40.0,
+      56.0,
+      64.0,
+      72.0,
+      80.0,
+      88.0,
+      120.0
+     ],
+     "movement_speeds_px_per_frame": {
+      "AlignWithPlayer": [
+       0.5
+      ],
+      "ChasePlayer": [
+       0.5,
+       1.0,
+       1.1992
+      ],
+      "BackAway": [
+       1.0
+      ],
+      "BackAwayUntilBlocked": [
+       0.5
+      ]
+     },
+     "attacks": [
+      "ki blast projectile (attack id 3, energy 1024; POW-based)",
+      "melee strike (attack id 2, melee, power 1024; STR-based)"
+     ],
+     "special_attacks": [],
+     "energy_absorb": false,
+     "stun_on_attack_ids": [
+      9,
+      15
+     ],
+     "on_death": {
+      "sequence": "0x83fb3c8",
+      "engine": "0x801069b",
+      "effects": [
+       {
+        "op": "event_script",
+        "script": "0x83fb3c8"
+       }
+      ],
+      "dialogue_excerpt": []
+     },
+     "next_phase": [],
+     "active_character_after": [],
+     "measured": {
+      "cooler@30": {
+       "cls": 29,
+       "gfx": 34,
+       "start_dist": 30,
+       "frames": 900,
+       "hits": 11,
+       "damage": [
+        141,
+        144,
+        145,
+        152,
+        188,
+        195,
+        197,
+        201
+       ],
+       "mean_interval": 86.7,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 6,
+         "lives": [
+          31,
+          39,
+          46,
+          44,
+          44,
+          44
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28
+       ]
+      },
+      "cooler@100": {
+       "cls": 29,
+       "gfx": 34,
+       "start_dist": 100,
+       "frames": 900,
+       "hits": 14,
+       "damage": [
+        186,
+        188,
+        189,
+        190,
+        193,
+        196,
+        199,
+        201,
+        203
+       ],
+       "mean_interval": 64.4,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 14,
+         "lives": [
+          38,
+          45,
+          44,
+          52,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24
+       ]
+      }
+     },
+     "player_character": null
+    }
+   ]
+  },
+  {
+   "key": "sparring",
+   "name": "Sparring Arena: Yamcha / Krillin / Tien",
+   "classes": [
+    106,
+    64,
+    98
+   ],
+   "notes": "Three separate spawn defs (one per opponent), rewards: +3 Power / Strength / Endurance capsule.",
+   "phases": [
+    {
+     "class_row": 106,
+     "names": [
+      "Yamcha"
+     ],
+     "map_index": 175,
+     "map_name": "Sparring Arena",
+     "zone": 6,
+     "area": 70,
+     "object_index": 3,
+     "spawn_def": "0x83fb724",
+     "spawn_condition": 1,
+     "activation": "cutscene/script activated (condition 1)",
+     "position": [
+      128,
+      140
+     ],
+     "gfx_id": 156,
+     "stats": {
+      "hp": 800,
+      "STR": 18,
+      "POW": 12,
+      "END": 14,
+      "melee_taken_mult": 128,
+      "energy_taken_mult": 128,
+      "class_exp": 600
+     },
+     "ai_state": 21,
+     "ai_states_used": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28
+     ],
+     "detection_radius_px": 88.0,
+     "range_check_radii_px": [
+      24.0,
+      36.0,
+      40.0,
+      56.0,
+      64.0,
+      72.0,
+      80.0,
+      88.0,
+      120.0
+     ],
+     "movement_speeds_px_per_frame": {
+      "AlignWithPlayer": [
+       0.5
+      ],
+      "ChasePlayer": [
+       0.5,
+       1.0,
+       1.1992
+      ],
+      "BackAway": [
+       1.0
+      ],
+      "BackAwayUntilBlocked": [
+       0.5
+      ]
+     },
+     "attacks": [
+      "ki blast projectile (attack id 3, energy 1024; POW-based)",
+      "melee strike (attack id 2, melee, power 1024; STR-based)"
+     ],
+     "special_attacks": [],
+     "energy_absorb": false,
+     "stun_on_attack_ids": [
+      9,
+      15
+     ],
+     "on_death": {
+      "sequence": "0x83d2de4",
+      "engine": "0x80106b3",
+      "effects": [
+       {
+        "op": "broadcast_msg_0x10"
+       },
+       {
+        "op": "change_map",
+        "zone": 6,
+        "area": 3,
+        "map_index": 147,
+        "entry": 1,
+        "x": 272,
+        "y": 336
+       },
+       {
+        "op": "set_flag",
+        "flag": 212
+       }
+      ],
+      "dialogue_excerpt": [
+       "YAMCHA: Whoa... You sure showed me!  Good fight!",
+       "@^You received a +3 Power Capsule!"
+      ]
+     },
+     "next_phase": [],
+     "active_character_after": [],
+     "measured": {
+      "yamcha@30": {
+       "cls": 106,
+       "gfx": 156,
+       "start_dist": 30,
+       "frames": 900,
+       "hits": 11,
+       "damage": [
+        11,
+        12,
+        13,
+        18
+       ],
+       "mean_interval": 84.0,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 10,
+         "lives": [
+          34,
+          37,
+          44,
+          47,
+          47,
+          47,
+          47,
+          54,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28
+       ]
+      },
+      "yamcha@100": {
+       "cls": 106,
+       "gfx": 156,
+       "start_dist": 100,
+       "frames": 900,
+       "hits": 13,
+       "damage": [
+        11,
+        12,
+        13
+       ],
+       "mean_interval": 67.2,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 13,
+         "lives": [
+          41,
+          48,
+          47,
+          54,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24
+       ]
+      }
+     },
+     "player_character": null
+    },
+    {
+     "class_row": 64,
+     "names": [
+      "Krillin"
+     ],
+     "map_index": 175,
+     "map_name": "Sparring Arena",
+     "zone": 6,
+     "area": 70,
+     "object_index": 4,
+     "spawn_def": "0x83fb754",
+     "spawn_condition": 1,
+     "activation": "cutscene/script activated (condition 1)",
+     "position": [
+      128,
+      140
+     ],
+     "gfx_id": 76,
+     "stats": {
+      "hp": 1800,
+      "STR": 23,
+      "POW": 24,
+      "END": 17,
+      "melee_taken_mult": 128,
+      "energy_taken_mult": 128,
+      "class_exp": 1200
+     },
+     "ai_state": 98,
+     "ai_states_used": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      98,
+      99,
+      100,
+      101,
+      102,
+      103,
+      104,
+      105
+     ],
+     "detection_radius_px": 88.0,
+     "range_check_radii_px": [
+      24.0,
+      36.0,
+      40.0,
+      56.0,
+      64.0,
+      72.0,
+      80.0,
+      88.0,
+      120.0
+     ],
+     "movement_speeds_px_per_frame": {
+      "AlignWithPlayer": [
+       0.5
+      ],
+      "ChasePlayer": [
+       0.5,
+       1.0
+      ],
+      "BackAway": [
+       1.0
+      ],
+      "BackAwayUntilBlocked": [
+       0.5
+      ]
+     },
+     "attacks": [
+      "ki blast projectile (attack id 3, energy 1024; POW-based)",
+      "melee strike (attack id 2, melee, power 1024; STR-based)"
+     ],
+     "special_attacks": [],
+     "energy_absorb": false,
+     "stun_on_attack_ids": [
+      9,
+      15
+     ],
+     "on_death": {
+      "sequence": "0x83d2eec",
+      "engine": "0x80106b3",
+      "effects": [
+       {
+        "op": "broadcast_msg_0x10"
+       },
+       {
+        "op": "change_map",
+        "zone": 6,
+        "area": 3,
+        "map_index": 147,
+        "entry": 1,
+        "x": 272,
+        "y": 336
+       },
+       {
+        "op": "set_flag",
+        "flag": 213
+       }
+      ],
+      "dialogue_excerpt": [
+       "KRILLIN: Owwww... That hurt.  I guess I need to train more!",
+       "@^You received a +3 Strength Capsule!"
+      ]
+     },
+     "next_phase": [],
+     "active_character_after": [],
+     "measured": {
+      "krillin@30": {
+       "cls": 64,
+       "gfx": 76,
+       "start_dist": 30,
+       "frames": 900,
+       "hits": 8,
+       "damage": [
+        23,
+        24,
+        25,
+        26
+       ],
+       "mean_interval": 121.4,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 2,
+         "lives": [
+          34,
+          34
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105
+       ]
+      },
+      "krillin@100": {
+       "cls": 64,
+       "gfx": 76,
+       "start_dist": 100,
+       "frames": 900,
+       "hits": 15,
+       "damage": [
+        24,
+        25,
+        26
+       ],
+       "mean_interval": 58.0,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 15,
+         "lives": [
+          41,
+          41,
+          41,
+          41,
+          41,
+          41,
+          41,
+          41,
+          41,
+          41,
+          41,
+          41,
+          41,
+          41,
+          41
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        99,
+        100,
+        101
+       ]
+      }
+     },
+     "player_character": null
+    },
+    {
+     "class_row": 98,
+     "names": [
+      "Tien"
+     ],
+     "map_index": 175,
+     "map_name": "Sparring Arena",
+     "zone": 6,
+     "area": 70,
+     "object_index": 5,
+     "spawn_def": "0x83fb784",
+     "spawn_condition": 1,
+     "activation": "cutscene/script activated (condition 1)",
+     "position": [
+      128,
+      140
+     ],
+     "gfx_id": 121,
+     "stats": {
+      "hp": 2110,
+      "STR": 35,
+      "POW": 29,
+      "END": 27,
+      "melee_taken_mult": 128,
+      "energy_taken_mult": 128,
+      "class_exp": 2500
+     },
+     "ai_state": 98,
+     "ai_states_used": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      98,
+      99,
+      100,
+      101,
+      102,
+      103,
+      104,
+      105
+     ],
+     "detection_radius_px": 88.0,
+     "range_check_radii_px": [
+      24.0,
+      36.0,
+      40.0,
+      56.0,
+      64.0,
+      72.0,
+      80.0,
+      88.0,
+      120.0
+     ],
+     "movement_speeds_px_per_frame": {
+      "AlignWithPlayer": [
+       0.5
+      ],
+      "ChasePlayer": [
+       0.5,
+       1.0
+      ],
+      "BackAway": [
+       1.0
+      ],
+      "BackAwayUntilBlocked": [
+       0.5
+      ]
+     },
+     "attacks": [
+      "ki blast projectile (attack id 3, energy 1024; POW-based)",
+      "melee strike (attack id 2, melee, power 1024; STR-based)"
+     ],
+     "special_attacks": [],
+     "energy_absorb": false,
+     "stun_on_attack_ids": [
+      9,
+      15
+     ],
+     "on_death": {
+      "sequence": "0x83d2ffc",
+      "engine": "0x80106b3",
+      "effects": [
+       {
+        "op": "broadcast_msg_0x10"
+       },
+       {
+        "op": "change_map",
+        "zone": 6,
+        "area": 3,
+        "map_index": 147,
+        "entry": 1,
+        "x": 272,
+        "y": 336
+       },
+       {
+        "op": "set_flag",
+        "flag": 214
+       }
+      ],
+      "dialogue_excerpt": [
+       "TIEN: Your techniques are powerful.\u000bThanks for a good fight.",
+       "@^You received a +3 Endurance Capsule!"
+      ]
+     },
+     "next_phase": [],
+     "active_character_after": [],
+     "measured": {
+      "tien@30": {
+       "cls": 98,
+       "gfx": 121,
+       "start_dist": 30,
+       "frames": 900,
+       "hits": 8,
+       "damage": [
+        31,
+        32,
+        38,
+        39,
+        41
+       ],
+       "mean_interval": 121.4,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 2,
+         "lives": [
+          34,
+          34
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105
+       ]
+      },
+      "tien@100": {
+       "cls": 98,
+       "gfx": 121,
+       "start_dist": 100,
+       "frames": 900,
+       "hits": 15,
+       "damage": [
+        30,
+        31,
+        32,
+        33
+       ],
+       "mean_interval": 58.0,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 15,
+         "lives": [
+          41,
+          41,
+          41,
+          41,
+          41,
+          41,
+          41,
+          41,
+          41,
+          41,
+          41,
+          41,
+          41,
+          41,
+          41
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        99,
+        100,
+        101
+       ]
+      }
+     },
+     "player_character": null
+    }
+   ]
+  },
+  {
+   "key": "android_19",
+   "name": "Android 19",
+   "classes": [
+    5
+   ],
+   "notes": "",
+   "phases": [
+    {
+     "class_row": 5,
+     "names": [
+      "Android 19"
+     ],
+     "map_index": 191,
+     "map_name": "Southern Continent",
+     "zone": 7,
+     "area": 15,
+     "object_index": 2,
+     "spawn_def": "0x83fd3bc",
+     "spawn_condition": 1,
+     "activation": "cutscene/script activated (condition 1)",
+     "position": [
+      504,
+      408
+     ],
+     "gfx_id": 12,
+     "stats": {
+      "hp": 2970,
+      "STR": 21,
+      "POW": 14,
+      "END": 11,
+      "melee_taken_mult": 128,
+      "energy_taken_mult": 128,
+      "class_exp": 0
+     },
+     "ai_state": 29,
+     "ai_states_used": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29
+     ],
+     "detection_radius_px": 88.0,
+     "range_check_radii_px": [
+      24.0,
+      36.0,
+      40.0,
+      56.0,
+      64.0,
+      72.0,
+      80.0,
+      88.0,
+      120.0
+     ],
+     "movement_speeds_px_per_frame": {
+      "AlignWithPlayer": [
+       0.5
+      ],
+      "ChasePlayer": [
+       0.5,
+       1.0,
+       1.1992
+      ],
+      "BackAway": [
+       1.0
+      ],
+      "BackAwayUntilBlocked": [
+       0.5
+      ]
+     },
+     "attacks": [
+      "ki blast projectile (attack id 3, energy 1024; POW-based)",
+      "melee strike (attack id 2, melee, power 1024; STR-based)"
+     ],
+     "special_attacks": [],
+     "energy_absorb": true,
+     "stun_on_attack_ids": [
+      1,
+      9,
+      15
+     ],
+     "on_death": {
+      "sequence": "0x83d4834",
+      "engine": "0x80106b3",
+      "effects": [
+       {
+        "op": "give_exp",
+        "amount": 3500
+       },
+       {
+        "op": "broadcast_msg_0x10"
+       },
+       {
+        "op": "change_map",
+        "zone": 7,
+        "area": 16,
+        "map_index": 192,
+        "entry": 1,
+        "x": 432,
+        "y": 328
+       },
+       {
+        "op": "set_flag",
+        "flag": 85
+       }
+      ],
+      "dialogue_excerpt": [
+       "@You're bluffing.  Show me what you've got.",
+       "KRILLIN: Good riddance!  That guy is the biggest jerk.",
+       "GOHAN: So, what do we do now?"
+      ]
+     },
+     "next_phase": [],
+     "active_character_after": [],
+     "measured": {
+      "android19@30": {
+       "cls": 5,
+       "gfx": 12,
+       "start_dist": 30,
+       "frames": 900,
+       "hits": 11,
+       "damage": [
+        13,
+        14,
+        15,
+        21
+       ],
+       "mean_interval": 84.0,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 10,
+         "lives": [
+          34,
+          37,
+          44,
+          47,
+          47,
+          47,
+          47,
+          54,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28
+       ]
+      },
+      "android19@100": {
+       "cls": 5,
+       "gfx": 12,
+       "start_dist": 100,
+       "frames": 900,
+       "hits": 13,
+       "damage": [
+        13,
+        14,
+        15
+       ],
+       "mean_interval": 67.2,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 13,
+         "lives": [
+          41,
+          48,
+          47,
+          54,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24
+       ]
+      }
+     },
+     "player_character": null
+    }
+   ]
+  },
+  {
+   "key": "android_20",
+   "name": "Android 20 (Dr. Gero)",
+   "classes": [
+    6,
+    7
+   ],
+   "notes": "",
+   "phases": [
+    {
+     "class_row": 6,
+     "names": [
+      "Android 20"
+     ],
+     "map_index": 195,
+     "map_name": "Southern Continent",
+     "zone": 7,
+     "area": 19,
+     "object_index": 1,
+     "spawn_def": "0x83fd7a8",
+     "spawn_condition": 1,
+     "activation": "cutscene/script activated (condition 1)",
+     "position": [
+      248,
+      312
+     ],
+     "gfx_id": 14,
+     "stats": {
+      "hp": 2810,
+      "STR": 24,
+      "POW": 19,
+      "END": 14,
+      "melee_taken_mult": 128,
+      "energy_taken_mult": 128,
+      "class_exp": 0
+     },
+     "ai_state": 29,
+     "ai_states_used": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29
+     ],
+     "detection_radius_px": 88.0,
+     "range_check_radii_px": [
+      24.0,
+      36.0,
+      40.0,
+      56.0,
+      64.0,
+      72.0,
+      80.0,
+      88.0,
+      120.0
+     ],
+     "movement_speeds_px_per_frame": {
+      "AlignWithPlayer": [
+       0.5
+      ],
+      "ChasePlayer": [
+       0.5,
+       1.0,
+       1.1992
+      ],
+      "BackAway": [
+       1.0
+      ],
+      "BackAwayUntilBlocked": [
+       0.5
+      ]
+     },
+     "attacks": [
+      "ki blast projectile (attack id 3, energy 1024; POW-based)",
+      "melee strike (attack id 2, melee, power 1024; STR-based)"
+     ],
+     "special_attacks": [],
+     "energy_absorb": true,
+     "stun_on_attack_ids": [
+      1,
+      9,
+      15
+     ],
+     "on_death": {
+      "sequence": "0x83d5524",
+      "engine": "0x80106b3",
+      "effects": [
+       {
+        "op": "give_exp",
+        "amount": 5000
+       },
+       {
+        "op": "broadcast_msg_0x10"
+       },
+       {
+        "op": "set_flag",
+        "flag": 86
+       }
+      ],
+      "dialogue_excerpt": [
+       "VEGETA: What a waste of technology.",
+       "PICCOLO: Hey guys look!  Trunks is here!",
+       "Trunks?  How bizarre, that guy has the same name as... ",
+       "What?!  How can he be different?",
+       "@17 and 18???",
+       "!BULMA: I think that Android was Dr. Gero!"
+      ]
+     },
+     "next_phase": [],
+     "active_character_after": [],
+     "measured": {
+      "android20@30": {
+       "cls": 6,
+       "gfx": 14,
+       "start_dist": 30,
+       "frames": 900,
+       "hits": 11,
+       "damage": [
+        19,
+        20,
+        24
+       ],
+       "mean_interval": 84.0,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 10,
+         "lives": [
+          34,
+          37,
+          44,
+          47,
+          47,
+          47,
+          47,
+          54,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28
+       ]
+      },
+      "android20@100": {
+       "cls": 6,
+       "gfx": 14,
+       "start_dist": 100,
+       "frames": 900,
+       "hits": 13,
+       "damage": [
+        19,
+        20
+       ],
+       "mean_interval": 67.2,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 13,
+         "lives": [
+          41,
+          48,
+          47,
+          54,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24
+       ]
+      }
+     },
+     "player_character": null
+    },
+    {
+     "class_row": 7,
+     "names": [
+      "Android 20"
+     ],
+     "map_index": 215,
+     "map_name": "Northern Mountains",
+     "zone": 8,
+     "area": 13,
+     "object_index": 1,
+     "spawn_def": "0x83ff970",
+     "spawn_condition": 1,
+     "activation": "cutscene/script activated (condition 1)",
+     "position": [
+      192,
+      232
+     ],
+     "gfx_id": 14,
+     "stats": {
+      "hp": 1900,
+      "STR": 25,
+      "POW": 21,
+      "END": 17,
+      "melee_taken_mult": 128,
+      "energy_taken_mult": 128,
+      "class_exp": 0
+     },
+     "ai_state": 29,
+     "ai_states_used": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29
+     ],
+     "detection_radius_px": 88.0,
+     "range_check_radii_px": [
+      24.0,
+      36.0,
+      40.0,
+      56.0,
+      64.0,
+      72.0,
+      80.0,
+      88.0,
+      120.0
+     ],
+     "movement_speeds_px_per_frame": {
+      "AlignWithPlayer": [
+       0.5
+      ],
+      "ChasePlayer": [
+       0.5,
+       1.0,
+       1.1992
+      ],
+      "BackAway": [
+       1.0
+      ],
+      "BackAwayUntilBlocked": [
+       0.5
+      ]
+     },
+     "attacks": [
+      "ki blast projectile (attack id 3, energy 1024; POW-based)",
+      "melee strike (attack id 2, melee, power 1024; STR-based)"
+     ],
+     "special_attacks": [],
+     "energy_absorb": true,
+     "stun_on_attack_ids": [
+      1,
+      9,
+      15
+     ],
+     "on_death": {
+      "sequence": "0x83ff938",
+      "engine": "0x801069b",
+      "effects": [
+       {
+        "op": "event_script",
+        "script": "0x83ff938"
+       }
+      ],
+      "dialogue_excerpt": []
+     },
+     "next_phase": [],
+     "active_character_after": [],
+     "measured": {
+      "android20_b@30": {
+       "cls": 7,
+       "gfx": 14,
+       "start_dist": 30,
+       "frames": 900,
+       "hits": 11,
+       "damage": [
+        21,
+        22,
+        23,
+        26
+       ],
+       "mean_interval": 84.0,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 10,
+         "lives": [
+          34,
+          37,
+          44,
+          47,
+          47,
+          47,
+          47,
+          54,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28
+       ]
+      },
+      "android20_b@100": {
+       "cls": 7,
+       "gfx": 14,
+       "start_dist": 100,
+       "frames": 900,
+       "hits": 13,
+       "damage": [
+        21,
+        22,
+        23
+       ],
+       "mean_interval": 67.2,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 13,
+         "lives": [
+          41,
+          48,
+          47,
+          54,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24
+       ]
+      }
+     },
+     "player_character": null
+    },
+    {
+     "class_row": 7,
+     "names": [
+      "Android 20"
+     ],
+     "map_index": 229,
+     "map_name": "Northern Mountains",
+     "zone": 8,
+     "area": 27,
+     "object_index": 3,
+     "spawn_def": "0x8400d28",
+     "spawn_condition": 1,
+     "activation": "cutscene/script activated (condition 1)",
+     "position": [
+      336,
+      176
+     ],
+     "gfx_id": 14,
+     "stats": {
+      "hp": 1900,
+      "STR": 25,
+      "POW": 21,
+      "END": 17,
+      "melee_taken_mult": 128,
+      "energy_taken_mult": 128,
+      "class_exp": 0
+     },
+     "ai_state": 29,
+     "ai_states_used": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29
+     ],
+     "detection_radius_px": 88.0,
+     "range_check_radii_px": [
+      24.0,
+      36.0,
+      40.0,
+      56.0,
+      64.0,
+      72.0,
+      80.0,
+      88.0,
+      120.0
+     ],
+     "movement_speeds_px_per_frame": {
+      "AlignWithPlayer": [
+       0.5
+      ],
+      "ChasePlayer": [
+       0.5,
+       1.0,
+       1.1992
+      ],
+      "BackAway": [
+       1.0
+      ],
+      "BackAwayUntilBlocked": [
+       0.5
+      ]
+     },
+     "attacks": [
+      "ki blast projectile (attack id 3, energy 1024; POW-based)",
+      "melee strike (attack id 2, melee, power 1024; STR-based)"
+     ],
+     "special_attacks": [],
+     "energy_absorb": true,
+     "stun_on_attack_ids": [
+      1,
+      9,
+      15
+     ],
+     "on_death": {
+      "sequence": "0x83d6480",
+      "engine": "0x80106b3",
+      "effects": [
+       {
+        "op": "give_exp",
+        "amount": 7000
+       },
+       {
+        "op": "set_flag",
+        "flag": 89
+       },
+       {
+        "op": "broadcast_msg_0x10"
+       }
+      ],
+      "dialogue_excerpt": []
+     },
+     "next_phase": [],
+     "active_character_after": [],
+     "measured": {
+      "android20_b@30": {
+       "cls": 7,
+       "gfx": 14,
+       "start_dist": 30,
+       "frames": 900,
+       "hits": 11,
+       "damage": [
+        21,
+        22,
+        23,
+        26
+       ],
+       "mean_interval": 84.0,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 10,
+         "lives": [
+          34,
+          37,
+          44,
+          47,
+          47,
+          47,
+          47,
+          54,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28
+       ]
+      },
+      "android20_b@100": {
+       "cls": 7,
+       "gfx": 14,
+       "start_dist": 100,
+       "frames": 900,
+       "hits": 13,
+       "damage": [
+        21,
+        22,
+        23
+       ],
+       "mean_interval": 67.2,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 13,
+         "lives": [
+          41,
+          48,
+          47,
+          54,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24
+       ]
+      }
+     },
+     "player_character": null
+    },
+    {
+     "class_row": 7,
+     "names": [
+      "Android 20"
+     ],
+     "map_index": 242,
+     "map_name": "Northern Mountains",
+     "zone": 8,
+     "area": 40,
+     "object_index": 1,
+     "spawn_def": "0x8402338",
+     "spawn_condition": 1,
+     "activation": "cutscene/script activated (condition 1)",
+     "position": [
+      208,
+      264
+     ],
+     "gfx_id": 14,
+     "stats": {
+      "hp": 1900,
+      "STR": 25,
+      "POW": 21,
+      "END": 17,
+      "melee_taken_mult": 128,
+      "energy_taken_mult": 128,
+      "class_exp": 0
+     },
+     "ai_state": 29,
+     "ai_states_used": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29
+     ],
+     "detection_radius_px": 88.0,
+     "range_check_radii_px": [
+      24.0,
+      36.0,
+      40.0,
+      56.0,
+      64.0,
+      72.0,
+      80.0,
+      88.0,
+      120.0
+     ],
+     "movement_speeds_px_per_frame": {
+      "AlignWithPlayer": [
+       0.5
+      ],
+      "ChasePlayer": [
+       0.5,
+       1.0,
+       1.1992
+      ],
+      "BackAway": [
+       1.0
+      ],
+      "BackAwayUntilBlocked": [
+       0.5
+      ]
+     },
+     "attacks": [
+      "ki blast projectile (attack id 3, energy 1024; POW-based)",
+      "melee strike (attack id 2, melee, power 1024; STR-based)"
+     ],
+     "special_attacks": [],
+     "energy_absorb": true,
+     "stun_on_attack_ids": [
+      1,
+      9,
+      15
+     ],
+     "on_death": {
+      "sequence": "0x83d78ec",
+      "engine": "0x80106b3",
+      "effects": [
+       {
+        "op": "give_exp",
+        "amount": 7000
+       },
+       {
+        "op": "set_flag",
+        "flag": 88
+       },
+       {
+        "op": "broadcast_msg_0x10"
+       }
+      ],
+      "dialogue_excerpt": []
+     },
+     "next_phase": [],
+     "active_character_after": [],
+     "measured": {
+      "android20_b@30": {
+       "cls": 7,
+       "gfx": 14,
+       "start_dist": 30,
+       "frames": 900,
+       "hits": 11,
+       "damage": [
+        21,
+        22,
+        23,
+        26
+       ],
+       "mean_interval": 84.0,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 10,
+         "lives": [
+          34,
+          37,
+          44,
+          47,
+          47,
+          47,
+          47,
+          54,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28
+       ]
+      },
+      "android20_b@100": {
+       "cls": 7,
+       "gfx": 14,
+       "start_dist": 100,
+       "frames": 900,
+       "hits": 13,
+       "damage": [
+        21,
+        22,
+        23
+       ],
+       "mean_interval": 67.2,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 13,
+         "lives": [
+          41,
+          48,
+          47,
+          54,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24
+       ]
+      }
+     },
+     "player_character": null
+    }
+   ]
+  },
+  {
+   "key": "android_18",
+   "name": "Android 18",
+   "classes": [
+    4
+   ],
+   "notes": "",
+   "phases": [
+    {
+     "class_row": 4,
+     "names": [
+      "Android 18"
+     ],
+     "map_index": 251,
+     "map_name": "Northern Mountains",
+     "zone": 8,
+     "area": 49,
+     "object_index": 0,
+     "spawn_def": "0x84033a4",
+     "spawn_condition": 1,
+     "activation": "cutscene/script activated (condition 1)",
+     "position": [
+      280,
+      264
+     ],
+     "gfx_id": 11,
+     "stats": {
+      "hp": 2910,
+      "STR": 29,
+      "POW": 34,
+      "END": 27,
+      "melee_taken_mult": 128,
+      "energy_taken_mult": 128,
+      "class_exp": 0
+     },
+     "ai_state": 21,
+     "ai_states_used": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28
+     ],
+     "detection_radius_px": 88.0,
+     "range_check_radii_px": [
+      24.0,
+      36.0,
+      40.0,
+      56.0,
+      64.0,
+      72.0,
+      80.0,
+      88.0,
+      120.0
+     ],
+     "movement_speeds_px_per_frame": {
+      "AlignWithPlayer": [
+       0.5
+      ],
+      "ChasePlayer": [
+       0.5,
+       1.0,
+       1.1992
+      ],
+      "BackAway": [
+       1.0
+      ],
+      "BackAwayUntilBlocked": [
+       0.5
+      ]
+     },
+     "attacks": [
+      "ki blast projectile (attack id 3, energy 1024; POW-based)",
+      "melee strike (attack id 2, melee, power 1024; STR-based)"
+     ],
+     "special_attacks": [],
+     "energy_absorb": false,
+     "stun_on_attack_ids": [
+      9,
+      15
+     ],
+     "on_death": {
+      "sequence": "0x83d98ac",
+      "engine": "0x80106b3",
+      "effects": [
+       {
+        "op": "give_exp",
+        "amount": 8000
+       },
+       {
+        "op": "broadcast_msg_0x10"
+       },
+       {
+        "op": "change_map",
+        "zone": 6,
+        "area": 99,
+        "map_index": 176,
+        "entry": 1,
+        "x": 2616,
+        "y": 1056
+       },
+       {
+        "op": "set_active_character",
+        "index": 1
+       },
+       {
+        "op": "set_flag",
+        "flag": 127
+       }
+      ],
+      "dialogue_excerpt": [
+       "ANDROID 18: Nice try!\u000bI was almost scared for a second there.\u000bWho's next?",
+       "Hey what are you looking at, 16?",
+       "ANDROID 16: You two scared the birds away.",
+       "Birds?  Listen, we better get going.  We have to find Goku.",
+       "16 is programmed to kill Goku.  So that's what we're going to do.",
+       "Did you forget?  Dr. Gero is gone!  You took care of that!"
+      ]
+     },
+     "next_phase": [],
+     "active_character_after": [
+      "Piccolo"
+     ],
+     "measured": {
+      "android18@30": {
+       "cls": 4,
+       "gfx": 11,
+       "start_dist": 30,
+       "frames": 900,
+       "hits": 11,
+       "damage": [
+        30,
+        37,
+        38,
+        39,
+        40
+       ],
+       "mean_interval": 84.0,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 10,
+         "lives": [
+          34,
+          37,
+          44,
+          47,
+          47,
+          47,
+          47,
+          54,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28
+       ]
+      },
+      "android18@100": {
+       "cls": 4,
+       "gfx": 11,
+       "start_dist": 100,
+       "frames": 900,
+       "hits": 13,
+       "damage": [
+        37,
+        38,
+        39,
+        40
+       ],
+       "mean_interval": 67.2,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 13,
+         "lives": [
+          41,
+          48,
+          47,
+          54,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24
+       ]
+      }
+     },
+     "player_character": null
+    }
+   ]
+  },
+  {
+   "key": "cell_imperfect",
+   "name": "Cell (Imperfect)",
+   "classes": [
+    60
+   ],
+   "notes": "",
+   "phases": [
+    {
+     "class_row": 60,
+     "names": [
+      "Cell"
+     ],
+     "map_index": 287,
+     "map_name": "Gingertown",
+     "zone": 10,
+     "area": 20,
+     "object_index": 0,
+     "spawn_def": "0x84058a4",
+     "spawn_condition": 131208,
+     "activation": "story-flag condition 0x20088",
+     "position": [
+      264,
+      128
+     ],
+     "gfx_id": 28,
+     "stats": {
+      "hp": 5210,
+      "STR": 32,
+      "POW": 32,
+      "END": 37,
+      "melee_taken_mult": 128,
+      "energy_taken_mult": 128,
+      "class_exp": 0
+     },
+     "ai_state": 80,
+     "ai_states_used": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      80,
+      81,
+      82,
+      83,
+      84,
+      85,
+      86,
+      87,
+      88,
+      89,
+      90
+     ],
+     "detection_radius_px": 88.0,
+     "range_check_radii_px": [
+      24.0,
+      36.0,
+      40.0,
+      56.0,
+      64.0,
+      72.0,
+      80.0,
+      88.0,
+      120.0
+     ],
+     "movement_speeds_px_per_frame": {
+      "AlignWithPlayer": [
+       0.5
+      ],
+      "ChasePlayer": [
+       0.5,
+       1.0,
+       1.1992
+      ],
+      "BackAway": [
+       1.0
+      ],
+      "BackAwayUntilBlocked": [
+       0.5
+      ]
+     },
+     "attacks": [
+      "drain grab (attack id 2 at 1/4 then 1/8 every 16 f, heals self)",
+      "ki blast projectile (attack id 3, energy 1024; POW-based)",
+      "melee strike (attack id 2, melee, power 1024; STR-based)"
+     ],
+     "special_attacks": [
+      "drain_grab"
+     ],
+     "energy_absorb": false,
+     "stun_on_attack_ids": [
+      9,
+      15
+     ],
+     "on_death": {
+      "sequence": "0x83e24a0",
+      "engine": "0x80106b3",
+      "effects": [
+       {
+        "op": "give_exp",
+        "amount": 12000
+       },
+       {
+        "op": "broadcast_msg_0x10"
+       },
+       {
+        "op": "set_active_character",
+        "index": 3
+       },
+       {
+        "op": "set_flag",
+        "flag": 136
+       }
+      ],
+      "dialogue_excerpt": [
+       "#It can't be!\u000bThe \"Kamehameha\" wave is Goku's attack!",
+       "#What do you mean?",
+       "#You will be absorbed into...\u000bPerfection!",
+       "#You're wrong!\u000bWe destroyed Dr. Gero's lab and all of his equipment!",
+       "#But what for?\u000bYou were already the most powerful being in your own time!",
+       "#Yes, I'm ready.  You've said more than enough!\u000bI just needed a little time."
+      ]
+     },
+     "next_phase": [],
+     "active_character_after": [
+      "Trunks"
+     ],
+     "measured": {
+      "cell_imperfect@30": {
+       "cls": 60,
+       "gfx": 28,
+       "start_dist": 30,
+       "frames": 900,
+       "hits": 9,
+       "damage": [
+        34,
+        35,
+        36,
+        37
+       ],
+       "mean_interval": 109.1,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 2,
+         "lives": [
+          30,
+          30
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        81,
+        82,
+        83,
+        84,
+        85,
+        86,
+        87,
+        88,
+        90
+       ]
+      },
+      "cell_imperfect@100": {
+       "cls": 60,
+       "gfx": 28,
+       "start_dist": 100,
+       "frames": 900,
+       "hits": 15,
+       "damage": [
+        34,
+        35,
+        36,
+        37
+       ],
+       "mean_interval": 59.4,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 15,
+         "lives": [
+          36,
+          36,
+          36,
+          36,
+          36,
+          36,
+          36,
+          36,
+          36,
+          36,
+          36,
+          36,
+          36,
+          36,
+          36
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        81,
+        82,
+        83
+       ]
+      }
+     },
+     "player_character": null
+    }
+   ]
+  },
+  {
+   "key": "android_17",
+   "name": "Android 17",
+   "classes": [
+    3
+   ],
+   "notes": "",
+   "phases": [
+    {
+     "class_row": 3,
+     "names": [
+      "Android 17"
+     ],
+     "map_index": 296,
+     "map_name": "Master Roshi's Island",
+     "zone": 11,
+     "area": 4,
+     "object_index": 1,
+     "spawn_def": "0x8406494",
+     "spawn_condition": 1,
+     "activation": "cutscene/script activated (condition 1)",
+     "position": [
+      264,
+      192
+     ],
+     "gfx_id": 9,
+     "stats": {
+      "hp": 3550,
+      "STR": 32,
+      "POW": 39,
+      "END": 34,
+      "melee_taken_mult": 128,
+      "energy_taken_mult": 128,
+      "class_exp": 0
+     },
+     "ai_state": 21,
+     "ai_states_used": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28
+     ],
+     "detection_radius_px": 88.0,
+     "range_check_radii_px": [
+      24.0,
+      36.0,
+      40.0,
+      56.0,
+      64.0,
+      72.0,
+      80.0,
+      88.0,
+      120.0
+     ],
+     "movement_speeds_px_per_frame": {
+      "AlignWithPlayer": [
+       0.5
+      ],
+      "ChasePlayer": [
+       0.5,
+       1.0,
+       1.1992
+      ],
+      "BackAway": [
+       1.0
+      ],
+      "BackAwayUntilBlocked": [
+       0.5
+      ]
+     },
+     "attacks": [
+      "ki blast projectile (attack id 3, energy 1024; POW-based)",
+      "melee strike (attack id 2, melee, power 1024; STR-based)"
+     ],
+     "special_attacks": [],
+     "energy_absorb": false,
+     "stun_on_attack_ids": [
+      9,
+      15
+     ],
+     "on_death": {
+      "sequence": "0x83e49f0",
+      "engine": "0x80106b3",
+      "effects": [
+       {
+        "op": "broadcast_msg_0x10"
+       },
+       {
+        "op": "change_map",
+        "zone": 11,
+        "area": 5,
+        "map_index": 297,
+        "entry": 1,
+        "x": 336,
+        "y": 88
+       },
+       {
+        "op": "set_flag",
+        "flag": 146
+       }
+      ],
+      "dialogue_excerpt": [
+       "PICCOLO: You're not perfect.  I'll destroy you before that happens."
+      ]
+     },
+     "next_phase": [],
+     "active_character_after": [],
+     "measured": {
+      "android17@30": {
+       "cls": 3,
+       "gfx": 9,
+       "start_dist": 30,
+       "frames": 900,
+       "hits": 11,
+       "damage": [
+        34,
+        44,
+        45,
+        46,
+        47,
+        48
+       ],
+       "mean_interval": 84.0,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 10,
+         "lives": [
+          34,
+          37,
+          44,
+          47,
+          47,
+          47,
+          47,
+          54,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28
+       ]
+      },
+      "android17@100": {
+       "cls": 3,
+       "gfx": 9,
+       "start_dist": 100,
+       "frames": 900,
+       "hits": 13,
+       "damage": [
+        44,
+        45,
+        46,
+        47,
+        48
+       ],
+       "mean_interval": 67.2,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 13,
+         "lives": [
+          41,
+          48,
+          47,
+          54,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24
+       ]
+      }
+     },
+     "player_character": null
+    },
+    {
+     "class_row": 3,
+     "names": [
+      "Android 17"
+     ],
+     "map_index": 297,
+     "map_name": "Master Roshi's Island",
+     "zone": 11,
+     "area": 5,
+     "object_index": 0,
+     "spawn_def": "0x840657c",
+     "spawn_condition": 0,
+     "activation": "spawned at map load",
+     "position": [
+      292,
+      176
+     ],
+     "gfx_id": 9,
+     "stats": {
+      "hp": 3550,
+      "STR": 32,
+      "POW": 39,
+      "END": 34,
+      "melee_taken_mult": 128,
+      "energy_taken_mult": 128,
+      "class_exp": 0
+     },
+     "ai_state": 21,
+     "ai_states_used": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28
+     ],
+     "detection_radius_px": 88.0,
+     "range_check_radii_px": [
+      24.0,
+      36.0,
+      40.0,
+      56.0,
+      64.0,
+      72.0,
+      80.0,
+      88.0,
+      120.0
+     ],
+     "movement_speeds_px_per_frame": {
+      "AlignWithPlayer": [
+       0.5
+      ],
+      "ChasePlayer": [
+       0.5,
+       1.0,
+       1.1992
+      ],
+      "BackAway": [
+       1.0
+      ],
+      "BackAwayUntilBlocked": [
+       0.5
+      ]
+     },
+     "attacks": [
+      "ki blast projectile (attack id 3, energy 1024; POW-based)",
+      "melee strike (attack id 2, melee, power 1024; STR-based)"
+     ],
+     "special_attacks": [],
+     "energy_absorb": false,
+     "stun_on_attack_ids": [
+      9,
+      15
+     ],
+     "on_death": {
+      "sequence": "0x110000",
+      "engine": "0x8010699",
+      "effects": [],
+      "dialogue_excerpt": []
+     },
+     "next_phase": [],
+     "active_character_after": [],
+     "measured": {
+      "android17@30": {
+       "cls": 3,
+       "gfx": 9,
+       "start_dist": 30,
+       "frames": 900,
+       "hits": 11,
+       "damage": [
+        34,
+        44,
+        45,
+        46,
+        47,
+        48
+       ],
+       "mean_interval": 84.0,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 10,
+         "lives": [
+          34,
+          37,
+          44,
+          47,
+          47,
+          47,
+          47,
+          54,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28
+       ]
+      },
+      "android17@100": {
+       "cls": 3,
+       "gfx": 9,
+       "start_dist": 100,
+       "frames": 900,
+       "hits": 13,
+       "damage": [
+        44,
+        45,
+        46,
+        47,
+        48
+       ],
+       "mean_interval": 67.2,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 13,
+         "lives": [
+          41,
+          48,
+          47,
+          54,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24
+       ]
+      }
+     },
+     "player_character": null
+    },
+    {
+     "class_row": 3,
+     "names": [
+      "Android 17"
+     ],
+     "map_index": 298,
+     "map_name": "Master Roshi's Island",
+     "zone": 11,
+     "area": 6,
+     "object_index": 0,
+     "spawn_def": "0x8406654",
+     "spawn_condition": 1,
+     "activation": "cutscene/script activated (condition 1)",
+     "position": [
+      288,
+      232
+     ],
+     "gfx_id": 9,
+     "stats": {
+      "hp": 3550,
+      "STR": 32,
+      "POW": 39,
+      "END": 34,
+      "melee_taken_mult": 128,
+      "energy_taken_mult": 128,
+      "class_exp": 0
+     },
+     "ai_state": 21,
+     "ai_states_used": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28
+     ],
+     "detection_radius_px": 88.0,
+     "range_check_radii_px": [
+      24.0,
+      36.0,
+      40.0,
+      56.0,
+      64.0,
+      72.0,
+      80.0,
+      88.0,
+      120.0
+     ],
+     "movement_speeds_px_per_frame": {
+      "AlignWithPlayer": [
+       0.5
+      ],
+      "ChasePlayer": [
+       0.5,
+       1.0,
+       1.1992
+      ],
+      "BackAway": [
+       1.0
+      ],
+      "BackAwayUntilBlocked": [
+       0.5
+      ]
+     },
+     "attacks": [
+      "ki blast projectile (attack id 3, energy 1024; POW-based)",
+      "melee strike (attack id 2, melee, power 1024; STR-based)"
+     ],
+     "special_attacks": [],
+     "energy_absorb": false,
+     "stun_on_attack_ids": [
+      9,
+      15
+     ],
+     "on_death": {
+      "sequence": "0x83e4b50",
+      "engine": "0x80106b3",
+      "effects": [
+       {
+        "op": "broadcast_msg_0x10"
+       },
+       {
+        "op": "actor_becomes_map_object",
+        "actor": 9,
+        "map_index": 298,
+        "object_index": 4,
+        "class_row": 3
+       }
+      ],
+      "dialogue_excerpt": [
+       "What is that supposed to mean?"
+      ]
+     },
+     "next_phase": [
+      {
+       "class_row": 3,
+       "map_index": 298,
+       "object_index": 4,
+       "how": "actor_becomes_map_object"
+      }
+     ],
+     "active_character_after": [],
+     "measured": {
+      "android17@30": {
+       "cls": 3,
+       "gfx": 9,
+       "start_dist": 30,
+       "frames": 900,
+       "hits": 11,
+       "damage": [
+        34,
+        44,
+        45,
+        46,
+        47,
+        48
+       ],
+       "mean_interval": 84.0,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 10,
+         "lives": [
+          34,
+          37,
+          44,
+          47,
+          47,
+          47,
+          47,
+          54,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28
+       ]
+      },
+      "android17@100": {
+       "cls": 3,
+       "gfx": 9,
+       "start_dist": 100,
+       "frames": 900,
+       "hits": 13,
+       "damage": [
+        44,
+        45,
+        46,
+        47,
+        48
+       ],
+       "mean_interval": 67.2,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 13,
+         "lives": [
+          41,
+          48,
+          47,
+          54,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24
+       ]
+      }
+     },
+     "player_character": null
+    },
+    {
+     "class_row": 3,
+     "names": [
+      "Android 17"
+     ],
+     "map_index": 298,
+     "map_name": "Master Roshi's Island",
+     "zone": 11,
+     "area": 6,
+     "object_index": 4,
+     "spawn_def": "0x84066e4",
+     "spawn_condition": 1,
+     "activation": "cutscene/script activated (condition 1)",
+     "position": [
+      288,
+      232
+     ],
+     "gfx_id": 9,
+     "stats": {
+      "hp": 3550,
+      "STR": 32,
+      "POW": 39,
+      "END": 34,
+      "melee_taken_mult": 128,
+      "energy_taken_mult": 128,
+      "class_exp": 0
+     },
+     "ai_state": 21,
+     "ai_states_used": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28
+     ],
+     "detection_radius_px": 88.0,
+     "range_check_radii_px": [
+      24.0,
+      36.0,
+      40.0,
+      56.0,
+      64.0,
+      72.0,
+      80.0,
+      88.0,
+      120.0
+     ],
+     "movement_speeds_px_per_frame": {
+      "AlignWithPlayer": [
+       0.5
+      ],
+      "ChasePlayer": [
+       0.5,
+       1.0,
+       1.1992
+      ],
+      "BackAway": [
+       1.0
+      ],
+      "BackAwayUntilBlocked": [
+       0.5
+      ]
+     },
+     "attacks": [
+      "ki blast projectile (attack id 3, energy 1024; POW-based)",
+      "melee strike (attack id 2, melee, power 1024; STR-based)"
+     ],
+     "special_attacks": [],
+     "energy_absorb": false,
+     "stun_on_attack_ids": [
+      9,
+      15
+     ],
+     "on_death": {
+      "sequence": "0x83e6078",
+      "engine": "0x80106b3",
+      "effects": [
+       {
+        "op": "spawn_map_object",
+        "map_index": 298,
+        "object_index": 3,
+        "class_row": null,
+        "kind": "walker_npc"
+       },
+       {
+        "op": "give_exp",
+        "amount": 15000
+       },
+       {
+        "op": "broadcast_msg_0x10"
+       },
+       {
+        "op": "set_flag",
+        "flag": 147
+       },
+       {
+        "op": "change_map",
+        "zone": 9,
+        "area": 1,
+        "map_index": 261,
+        "entry": 1,
+        "x": 736,
+        "y": 416
+       },
+       {
+        "op": "set_flag",
+        "flag": 148
+       }
+      ],
+      "dialogue_excerpt": [
+       "!ANDROID 17: Huh?\u000bWhat are you?",
+       "PICCOLO: (What?  They don't even know who Cell is!)",
+       "Android 17!  Amazingly efficient! ",
+       "And 18!  Poetry in motion!",
+       "Stay away from them!",
+       "Ha! Ha! Ha! Ha!"
+      ]
+     },
+     "next_phase": [],
+     "active_character_after": [],
+     "measured": {
+      "android17@30": {
+       "cls": 3,
+       "gfx": 9,
+       "start_dist": 30,
+       "frames": 900,
+       "hits": 11,
+       "damage": [
+        34,
+        44,
+        45,
+        46,
+        47,
+        48
+       ],
+       "mean_interval": 84.0,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 10,
+         "lives": [
+          34,
+          37,
+          44,
+          47,
+          47,
+          47,
+          47,
+          54,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28
+       ]
+      },
+      "android17@100": {
+       "cls": 3,
+       "gfx": 9,
+       "start_dist": 100,
+       "frames": 900,
+       "hits": 13,
+       "damage": [
+        44,
+        45,
+        46,
+        47,
+        48
+       ],
+       "mean_interval": 67.2,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 13,
+         "lives": [
+          41,
+          48,
+          47,
+          54,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24
+       ]
+      }
+     },
+     "player_character": "unchanged"
+    }
+   ]
+  },
+  {
+   "key": "cell_semiperfect",
+   "name": "Cell (Semi-perfect / \"Nonperfect\") -> Perfect Cell (Tropical Islands)",
+   "classes": [
+    76,
+    78,
+    79
+   ],
+   "notes": "",
+   "phases": [
+    {
+     "class_row": 76,
+     "names": [
+      "Cell, \"Nonperfect\""
+     ],
+     "map_index": 302,
+     "map_name": "Tropical Islands",
+     "zone": 12,
+     "area": 4,
+     "object_index": 1,
+     "spawn_def": "0x8406e10",
+     "spawn_condition": 1,
+     "activation": "cutscene/script activated (condition 1)",
+     "position": [
+      208,
+      280
+     ],
+     "gfx_id": 29,
+     "stats": {
+      "hp": 4890,
+      "STR": 39,
+      "POW": 41,
+      "END": 46,
+      "melee_taken_mult": 128,
+      "energy_taken_mult": 128,
+      "class_exp": 0
+     },
+     "ai_state": 116,
+     "ai_states_used": [
+      111,
+      112,
+      113,
+      114,
+      115,
+      116,
+      117,
+      118,
+      119,
+      120,
+      121,
+      122,
+      123,
+      124,
+      125,
+      126,
+      127,
+      128
+     ],
+     "detection_radius_px": 88.0,
+     "range_check_radii_px": [
+      24.0,
+      36.0,
+      40.0,
+      56.0,
+      64.0,
+      72.0,
+      80.0,
+      88.0,
+      120.0
+     ],
+     "movement_speeds_px_per_frame": {
+      "AlignWithPlayer": [
+       0.6992
+      ],
+      "ChasePlayer": [
+       0.6992,
+       1.1992
+      ],
+      "BackAway": [
+       1.1992
+      ],
+      "BackAwayUntilBlocked": [
+       0.6992
+      ]
+     },
+     "attacks": [
+      "beam (attack id 10 power 64, scale 12x)",
+      "drain grab (attack id 2 at 1/4 then 1/8 every 16 f, heals self)",
+      "ki blast projectile (attack id 3, energy 1024; POW-based)",
+      "melee strike (attack id 2, melee, power 1024; STR-based)"
+     ],
+     "special_attacks": [
+      "beam",
+      "drain_grab"
+     ],
+     "energy_absorb": false,
+     "stun_on_attack_ids": [
+      9,
+      15
+     ],
+     "on_death": {
+      "sequence": "0x83e6f30",
+      "engine": "0x80106b3",
+      "effects": [
+       {
+        "op": "give_exp",
+        "amount": 30000
+       },
+       {
+        "op": "broadcast_msg_0x10"
+       },
+       {
+        "op": "change_map",
+        "zone": 12,
+        "area": 5,
+        "map_index": 303,
+        "entry": 1,
+        "x": 144,
+        "y": 408
+       },
+       {
+        "op": "change_map",
+        "zone": 12,
+        "area": 6,
+        "map_index": 304,
+        "entry": 1,
+        "x": 248,
+        "y": 544
+       },
+       {
+        "op": "set_active_character",
+        "index": 3
+       },
+       {
+        "op": "refill_player_hp"
+       },
+       {
+        "op": "refill_player_ep"
+       },
+       {
+        "op": "actor_becomes_map_object",
+        "actor": 30,
+        "map_index": 304,
+        "object_index": 4,
+        "class_row": 78
+       }
+      ],
+      "dialogue_excerpt": [
+       "VEGETA: That's right.\u000bI'm an Ascended Saiyan.",
+       "How did you acquire this new strength?\u000bEnlighten me.",
+       "I do a lot of push-ups and sit-ups.\u000bAnd I drink plenty of juice.",
+       "You will pay for your insolence Vegeta!",
+       "I don't think so Cell.  You are outclassed in every way.",
+       "And it gets worse for you Cell...  Here's my son!"
+      ]
+     },
+     "next_phase": [
+      {
+       "class_row": 78,
+       "map_index": 304,
+       "object_index": 4,
+       "how": "actor_becomes_map_object"
+      }
+     ],
+     "active_character_after": [
+      "Trunks"
+     ],
+     "measured": {
+      "cell_nonperfect@30": {
+       "cls": 76,
+       "gfx": 29,
+       "start_dist": 30,
+       "frames": 900,
+       "hits": 13,
+       "damage": [
+        24,
+        36,
+        45,
+        52
+       ],
+       "mean_interval": 73.5,
+       "projectiles": {
+        "beam_80143a8": {
+         "count": 4,
+         "lives": [
+          119,
+          129,
+          129,
+          120
+         ],
+         "speeds": [
+          0.004,
+          0.008,
+          0.012,
+          0.177
+         ]
+        },
+        "enemy_ki_blast": {
+         "count": 1,
+         "lives": [
+          42
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        123,
+        124,
+        125,
+        126,
+        128
+       ]
+      },
+      "cell_nonperfect@100": {
+       "cls": 76,
+       "gfx": 29,
+       "start_dist": 100,
+       "frames": 900,
+       "hits": 16,
+       "damage": [
+        24,
+        36,
+        48,
+        50,
+        52
+       ],
+       "mean_interval": 57.0,
+       "projectiles": {
+        "beam_80143a8": {
+         "count": 5,
+         "lives": [
+          124,
+          127,
+          115,
+          115,
+          115
+         ],
+         "speeds": [
+          0.004,
+          0.008,
+          0.012,
+          0.016,
+          0.165,
+          0.177
+         ]
+        },
+        "enemy_ki_blast": {
+         "count": 4,
+         "lives": [
+          42,
+          42,
+          42,
+          42
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        117,
+        118,
+        119,
+        120,
+        121
+       ]
+      }
+     },
+     "player_character": null
+    },
+    {
+     "class_row": 79,
+     "names": [
+      "Cell, \"Perfect\""
+     ],
+     "map_index": 304,
+     "map_name": "Tropical Islands",
+     "zone": 12,
+     "area": 6,
+     "object_index": 1,
+     "spawn_def": "0x8406f78",
+     "spawn_condition": 1,
+     "activation": "cutscene/script activated (condition 1)",
+     "position": [
+      248,
+      280
+     ],
+     "gfx_id": 30,
+     "stats": {
+      "hp": 5500,
+      "STR": 44,
+      "POW": 46,
+      "END": 50,
+      "melee_taken_mult": 128,
+      "energy_taken_mult": 128,
+      "class_exp": 0
+     },
+     "ai_state": 148,
+     "ai_states_used": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      111,
+      112,
+      113,
+      114,
+      115,
+      138,
+      139,
+      140,
+      141,
+      142,
+      143,
+      144,
+      145,
+      146,
+      147,
+      148
+     ],
+     "detection_radius_px": 88.0,
+     "range_check_radii_px": [
+      24.0,
+      36.0,
+      40.0,
+      56.0,
+      64.0,
+      72.0,
+      80.0,
+      88.0,
+      120.0
+     ],
+     "movement_speeds_px_per_frame": {
+      "AlignWithPlayer": [
+       0.6992
+      ],
+      "ChasePlayer": [
+       0.6992,
+       1.1992
+      ],
+      "BackAway": [
+       1.1992
+      ],
+      "BackAwayUntilBlocked": [
+       0.6992
+      ]
+     },
+     "attacks": [
+      "beam (attack id 10 power 64, scale 12x)",
+      "ki blast projectile (attack id 3, energy 1024; POW-based)",
+      "melee strike (attack id 2, melee, power 1024; STR-based)"
+     ],
+     "special_attacks": [
+      "beam"
+     ],
+     "energy_absorb": false,
+     "stun_on_attack_ids": [
+      9,
+      15
+     ],
+     "on_death": {
+      "sequence": "0x83e77b0",
+      "engine": "0x80106b3",
+      "effects": [
+       {
+        "op": "give_exp",
+        "amount": 40000
+       },
+       {
+        "op": "broadcast_msg_0x10"
+       },
+       {
+        "op": "spawn_map_object",
+        "map_index": 304,
+        "object_index": 3,
+        "class_row": null,
+        "kind": "npc"
+       },
+       {
+        "op": "spawn_map_object",
+        "map_index": 304,
+        "object_index": 2,
+        "class_row": null,
+        "kind": "npc"
+       },
+       {
+        "op": "set_flag",
+        "flag": 151
+       }
+      ],
+      "dialogue_excerpt": [
+       "What do you mean?",
+       "What are you talking about?",
+       "I should return to Capsule Corporation and tell the others.",
+       "@^Journal Updated!"
+      ]
+     },
+     "next_phase": [],
+     "active_character_after": [],
+     "measured": {},
+     "player_character": "unchanged"
+    },
+    {
+     "class_row": 78,
+     "names": [
+      "Cell, \"Perfect\""
+     ],
+     "map_index": 304,
+     "map_name": "Tropical Islands",
+     "zone": 12,
+     "area": 6,
+     "object_index": 4,
+     "spawn_def": "0x8406ff0",
+     "spawn_condition": 1,
+     "activation": "cutscene/script activated (condition 1)",
+     "position": [
+      248,
+      256
+     ],
+     "gfx_id": 30,
+     "stats": {
+      "hp": 5160,
+      "STR": 44,
+      "POW": 46,
+      "END": 50,
+      "melee_taken_mult": 128,
+      "energy_taken_mult": 128,
+      "class_exp": 0
+     },
+     "ai_state": 148,
+     "ai_states_used": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      111,
+      112,
+      113,
+      114,
+      115,
+      138,
+      139,
+      140,
+      141,
+      142,
+      143,
+      144,
+      145,
+      146,
+      147,
+      148
+     ],
+     "detection_radius_px": 88.0,
+     "range_check_radii_px": [
+      24.0,
+      36.0,
+      40.0,
+      56.0,
+      64.0,
+      72.0,
+      80.0,
+      88.0,
+      120.0
+     ],
+     "movement_speeds_px_per_frame": {
+      "AlignWithPlayer": [
+       0.6992
+      ],
+      "ChasePlayer": [
+       0.6992,
+       1.1992
+      ],
+      "BackAway": [
+       1.1992
+      ],
+      "BackAwayUntilBlocked": [
+       0.6992
+      ]
+     },
+     "attacks": [
+      "beam (attack id 10 power 64, scale 12x)",
+      "ki blast projectile (attack id 3, energy 1024; POW-based)",
+      "melee strike (attack id 2, melee, power 1024; STR-based)"
+     ],
+     "special_attacks": [
+      "beam"
+     ],
+     "energy_absorb": false,
+     "stun_on_attack_ids": [
+      9,
+      15
+     ],
+     "on_death": {
+      "sequence": "0x83e7104",
+      "engine": "0x80106b3",
+      "effects": [
+       {
+        "op": "actor_becomes_map_object",
+        "actor": 30,
+        "map_index": 304,
+        "object_index": 1,
+        "class_row": 79
+       },
+       {
+        "op": "broadcast_msg_0x10"
+       }
+      ],
+      "dialogue_excerpt": []
+     },
+     "next_phase": [
+      {
+       "class_row": 79,
+       "map_index": 304,
+       "object_index": 1,
+       "how": "actor_becomes_map_object"
+      }
+     ],
+     "active_character_after": [],
+     "measured": {
+      "perfect_cell_78@30": {
+       "cls": 78,
+       "gfx": 30,
+       "start_dist": 30,
+       "frames": 900,
+       "hits": 11,
+       "damage": [
+        53,
+        54,
+        55,
+        57,
+        61
+       ],
+       "mean_interval": 89.0,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 1,
+         "lives": [
+          28
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        139,
+        140,
+        141,
+        143,
+        144,
+        145,
+        146,
+        147
+       ]
+      },
+      "perfect_cell_78@100": {
+       "cls": 78,
+       "gfx": 30,
+       "start_dist": 100,
+       "frames": 900,
+       "hits": 14,
+       "damage": [
+        36,
+        59,
+        60,
+        61
+       ],
+       "mean_interval": 57.8,
+       "projectiles": {
+        "beam_80143a8": {
+         "count": 4,
+         "lives": [
+          124,
+          126,
+          114,
+          114
+         ],
+         "speeds": [
+          0.004,
+          0.008,
+          0.012,
+          0.016,
+          0.159,
+          0.171
+         ]
+        },
+        "enemy_ki_blast": {
+         "count": 5,
+         "lives": [
+          41,
+          41,
+          41,
+          41,
+          41
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        139,
+        140,
+        141,
+        142,
+        143
+       ]
+      }
+     },
+     "player_character": "Trunks"
+    }
+   ]
+  },
+  {
+   "key": "cell_games",
+   "name": "Cell Games",
+   "classes": [
+    21,
+    22,
+    23,
+    26,
+    24,
+    25
+   ],
+   "notes": "",
+   "phases": [
+    {
+     "class_row": 21,
+     "names": [
+      "Cell, \"Perfect\""
+     ],
+     "map_index": 324,
+     "map_name": "The Cell Games Arena",
+     "zone": 14,
+     "area": 2,
+     "object_index": 1,
+     "spawn_def": "0x8408e4c",
+     "spawn_condition": 1,
+     "activation": "cutscene/script activated (condition 1)",
+     "position": [
+      444,
+      432
+     ],
+     "gfx_id": 30,
+     "stats": {
+      "hp": 6500,
+      "STR": 50,
+      "POW": 55,
+      "END": 60,
+      "melee_taken_mult": 128,
+      "energy_taken_mult": 128,
+      "class_exp": 0
+     },
+     "ai_state": 138,
+     "ai_states_used": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      138,
+      139,
+      140,
+      141,
+      142,
+      143,
+      144,
+      145,
+      146,
+      147
+     ],
+     "detection_radius_px": 88.0,
+     "range_check_radii_px": [
+      24.0,
+      36.0,
+      40.0,
+      56.0,
+      64.0,
+      72.0,
+      80.0,
+      88.0,
+      120.0
+     ],
+     "movement_speeds_px_per_frame": {
+      "AlignWithPlayer": [
+       0.6992
+      ],
+      "ChasePlayer": [
+       0.6992,
+       1.1992
+      ],
+      "BackAway": [
+       1.1992
+      ],
+      "BackAwayUntilBlocked": [
+       0.6992
+      ]
+     },
+     "attacks": [
+      "beam (attack id 10 power 64, scale 12x)",
+      "ki blast projectile (attack id 3, energy 1024; POW-based)",
+      "melee strike (attack id 2, melee, power 1024; STR-based)"
+     ],
+     "special_attacks": [
+      "beam"
+     ],
+     "energy_absorb": false,
+     "stun_on_attack_ids": [
+      9,
+      15
+     ],
+     "on_death": {
+      "sequence": "0x83e8f50",
+      "engine": "0x80106b3",
+      "effects": [
+       {
+        "op": "change_map",
+        "zone": 14,
+        "area": 3,
+        "map_index": 325,
+        "entry": 1,
+        "x": 368,
+        "y": 440
+       }
+      ],
+      "dialogue_excerpt": []
+     },
+     "next_phase": [],
+     "active_character_after": [],
+     "measured": {
+      "perfect_cell_21@30": {
+       "cls": 21,
+       "gfx": 30,
+       "start_dist": 30,
+       "frames": 900,
+       "hits": 11,
+       "damage": [
+        65,
+        66,
+        67,
+        70,
+        83
+       ],
+       "mean_interval": 89.0,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 1,
+         "lives": [
+          28
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        139,
+        140,
+        141,
+        143,
+        144,
+        145,
+        146,
+        147
+       ]
+      },
+      "perfect_cell_21@100": {
+       "cls": 21,
+       "gfx": 30,
+       "start_dist": 100,
+       "frames": 900,
+       "hits": 14,
+       "damage": [
+        48,
+        60,
+        79,
+        80,
+        81,
+        82,
+        83
+       ],
+       "mean_interval": 57.8,
+       "projectiles": {
+        "beam_80143a8": {
+         "count": 4,
+         "lives": [
+          124,
+          126,
+          114,
+          114
+         ],
+         "speeds": [
+          0.004,
+          0.008,
+          0.012,
+          0.016,
+          0.159,
+          0.171
+         ]
+        },
+        "enemy_ki_blast": {
+         "count": 5,
+         "lives": [
+          41,
+          41,
+          41,
+          41,
+          41
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        139,
+        140,
+        141,
+        142,
+        143
+       ]
+      }
+     },
+     "player_character": null
+    },
+    {
+     "class_row": 22,
+     "names": [
+      "Cell, \"Perfect\""
+     ],
+     "map_index": 325,
+     "map_name": "The Cell Games Arena",
+     "zone": 14,
+     "area": 3,
+     "object_index": 0,
+     "spawn_def": "0x8408f18",
+     "spawn_condition": 0,
+     "activation": "spawned at map load",
+     "position": [
+      500,
+      440
+     ],
+     "gfx_id": 30,
+     "stats": {
+      "hp": 6500,
+      "STR": 50,
+      "POW": 55,
+      "END": 60,
+      "melee_taken_mult": 128,
+      "energy_taken_mult": 128,
+      "class_exp": 0
+     },
+     "ai_state": 138,
+     "ai_states_used": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      138,
+      139,
+      140,
+      141,
+      142,
+      143,
+      144,
+      145,
+      146,
+      147
+     ],
+     "detection_radius_px": 88.0,
+     "range_check_radii_px": [
+      24.0,
+      36.0,
+      40.0,
+      56.0,
+      64.0,
+      72.0,
+      80.0,
+      88.0,
+      120.0
+     ],
+     "movement_speeds_px_per_frame": {
+      "AlignWithPlayer": [
+       0.6992
+      ],
+      "ChasePlayer": [
+       0.6992,
+       1.1992
+      ],
+      "BackAway": [
+       1.1992
+      ],
+      "BackAwayUntilBlocked": [
+       0.6992
+      ]
+     },
+     "attacks": [
+      "beam (attack id 10 power 64, scale 12x)",
+      "ki blast projectile (attack id 3, energy 1024; POW-based)",
+      "melee strike (attack id 2, melee, power 1024; STR-based)"
+     ],
+     "special_attacks": [
+      "beam"
+     ],
+     "energy_absorb": false,
+     "stun_on_attack_ids": [
+      9,
+      15
+     ],
+     "on_death": {
+      "sequence": "0x83e93e8",
+      "engine": "0x80106b3",
+      "effects": [
+       {
+        "op": "broadcast_msg_0x10"
+       },
+       {
+        "op": "change_map",
+        "zone": 14,
+        "area": 3,
+        "map_index": 325,
+        "entry": 1,
+        "x": 368,
+        "y": 440
+       },
+       {
+        "op": "spawn_map_object",
+        "map_index": 325,
+        "object_index": 5,
+        "class_row": 23,
+        "kind": "enemy"
+       },
+       {
+        "op": "set_active_character",
+        "index": 0
+       },
+       {
+        "op": "set_flag",
+        "flag": 192
+       }
+      ],
+      "dialogue_excerpt": [
+       "VEGETA: You coward!!!",
+       "TRUNKS: Don't do it!  Don't give up!",
+       "#You can do it, right son?",
+       "Me?  Fight Cell?",
+       "Think about what you're saying Goku.\u000bIf Gohan fights Cell he's going to die!",
+       "Okay.\u000bI'll do it."
+      ]
+     },
+     "next_phase": [
+      {
+       "class_row": 23,
+       "map_index": 325,
+       "object_index": 5,
+       "how": "spawn_map_object"
+      }
+     ],
+     "active_character_after": [
+      "Gohan"
+     ],
+     "measured": {},
+     "player_character": null
+    },
+    {
+     "class_row": 23,
+     "names": [
+      "Cell, \"Perfect\""
+     ],
+     "map_index": 325,
+     "map_name": "The Cell Games Arena",
+     "zone": 14,
+     "area": 3,
+     "object_index": 5,
+     "spawn_def": "0x8408fc8",
+     "spawn_condition": 1,
+     "activation": "cutscene/script activated (condition 1)",
+     "position": [
+      500,
+      440
+     ],
+     "gfx_id": 30,
+     "stats": {
+      "hp": 6500,
+      "STR": 50,
+      "POW": 55,
+      "END": 60,
+      "melee_taken_mult": 128,
+      "energy_taken_mult": 128,
+      "class_exp": 0
+     },
+     "ai_state": 138,
+     "ai_states_used": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      138,
+      139,
+      140,
+      141,
+      142,
+      143,
+      144,
+      145,
+      146,
+      147
+     ],
+     "detection_radius_px": 88.0,
+     "range_check_radii_px": [
+      24.0,
+      36.0,
+      40.0,
+      56.0,
+      64.0,
+      72.0,
+      80.0,
+      88.0,
+      120.0
+     ],
+     "movement_speeds_px_per_frame": {
+      "AlignWithPlayer": [
+       0.6992
+      ],
+      "ChasePlayer": [
+       0.6992,
+       1.1992
+      ],
+      "BackAway": [
+       1.1992
+      ],
+      "BackAwayUntilBlocked": [
+       0.6992
+      ]
+     },
+     "attacks": [
+      "beam (attack id 10 power 64, scale 12x)",
+      "ki blast projectile (attack id 3, energy 1024; POW-based)",
+      "melee strike (attack id 2, melee, power 1024; STR-based)"
+     ],
+     "special_attacks": [
+      "beam"
+     ],
+     "energy_absorb": false,
+     "stun_on_attack_ids": [
+      9,
+      15
+     ],
+     "on_death": {
+      "sequence": "0x83e9d4c",
+      "engine": "0x80106b3",
+      "effects": [
+       {
+        "op": "change_map",
+        "zone": 14,
+        "area": 3,
+        "map_index": 325,
+        "entry": 1,
+        "x": 400,
+        "y": 440
+       },
+       {
+        "op": "broadcast_msg_0x10"
+       },
+       {
+        "op": "set_flag",
+        "flag": 194
+       },
+       {
+        "op": "broadcast_msg_0x10"
+       },
+       {
+        "op": "spawn_map_object",
+        "map_index": 325,
+        "object_index": 8,
+        "class_row": 26,
+        "kind": "enemy"
+       },
+       {
+        "op": "set_active_character",
+        "index": 1
+       }
+      ],
+      "dialogue_excerpt": [
+       "PICCOLO: No!  I can't take it!",
+       "You can just stand there if you want, but I'm helping Gohan!",
+       "ANDROID 16: Let me handle this.",
+       "What is he doing?",
+       "!Does anyone else want to be a martyr? ",
+       "What the heck are those things?"
+      ]
+     },
+     "next_phase": [
+      {
+       "class_row": 26,
+       "map_index": 325,
+       "object_index": 8,
+       "how": "spawn_map_object"
+      }
+     ],
+     "active_character_after": [
+      "Piccolo"
+     ],
+     "measured": {},
+     "player_character": "Gohan"
+    },
+    {
+     "class_row": 26,
+     "names": [
+      "Cell Junior"
+     ],
+     "map_index": 325,
+     "map_name": "The Cell Games Arena",
+     "zone": 14,
+     "area": 3,
+     "object_index": 8,
+     "spawn_def": "0x8409038",
+     "spawn_condition": 1,
+     "activation": "cutscene/script activated (condition 1)",
+     "position": [
+      432,
+      376
+     ],
+     "gfx_id": 31,
+     "stats": {
+      "hp": 4990,
+      "STR": 46,
+      "POW": 50,
+      "END": 46,
+      "melee_taken_mult": 128,
+      "energy_taken_mult": 128,
+      "class_exp": 0
+     },
+     "ai_state": 21,
+     "ai_states_used": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28
+     ],
+     "detection_radius_px": 88.0,
+     "range_check_radii_px": [
+      24.0,
+      36.0,
+      40.0,
+      56.0,
+      64.0,
+      72.0,
+      80.0,
+      88.0,
+      120.0
+     ],
+     "movement_speeds_px_per_frame": {
+      "AlignWithPlayer": [
+       0.5
+      ],
+      "ChasePlayer": [
+       0.5,
+       1.0,
+       1.1992
+      ],
+      "BackAway": [
+       1.0
+      ],
+      "BackAwayUntilBlocked": [
+       0.5
+      ]
+     },
+     "attacks": [
+      "ki blast projectile (attack id 3, energy 1024; POW-based)",
+      "melee strike (attack id 2, melee, power 1024; STR-based)"
+     ],
+     "special_attacks": [],
+     "energy_absorb": false,
+     "stun_on_attack_ids": [
+      9,
+      15
+     ],
+     "on_death": {
+      "sequence": "0x83e9e24",
+      "engine": "0x80106b3",
+      "effects": [
+       {
+        "op": "spawn_map_object",
+        "map_index": 325,
+        "object_index": 9,
+        "class_row": 26,
+        "kind": "enemy"
+       },
+       {
+        "op": "give_exp",
+        "amount": 50000
+       },
+       {
+        "op": "set_active_character",
+        "index": 2
+       },
+       {
+        "op": "broadcast_msg_0x10"
+       }
+      ],
+      "dialogue_excerpt": []
+     },
+     "next_phase": [
+      {
+       "class_row": 26,
+       "map_index": 325,
+       "object_index": 9,
+       "how": "spawn_map_object"
+      }
+     ],
+     "active_character_after": [
+      "Vegeta"
+     ],
+     "measured": {
+      "cell_jr@30": {
+       "cls": 26,
+       "gfx": 31,
+       "start_dist": 30,
+       "frames": 900,
+       "hits": 11,
+       "damage": [
+        57,
+        65,
+        66,
+        67,
+        68,
+        70,
+        71
+       ],
+       "mean_interval": 84.1,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 10,
+         "lives": [
+          34,
+          37,
+          45,
+          47,
+          47,
+          47,
+          47,
+          55,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28
+       ]
+      },
+      "cell_jr@100": {
+       "cls": 26,
+       "gfx": 31,
+       "start_dist": 100,
+       "frames": 900,
+       "hits": 14,
+       "damage": [
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71
+       ],
+       "mean_interval": 64.2,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 14,
+         "lives": [
+          41,
+          48,
+          47,
+          55,
+          48,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24
+       ]
+      }
+     },
+     "player_character": "Piccolo"
+    },
+    {
+     "class_row": 26,
+     "names": [
+      "Cell Junior"
+     ],
+     "map_index": 325,
+     "map_name": "The Cell Games Arena",
+     "zone": 14,
+     "area": 3,
+     "object_index": 9,
+     "spawn_def": "0x8409068",
+     "spawn_condition": 1,
+     "activation": "cutscene/script activated (condition 1)",
+     "position": [
+      432,
+      376
+     ],
+     "gfx_id": 31,
+     "stats": {
+      "hp": 4990,
+      "STR": 46,
+      "POW": 50,
+      "END": 46,
+      "melee_taken_mult": 128,
+      "energy_taken_mult": 128,
+      "class_exp": 0
+     },
+     "ai_state": 21,
+     "ai_states_used": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28
+     ],
+     "detection_radius_px": 88.0,
+     "range_check_radii_px": [
+      24.0,
+      36.0,
+      40.0,
+      56.0,
+      64.0,
+      72.0,
+      80.0,
+      88.0,
+      120.0
+     ],
+     "movement_speeds_px_per_frame": {
+      "AlignWithPlayer": [
+       0.5
+      ],
+      "ChasePlayer": [
+       0.5,
+       1.0,
+       1.1992
+      ],
+      "BackAway": [
+       1.0
+      ],
+      "BackAwayUntilBlocked": [
+       0.5
+      ]
+     },
+     "attacks": [
+      "ki blast projectile (attack id 3, energy 1024; POW-based)",
+      "melee strike (attack id 2, melee, power 1024; STR-based)"
+     ],
+     "special_attacks": [],
+     "energy_absorb": false,
+     "stun_on_attack_ids": [
+      9,
+      15
+     ],
+     "on_death": {
+      "sequence": "0x83e9e84",
+      "engine": "0x80106b3",
+      "effects": [
+       {
+        "op": "spawn_map_object",
+        "map_index": 325,
+        "object_index": 10,
+        "class_row": 26,
+        "kind": "enemy"
+       },
+       {
+        "op": "give_exp",
+        "amount": 50000
+       },
+       {
+        "op": "set_active_character",
+        "index": 3
+       },
+       {
+        "op": "broadcast_msg_0x10"
+       }
+      ],
+      "dialogue_excerpt": []
+     },
+     "next_phase": [
+      {
+       "class_row": 26,
+       "map_index": 325,
+       "object_index": 10,
+       "how": "spawn_map_object"
+      }
+     ],
+     "active_character_after": [
+      "Trunks"
+     ],
+     "measured": {
+      "cell_jr@30": {
+       "cls": 26,
+       "gfx": 31,
+       "start_dist": 30,
+       "frames": 900,
+       "hits": 11,
+       "damage": [
+        57,
+        65,
+        66,
+        67,
+        68,
+        70,
+        71
+       ],
+       "mean_interval": 84.1,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 10,
+         "lives": [
+          34,
+          37,
+          45,
+          47,
+          47,
+          47,
+          47,
+          55,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28
+       ]
+      },
+      "cell_jr@100": {
+       "cls": 26,
+       "gfx": 31,
+       "start_dist": 100,
+       "frames": 900,
+       "hits": 14,
+       "damage": [
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71
+       ],
+       "mean_interval": 64.2,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 14,
+         "lives": [
+          41,
+          48,
+          47,
+          55,
+          48,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24
+       ]
+      }
+     },
+     "player_character": "Vegeta"
+    },
+    {
+     "class_row": 26,
+     "names": [
+      "Cell Junior"
+     ],
+     "map_index": 325,
+     "map_name": "The Cell Games Arena",
+     "zone": 14,
+     "area": 3,
+     "object_index": 10,
+     "spawn_def": "0x8409098",
+     "spawn_condition": 1,
+     "activation": "cutscene/script activated (condition 1)",
+     "position": [
+      432,
+      376
+     ],
+     "gfx_id": 31,
+     "stats": {
+      "hp": 4990,
+      "STR": 46,
+      "POW": 50,
+      "END": 46,
+      "melee_taken_mult": 128,
+      "energy_taken_mult": 128,
+      "class_exp": 0
+     },
+     "ai_state": 21,
+     "ai_states_used": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28
+     ],
+     "detection_radius_px": 88.0,
+     "range_check_radii_px": [
+      24.0,
+      36.0,
+      40.0,
+      56.0,
+      64.0,
+      72.0,
+      80.0,
+      88.0,
+      120.0
+     ],
+     "movement_speeds_px_per_frame": {
+      "AlignWithPlayer": [
+       0.5
+      ],
+      "ChasePlayer": [
+       0.5,
+       1.0,
+       1.1992
+      ],
+      "BackAway": [
+       1.0
+      ],
+      "BackAwayUntilBlocked": [
+       0.5
+      ]
+     },
+     "attacks": [
+      "ki blast projectile (attack id 3, energy 1024; POW-based)",
+      "melee strike (attack id 2, melee, power 1024; STR-based)"
+     ],
+     "special_attacks": [],
+     "energy_absorb": false,
+     "stun_on_attack_ids": [
+      9,
+      15
+     ],
+     "on_death": {
+      "sequence": "0x83ea400",
+      "engine": "0x80106b3",
+      "effects": [
+       {
+        "op": "change_map",
+        "zone": 14,
+        "area": 3,
+        "map_index": 325,
+        "entry": 1,
+        "x": 576,
+        "y": 376
+       },
+       {
+        "op": "spawn_map_object",
+        "map_index": 325,
+        "object_index": 11,
+        "class_row": 24,
+        "kind": "enemy"
+       },
+       {
+        "op": "give_exp",
+        "amount": 50000
+       },
+       {
+        "op": "set_active_character",
+        "index": 0
+       },
+       {
+        "op": "broadcast_msg_0x10"
+       },
+       {
+        "op": "refill_player_hp"
+       },
+       {
+        "op": "refill_player_ep"
+       }
+      ],
+      "dialogue_excerpt": [
+       "ANDROID 16: You!",
+       "HERCULE: Who said that?",
+       "Please help me.\u000bTake me over to the boy!",
+       "You must be nuts!\u000bCell is out there!",
+       "Please!  It is for the good of the Earth!",
+       "Gohan."
+      ]
+     },
+     "next_phase": [
+      {
+       "class_row": 24,
+       "map_index": 325,
+       "object_index": 11,
+       "how": "spawn_map_object"
+      }
+     ],
+     "active_character_after": [
+      "Gohan"
+     ],
+     "measured": {
+      "cell_jr@30": {
+       "cls": 26,
+       "gfx": 31,
+       "start_dist": 30,
+       "frames": 900,
+       "hits": 11,
+       "damage": [
+        57,
+        65,
+        66,
+        67,
+        68,
+        70,
+        71
+       ],
+       "mean_interval": 84.1,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 10,
+         "lives": [
+          34,
+          37,
+          45,
+          47,
+          47,
+          47,
+          47,
+          55,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28
+       ]
+      },
+      "cell_jr@100": {
+       "cls": 26,
+       "gfx": 31,
+       "start_dist": 100,
+       "frames": 900,
+       "hits": 14,
+       "damage": [
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71
+       ],
+       "mean_interval": 64.2,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 14,
+         "lives": [
+          41,
+          48,
+          47,
+          55,
+          48,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47,
+          47
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        22,
+        23,
+        24
+       ]
+      }
+     },
+     "player_character": "Trunks"
+    },
+    {
+     "class_row": 24,
+     "names": [
+      "Cell, \"Perfect\""
+     ],
+     "map_index": 325,
+     "map_name": "The Cell Games Arena",
+     "zone": 14,
+     "area": 3,
+     "object_index": 11,
+     "spawn_def": "0x84090c8",
+     "spawn_condition": 1,
+     "activation": "cutscene/script activated (condition 1)",
+     "position": [
+      512,
+      472
+     ],
+     "gfx_id": 30,
+     "stats": {
+      "hp": 6500,
+      "STR": 50,
+      "POW": 55,
+      "END": 60,
+      "melee_taken_mult": 128,
+      "energy_taken_mult": 128,
+      "class_exp": 0
+     },
+     "ai_state": 138,
+     "ai_states_used": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      138,
+      139,
+      140,
+      141,
+      142,
+      143,
+      144,
+      145,
+      146,
+      147
+     ],
+     "detection_radius_px": 88.0,
+     "range_check_radii_px": [
+      24.0,
+      36.0,
+      40.0,
+      56.0,
+      64.0,
+      72.0,
+      80.0,
+      88.0,
+      120.0
+     ],
+     "movement_speeds_px_per_frame": {
+      "AlignWithPlayer": [
+       0.6992
+      ],
+      "ChasePlayer": [
+       0.6992,
+       1.1992
+      ],
+      "BackAway": [
+       1.1992
+      ],
+      "BackAwayUntilBlocked": [
+       0.6992
+      ]
+     },
+     "attacks": [
+      "beam (attack id 10 power 64, scale 12x)",
+      "ki blast projectile (attack id 3, energy 1024; POW-based)",
+      "melee strike (attack id 2, melee, power 1024; STR-based)"
+     ],
+     "special_attacks": [
+      "beam"
+     ],
+     "energy_absorb": false,
+     "stun_on_attack_ids": [
+      9,
+      15
+     ],
+     "on_death": {
+      "sequence": "0x83eb704",
+      "engine": "0x80106b3",
+      "effects": [
+       {
+        "op": "change_map",
+        "zone": 14,
+        "area": 3,
+        "map_index": 325,
+        "entry": 1,
+        "x": 432,
+        "y": 416
+       },
+       {
+        "op": "broadcast_msg_0x10"
+       },
+       {
+        "op": "spawn_map_object",
+        "map_index": 325,
+        "object_index": 12,
+        "class_row": 25,
+        "kind": "enemy"
+       }
+      ],
+      "dialogue_excerpt": [
+       "CELL: You're not a boy!  You're a monster!",
+       "PICCOLO: He spit out Android 18!",
+       "I'll get you for this!!!!",
+       "TIEN: What do we do?\u000bSomeone come up with a plan!",
+       "There's nothing we can do!\u000bI'm afraid this is it.\u000bCell has beaten us.",
+       "GOKU: Listen... I can only think of one way to save the Earth now."
+      ]
+     },
+     "next_phase": [
+      {
+       "class_row": 25,
+       "map_index": 325,
+       "object_index": 12,
+       "how": "spawn_map_object"
+      }
+     ],
+     "active_character_after": [],
+     "measured": {},
+     "player_character": "Gohan"
+    },
+    {
+     "class_row": 25,
+     "names": [
+      "Cell, \"Perfect\""
+     ],
+     "map_index": 325,
+     "map_name": "The Cell Games Arena",
+     "zone": 14,
+     "area": 3,
+     "object_index": 12,
+     "spawn_def": "0x84090f8",
+     "spawn_condition": 1,
+     "activation": "cutscene/script activated (condition 1)",
+     "position": [
+      512,
+      472
+     ],
+     "gfx_id": 30,
+     "stats": {
+      "hp": 8230,
+      "STR": 60,
+      "POW": 59,
+      "END": 65,
+      "melee_taken_mult": 128,
+      "energy_taken_mult": 128,
+      "class_exp": 0
+     },
+     "ai_state": 138,
+     "ai_states_used": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      138,
+      139,
+      140,
+      141,
+      142,
+      143,
+      144,
+      145,
+      146,
+      147
+     ],
+     "detection_radius_px": 88.0,
+     "range_check_radii_px": [
+      24.0,
+      36.0,
+      40.0,
+      56.0,
+      64.0,
+      72.0,
+      80.0,
+      88.0,
+      120.0
+     ],
+     "movement_speeds_px_per_frame": {
+      "AlignWithPlayer": [
+       0.6992
+      ],
+      "ChasePlayer": [
+       0.6992,
+       1.1992
+      ],
+      "BackAway": [
+       1.1992
+      ],
+      "BackAwayUntilBlocked": [
+       0.6992
+      ]
+     },
+     "attacks": [
+      "beam (attack id 10 power 64, scale 12x)",
+      "ki blast projectile (attack id 3, energy 1024; POW-based)",
+      "melee strike (attack id 2, melee, power 1024; STR-based)"
+     ],
+     "special_attacks": [
+      "beam"
+     ],
+     "energy_absorb": false,
+     "stun_on_attack_ids": [
+      9,
+      15
+     ],
+     "on_death": {
+      "sequence": "0x83ec758",
+      "engine": "0x80106b3",
+      "effects": [
+       {
+        "op": "change_map",
+        "zone": 14,
+        "area": 4,
+        "map_index": 326,
+        "entry": 1,
+        "x": 493,
+        "y": 392
+       },
+       {
+        "op": "broadcast_msg_0x10"
+       },
+       {
+        "op": "set_flag",
+        "flag": 195
+       },
+       {
+        "op": "change_map",
+        "zone": 6,
+        "area": 99,
+        "map_index": 176,
+        "entry": 1,
+        "x": 1832,
+        "y": 1088
+       }
+      ],
+      "dialogue_excerpt": [
+       "GOKU: Dig deeper Gohan!",
+       "CELL: These are your last minutes boy!  Make them count!",
+       "Would you stop interfering?!",
+       "Gohan raise it higher!  You can win this one!",
+       "They just keep lining up to die!",
+       "VEGETA: ARGHHH!!!"
+      ]
+     },
+     "next_phase": [],
+     "active_character_after": [],
+     "measured": {
+      "perfect_cell_25@30": {
+       "cls": 25,
+       "gfx": 30,
+       "start_dist": 30,
+       "frames": 900,
+       "hits": 11,
+       "damage": [
+        89,
+        90,
+        91,
+        92,
+        93,
+        94,
+        97
+       ],
+       "mean_interval": 89.0,
+       "projectiles": {
+        "enemy_ki_blast": {
+         "count": 1,
+         "lives": [
+          28
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        139,
+        140,
+        141,
+        143,
+        144,
+        145,
+        146,
+        147
+       ]
+      },
+      "perfect_cell_25@100": {
+       "cls": 25,
+       "gfx": 30,
+       "start_dist": 100,
+       "frames": 900,
+       "hits": 14,
+       "damage": [
+        60,
+        90,
+        91,
+        93,
+        94
+       ],
+       "mean_interval": 57.8,
+       "projectiles": {
+        "beam_80143a8": {
+         "count": 4,
+         "lives": [
+          124,
+          126,
+          114,
+          114
+         ],
+         "speeds": [
+          0.004,
+          0.008,
+          0.012,
+          0.016,
+          0.159,
+          0.171
+         ]
+        },
+        "enemy_ki_blast": {
+         "count": 5,
+         "lives": [
+          41,
+          41,
+          41,
+          41,
+          41
+         ],
+         "speeds": [
+          3.0
+         ]
+        }
+       },
+       "states_seen": [
+        139,
+        140,
+        141,
+        142,
+        143
+       ]
+      }
+     },
+     "player_character": "unchanged"
+    }
+   ]
+  }
+ ]
+}

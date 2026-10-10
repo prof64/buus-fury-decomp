@@ -1,0 +1,6 @@
+{
+  "$extends": "effects/fx_0871370c/effect.json",
+  "id": "mod_dark_orb",
+  "name": "Dark orb (new-boss mod)",
+  "name_confidence": "mod"
+}

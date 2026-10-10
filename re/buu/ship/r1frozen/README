@@ -1,0 +1,2 @@
+ship_driver.py and nav.py exactly as at commit db3928d (run 1's ship recording), for run 2 (../ship_route2.py).
+ship_driver.py's ROOT line is adjusted for the deeper folder.

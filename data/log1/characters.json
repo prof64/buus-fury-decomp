@@ -1,0 +1,423 @@
+{
+ "source": "LoG1 (USA); re/log1/extract_characters.py",
+ "characters": [
+  {
+   "name": "Goku",
+   "team": 1,
+   "char_struct": "0x02013224 (first 0x278-byte char slot)",
+   "controller": "0x030007AC",
+   "base_stats": {
+    "level": 1,
+    "max_hp": 105,
+    "max_ki": 100,
+    "max_flight_energy": 6,
+    "defense": 250,
+    "exp": 0
+   },
+   "defense": {
+    "value": 250,
+    "constant": true,
+    "source": "init_char 0x08006E62 (movs r0,#0xFA; str r0,[r4,#0x60])"
+   },
+   "growth": "per-level absolute values from levels.json (no formula; table lookup)",
+   "growth_table": [
+    {
+     "level": 1,
+     "exp": 0,
+     "max_hp": 105,
+     "max_ki": 100,
+     "max_flight_energy": 6
+    },
+    {
+     "level": 2,
+     "exp": 350,
+     "max_hp": 200,
+     "max_ki": 150,
+     "max_flight_energy": 7
+    },
+    {
+     "level": 3,
+     "exp": 500,
+     "max_hp": 325,
+     "max_ki": 200,
+     "max_flight_energy": 8
+    },
+    {
+     "level": 4,
+     "exp": 900,
+     "max_hp": 435,
+     "max_ki": 300,
+     "max_flight_energy": 9
+    },
+    {
+     "level": 5,
+     "exp": 1600,
+     "max_hp": 600,
+     "max_ki": 350,
+     "max_flight_energy": 10
+    },
+    {
+     "level": 6,
+     "exp": 3200,
+     "max_hp": 900,
+     "max_ki": 1000,
+     "max_flight_energy": 11
+    },
+    {
+     "level": 7,
+     "exp": 6400,
+     "max_hp": 1100,
+     "max_ki": 1000,
+     "max_flight_energy": 12
+    },
+    {
+     "level": 8,
+     "exp": 12800,
+     "max_hp": 1300,
+     "max_ki": 1000,
+     "max_flight_energy": 13
+    },
+    {
+     "level": 9,
+     "exp": 25600,
+     "max_hp": 1500,
+     "max_ki": 2000,
+     "max_flight_energy": 14
+    },
+    {
+     "level": 10,
+     "exp": 30400,
+     "max_hp": 1700,
+     "max_ki": 5000,
+     "max_flight_energy": 15
+    },
+    {
+     "level": 11,
+     "exp": 44000,
+     "max_hp": 2000,
+     "max_ki": 6000,
+     "max_flight_energy": 18
+    },
+    {
+     "level": 12,
+     "exp": 100000,
+     "max_hp": 3000,
+     "max_ki": 7000,
+     "max_flight_energy": 21
+    },
+    {
+     "level": 13,
+     "exp": 140200,
+     "max_hp": 4000,
+     "max_ki": 8000,
+     "max_flight_energy": 25
+    },
+    {
+     "level": 14,
+     "exp": 180800,
+     "max_hp": 5000,
+     "max_ki": 9000,
+     "max_flight_energy": 30
+    },
+    {
+     "level": 15,
+     "exp": 257680,
+     "max_hp": 6000,
+     "max_ki": 10000,
+     "max_flight_energy": 33
+    },
+    {
+     "level": 16,
+     "exp": 355360,
+     "max_hp": 7000,
+     "max_ki": 18000,
+     "max_flight_energy": 35
+    },
+    {
+     "level": 17,
+     "exp": 410720,
+     "max_hp": 8000,
+     "max_ki": 25000,
+     "max_flight_energy": 40
+    },
+    {
+     "level": 18,
+     "exp": 500000,
+     "max_hp": 9000,
+     "max_ki": 45000,
+     "max_flight_energy": 45
+    },
+    {
+     "level": 19,
+     "exp": 630000,
+     "max_hp": 10000,
+     "max_ki": 60000,
+     "max_flight_energy": 50
+    },
+    {
+     "level": 20,
+     "exp": 800000,
+     "max_hp": 20000,
+     "max_ki": 65000,
+     "max_flight_energy": 55
+    },
+    {
+     "level": 21,
+     "exp": 900000,
+     "max_hp": 40000,
+     "max_ki": 75000,
+     "max_flight_energy": 60
+    },
+    {
+     "level": 22,
+     "exp": 1000000,
+     "max_hp": 50000,
+     "max_ki": 95000,
+     "max_flight_energy": 70
+    },
+    {
+     "level": 23,
+     "exp": 2200000,
+     "max_hp": 80000,
+     "max_ki": 110000,
+     "max_flight_energy": 80
+    },
+    {
+     "level": 24,
+     "exp": 3100000,
+     "max_hp": 100000,
+     "max_ki": 120000,
+     "max_flight_energy": 90
+    },
+    {
+     "level": 25,
+     "exp": 3600000,
+     "max_hp": 150000,
+     "max_ki": 150000,
+     "max_flight_energy": 99
+    }
+   ],
+   "max_level": 25,
+   "regen": {
+    "ki": "+(maxKi >> 6) every frame where frame_counter & 15 == 0, not while flying (0x08008018)",
+    "hp": "none (only items / scripts)",
+    "flight_energy": "none (feather pickups only)"
+   },
+   "movement": {
+    "walk_px_per_frame": 1.0,
+    "walk_raw": "controller+6 = 16 (1/16 px units) x multiplier 1 (0x08002CE0)",
+    "fly_px_per_frame": 2.0,
+    "fly_raw": "multiplier 2 in flight state 14 (0x08002AC6)",
+    "diagonal": "NO diagonal movement: one direction per frame, priority UP > DOWN > LEFT > RIGHT (if/else chain 0x08002CE0..0x08002DFA; VERIFIED test_diag.py)",
+    "position_units": "1/16 px at controller+0x14/+0x16"
+   },
+   "collision_footprint": {
+    "w": 16,
+    "h": 8,
+    "note": "feet box from entity position"
+   },
+   "hurtbox": {
+    "down": {
+     "x0": 2,
+     "y0": -22,
+     "x1": 14,
+     "y1": 6
+    },
+    "up": {
+     "x0": 2,
+     "y0": -22,
+     "x1": 14,
+     "y1": 6
+    },
+    "left": {
+     "x0": 2,
+     "y0": -22,
+     "x1": 14,
+     "y1": 6
+    },
+    "right": {
+     "x0": 2,
+     "y0": -22,
+     "x1": 14,
+     "y1": 6
+    }
+   },
+   "invulnerability_after_hit": "none for the player (state-6 handler only flashes and resets the player to Standing)",
+   "damage_taken_cap": "maxHP // 3 + 1 per enemy hit (0x03000C1C; set by 0x08006D70 on every stat refresh)",
+   "moves": [
+    "melee",
+    "Ki Blast (id 0, always)",
+    "Kame Hame Ha (id 1, learned flag bit1 @0x0300004D)",
+    "Solar Flare (id 2, learned flag bit2 @0x0300004D)",
+    "Flight (R)"
+   ],
+   "controls": {
+    "A": "punch / talk / pick up (msg 0 broadcast)",
+    "B": "fire/charge selected ki move",
+    "L": "cycle selected ki move among learned ones (0x08003524)",
+    "R": "take off / land (flight)",
+    "START": "pause menu",
+    "SELECT": "read only by an overlay entity (0x08003DBE); no combat effect found"
+   },
+   "cheats": {
+    "invincibility": {
+     "input": "UP, DOWN, LEFT, RIGHT, B, A during the Shenron intro scene",
+     "code": "0x080048FA (sequence u16[6] at 0x08011462)",
+     "effect": "0x03000C18 = 1: player HP never decreases",
+     "verified": "VERIFIED (test_cheat.py)"
+    }
+   },
+   "sprites": {
+    "goku": {
+     "sprite_id": 52,
+     "def_addr": "0x085C1884",
+     "footprint": {
+      "w": 16,
+      "h": 8
+     },
+     "hurtbox": {
+      "down": {
+       "x0": 2,
+       "y0": -22,
+       "x1": 14,
+       "y1": 6
+      },
+      "up": {
+       "x0": 2,
+       "y0": -22,
+       "x1": 14,
+       "y1": 6
+      },
+      "left": {
+       "x0": 2,
+       "y0": -22,
+       "x1": 14,
+       "y1": 6
+      },
+      "right": {
+       "x0": 2,
+       "y0": -22,
+       "x1": 14,
+       "y1": 6
+      }
+     },
+     "palette_ptr": "0x0853AD74",
+     "anim_table": "0x08014660",
+     "anims_present": [
+      "Standing",
+      "Walking",
+      "Death",
+      "Melee1",
+      "Melee2",
+      "Ki",
+      "Excited",
+      "Sad",
+      "SSaiyaJin",
+      "Raditz",
+      "Bubbles",
+      "Flying",
+      "Bored",
+      "Mallet"
+     ]
+    },
+    "ssgoku": {
+     "sprite_id": 98,
+     "def_addr": "0x085C1F64",
+     "footprint": {
+      "w": 16,
+      "h": 8
+     },
+     "hurtbox": {
+      "down": {
+       "x0": 2,
+       "y0": -22,
+       "x1": 14,
+       "y1": 6
+      },
+      "up": {
+       "x0": 2,
+       "y0": -22,
+       "x1": 14,
+       "y1": 6
+      },
+      "left": {
+       "x0": 2,
+       "y0": -22,
+       "x1": 14,
+       "y1": 6
+      },
+      "right": {
+       "x0": 2,
+       "y0": -22,
+       "x1": 14,
+       "y1": 6
+      }
+     },
+     "palette_ptr": "0x0853A9F4",
+     "anim_table": "0x08012270",
+     "anims_present": [
+      "Standing",
+      "Walking",
+      "Death",
+      "Melee1",
+      "Melee2",
+      "Ki",
+      "Excited",
+      "Sad",
+      "Raditz",
+      "Bubbles",
+      "Flying",
+      "Bored",
+      "Mallet"
+     ]
+    },
+    "gokumallet": {
+     "sprite_id": 53,
+     "def_addr": "0x085C18B0",
+     "footprint": {
+      "w": 16,
+      "h": 8
+     },
+     "hurtbox": {
+      "down": {
+       "x0": -6,
+       "y0": -38,
+       "x1": 22,
+       "y1": 22
+      },
+      "up": {
+       "x0": -6,
+       "y0": -38,
+       "x1": 22,
+       "y1": 22
+      },
+      "left": {
+       "x0": -6,
+       "y0": -38,
+       "x1": 22,
+       "y1": 22
+      },
+      "right": {
+       "x0": -6,
+       "y0": -38,
+       "x1": 22,
+       "y1": 22
+      }
+     },
+     "palette_ptr": "0x0853B334",
+     "anim_table": "0x08018420",
+     "anims_present": [
+      "Standing",
+      "Walking",
+      "Melee1",
+      "Melee2",
+      "Flying"
+     ]
+    }
+   },
+   "notes": [
+    "Super Saiyan Goku (ssgoku) and the mallet Goku (gokumallet, King Kai/Gregory minigame) are sprite variants selected by scripts (controller+4); no separate stat table was found -> INFERRED same stats."
+   ]
+  }
+ ]
+}

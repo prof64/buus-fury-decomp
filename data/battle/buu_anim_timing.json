@@ -1,0 +1,447 @@
+{
+ "source": "tools/battle/gen_buu_anim_timing.py (ROM tables 0x08072670 / 0x0807273C + the IWRAM state objects)",
+ "setanim": [
+  {
+   "id": 0,
+   "name": "idle",
+   "raw": 1,
+   "state": "0x03002B44",
+   "vtable": "0x0804C790",
+   "tick": "idle",
+   "shift": 3,
+   "end": "-"
+  },
+  {
+   "id": 1,
+   "name": "walk",
+   "raw": 2,
+   "state": "0x03002B4C",
+   "vtable": "0x0804C3A8",
+   "tick": "loop",
+   "shift": 3,
+   "end": "-"
+  },
+  {
+   "id": 2,
+   "name": "dash",
+   "raw": 3,
+   "state": "0x03002B3C",
+   "vtable": "0x0804BEF0",
+   "tick": "loop+dash sound",
+   "shift": 3,
+   "end": "-"
+  },
+  {
+   "id": 3,
+   "name": "kiblast",
+   "raw": 4,
+   "state": "0x03001B10",
+   "vtable": "0x0804D784",
+   "tick": "once",
+   "shift": 3,
+   "end": "idle"
+  },
+  {
+   "id": 4,
+   "name": "attack1",
+   "raw": 5,
+   "state": "0x03001B50",
+   "vtable": "0x0804C35C",
+   "tick": "once",
+   "shift": 2,
+   "end": "idle"
+  },
+  {
+   "id": 5,
+   "name": "attack2",
+   "raw": 6,
+   "state": "0x03001B50",
+   "vtable": "0x0804C35C",
+   "tick": "once",
+   "shift": 2,
+   "end": "idle"
+  },
+  {
+   "id": 6,
+   "name": "attack3",
+   "raw": 7,
+   "state": "0x03001B50",
+   "vtable": "0x0804C35C",
+   "tick": "once",
+   "shift": 2,
+   "end": "idle"
+  },
+  {
+   "id": 7,
+   "name": "guard",
+   "raw": 8,
+   "state": "0x03001B04",
+   "vtable": "0x0804A188",
+   "tick": "hold",
+   "shift": null,
+   "end": "-"
+  },
+  {
+   "id": 8,
+   "name": "bored",
+   "raw": 9,
+   "state": "0x03002B38",
+   "vtable": "0x0804C384",
+   "tick": "bored",
+   "shift": null,
+   "end": "-"
+  },
+  {
+   "id": 9,
+   "name": "hurt",
+   "raw": 10,
+   "state": "0x03001B10",
+   "vtable": "0x0804D784",
+   "tick": "once",
+   "shift": 3,
+   "end": "idle"
+  },
+  {
+   "id": 10,
+   "name": "special_11",
+   "raw": 11,
+   "state": "0x03001B58",
+   "vtable": "0x0804A1D0",
+   "tick": "loop",
+   "shift": 3,
+   "end": "-"
+  },
+  {
+   "id": 11,
+   "name": "special_12",
+   "raw": 12,
+   "state": "0x03001B58",
+   "vtable": "0x0804A1D0",
+   "tick": "loop",
+   "shift": 3,
+   "end": "-"
+  },
+  {
+   "id": 12,
+   "name": "special_13",
+   "raw": 13,
+   "state": "0x03001B18",
+   "vtable": "0x0804D784",
+   "tick": "once",
+   "shift": 4,
+   "end": "idle"
+  },
+  {
+   "id": 13,
+   "name": "special_14",
+   "raw": 14,
+   "state": "0x03001B58",
+   "vtable": "0x0804A1D0",
+   "tick": "loop",
+   "shift": 3,
+   "end": "-"
+  },
+  {
+   "id": 14,
+   "name": "special_15",
+   "raw": 15,
+   "state": "0x03001B58",
+   "vtable": "0x0804A1D0",
+   "tick": "loop",
+   "shift": 3,
+   "end": "-"
+  },
+  {
+   "id": 15,
+   "name": "special_16",
+   "raw": 16,
+   "state": "0x03001B48",
+   "vtable": "0x08049E40",
+   "tick": "loop",
+   "shift": 3,
+   "end": "-"
+  },
+  {
+   "id": 16,
+   "name": "knockdown",
+   "raw": 18,
+   "state": "0x03001B40",
+   "vtable": "0x0804A730",
+   "tick": "once",
+   "shift": 5,
+   "end": "hold"
+  },
+  {
+   "id": 17,
+   "name": "special_19",
+   "raw": 19,
+   "state": "0x03001B18",
+   "vtable": "0x0804D784",
+   "tick": "once",
+   "shift": 4,
+   "end": "idle"
+  },
+  {
+   "id": 18,
+   "name": "special_20",
+   "raw": 20,
+   "state": "0x03001B18",
+   "vtable": "0x0804D784",
+   "tick": "once",
+   "shift": 4,
+   "end": "idle"
+  },
+  {
+   "id": 19,
+   "name": "special_21",
+   "raw": 21,
+   "state": "0x03001B18",
+   "vtable": "0x0804D784",
+   "tick": "once",
+   "shift": 4,
+   "end": "idle"
+  },
+  {
+   "id": 20,
+   "name": "special_22",
+   "raw": 22,
+   "state": "0x03001B18",
+   "vtable": "0x0804D784",
+   "tick": "once",
+   "shift": 4,
+   "end": "idle"
+  },
+  {
+   "id": 21,
+   "name": "special_23",
+   "raw": 23,
+   "state": "0x03001B18",
+   "vtable": "0x0804D784",
+   "tick": "once",
+   "shift": 4,
+   "end": "idle"
+  },
+  {
+   "id": 22,
+   "name": "special_24",
+   "raw": 24,
+   "state": "0x03001B18",
+   "vtable": "0x0804D784",
+   "tick": "once",
+   "shift": 4,
+   "end": "idle"
+  },
+  {
+   "id": 23,
+   "name": "transform (SS)",
+   "raw": 11,
+   "state": "0x03002BBC",
+   "vtable": "0x0804DCA4",
+   "tick": "once",
+   "shift": 4,
+   "end": "-"
+  },
+  {
+   "id": 24,
+   "name": "revert",
+   "raw": 12,
+   "state": "0x03002BB4",
+   "vtable": "0x0804CC58",
+   "tick": "once",
+   "shift": 4,
+   "end": "-"
+  }
+ ],
+ "durations": {
+  "11": {
+   "each": 16,
+   "loop": false,
+   "end": "-"
+  },
+  "12": {
+   "each": 16,
+   "loop": false,
+   "end": "-"
+  },
+  "1": {
+   "two_frame": [
+    241,
+    15
+   ],
+   "other": 8,
+   "loop": true
+  },
+  "2": {
+   "each": 8,
+   "loop": true
+  },
+  "3": {
+   "each": 8,
+   "loop": true
+  },
+  "4": {
+   "each": 8,
+   "loop": false,
+   "end": "idle"
+  },
+  "5": {
+   "each": 4,
+   "loop": false,
+   "end": "idle"
+  },
+  "6": {
+   "each": 4,
+   "loop": false,
+   "end": "idle"
+  },
+  "7": {
+   "each": 4,
+   "loop": false,
+   "end": "idle"
+  },
+  "9": {
+   "each": 32,
+   "loop": true,
+   "loop_from": 2
+  },
+  "10": {
+   "each": 8,
+   "loop": false,
+   "end": "idle"
+  },
+  "13": {
+   "each": 16,
+   "loop": false,
+   "end": "idle"
+  },
+  "14": {
+   "each": 8,
+   "loop": true
+  },
+  "15": {
+   "each": 8,
+   "loop": true
+  },
+  "16": {
+   "each": 8,
+   "loop": true
+  },
+  "18": {
+   "each": 32,
+   "loop": false,
+   "end": "hold"
+  },
+  "19": {
+   "each": 16,
+   "loop": false,
+   "end": "idle"
+  },
+  "20": {
+   "each": 16,
+   "loop": false,
+   "end": "idle"
+  },
+  "21": {
+   "each": 16,
+   "loop": false,
+   "end": "idle"
+  },
+  "22": {
+   "each": 16,
+   "loop": false,
+   "end": "idle"
+  },
+  "23": {
+   "each": 16,
+   "loop": false,
+   "end": "idle"
+  },
+  "24": {
+   "each": 16,
+   "loop": false,
+   "end": "idle"
+  }
+ },
+ "skills": {
+  "1": {
+   "raw": 19,
+   "timing": "as Kamehameha with frame (tick >> 3) & 1"
+  },
+  "2": {
+   "raw": 19,
+   "timing": "held: frame (tick >> 3) & 1; released: frame kept, idle 17 ticks later"
+  },
+  "3": {
+   "raw": 19,
+   "timing": "as Kamehameha"
+  },
+  "4": {
+   "raw": 4,
+   "timing": "frame 0, at tick 16 frame 1 (launch); idle at tick 32"
+  },
+  "5": {
+   "raw": 20,
+   "timing": "frame tick >> 3 until the dragon (tick 16); then ((tick >> 3) & 1) + 2; after the launch 24 ticks"
+  },
+  "6": {
+   "raw": 19,
+   "timing": "as Kamehameha"
+  },
+  "7": {
+   "raw": 4,
+   "timing": "frame 0, at tick 16 frame 1 + the blast; tick 40: a queued B press (EP) toggles frame 1/2 and rewinds to tick 16, else idle"
+  },
+  "8": {
+   "raw": 20,
+   "timing": "frame tick >> 2 until tick 8; then ((tick >> 2) & 1) + 2 up to tick 59"
+  },
+  "9": {
+   "raw": 20,
+   "timing": "charging: frame (tick >> 2) & 1; swinging (90 frames): frame ((counter / 3) & 7) + 2"
+  },
+  "10": {
+   "raw": 20,
+   "timing": "charge: frame (tick >> 2) & 1, 2 from tick 20; fired at 24: frame ((tick >> 3) & 1) + 3"
+  },
+  "11": {
+   "raw": 19,
+   "timing": "charge frame 0 for 24 ticks; then the tick advances 2 per frame: frame ((tick >> 3) & 1) + 1"
+  },
+  "13": {
+   "raw": 20,
+   "timing": "frame tick >> 3 (0..4) up to tick 40; held after 40: frame 0"
+  },
+  "14": {
+   "raw": 20,
+   "timing": "target pick: hold state frame 0; teleport: frames (-t >> 3), (24 - t) >> 3, punch (t - 24) >> 2"
+  },
+  "15": {
+   "raw": 19,
+   "timing": "charge frame 0 for 24 ticks; held at 24: fire, frame ((tick >> 3) & 1) + 1 while held"
+  },
+  "16": {
+   "raw": 19,
+   "timing": "as Kamehameha"
+  },
+  "17": {
+   "raw": 13,
+   "timing": "frame 0 until the B release; then frame 1 for 31 frames"
+  },
+  "18": {
+   "raw": 20,
+   "timing": "once, shift 2 (into form 14); from form 14: raw 12, once shift 2"
+  },
+  "20": {
+   "raw": 11,
+   "timing": "once, shift 4 (16 frames per frame); the gauge fills with the tick"
+  },
+  "22": {
+   "raw": 11,
+   "timing": "as Super Saiyan"
+  },
+  "23": {
+   "raw": 4,
+   "timing": "frame tick >> 4 (0, 1, 2); idle after tick 32"
+  }
+ }
+}

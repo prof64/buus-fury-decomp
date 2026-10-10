@@ -1,0 +1,6 @@
+{
+  "id": "new-character",
+  "name": "New fighter: Shadow Goku (recoloured Goku, own stats, growth and skills)",
+  "format_version": 1,
+  "depends": ["base"]
+}

@@ -1,0 +1,27 @@
+# Standalone workspace (NOT a member of engine/): script-runtime evaluation for the remake.
+# See engine/docs/script-runtime-eval.md.
+[workspace]
+resolver = "2"
+members = ["host", "rt-rhai", "rt-boa", "rt-mini", "bench", "wasm-rhai", "wasm-boa", "wasm-mini"]
+
+[workspace.package]
+edition = "2021"
+version = "0.0.0"
+publish = false
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+
+[profile.release-wasm]
+inherits = "release"
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.wasm-dbg]
+inherits = "release-wasm"
+strip = false
+debug = 1

@@ -1,0 +1,20 @@
+[package]
+name = "probe-piccolo"
+edition = "2021"
+version = "0.0.0"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+piccolo = "0.3"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[workspace]

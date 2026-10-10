@@ -1,0 +1,201 @@
+{
+ "meta": {
+  "generator": "re/buu/extract_formulas.py",
+  "conventions": "Generate data/buu/formulas.json and data/buu/rng.json (machine-readable formulas + lookup tables).\n\nEvery expression uses integer math exactly as the game does: '>>' arithmetic shift, '//' floor\ndivision (C-style truncation noted where it matters), rand(n) = ((next()&0xFFFF)*n)>>16,\nchance(p) = (next()&0xFFFF) < p. Units: HP/EP points unless stated; damage is produced in 1/1024 HP.\nPython reference implementations live in re/buu/damage_model.py and re/buu/rng.py; both were checked\nagainst the running game (verify_damage*.py: 48/48 exact; verify_levelup.py exact).\n"
+ },
+ "damage": {
+  "function": "0x0800E9D8 Character::ComputeDamage(target, hit)",
+  "inputs": {
+   "kind": "attack-type byte0 (0 melee, else energy)",
+   "sub": "attack-type byte1",
+   "power": "attack-type u32 +4 (1024=1.0)",
+   "mult": "hit+4 (per-move multiplier, 1024=1.0)",
+   "S": "attacker STR (melee) or POW (energy) = obj+0x1B0/+0x1B2",
+   "D": "defender END (melee, obj+0x1B4) or END2 (energy, obj+0x1B6)",
+   "resist": "defender obj+0x1B8 (melee) / +0x1B9 (energy), 128 = x1.0",
+   "crit_bonus": "attacker obj+0x1BC (= equipment crit% * 656)"
+  },
+  "steps": [
+   "melee only: crit = (sub != 3) and chance(82*S + crit_bonus); if crit: power = power + (power>>1)",
+   "melee only: P = (S * power * 0xCCD) >> 16      # = S*power/20",
+   "energy:     P = power",
+   "if D >= 200: D = min(D/4 + 150, 220)             # C division (truncate)",
+   "X = ((221 - D) * P * 297) >> 16",
+   "A = S + ((S*S*(S+100)) >> 13)",
+   "Y = (mult * X + 1023) >> 10                     # ceil(mult*X/1024)",
+   "raw = (((256 + rand(26)) * Y) >> 8) * A          # hit+0x14",
+   "dmg = (resist * raw + 127) >> 7                  # 64-bit math; hit+0x18",
+   "if defender blocking (obj+0x1C8 != 0) and (hit.dir ^ 1) == defender.facing and dmg: dmg = (dmg * obj+0x1C0) >> 16   # 0x1000 -> 1/16",
+   "HP loss: acc += dmg; whole = acc >> 10; acc -= whole<<10; HP -= whole (player 0x08010BF2; enemies HP stored <<10, 0x0800FA2A)"
+  ],
+  "random_spread": "x(256..281)/256 i.e. +0%..+9.8%",
+  "invulnerability": "during the player hurt state (24 frames, VERIFIED emu) both resist bytes are 0 -> dmg 0",
+  "status": "VERIFIED: 48 game damage events (player melee/energy, crits, D>=200 clamp, enemy->player, frontal block) reproduced exactly from captured RNG state (verify_damage*.py)"
+ },
+ "crit": {
+  "chance_per_melee_hit": "(82*STR + crit_bonus)/65536",
+  "crit_bonus_from_equipment": "percent * 656 (record+0x66, Charge Gloves 5, Shock Boots 10, Soccer Cleats 20)",
+  "effect": "power x1.5 (before the STR/20 scaling)",
+  "status": "VERIFIED"
+ },
+ "xp": {
+  "enemy_kill": "gain = (enemy.exp * record[+0x58] + 255) >> 8, record+0x58 = 256 + sum(equipment exp bonuses); only the active character",
+  "function_enemy": "0x0800F80C",
+  "function_gain": "0x08013914",
+  "fusion": "fusion forms (flag 0x04) pass the full amount to both component characters, then recompute fusion stats",
+  "level": "level = 50 + max{i in 0..150 : xp >= xp_table[i]}  (0x080135D2); xp_table at 0x086B7084 (levels.json)",
+  "to_next": "xp_table[level-49] - xp",
+  "status": "VERIFIED (disasm + emu: +1225 XP for a Majin Fighter, 1.0 multiplier)"
+ },
+ "level_up": {
+  "function": "0x08013678 LevelUp(record, old, new); once per level gained",
+  "growth_rows": {
+   "0": [
+    327680,
+    393216,
+    512,
+    1024,
+    256,
+    196608,
+    128,
+    1280
+   ],
+   "1": [
+    196608,
+    327680,
+    256,
+    1060,
+    256,
+    262144,
+    128,
+    1384
+   ],
+   "2": [
+    262144,
+    393216,
+    384,
+    1060,
+    256,
+    262144,
+    64,
+    1280
+   ],
+   "3": [
+    262144,
+    393216,
+    384,
+    1200,
+    256,
+    196608,
+    64,
+    1280
+   ],
+   "4": [
+    196608,
+    327680,
+    384,
+    1280,
+    256,
+    196608,
+    128,
+    1200
+   ]
+  },
+  "per_level": [
+   "r1..r4 = rand(256) x4 (in this order)",
+   "maxHP = maxHP + ((((g0*r1)>>8) + g1) >> 16)",
+   "maxHP = maxHP + ((maxHP * (((g2*r2)>>8) + g3)) >> 16)",
+   "maxEP = maxEP + (((g4*r3) + g5) >> 16)",
+   "maxEP = maxEP + ((maxEP * (((g6*r4)>>8) + g7)) >> 16)",
+   "HP = maxHP; EP = maxEP",
+   "stat points (record+0x2C) += 3"
+  ],
+  "status": "VERIFIED exactly (verify_levelup.py: predicted 135->153 HP, 90->99 EP for 60->62)"
+ },
+ "stat_points": {
+  "per_level": 3,
+  "spend": "1 point -> +1 STR/POW/END/SPD (Status screen)",
+  "status": "VERIFIED (emu)"
+ },
+ "stats_recalc": {
+  "function": "0x08013C66",
+  "steps": [
+   "calc = base STR/POW/END/END/SPD (record+0x28..0x2B; END copied into both END and END2)",
+   "for each of 4 equipped items: add s8 modifiers (+0x16..+0x1A), XP bonus (+0x1C) to calc+4, OR flags (+0x24) into record+0x13, run effect script (+0x28)",
+   "Holy Water (GameData+0x4DC != 0): add +0x4E0 STR, +0x4E4 POW, +0x4E8 END/END2, +0x4EC SPD (0x080046AE)",
+   "clamp negatives to 0 -> record+0x4C..+0x54; factors to +0x56..+0x67"
+  ],
+  "apply_to_player": "0x0800E074: obj STR/POW/END/END2 = record+0x4C..; resists = 128; walk = 5*SPD+102; dash = walk+320; crit bonus = record+0x66*656; block factor = record+0x60; thorns = record+0x5C"
+ },
+ "forms": {
+  "super_saiyan": "+5 STR/POW/END/END2, +128 walk & dash speed (0x0800E2F2/0x0800E344)",
+  "super_saiyan_3": "+15 STR/POW/END/END2, +192 speed (0x0800E470)",
+  "trunks_form_24": "walk & dash speed / 4 (0x0800E550)",
+  "trunks_form_25": "+64 speed (0x0800E5C0)",
+  "ss_gauge": {
+   "fill": "during the transform animation gauge = maxEP * frame/len (0x0801C4F4)",
+   "drain": "acc += 0xCCD per frame; every overflow (20 frames) gauge -= 1; at 0 -> revert (0x0800E3E6)",
+   "duration_frames": "maxEP * 20",
+   "energy_moves": "use the SS gauge instead of EP while SS"
+  },
+  "ss3_gauge": {
+   "drain_per_frame": "(22*maxEP + 0x3333) / 65536 (accumulated, 0x0800E4C4)"
+  },
+  "ss_cooldown": "record+4 must be 0 to transform; it decreases by record+0x62>>6 per frame in normal form (0x08013E06); Super items x7/8",
+  "status": "stat/speed bonuses VERIFIED (emu, all 54 forms: measure_forms.py); gauge rules VERIFIED (disasm) + SS drain 3/s VERIFIED (emu)"
+ },
+ "fusion": {
+  "function": "0x0801375E",
+  "hp_ep": "(A+B)*154>>8 for HP, maxHP, EP, maxEP",
+  "xp": "(A+B)/2",
+  "STR_POW_END": "(A+B)/2 + 10",
+  "SPD": "(A+B)/2 + 16",
+  "status": "VERIFIED (disasm)"
+ },
+ "regen": {
+  "active_EP": "every 65536/110 = 595.8 frames (timer +=110/frame, 0x0800E1D0): EP += maxEP*0x7AE>>16 (3%)",
+  "reserve_characters": "same tick: every other party member EP += 5% maxEP and HP += 5% maxHP (0xCCD>>16)",
+  "passive_HP": "none, except record+0x64/256 HP per frame (\"Z\" Armor: 21/256)",
+  "melee": "+1 EP per damaging melee hit (script #2)",
+  "status": "VERIFIED (disasm + emu: +2 EP (3% of 90) observed after ~600 frames idle)"
+ },
+ "movement": {
+  "walk": "5*SPD + 102",
+  "dash": "walk + 320",
+  "units": "1/256 px per frame",
+  "status": "VERIFIED (emu, SPD 10/50/100/150/255)",
+  "ki_blast_speed": "3 px/frame (dir vector 0x08719C40 = 0x300)"
+ },
+ "knockback": {
+  "enemy": "~15 px over 15 frames after a punch (emu); velocity = dir * ((rand(64)+96)*K)>>7 (0x08018A08, K from reaction def; x4 if obj+0x294)",
+  "player": "~17 px, 24-frame hurt state with invulnerability (emu)",
+  "status": "measured (emu); constants INFERRED"
+ },
+ "zenie": {
+  "coin_values": [
+   5,
+   25,
+   50,
+   100
+  ],
+  "coin_defs": "0x86fc250",
+  "loot_script_500": "G=(level-48)*100; r=rand(400); 100Z if r<=G/100, 50Z if r<=G/83, 25Z if r<=G/66, else 5Z",
+  "pilafs_gloves": "+1 Zenie per damaging melee hit"
+ },
+ "loot": {
+  "script": "#497 run_script(497, loot_level, forced_item)",
+  "rolls": "1% chance of nothing; else d100 -> rolls 8 (<=5),7 (<=10),6 (<=20),5 (<=30),4 (<=40),3 (<=55),2 (<=75),1; +2 Lucky Charm (tested twice), +2 Rabbit's Foot, +3 Four-Leaf Clover, -1 Skull Ring, -2 Doom Amulet, -3 Hare's Foot; clamp 1..8",
+  "forced_item": "if forced_item set and chance(5%) and the player owns none: drop that equipment, uses one roll",
+  "per_roll": "if chance(85%) or (G2 and G1): zenie coin (script 500); elif not G1 and chance(25%): equipment roll (script 496, level-window tables; at most one equipment per kill via G1) - if it drops nothing it becomes a supply roll; else supply roll (script 499, at most one per kill via G2; later ones become zenie)",
+  "quirk": "G0..G3 are global words (0x03001058) shared with the sub-scripts: script 500 overwrites G1/G2 with non-zero values, so after the first zenie roll practically every remaining roll is also zenie. Items therefore almost only come from the first roll(s).",
+  "simulation": "enemies.json drops.simulated_per_kill (Monte-Carlo of the real bytecode, loot.py)",
+  "pickup_rng_cost": "spawning a pickup consumes RNG between rolls: coin 5 draws, equipment 4, supply 5 (assumed)",
+  "status": "VERIFIED: 500 kills match simulated rates (verify_loot.py); 60/60 kills replayed exactly (verify_loot2.py)"
+ },
+ "items": {
+  "food": "HP += value (+25% with Majestic Chopsticks equipped)",
+  "drink": "EP += value (+25% with Twisty-Straw; bug sets HP instead)",
+  "senzu": "full HP/EP",
+  "holy_water": "+25 STR/POW/END/SPD for 30 s"
+ }
+}

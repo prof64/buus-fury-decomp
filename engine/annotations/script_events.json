@@ -1,0 +1,3661 @@
+[
+{
+"event": 0,
+"purpose": "engine_hook",
+"refs": [
+"engine_code"
+]
+},
+{
+"event": 1,
+"purpose": "engine_hook",
+"refs": [
+"engine_code"
+]
+},
+{
+"event": 2,
+"purpose": "engine_hook",
+"refs": [
+"engine_code"
+]
+},
+{
+"event": 3,
+"purpose": "engine_hook",
+"refs": [
+"engine_code"
+]
+},
+{
+"event": 4,
+"purpose": "engine_hook",
+"refs": [
+"engine_code"
+]
+},
+{
+"event": 5,
+"purpose": "other",
+"refs": []
+},
+{
+"event": 6,
+"purpose": "engine_hook",
+"refs": [
+"engine_code"
+]
+},
+{
+"event": 7,
+"purpose": "engine_hook",
+"refs": [
+"engine_code"
+]
+},
+{
+"event": 8,
+"purpose": "engine_hook",
+"refs": [
+"engine_code"
+]
+},
+{
+"event": 9,
+"purpose": "engine_hook",
+"refs": [
+"engine_code"
+]
+},
+{
+"event": 10,
+"purpose": "engine_hook",
+"refs": [
+"engine_code"
+]
+},
+{
+"event": 11,
+"purpose": "map_event",
+"refs": [
+"engine_code",
+"map_fixed_event_trigger"
+]
+},
+{
+"event": 12,
+"purpose": "dialog",
+"refs": [
+"run_event"
+]
+},
+{
+"event": 13,
+"purpose": "cutscene",
+"refs": [
+"engine_code"
+]
+},
+{
+"event": 14,
+"purpose": "engine_hook",
+"refs": [
+"engine_code"
+]
+},
+{
+"event": 15,
+"purpose": "engine_hook",
+"refs": [
+"engine_code"
+]
+},
+{
+"event": 16,
+"purpose": "dialog",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 17,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 18,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 19,
+"purpose": "cutscene",
+"refs": [
+"run_event"
+]
+},
+{
+"event": 20,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 21,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback",
+"event_goto"
+]
+},
+{
+"event": 22,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 23,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 24,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 25,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 26,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 27,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 28,
+"purpose": "shop",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 29,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 30,
+"purpose": "shop",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 31,
+"purpose": "shop",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 32,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 33,
+"purpose": "shop",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 34,
+"purpose": "shop",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 35,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 36,
+"purpose": "shop",
+"refs": []
+},
+{
+"event": 37,
+"purpose": "dialog",
+"refs": [
+"run_event"
+]
+},
+{
+"event": 38,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 39,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 40,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 41,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 42,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 43,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 44,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 45,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 46,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 47,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 48,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 49,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 50,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 51,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 52,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 53,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 54,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 55,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 56,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 57,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 58,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 59,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 60,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 61,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 62,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 63,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 64,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 65,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 66,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 67,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 68,
+"purpose": "dialog",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 69,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 70,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 71,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 72,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 73,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 74,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 75,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 76,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 77,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 78,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 79,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 80,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 81,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 82,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 83,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 84,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 85,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 86,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 87,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 88,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 89,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 90,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 91,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 92,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 93,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 94,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 95,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 96,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 97,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 98,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 99,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 100,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 101,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 102,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 103,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 104,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 105,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 106,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 107,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 108,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 109,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 110,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 111,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 112,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 113,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 114,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 115,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 116,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 117,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 118,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 119,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 120,
+"purpose": "engine_hook",
+"refs": [
+"engine_code"
+]
+},
+{
+"event": 121,
+"purpose": "boss_fight",
+"refs": [
+"ai_run_script"
+]
+},
+{
+"event": 122,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback",
+"event_goto"
+]
+},
+{
+"event": 123,
+"purpose": "quest_flag_logic",
+"refs": []
+},
+{
+"event": 124,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 125,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 126,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 127,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 128,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 129,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 130,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 131,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 132,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 133,
+"purpose": "dialog",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 134,
+"purpose": "dialog",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 135,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 136,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 137,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 138,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 139,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 140,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 141,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 142,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 143,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 144,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 145,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 146,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 147,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 148,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 149,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 150,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 151,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 152,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 153,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 154,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 155,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 156,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 157,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 158,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 159,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 160,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 161,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 162,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 163,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 164,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 165,
+"purpose": "dialog",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 166,
+"purpose": "dialog",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 167,
+"purpose": "dialog",
+"refs": [
+"run_event"
+]
+},
+{
+"event": 168,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 169,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 170,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 171,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 172,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 173,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 174,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 175,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 176,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 177,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 178,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 179,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 180,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 181,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 182,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 183,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 184,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 185,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 186,
+"purpose": "npc_talk",
+"refs": [
+"map_event_trigger",
+"npc_talk"
+]
+},
+{
+"event": 187,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 188,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 189,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 190,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 191,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 192,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 193,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 194,
+"purpose": "dialog",
+"refs": [
+"run_event"
+]
+},
+{
+"event": 195,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 196,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 197,
+"purpose": "map_event",
+"refs": [
+"list3_callback",
+"list3_event"
+]
+},
+{
+"event": 198,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 199,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 200,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 201,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 202,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 203,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 204,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 205,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 206,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 207,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 208,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 209,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 210,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 211,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 212,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 213,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 214,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 215,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 216,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 217,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 218,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 219,
+"purpose": "dialog",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 220,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 221,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 222,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 223,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 224,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 225,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 226,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback",
+"event_goto"
+]
+},
+{
+"event": 227,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 228,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 229,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 230,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 231,
+"purpose": "cutscene",
+"refs": [
+"run_event"
+]
+},
+{
+"event": 232,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 233,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 234,
+"purpose": "cutscene",
+"refs": [
+"run_event"
+]
+},
+{
+"event": 235,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 236,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 237,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 238,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 239,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 240,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 241,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 242,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 243,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 244,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 245,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 246,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 247,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 248,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 249,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 250,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 251,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 252,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 253,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 254,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 255,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 256,
+"purpose": "npc_talk",
+"refs": [
+"map_event_trigger",
+"npc_talk"
+]
+},
+{
+"event": 257,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 258,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 259,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 260,
+"purpose": "dialog",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 261,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 262,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 263,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 264,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 265,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 266,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 267,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 268,
+"purpose": "dialog",
+"refs": []
+},
+{
+"event": 269,
+"purpose": "dialog",
+"refs": []
+},
+{
+"event": 270,
+"purpose": "dialog",
+"refs": []
+},
+{
+"event": 271,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 272,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 273,
+"purpose": "dialog",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 274,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 275,
+"purpose": "dialog",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 276,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 277,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 278,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 279,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 280,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 281,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 282,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 283,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 284,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 285,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 286,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 287,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 288,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 289,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 290,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 291,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 292,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 293,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 294,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 295,
+"purpose": "quest_flag_logic",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 296,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 297,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 298,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 299,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 300,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 301,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 302,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 303,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 304,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 305,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 306,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 307,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 308,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 309,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 310,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 311,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 312,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback",
+"event_goto"
+]
+},
+{
+"event": 313,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 314,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 315,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 316,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 317,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 318,
+"purpose": "map_event",
+"refs": [
+"list3_callback",
+"list3_event"
+]
+},
+{
+"event": 319,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 320,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 321,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 322,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 323,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 324,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 325,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 326,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 327,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 328,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 329,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 330,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 331,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 332,
+"purpose": "map_event",
+"refs": [
+"list3_callback",
+"list3_event"
+]
+},
+{
+"event": 333,
+"purpose": "map_event",
+"refs": [
+"list3_callback",
+"list3_event"
+]
+},
+{
+"event": 334,
+"purpose": "map_event",
+"refs": [
+"list3_callback",
+"list3_event"
+]
+},
+{
+"event": 335,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 336,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 337,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 338,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 339,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 340,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 341,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 342,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 343,
+"purpose": "cutscene",
+"refs": [
+"event_goto",
+"run_event"
+]
+},
+{
+"event": 344,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 345,
+"purpose": "dialog",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 346,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 347,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 348,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 349,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 350,
+"purpose": "dialog",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 351,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 352,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 353,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 354,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 355,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 356,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 357,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 358,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 359,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 360,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 361,
+"purpose": "dialog",
+"refs": []
+},
+{
+"event": 362,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 363,
+"purpose": "dialog",
+"refs": [
+"run_event"
+]
+},
+{
+"event": 364,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 365,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 366,
+"purpose": "map_event",
+"refs": [
+"list3_callback",
+"list3_event"
+]
+},
+{
+"event": 367,
+"purpose": "map_event",
+"refs": [
+"list3_callback",
+"list3_event"
+]
+},
+{
+"event": 368,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 369,
+"purpose": "cutscene",
+"refs": [
+"list2_callback",
+"list2_event"
+]
+},
+{
+"event": 370,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 371,
+"purpose": "dialog",
+"refs": [
+"run_event"
+]
+},
+{
+"event": 372,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 373,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 374,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 375,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 376,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 377,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 378,
+"purpose": "dialog",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 379,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 380,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 381,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 382,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 383,
+"purpose": "dialog",
+"refs": []
+},
+{
+"event": 384,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 385,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 386,
+"purpose": "cutscene",
+"refs": [
+"run_event"
+]
+},
+{
+"event": 387,
+"purpose": "map_event",
+"refs": [
+"list3_callback",
+"list3_event"
+]
+},
+{
+"event": 388,
+"purpose": "cutscene",
+"refs": [
+"run_event"
+]
+},
+{
+"event": 389,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 390,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 391,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 392,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 393,
+"purpose": "quest_flag_logic",
+"refs": [
+"run_event"
+]
+},
+{
+"event": 394,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 395,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 396,
+"purpose": "map_event",
+"refs": [
+"list3_callback",
+"list3_event"
+]
+},
+{
+"event": 397,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 398,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 399,
+"purpose": "map_event",
+"refs": [
+"list3_callback",
+"list3_event"
+]
+},
+{
+"event": 400,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 401,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 402,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 403,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 404,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 405,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 406,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 407,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 408,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 409,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 410,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 411,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 412,
+"purpose": "npc_talk",
+"refs": [
+"map_event_trigger",
+"npc_talk"
+]
+},
+{
+"event": 413,
+"purpose": "cutscene",
+"refs": [
+"list2_callback",
+"list2_event"
+]
+},
+{
+"event": 414,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 415,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 416,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 417,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 418,
+"purpose": "cutscene",
+"refs": [
+"list2_callback",
+"list2_event"
+]
+},
+{
+"event": 419,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 420,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 421,
+"purpose": "map_event",
+"refs": [
+"list3_callback",
+"list3_event"
+]
+},
+{
+"event": 422,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 423,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 424,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 425,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 426,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 427,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 428,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 429,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 430,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 431,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 432,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 433,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 434,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 435,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 436,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 437,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 438,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 439,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 440,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 441,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 442,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 443,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 444,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 445,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 446,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 447,
+"purpose": "dialog",
+"refs": []
+},
+{
+"event": 448,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 449,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 450,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 451,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 452,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 453,
+"purpose": "dialog",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 454,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 455,
+"purpose": "dialog",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 456,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 457,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 458,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 459,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 460,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 461,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 462,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 463,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 464,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 465,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 466,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 467,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 468,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 469,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 470,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 471,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 472,
+"purpose": "other",
+"refs": []
+},
+{
+"event": 473,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 474,
+"purpose": "boss_fight",
+"refs": [
+"ai_run_script"
+]
+},
+{
+"event": 475,
+"purpose": "boss_fight",
+"refs": [
+"ai_run_script"
+]
+},
+{
+"event": 476,
+"purpose": "boss_fight",
+"refs": [
+"ai_run_script"
+]
+},
+{
+"event": 477,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 478,
+"purpose": "cutscene",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 479,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 480,
+"purpose": "cutscene",
+"refs": [
+"run_event"
+]
+},
+{
+"event": 481,
+"purpose": "cutscene",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 482,
+"purpose": "dialog",
+"refs": [
+"event_goto"
+]
+},
+{
+"event": 483,
+"purpose": "map_event",
+"refs": [
+"list2_callback",
+"list2_event"
+]
+},
+{
+"event": 484,
+"purpose": "quest_flag_logic",
+"refs": [
+"run_event"
+]
+},
+{
+"event": 485,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 486,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 487,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 488,
+"purpose": "map_event",
+"refs": [
+"map_event_trigger"
+]
+},
+{
+"event": 489,
+"purpose": "boss_fight",
+"refs": [
+"enemy_defeat_callback"
+]
+},
+{
+"event": 490,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 491,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 492,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 493,
+"purpose": "npc_talk",
+"refs": [
+"npc_talk"
+]
+},
+{
+"event": 494,
+"purpose": "quest_flag_logic",
+"refs": [
+"run_event"
+]
+},
+{
+"event": 495,
+"purpose": "dialog",
+"refs": [
+"run_event"
+]
+},
+{
+"event": 496,
+"purpose": "loot",
+"refs": [
+"run_script"
+]
+},
+{
+"event": 497,
+"purpose": "loot",
+"refs": [
+"run_script"
+]
+},
+{
+"event": 498,
+"purpose": "loot",
+"refs": [
+"engine_code"
+]
+},
+{
+"event": 499,
+"purpose": "loot",
+"refs": [
+"run_script"
+]
+},
+{
+"event": 500,
+"purpose": "loot",
+"refs": [
+"run_script"
+]
+},
+{
+"event": 501,
+"purpose": "cutscene",
+"refs": [
+"run_event"
+]
+},
+{
+"event": 502,
+"purpose": "cutscene",
+"refs": [
+"run_event"
+]
+},
+{
+"event": 503,
+"purpose": "cutscene",
+"refs": [
+"run_event",
+"run_script"
+]
+},
+{
+"event": 504,
+"purpose": "cutscene",
+"refs": [
+"run_event"
+]
+},
+{
+"event": 505,
+"purpose": "quest_flag_logic",
+"refs": [
+"run_script"
+]
+},
+{
+"event": 506,
+"purpose": "quest_flag_logic",
+"refs": [
+"run_script"
+]
+},
+{
+"event": 507,
+"purpose": "quest_flag_logic",
+"refs": [
+"run_script"
+]
+},
+{
+"event": 508,
+"purpose": "quest_flag_logic",
+"refs": [
+"run_event"
+]
+},
+{
+"event": 509,
+"purpose": "quest_flag_logic",
+"refs": [
+"run_event"
+]
+},
+{
+"event": 510,
+"purpose": "quest_flag_logic",
+"refs": [
+"run_event"
+]
+},
+{
+"event": 511,
+"purpose": "cutscene",
+"refs": [
+"run_script"
+]
+},
+{
+"event": 512,
+"purpose": "quest_flag_logic",
+"refs": [
+"run_script"
+]
+},
+{
+"event": 513,
+"purpose": "quest_flag_logic",
+"refs": [
+"run_event"
+]
+},
+{
+"event": 514,
+"purpose": "quest_flag_logic",
+"refs": [
+"run_event"
+]
+},
+{
+"event": 515,
+"purpose": "quest_flag_logic",
+"refs": [
+"run_event"
+]
+},
+{
+"event": 516,
+"purpose": "quest_flag_logic",
+"refs": [
+"run_event"
+]
+},
+{
+"event": 517,
+"purpose": "cutscene",
+"refs": [
+"run_event"
+]
+},
+{
+"event": 518,
+"purpose": "dialog",
+"refs": [
+"run_event"
+]
+},
+{
+"event": 519,
+"purpose": "quest_flag_logic",
+"refs": [
+"run_event"
+]
+},
+{
+"event": 520,
+"purpose": "quest_flag_logic",
+"refs": [
+"run_event"
+]
+},
+{
+"event": 521,
+"purpose": "dialog",
+"refs": [
+"run_event"
+]
+}
+]

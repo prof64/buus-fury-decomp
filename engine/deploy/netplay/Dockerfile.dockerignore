@@ -1,0 +1,6 @@
+# build context = engine/: only the workspace sources (not target/, experiments/, web/, ...)
+*
+!Cargo.toml
+!Cargo.lock
+!crates
+crates/*/target

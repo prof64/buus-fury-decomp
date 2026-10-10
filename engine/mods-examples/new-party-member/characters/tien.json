@@ -1,0 +1,26 @@
+{
+  "id": "tien",
+  "index": 10,
+  "name": "Tien",
+  "new_game": {
+    "level": 60,
+    "hp": 150,
+    "ep": 70,
+    "STR": 30,
+    "POW": 22,
+    "END": 28,
+    "SPD": 46,
+    "form": 56,
+    "skills": [8, 7],
+    "skill_names": ["Energy Punch", "Energy Blast"],
+    "xp": 2200,
+    "equip": [0, 44, 77, 112],
+    "in_party": false
+  },
+  "growth": {
+    "raw_u32": [393216, 458752, 640, 1024, 192, 131072, 96, 1024],
+    "note": "mod: more HP growth than Goku, less EP (same formulas as characters/*.json)"
+  },
+  "forms": [56],
+  "form_ids": ["56_tien"]
+}

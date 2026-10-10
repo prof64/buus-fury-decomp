@@ -1,0 +1,6 @@
+{
+  "id": "scripted-skills",
+  "name": "Scripted skills: Homing Volley + Teleport Strike (Goku)",
+  "format_version": 1,
+  "depends": ["base"]
+}

@@ -1,0 +1,17 @@
+# Packaging (https://just.systems). Every recipe is also a plain script under package/.
+
+# macOS app: dist/Buu's Fury.app
+app:
+    sh package/mac-app.sh
+
+# static web build: web/dist/
+web:
+    sh package/web-dist.sh
+
+# serve web/dist/ on http://localhost:8370/app/
+serve port="8370":
+    python3 package/serve.py --port {{port}}
+
+# run the desktop game from source (any buus-fury flags)
+run *args:
+    cargo run --release -p wf-native -- {{args}}

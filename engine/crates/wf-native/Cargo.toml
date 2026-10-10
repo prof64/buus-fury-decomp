@@ -1,0 +1,25 @@
+[package]
+name = "wf-native"
+description = "Native frontend: window (winit + softbuffer), audio (cpal), gamepads (gilrs), first-launch ROM drop / file dialog + extraction into the platform data dir"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "buus-fury"
+path = "src/main.rs"
+
+[dependencies]
+wf-app = { path = "../wf-app" }
+wf-core = { path = "../wf-core" }
+wf-view = { path = "../wf-view" }
+wf-net = { path = "../wf-net", features = ["webrtc"] }
+wf-extract = { path = "../wf-extract" }
+wf-rom = { workspace = true }
+serde_json = { workspace = true }
+winit = "0.30"
+softbuffer = "0.4"
+cpal = "0.15"
+gilrs = "0.11"
+rfd = "0.15"
+dirs = "6"

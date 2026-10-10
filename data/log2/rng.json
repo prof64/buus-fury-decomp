@@ -1,0 +1,561 @@
+{
+ "source": "LoG2 ROM; extract_rng.py",
+ "state": {
+  "addr": "0x03003890",
+  "words": [
+   "a (u32 @0x03003890)",
+   "b (u32 @0x03003894)"
+  ],
+  "initial": "0,0 (IWRAM is zero-cleared by crt0 at 0x0800010c); no explicit seeding - VERIFIED no writes during boot logos",
+  "seeding": "entropy comes only from the number of frames spent on the title/intro screens (0x08000c1c calls rng() every frame there); in gameplay the RNG is NOT advanced per frame, only on demand (VERIFIED: 120 idle frames in-map -> 0 calls). State is not saved to EEPROM (not part of the 0x164-byte party block) - INFERRED"
+ },
+ "rng": {
+  "addr": "0x80213fc",
+  "algorithm": [
+   "r1 = (a + 0x02cbbc71) ^ b",
+   "r0 = (rol32(b, 3) + 0x0632d80f) ^ r1",
+   "b = r0; a = r1",
+   "return (r1 - r0) mod 2^32"
+  ],
+  "python": "def rng(s):\n a,b=s\n r1=((a+0x2cbbc71)&M)^b\n r0=((((b<<3)|(b>>29))&M)+0x632d80f)&M\n r0^=r1\n s[:]=[r1,r0]\n return (r1-r0)&M"
+ },
+ "rand": {
+  "addr": "0x802141c",
+  "formula": "rand(n) = ((rng() & 0xffff) * n) >> 16   -> uniform-ish in [0, n)"
+ },
+ "chance": {
+  "addr": "0x802142e",
+  "formula": "chance(p) = 1 if (rng() & 0xffff) < p else 0   -> probability p/65536"
+ },
+ "verified": "Damage formula predictions using this RNG matched the emulator 14/14 hits; level-up prediction matched (it_lvl.py).",
+ "callers": [
+  {
+   "call_site": "0x8000c1c",
+   "target": "rng",
+   "r0_imm": null,
+   "purpose": "title/intro screen manager: advances RNG once per frame while on the title screens (the only per-frame advance)"
+  },
+  {
+   "call_site": "0x8003c80",
+   "target": "rand",
+   "r0_imm": null,
+   "purpose": "level-up stat growth: rand((max-min+1)*n) per stat (0x08003c6e)"
+  },
+  {
+   "call_site": "0x8003d04",
+   "target": "rand",
+   "r0_imm": null,
+   "purpose": "level-up: maxHP growth rand(0x51f)"
+  },
+  {
+   "call_site": "0x8003d1c",
+   "target": "rand",
+   "r0_imm": 3,
+   "purpose": "level-up: maxEP growth rand(3)"
+  },
+  {
+   "call_site": "0x800755a",
+   "target": "rand",
+   "r0_imm": 255,
+   "purpose": "INFERRED entity: random animation timer rand(255)"
+  },
+  {
+   "call_site": "0x800758e",
+   "target": "rand",
+   "r0_imm": 255,
+   "purpose": "INFERRED entity: random animation timer rand(255)"
+  },
+  {
+   "call_site": "0x8007e42",
+   "target": "rand",
+   "r0_imm": 3,
+   "purpose": "player melee hit: random hit sound variant rand(3) (sfx 0x22..0x24)"
+  },
+  {
+   "call_site": "0x8007e98",
+   "target": "rand",
+   "r0_imm": null,
+   "purpose": "player hit reaction: random state/anim variant rand(3)+0x28"
+  },
+  {
+   "call_site": "0x80084d2",
+   "target": "rand",
+   "r0_imm": 3,
+   "purpose": "player: random sound variant rand(3)+0x22"
+  },
+  {
+   "call_site": "0x8009572",
+   "target": "rand",
+   "r0_imm": null,
+   "purpose": "script VM sub-op 0x11: top = rand(top)  (used by enemy drop scripts: rand(100))"
+  },
+  {
+   "call_site": "0x800958a",
+   "target": "chance",
+   "r0_imm": null,
+   "purpose": "script VM sub-op 0x12: top = chance(top percent)"
+  },
+  {
+   "call_site": "0x800cb94",
+   "target": "chance",
+   "r0_imm": null,
+   "purpose": "INFERRED map ambient object: chance(param) to trigger"
+  },
+  {
+   "call_site": "0x800cba8",
+   "target": "rand",
+   "r0_imm": 5,
+   "purpose": "INFERRED map ambient object: rand(5) variant"
+  },
+  {
+   "call_site": "0x800ddea",
+   "target": "rng",
+   "r0_imm": null,
+   "purpose": "INFERRED screen shake / jitter: raw rng()"
+  },
+  {
+   "call_site": "0x800ddfc",
+   "target": "rng",
+   "r0_imm": null,
+   "purpose": "INFERRED screen shake / jitter: raw rng()"
+  },
+  {
+   "call_site": "0x800e17e",
+   "target": "rand",
+   "r0_imm": 2,
+   "purpose": "enemy: random sound variant rand(2)+0x25"
+  },
+  {
+   "call_site": "0x800e91c",
+   "target": "rand",
+   "r0_imm": 2,
+   "purpose": "enemy: random sound variant rand(2)+0xd"
+  },
+  {
+   "call_site": "0x800ea16",
+   "target": "rand",
+   "r0_imm": 3,
+   "purpose": "enemy hurt: random sound variant rand(3)+0x22"
+  },
+  {
+   "call_site": "0x800f086",
+   "target": "rand",
+   "r0_imm": 5,
+   "purpose": "INFERRED hit spark/particle offset rand(5)-2"
+  },
+  {
+   "call_site": "0x800f08e",
+   "target": "rand",
+   "r0_imm": 3,
+   "purpose": "INFERRED hit spark/particle offset rand(3)-1"
+  },
+  {
+   "call_site": "0x800f25e",
+   "target": "rand",
+   "r0_imm": null,
+   "purpose": "INFERRED debris/particle velocity rand(0x1000)"
+  },
+  {
+   "call_site": "0x800f930",
+   "target": "chance",
+   "r0_imm": 164,
+   "purpose": "DAMAGE: melee critical chance(0xa4*STR) -> double power"
+  },
+  {
+   "call_site": "0x800f968",
+   "target": "rand",
+   "r0_imm": 26,
+   "purpose": "DAMAGE: variance rand(26) -> x(256..281)/256"
+  },
+  {
+   "call_site": "0x800fa40",
+   "target": "rand",
+   "r0_imm": null,
+   "purpose": "enemy death explosion/particles rand(0x1000)"
+  },
+  {
+   "call_site": "0x8011c30",
+   "target": "rand",
+   "r0_imm": 2,
+   "purpose": "visual effect particles (random offsets)"
+  },
+  {
+   "call_site": "0x8011db4",
+   "target": "rand",
+   "r0_imm": 64,
+   "purpose": "visual effect particles (random offsets)"
+  },
+  {
+   "call_site": "0x8011dc0",
+   "target": "rand",
+   "r0_imm": 3,
+   "purpose": "visual effect particles (random offsets)"
+  },
+  {
+   "call_site": "0x80133ac",
+   "target": "rand",
+   "r0_imm": 3,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x8013846",
+   "target": "rand",
+   "r0_imm": 2,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x8013a94",
+   "target": "rand",
+   "r0_imm": 3,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x8013dc4",
+   "target": "rand",
+   "r0_imm": null,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x8013f34",
+   "target": "rand",
+   "r0_imm": 32,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x8013f3e",
+   "target": "rand",
+   "r0_imm": null,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x8013f48",
+   "target": "rand",
+   "r0_imm": null,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x8013fba",
+   "target": "rand",
+   "r0_imm": 2,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x8014100",
+   "target": "rand",
+   "r0_imm": 3,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x8014300",
+   "target": "rand",
+   "r0_imm": 3,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x8014698",
+   "target": "rand",
+   "r0_imm": null,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x80146ca",
+   "target": "rand",
+   "r0_imm": 5,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x80146d8",
+   "target": "rand",
+   "r0_imm": 3,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x8014704",
+   "target": "rand",
+   "r0_imm": 32,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x8014712",
+   "target": "rand",
+   "r0_imm": 32,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x8014720",
+   "target": "rand",
+   "r0_imm": null,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x8014f12",
+   "target": "rand",
+   "r0_imm": 2,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x8014fd2",
+   "target": "rand",
+   "r0_imm": 2,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x80150c2",
+   "target": "rand",
+   "r0_imm": null,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x80151be",
+   "target": "rand",
+   "r0_imm": 2,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x8015504",
+   "target": "rand",
+   "r0_imm": 3,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x801551e",
+   "target": "rand",
+   "r0_imm": 2,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x8015b7c",
+   "target": "rand",
+   "r0_imm": 6,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x8015b8c",
+   "target": "rand",
+   "r0_imm": 3,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x8016144",
+   "target": "rand",
+   "r0_imm": 2,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x801623e",
+   "target": "rand",
+   "r0_imm": 3,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x80167aa",
+   "target": "rand",
+   "r0_imm": 32,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x80167b4",
+   "target": "rand",
+   "r0_imm": 32,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x80167be",
+   "target": "rand",
+   "r0_imm": 5,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x801682c",
+   "target": "rand",
+   "r0_imm": 2,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x80168b0",
+   "target": "rand",
+   "r0_imm": 3,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x801693e",
+   "target": "rand",
+   "r0_imm": 25,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x801694c",
+   "target": "rand",
+   "r0_imm": 5,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x8016c7e",
+   "target": "rand",
+   "r0_imm": 8,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x8016cb2",
+   "target": "chance",
+   "r0_imm": 1,
+   "purpose": "player special-move / projectile code (spread, jitter, particle effects) - see player agent"
+  },
+  {
+   "call_site": "0x801a1c8",
+   "target": "rand",
+   "r0_imm": 3,
+   "purpose": "enemy AI behaviour-tree nodes (random wander direction/timers/attack choice) - see enemy agent"
+  },
+  {
+   "call_site": "0x801a7b2",
+   "target": "rand",
+   "r0_imm": 2,
+   "purpose": "enemy death: random death sound rand(2)+0x1f"
+  },
+  {
+   "call_site": "0x801a85e",
+   "target": "rand",
+   "r0_imm": 64,
+   "purpose": "enemy AI behaviour-tree nodes (random wander direction/timers/attack choice) - see enemy agent"
+  },
+  {
+   "call_site": "0x801a886",
+   "target": "rand",
+   "r0_imm": 1,
+   "purpose": "enemy AI behaviour-tree nodes (random wander direction/timers/attack choice) - see enemy agent"
+  },
+  {
+   "call_site": "0x801abbc",
+   "target": "rand",
+   "r0_imm": 64,
+   "purpose": "enemy AI behaviour-tree nodes (random wander direction/timers/attack choice) - see enemy agent"
+  },
+  {
+   "call_site": "0x801abe4",
+   "target": "rand",
+   "r0_imm": 1,
+   "purpose": "enemy AI behaviour-tree nodes (random wander direction/timers/attack choice) - see enemy agent"
+  },
+  {
+   "call_site": "0x801b944",
+   "target": "rand",
+   "r0_imm": 3,
+   "purpose": "enemy AI behaviour-tree nodes (random wander direction/timers/attack choice) - see enemy agent"
+  },
+  {
+   "call_site": "0x801ba1a",
+   "target": "chance",
+   "r0_imm": null,
+   "purpose": "enemy AI behaviour-tree nodes (random wander direction/timers/attack choice) - see enemy agent"
+  },
+  {
+   "call_site": "0x801ba72",
+   "target": "chance",
+   "r0_imm": null,
+   "purpose": "enemy AI behaviour-tree nodes (random wander direction/timers/attack choice) - see enemy agent"
+  },
+  {
+   "call_site": "0x801be42",
+   "target": "rand",
+   "r0_imm": 3,
+   "purpose": "enemy AI behaviour-tree nodes (random wander direction/timers/attack choice) - see enemy agent"
+  },
+  {
+   "call_site": "0x801be62",
+   "target": "rand",
+   "r0_imm": null,
+   "purpose": "enemy AI behaviour-tree nodes (random wander direction/timers/attack choice) - see enemy agent"
+  },
+  {
+   "call_site": "0x801c7c2",
+   "target": "rand",
+   "r0_imm": 3,
+   "purpose": "enemy AI behaviour-tree nodes (random wander direction/timers/attack choice) - see enemy agent"
+  },
+  {
+   "call_site": "0x801c8cc",
+   "target": "rand",
+   "r0_imm": 1,
+   "purpose": "enemy AI behaviour-tree nodes (random wander direction/timers/attack choice) - see enemy agent"
+  },
+  {
+   "call_site": "0x801c8e2",
+   "target": "rand",
+   "r0_imm": null,
+   "purpose": "enemy AI behaviour-tree nodes (random wander direction/timers/attack choice) - see enemy agent"
+  },
+  {
+   "call_site": "0x801ca1e",
+   "target": "rand",
+   "r0_imm": 3,
+   "purpose": "enemy AI behaviour-tree nodes (random wander direction/timers/attack choice) - see enemy agent"
+  },
+  {
+   "call_site": "0x801cddc",
+   "target": "rand",
+   "r0_imm": 2,
+   "purpose": "enemy AI behaviour-tree nodes (random wander direction/timers/attack choice) - see enemy agent"
+  },
+  {
+   "call_site": "0x801d200",
+   "target": "rand",
+   "r0_imm": 3,
+   "purpose": "enemy AI behaviour-tree nodes (random wander direction/timers/attack choice) - see enemy agent"
+  },
+  {
+   "call_site": "0x801da34",
+   "target": "rand",
+   "r0_imm": 2,
+   "purpose": "enemy AI behaviour-tree nodes (random wander direction/timers/attack choice) - see enemy agent"
+  },
+  {
+   "call_site": "0x801daba",
+   "target": "rand",
+   "r0_imm": 3,
+   "purpose": "enemy AI behaviour-tree nodes (random wander direction/timers/attack choice) - see enemy agent"
+  },
+  {
+   "call_site": "0x801dd8a",
+   "target": "rand",
+   "r0_imm": 192,
+   "purpose": "enemy AI behaviour-tree nodes (random wander direction/timers/attack choice) - see enemy agent"
+  },
+  {
+   "call_site": "0x801dd9e",
+   "target": "rand",
+   "r0_imm": 192,
+   "purpose": "enemy AI behaviour-tree nodes (random wander direction/timers/attack choice) - see enemy agent"
+  },
+  {
+   "call_site": "0x801defe",
+   "target": "rand",
+   "r0_imm": 3,
+   "purpose": "enemy AI behaviour-tree nodes (random wander direction/timers/attack choice) - see enemy agent"
+  },
+  {
+   "call_site": "0x801e3fe",
+   "target": "rand",
+   "r0_imm": 3,
+   "purpose": "enemy AI behaviour-tree nodes (random wander direction/timers/attack choice) - see enemy agent"
+  },
+  {
+   "call_site": "0x801eaf8",
+   "target": "rand",
+   "r0_imm": 2,
+   "purpose": "enemy AI behaviour-tree nodes (random wander direction/timers/attack choice) - see enemy agent"
+  },
+  {
+   "call_site": "0x8021420",
+   "target": "rng",
+   "r0_imm": null,
+   "purpose": "rand(n) itself"
+  },
+  {
+   "call_site": "0x8021432",
+   "target": "rng",
+   "r0_imm": null,
+   "purpose": "chance(p) itself"
+  }
+ ]
+}

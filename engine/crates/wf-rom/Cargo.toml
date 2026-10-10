@@ -1,0 +1,11 @@
+[package]
+name = "wf-rom"
+description = "Buu's Fury ROM access: verification, Webfoot LZ, text, GBA graphics primitives, content sink"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+sha1.workspace = true
+png.workspace = true
+serde_json.workspace = true

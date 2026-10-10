@@ -1,0 +1,25 @@
+{
+  "key": "8-3",
+  "add_objects": [
+    {
+      "type": "npc",
+      "comment": "Chiaotzu (sprite 56 = script sprite id 65) by the forest path; talking runs event s930",
+      "condition": { "always": true },
+      "pos": [336, 488],
+      "sprite_index": 65,
+      "talk": { "event": "s930" },
+      "behaviour": []
+    },
+    {
+      "type": "enemy",
+      "comment": "Babidi's soldier hiding in the forest: never placed by the area load (value 1) - s930 creates it with spawn_map_object(200) (its explicit list index, clear of the base list and other mods); its defeat runs s931",
+      "list": { "list": 1, "index": 200 },
+      "condition": { "value": 1 },
+      "enemy_type": 68,
+      "pos": [304, 448],
+      "sprite_index": 173,
+      "on_defeat": { "event": "s931" },
+      "behaviour": []
+    }
+  ]
+}

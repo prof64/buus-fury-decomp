@@ -1,0 +1,6 @@
+{
+  "id": "state_2003",
+  "state": 8195,
+  "note": "Shadow Brute: the phase change - a scripted roar (invulnerable, screen shake, flash, some HP back), then phase 2. No on-hit tree: hits are ignored while it roars.",
+  "tree": {"name": "ModAction", "call": "hooks/ai/brute.rhai:roar", "args": [48]}
+}

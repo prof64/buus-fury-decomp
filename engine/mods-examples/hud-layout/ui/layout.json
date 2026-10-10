@@ -1,0 +1,8 @@
+{
+  "hud": { "pos": [152, 136], "anchor": "bottom_right", "priority": 1 },
+  "skill_icons": {
+    "dir": "icons/skills_night",
+    "files": { "7": "icons/hud_mod/energy_blast.png" }
+  },
+  "banner": { "y": 8 }
+}

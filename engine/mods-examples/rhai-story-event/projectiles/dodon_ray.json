@@ -1,0 +1,16 @@
+{
+  "id": "dodon_ray",
+  "sheet": "effects/mod_dodon",
+  "frames": [[0, 1], [4, 5], [8], [9, 10]],
+  "rate": 2,
+  "end_frames": [12],
+  "end_time": 6,
+  "speed": 1792,
+  "life": 50,
+  "hit_box": [10, 10],
+  "pierce": 1,
+  "wall": "explode",
+  "damage": 900,
+  "attack_sub": 4,
+  "sfx_hit": 48
+}

@@ -1,0 +1,216 @@
+//! The launcher (headless): its menus produce the games the shells start, and a story save slot written by a
+//! session continues where it was saved.
+
+use wf_app::launcher::{self, Choice, Launcher, Settings};
+use wf_app::wf_content::{FileSource, MemSource, Packs};
+
+fn packs(files: &std::collections::BTreeMap<String, Vec<u8>>) -> Packs {
+    Packs::new(vec![Box::new(MemSource(files.clone())) as Box<dyn FileSource>]).unwrap()
+}
+
+#[test]
+fn launcher_menus_and_save_slots() {
+    let Some(rom) = wf_rom::testutil::rom() else { return };
+    let (c, _) = wf_extract::extract_rom(&rom, &Default::default(), &mut |_| {});
+    let p = packs(&c.files);
+    let mut l = Launcher::new(&p, Settings::default(), true);
+    // Battle page: START
+    assert_eq!(l.key("ArrowDown"), Choice::None);
+    assert_eq!(l.key("Enter"), Choice::None);
+    let Choice::Battle(cfg) = l.key("Enter") else { panic!("battle") };
+    assert_eq!(cfg.players[0].fighter, "goku");
+    assert!(launcher::Launcher::new(&p, Settings::default(), true).battle_config().phases[0].enemy.starts_with('t'));
+    let mut fb = vec![0u32; 240 * 160];
+    l.draw(&p, &mut fb, 240, 160);
+    assert!(fb.iter().any(|&px| px != 0xFF00_0000));
+    // Story page: the title screen hand-over
+    l.key("Escape");
+    l.key("ArrowUp");
+    assert_eq!(l.key("Enter"), Choice::None);
+    assert_eq!(l.key("Enter"), Choice::Title);
+    assert!(launcher::title_app(packs(&c.files), &[], 1).is_ok());
+
+    // a slot saved by a session continues there
+    let app = launcher::story_app(packs(&c.files), &[], None, 1).expect("new game");
+    let (gen, files) = launcher::saves_of(&app).expect("story saves");
+    assert_eq!(gen, 0);
+    // (the slot files are empty; the block after them is the options, `saves_of`)
+    assert!(files[..launcher::SLOTS].iter().all(|f| f.is_empty()));
+    let s = app.sim.as_any().unwrap().downcast_ref::<wf_app::story::StorySim>().unwrap();
+    let mut saves = s.session.world.saves.clone();
+    saves.set(1, Some(wf_core_save(s)));
+    let slots: Vec<Vec<u8>> = (0..launcher::SLOTS).map(|i| saves.slot_bytes(i)).collect();
+    assert!(!slots[1].is_empty());
+    let d = wf_app::battle::load_data(&p).unwrap();
+    // (the area by its banner name, as the in-game Select Game shows it)
+    let area = d.field.as_ref().and_then(|f| f.areas.get(&(1, 1))).map(|a| a.banner.trim().to_string()).filter(|b| !b.is_empty()).unwrap_or_else(|| "1-1".into());
+    assert!(launcher::slot_summary(&slots[1], &d).is_some_and(|t| t.contains(&area)), "{:?} {area}", launcher::slot_summary(&slots[1], &d));
+    let app = launcher::story_app(packs(&c.files), &slots, Some(1), 1).expect("continue");
+    let s2 = app.sim.as_any().unwrap().downcast_ref::<wf_app::story::StorySim>().unwrap();
+    assert_eq!(s2.session.world.saves.current, 1);
+    assert!(launcher::story_app(packs(&c.files), &slots, Some(2), 1).is_err(), "empty slot");
+}
+
+fn wf_core_save(s: &wf_app::story::StorySim) -> wf_core_saves::SaveData {
+    wf_core_saves::save_data(&s.session.world, false)
+}
+
+use wf_core::menu::save as wf_core_saves;
+
+/// A quick battle is set up as the story would have the fighter (user report: SS3 Goku vs Kid Buu at level 60 -
+/// every skill greyed out, one hit from Kid Buu a KO): the enemies' level (Kid Buu's level byte 150), the level's
+/// stat points spent, the story's skill level and a full SS3 gauge - every skill of the form usable at the start.
+#[test]
+fn quick_battle_defaults_follow_the_enemy() {
+    let Some(rom) = wf_rom::testutil::rom() else { return };
+    let (c, _) = wf_extract::extract_rom(&rom, &Default::default(), &mut |_| {});
+    let p = packs(&c.files);
+    let mut s = Settings::default();
+    s.battle.fighter = "goku".into();
+    s.battle.form = Some(5);
+    s.battle.enemy = "t60".into();
+    let l = Launcher::new(&p, s, true);
+    let cfg = l.battle_config();
+    let f = &cfg.players[0];
+    assert_eq!((f.form, f.level, f.skill_level, f.full_gauge, f.auto_spend.as_str()), (5, 150, 2, true, "even"));
+    let mut ses = wf_core::session::Session::new(wf_app::battle::load_data(&p).unwrap(), cfg);
+    ses.step(&[0]);
+    let w = &ses.world;
+    let pi = w.player_idx(0).unwrap();
+    assert!(w.pl_ref(pi).ss3_gauge >> 16 > 1000, "SS3 gauge {}", w.pl_ref(pi).ss3_gauge >> 16);
+    // (Super Saiyan itself is not usable in an SS3 form - the game's check)
+    for &sk in w.pl_ref(pi).skills.iter().filter(|&&s| s != 20) {
+        assert!(wf_core::player::can_use_skill(w, pi, sk), "skill {sk} greyed out");
+    }
+    // settings saved before the automatic level existed get it
+    assert!(Settings::from_json(r#"{"battle":{"level":60}}"#).unwrap().battle.level_auto);
+    // the full moveset whatever the level (Battle mode is an arena): Goku and Gotenks have Super Saiyan 3 from base;
+    // the Great Saiyaman is a form of its own - no Super Saiyan above it, no story suit toggle (18); settings saved
+    // with the old PC default move to Classic once
+    assert!(l.battle_config().players[0].skills.as_ref().is_some_and(|s| s.contains(&22)));
+    for (fighter, form) in [("goku", 2), ("gotenks", 31)] {
+        let mut s = Settings::default();
+        s.battle.fighter = fighter.into();
+        s.battle.form = Some(form);
+        s.battle.enemy = "t68".into();
+        let cfg = Launcher::new(&p, s, true).battle_config();
+        assert!(cfg.players[0].skills.as_ref().is_some_and(|s| s.contains(&22)), "{fighter}: no SS3");
+        assert_eq!(cfg.players[0].skill_level, 2);
+    }
+    let mut s = Settings::default();
+    s.battle.fighter = "gohan".into();
+    s.battle.form = Some(14);
+    assert!(Launcher::new(&p, s, true).battle_config().players[0].skills.as_ref().is_some_and(|s| !s.contains(&18) && !s.contains(&20)));
+    assert_eq!(Settings::from_json(r#"{"view":"pc:0"}"#).unwrap().view, "gba:0");
+    assert_eq!(Settings::default().view, "gba:0");
+}
+
+/// The Battle page's character picker (Character / Form / Outfit): no two rows with the same labels, every row starts
+/// a battle in exactly its form record, that form's sprite has the fighting animations and the fighter lands hits on
+/// Majin Fighters; a form's transformations stay on the picker (a halo stays a halo); settings naming a record the
+/// picker no longer lists move to its replacement.
+#[test]
+fn battle_picker_rows_are_distinct_and_playable() {
+    let Some(rom) = wf_rom::testutil::rom() else { return };
+    let (c, _) = wf_extract::extract_rom(&rom, &Default::default(), &mut |_| {});
+    let p = packs(&c.files);
+    let data = wf_app::battle::load_data(&p).unwrap();
+    let l = Launcher::new(&p, Settings::default(), true);
+    let picks = l.picks().to_vec();
+    let chars: Vec<&str> = picks.iter().map(|k| k.character.as_str()).fold(vec![], |mut v, c| {
+        if !v.contains(&c) {
+            v.push(c);
+        }
+        v
+    });
+    assert_eq!(chars, ["Goku", "Gohan", "Goten", "Trunks", "Vegeta", "Gotenks", "Vegito", "Gogeta", "Hercule", "Videl", "Pikkon"]);
+    for (i, a) in picks.iter().enumerate() {
+        for b in &picks[i + 1..] {
+            assert!((&a.character, &a.form, &a.outfit) != (&b.character, &b.form, &b.outfit), "duplicate row {a:?}");
+            assert!((&a.fighter, a.form_id) != (&b.fighter, b.form_id), "one record twice {a:?} {b:?}");
+        }
+        // up / down lead to a row of the same character, with the same look when that form has it
+        let f = data.form(a.form_id).unwrap();
+        for to in [f.up, f.down].into_iter().filter(|&t| t != 255) {
+            let to = [(25, 24)].iter().find(|x| x.0 == to).map(|x| x.1).unwrap_or(to);
+            let t = picks.iter().find(|q| q.fighter == a.fighter && q.form_id == to).unwrap_or_else(|| panic!("{a:?}: transforms into {to}, not on the picker"));
+            let looks: Vec<&str> = picks.iter().filter(|q| q.character == t.character && q.form == t.form).map(|q| q.outfit.as_str()).collect();
+            if looks.contains(&a.outfit.as_str()) {
+                assert_eq!(t.outfit, a.outfit, "{a:?} transforms into {t:?}");
+            }
+        }
+    }
+    for k in &picks {
+        let mut s = Settings::default();
+        s.battle.fighter = k.fighter.clone();
+        s.battle.form = Some(k.form_id);
+        s.battle.enemy = "t68".into();
+        s.battle.count = 2;
+        let l = Launcher::new(&p, s, true);
+        let cfg = l.battle_config();
+        assert_eq!((cfg.players[0].fighter.as_str(), cfg.players[0].form), (k.fighter.as_str(), k.form_id));
+        let mut ses = wf_core::session::Session::new(data.clone(), cfg);
+        let hp = |w: &wf_core::world::World| -> i64 { w.ents.iter().filter_map(|e| if let wf_core::world::Body::Enemy(n) = &e.body { Some(n.hp1024) } else { None }).sum() };
+        let hp0 = hp(&ses.world);
+        {
+            let w = &ses.world;
+            let pl = w.pl_ref(w.player_idx(0).unwrap());
+            assert_eq!(pl.form, k.form_id);
+            let sp = pl.a.sprite.and_then(|s| w.data.sprite(s)).unwrap_or_else(|| panic!("{k:?}: no sprite"));
+            for raw in [1, 2, 3, 4, 5, 6, 7, 8, 10] {
+                assert!(sp.anim_raw(raw).is_some(), "{k:?}: no animation {raw}");
+            }
+        }
+        // walk in, punch, Energy Blasts
+        for f in 0..900usize {
+            let keys: u16 = match (f / 30) % 3 {
+                0 => 0x10,
+                1 => (f % 6 < 2) as u16,
+                _ => if f % 10 < 2 { 2 } else { 0 },
+            };
+            ses.step(&[keys]);
+        }
+        assert!(hp(&ses.world) < hp0, "{k:?}: no hit landed");
+    }
+    // saved settings: a record the picker does not list, and no form at all (the character's first row: Goku's base
+    // look, not his record default - the Other World halo, form 2)
+    for (fighter, form, want) in [("goku", Some(1), 0), ("gohan", Some(11), 10), ("gogeta", Some(44), 41), ("goku", None, 0), ("f48", Some(48), 0)] {
+        let mut s = Settings::default();
+        s.battle.fighter = fighter.into();
+        s.battle.form = form;
+        let l = Launcher::new(&p, s, true);
+        assert_eq!(l.battle_config().players[0].form, want, "{fighter} {form:?}");
+    }
+}
+
+/// Battle mode is a plain arena fighter: one opponent per fight from a list with no part / summon / story actor and
+/// no name twice, an open arena picked on its own (no automatic story arena), the arena rules on; settings saved with
+/// a story preset keep its opponent when it was one enemy, and an arena no longer offered moves to the default
+#[test]
+fn battle_mode_is_an_arena() {
+    let Some(rom) = wf_rom::testutil::rom() else { return };
+    let (c, _) = wf_extract::extract_rom(&rom, &Default::default(), &mut |_| {});
+    let p = packs(&c.files);
+    let l = Launcher::new(&p, Settings::default(), true);
+    let es = l.enemy_list();
+    assert!(!es.iter().any(|e| e.0 == "t57"), "Janemba's hand offered");
+    let mut names: Vec<String> = es.iter().map(|e| e.1.to_uppercase()).collect();
+    let n = names.len();
+    names.sort();
+    names.dedup();
+    assert_eq!(names.len(), n, "a name twice");
+    let cfg = l.battle_config();
+    assert!(cfg.arena_rules);
+    assert_eq!((cfg.phases.len(), cfg.phases[0].count, cfg.arena.as_str()), (1, 1, launcher::DEFAULT_ARENA));
+    let s = Settings::from_json(r#"{"battle":{"preset_mode":true,"preset":"broly","arena":"","count":4}}"#).unwrap();
+    let cfg = Launcher::new(&p, s, true).battle_config();
+    assert_eq!((cfg.phases[0].enemy.as_str(), cfg.phases[0].count, cfg.arena.as_str()), ("t10", 1, launcher::DEFAULT_ARENA));
+    let mut s = Settings::default();
+    s.battle.arena = "forest".into();
+    assert_eq!(Launcher::new(&p, s, true).battle_config().arena, launcher::DEFAULT_ARENA);
+    for a in launcher::BATTLE_ARENAS {
+        let mut s = Settings::default();
+        s.battle.arena = a.to_string();
+        assert_eq!(Launcher::new(&p, s, true).battle_config().arena, *a);
+    }
+}

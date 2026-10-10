@@ -1,0 +1,8 @@
+{
+ "id": "rhai_unknown_native",
+ "name": "rhai_unknown_native",
+ "format_version": 1,
+ "depends": [
+  "base"
+ ]
+}

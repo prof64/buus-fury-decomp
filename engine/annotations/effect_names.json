@@ -1,0 +1,4077 @@
+{
+ "086FD9D0": {
+  "confidence": "high",
+  "name": "Smoke puff",
+  "notes": "generic effect 0x0802A81C, 4 records, rate 0x1000 + rand(0x1000) at most sites"
+ },
+ "08712FDC": {
+  "confidence": "high",
+  "name": "Explosion",
+  "notes": "generic effect 0x0802A81C, 4 records; rate 0x2000 (projectiles) or 0x1000 + rand(0x1000) (0x0801952C: deaths, Big Bang, Dragon Fist, beams)"
+ },
+ "0871370C": {
+  "confidence": "high",
+  "name": "Energy Blast",
+  "notes": "ki blast 0x080197B4 (player and enemies): records dir*4 + f (f = t >> 3, then 2/3), record 16 = spark shown 16 ticks at a wall / hit"
+ },
+ "0871D168": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (down): start",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D174": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (down): start (frame 2)",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D180": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (down): start mirror",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D18C": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (down): body 8",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D198": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (down): body 16",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D1A4": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (down): body 32",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D1B0": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (down): body (2nd gfx)",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D1BC": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (down): head",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D1C8": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (down): head (frame 2)",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D1D4": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (down): head mirror",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D1E0": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (down): impact",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D1EC": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (down): impact (frame 2)",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D1F8": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (down): impact mirror",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D204": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (down): tail",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D210": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (down): tail (frame 2)",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D21C": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (down): tail mirror",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D228": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (up): start",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D234": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (up): start (frame 2)",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D240": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (up): start mirror",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D24C": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (up): body 8",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D258": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (up): body 16",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D264": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (up): body 32",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D270": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (up): body (2nd gfx)",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D27C": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (up): head",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D288": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (up): head (frame 2)",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D294": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (up): head mirror",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D2A0": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (up): impact",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D2AC": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (up): impact (frame 2)",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D2B8": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (up): impact mirror",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D2C4": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (up): tail",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D2D0": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (up): tail (frame 2)",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D2DC": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (up): tail mirror",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D2E8": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (left): start",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D2F4": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (left): start (frame 2)",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D300": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (left): start mirror",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D30C": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (left): body 8",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D318": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (left): body 16",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D324": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (left): body 32",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D330": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (left): body (2nd gfx)",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D33C": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (left): head",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D348": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (left): head (frame 2)",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D354": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (left): head mirror",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D360": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (left): impact",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D36C": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (left): impact (frame 2)",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D378": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (left): impact mirror",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D384": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (left): tail",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D390": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (left): tail (frame 2)",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D39C": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (left): tail mirror",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D3A8": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (right): start",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D3B4": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (right): start (frame 2)",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D3C0": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (right): start mirror",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D3CC": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (right): body 8",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D3D8": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (right): body 16",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D3E4": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (right): body 32",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D3F0": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (right): body (2nd gfx)",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D3FC": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (right): head",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D408": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (right): head (frame 2)",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D414": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (right): head mirror",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D420": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (right): impact",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D42C": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (right): impact (frame 2)",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D438": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (right): impact mirror",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D444": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (right): tail",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D450": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (right): tail (frame 2)",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D45C": {
+  "confidence": "high",
+  "name": "Kamehameha Lv1 (right): tail mirror",
+  "notes": "beam piece table 0x0871d168 (level definition 0x0871da68); drawn as buu_beam_kamehameha_1"
+ },
+ "0871D468": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (down): start",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D474": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (down): start (frame 2)",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D480": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (down): start mirror",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D48C": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (down): body 8",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D498": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (down): body 16",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D4A4": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (down): body 32",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D4B0": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (down): body (2nd gfx)",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D4BC": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (down): head",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D4C8": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (down): head (frame 2)",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D4D4": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (down): head mirror",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D4E0": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (down): impact",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D4EC": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (down): impact (frame 2)",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D4F8": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (down): impact mirror",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D504": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (down): tail",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D510": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (down): tail (frame 2)",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D51C": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (down): tail mirror",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D528": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (up): start",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D534": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (up): start (frame 2)",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D540": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (up): start mirror",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D54C": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (up): body 8",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D558": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (up): body 16",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D564": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (up): body 32",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D570": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (up): body (2nd gfx)",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D57C": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (up): head",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D588": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (up): head (frame 2)",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D594": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (up): head mirror",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D5A0": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (up): impact",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D5AC": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (up): impact (frame 2)",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D5B8": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (up): impact mirror",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D5C4": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (up): tail",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D5D0": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (up): tail (frame 2)",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D5DC": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (up): tail mirror",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D5E8": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (left): start",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D5F4": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (left): start (frame 2)",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D600": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (left): start mirror",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D60C": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (left): body 8",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D618": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (left): body 16",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D624": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (left): body 32",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D630": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (left): body (2nd gfx)",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D63C": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (left): head",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D648": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (left): head (frame 2)",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D654": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (left): head mirror",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D660": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (left): impact",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D66C": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (left): impact (frame 2)",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D678": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (left): impact mirror",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D684": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (left): tail",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D690": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (left): tail (frame 2)",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D69C": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (left): tail mirror",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D6A8": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (right): start",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D6B4": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (right): start (frame 2)",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D6C0": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (right): start mirror",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D6CC": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (right): body 8",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D6D8": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (right): body 16",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D6E4": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (right): body 32",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D6F0": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (right): body (2nd gfx)",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D6FC": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (right): head",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D708": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (right): head (frame 2)",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D714": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (right): head mirror",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D720": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (right): impact",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D72C": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (right): impact (frame 2)",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D738": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (right): impact mirror",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D744": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (right): tail",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D750": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (right): tail (frame 2)",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D75C": {
+  "confidence": "high",
+  "name": "Kamehameha Lv2 (right): tail mirror",
+  "notes": "beam piece table 0x0871d468 (level definition 0x0871da78); drawn as buu_beam_kamehameha_2"
+ },
+ "0871D768": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (down): start",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D774": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (down): start (frame 2)",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D780": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (down): start mirror",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D78C": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (down): body 8",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D798": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (down): body 16",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D7A4": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (down): body 32",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D7B0": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (down): body (2nd gfx)",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D7BC": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (down): head",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D7C8": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (down): head (frame 2)",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D7D4": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (down): head mirror",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D7E0": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (down): impact",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D7EC": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (down): impact (frame 2)",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D7F8": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (down): impact mirror",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D804": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (down): tail",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D810": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (down): tail (frame 2)",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D81C": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (down): tail mirror",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D828": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (up): start",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D834": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (up): start (frame 2)",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D840": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (up): start mirror",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D84C": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (up): body 8",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D858": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (up): body 16",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D864": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (up): body 32",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D870": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (up): body (2nd gfx)",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D87C": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (up): head",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D888": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (up): head (frame 2)",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D894": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (up): head mirror",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D8A0": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (up): impact",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D8AC": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (up): impact (frame 2)",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D8B8": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (up): impact mirror",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D8C4": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (up): tail",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D8D0": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (up): tail (frame 2)",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D8DC": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (up): tail mirror",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D8E8": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (left): start",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D8F4": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (left): start (frame 2)",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D900": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (left): start mirror",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D90C": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (left): body 8",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D918": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (left): body 16",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D924": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (left): body 32",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D930": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (left): body (2nd gfx)",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D93C": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (left): head",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D948": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (left): head (frame 2)",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D954": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (left): head mirror",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D960": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (left): impact",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D96C": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (left): impact (frame 2)",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D978": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (left): impact mirror",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D984": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (left): tail",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D990": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (left): tail (frame 2)",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D99C": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (left): tail mirror",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D9A8": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (right): start",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D9B4": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (right): start (frame 2)",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D9C0": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (right): start mirror",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D9CC": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (right): body 8",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D9D8": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (right): body 16",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D9E4": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (right): body 32",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D9F0": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (right): body (2nd gfx)",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871D9FC": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (right): head",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871DA08": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (right): head (frame 2)",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871DA14": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (right): head mirror",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871DA20": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (right): impact",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871DA2C": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (right): impact (frame 2)",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871DA38": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (right): impact mirror",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871DA44": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (right): tail",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871DA50": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (right): tail (frame 2)",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871DA5C": {
+  "confidence": "high",
+  "name": "Kamehameha Lv3 (right): tail mirror",
+  "notes": "beam piece table 0x0871d768 (level definition 0x0871da88); drawn as buu_beam_kamehameha_3"
+ },
+ "0871E630": {
+  "confidence": "high",
+  "name": "Tank shell",
+  "notes": "class 0x0801C900: records 0-3 by direction, 4-6 smoke trail (rate 0x2AAA every 4 ticks)"
+ },
+ "0871E984": {
+  "confidence": "high",
+  "name": "Bomb",
+  "notes": "class 0x0801C6E4 (Bomber, Grenadier, Mad Bomber): k = (t >> 2) & 3, 3 -> 1"
+ },
+ "087202E8": {
+  "confidence": "high",
+  "name": "Energy shield",
+  "notes": "R+B shield 0x0801DFE0: record = c >> 3 (grow 0-2, loop 3-6, shrink), drawn on even ticks"
+ },
+ "08721164": {
+  "confidence": "high",
+  "name": "Beam charge sparkles",
+  "notes": "state-0 sparkle of the beam object: 0-2 Kamekameha, 3-5 Kamehameha / Electric / Big Bang Kamehameha, 6-8 Banshee Blast, 9-11 Masenkoha Lv1-2, 12-14 Lv3 beams / Masenkoha Lv3 / Flame Kamehameha / Super Buu ball"
+ },
+ "08724718": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (down): start",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724724": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (down): start (frame 2)",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724730": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (down): start mirror",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "0872473C": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (down): body 8",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724748": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (down): body 16",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724754": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (down): body 32",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724760": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (down): body (2nd gfx)",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "0872476C": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (down): head",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724778": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (down): head (frame 2)",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724784": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (down): head mirror",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724790": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (down): impact",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "0872479C": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (down): impact (frame 2)",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "087247A8": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (down): impact mirror",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "087247B4": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (down): tail",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "087247C0": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (down): tail (frame 2)",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "087247CC": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (down): tail mirror",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "087247D8": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (up): start",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "087247E4": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (up): start (frame 2)",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "087247F0": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (up): start mirror",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "087247FC": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (up): body 8",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724808": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (up): body 16",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724814": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (up): body 32",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724820": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (up): body (2nd gfx)",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "0872482C": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (up): head",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724838": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (up): head (frame 2)",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724844": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (up): head mirror",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724850": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (up): impact",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "0872485C": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (up): impact (frame 2)",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724868": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (up): impact mirror",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724874": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (up): tail",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724880": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (up): tail (frame 2)",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "0872488C": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (up): tail mirror",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724898": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (left): start",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "087248A4": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (left): start (frame 2)",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "087248B0": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (left): start mirror",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "087248BC": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (left): body 8",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "087248C8": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (left): body 16",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "087248D4": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (left): body 32",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "087248E0": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (left): body (2nd gfx)",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "087248EC": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (left): head",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "087248F8": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (left): head (frame 2)",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724904": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (left): head mirror",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724910": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (left): impact",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "0872491C": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (left): impact (frame 2)",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724928": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (left): impact mirror",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724934": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (left): tail",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724940": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (left): tail (frame 2)",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "0872494C": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (left): tail mirror",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724958": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (right): start",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724964": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (right): start (frame 2)",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724970": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (right): start mirror",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "0872497C": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (right): body 8",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724988": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (right): body 16",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724994": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (right): body 32",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "087249A0": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (right): body (2nd gfx)",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "087249AC": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (right): head",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "087249B8": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (right): head (frame 2)",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "087249C4": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (right): head mirror",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "087249D0": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (right): impact",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "087249DC": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (right): impact (frame 2)",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "087249E8": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (right): impact mirror",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "087249F4": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (right): tail",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724A00": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (right): tail (frame 2)",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724A0C": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv1 (right): tail mirror",
+  "notes": "beam piece table 0x08724718 (level definition 0x08725018); drawn as buu_beam_electric_kamehameha_1"
+ },
+ "08724A18": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (down): start",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724A24": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (down): start (frame 2)",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724A30": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (down): start mirror",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724A3C": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (down): body 8",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724A48": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (down): body 16",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724A54": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (down): body 32",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724A60": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (down): body (2nd gfx)",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724A6C": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (down): head",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724A78": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (down): head (frame 2)",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724A84": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (down): head mirror",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724A90": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (down): impact",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724A9C": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (down): impact (frame 2)",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724AA8": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (down): impact mirror",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724AB4": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (down): tail",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724AC0": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (down): tail (frame 2)",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724ACC": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (down): tail mirror",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724AD8": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (up): start",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724AE4": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (up): start (frame 2)",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724AF0": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (up): start mirror",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724AFC": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (up): body 8",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724B08": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (up): body 16",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724B14": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (up): body 32",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724B20": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (up): body (2nd gfx)",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724B2C": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (up): head",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724B38": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (up): head (frame 2)",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724B44": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (up): head mirror",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724B50": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (up): impact",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724B5C": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (up): impact (frame 2)",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724B68": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (up): impact mirror",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724B74": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (up): tail",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724B80": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (up): tail (frame 2)",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724B8C": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (up): tail mirror",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724B98": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (left): start",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724BA4": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (left): start (frame 2)",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724BB0": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (left): start mirror",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724BBC": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (left): body 8",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724BC8": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (left): body 16",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724BD4": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (left): body 32",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724BE0": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (left): body (2nd gfx)",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724BEC": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (left): head",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724BF8": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (left): head (frame 2)",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724C04": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (left): head mirror",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724C10": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (left): impact",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724C1C": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (left): impact (frame 2)",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724C28": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (left): impact mirror",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724C34": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (left): tail",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724C40": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (left): tail (frame 2)",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724C4C": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (left): tail mirror",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724C58": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (right): start",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724C64": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (right): start (frame 2)",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724C70": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (right): start mirror",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724C7C": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (right): body 8",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724C88": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (right): body 16",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724C94": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (right): body 32",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724CA0": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (right): body (2nd gfx)",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724CAC": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (right): head",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724CB8": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (right): head (frame 2)",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724CC4": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (right): head mirror",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724CD0": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (right): impact",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724CDC": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (right): impact (frame 2)",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724CE8": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (right): impact mirror",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724CF4": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (right): tail",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724D00": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (right): tail (frame 2)",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724D0C": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv2 (right): tail mirror",
+  "notes": "beam piece table 0x08724a18 (level definition 0x08725028); drawn as buu_beam_electric_kamehameha_2"
+ },
+ "08724D18": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (down): start",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724D24": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (down): start (frame 2)",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724D30": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (down): start mirror",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724D3C": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (down): body 8",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724D48": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (down): body 16",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724D54": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (down): body 32",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724D60": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (down): body (2nd gfx)",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724D6C": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (down): head",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724D78": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (down): head (frame 2)",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724D84": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (down): head mirror",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724D90": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (down): impact",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724D9C": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (down): impact (frame 2)",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724DA8": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (down): impact mirror",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724DB4": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (down): tail",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724DC0": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (down): tail (frame 2)",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724DCC": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (down): tail mirror",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724DD8": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (up): start",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724DE4": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (up): start (frame 2)",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724DF0": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (up): start mirror",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724DFC": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (up): body 8",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724E08": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (up): body 16",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724E14": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (up): body 32",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724E20": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (up): body (2nd gfx)",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724E2C": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (up): head",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724E38": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (up): head (frame 2)",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724E44": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (up): head mirror",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724E50": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (up): impact",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724E5C": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (up): impact (frame 2)",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724E68": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (up): impact mirror",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724E74": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (up): tail",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724E80": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (up): tail (frame 2)",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724E8C": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (up): tail mirror",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724E98": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (left): start",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724EA4": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (left): start (frame 2)",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724EB0": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (left): start mirror",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724EBC": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (left): body 8",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724EC8": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (left): body 16",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724ED4": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (left): body 32",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724EE0": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (left): body (2nd gfx)",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724EEC": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (left): head",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724EF8": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (left): head (frame 2)",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724F04": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (left): head mirror",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724F10": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (left): impact",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724F1C": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (left): impact (frame 2)",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724F28": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (left): impact mirror",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724F34": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (left): tail",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724F40": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (left): tail (frame 2)",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724F4C": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (left): tail mirror",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724F58": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (right): start",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724F64": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (right): start (frame 2)",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724F70": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (right): start mirror",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724F7C": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (right): body 8",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724F88": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (right): body 16",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724F94": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (right): body 32",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724FA0": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (right): body (2nd gfx)",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724FAC": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (right): head",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724FB8": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (right): head (frame 2)",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724FC4": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (right): head mirror",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724FD0": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (right): impact",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724FDC": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (right): impact (frame 2)",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724FE8": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (right): impact mirror",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08724FF4": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (right): tail",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "08725000": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (right): tail (frame 2)",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "0872500C": {
+  "confidence": "high",
+  "name": "Electric Kamehameha Lv3 (right): tail mirror",
+  "notes": "beam piece table 0x08724d18 (level definition 0x08725038); drawn as buu_beam_electric_kamehameha_3"
+ },
+ "0872509C": {
+  "confidence": "high",
+  "name": "Masenkoha cursor",
+  "notes": "cursor 0x08021594, centred 16x16"
+ },
+ "0872A5DC": {
+  "confidence": "high",
+  "name": "Masenkoha blast",
+  "notes": "Lv1 records 0-3, Lv2 4-8, Lv3 / Super Buu ball 9-14; 4 ticks each"
+ },
+ "0872BF04": {
+  "confidence": "high",
+  "name": "Instant Transmission markers",
+  "notes": "groups of 4 (rec = group + ((t >> 2) & 3)): 0-3 cursor, 4-7 target, 8-11 unused; drawn twice (normal + vertically flipped) as a 32x32 ring"
+ },
+ "0872D6C4": {
+  "confidence": "high",
+  "name": "Flame (down)",
+  "notes": "records 1-4 of the down flame; full table fx_0872d6b8"
+ },
+ "0872D700": {
+  "confidence": "high",
+  "name": "Flame (up)",
+  "notes": "records 1-4 of the up flame; full table fx_0872d6b8"
+ },
+ "0872D73C": {
+  "confidence": "high",
+  "name": "Flame (left)",
+  "notes": "records 1-4 of the left flame; full table fx_0872d6b8"
+ },
+ "0872D778": {
+  "confidence": "high",
+  "name": "Flame (right)",
+  "notes": "records 1-4 of the right flame; full table fx_0872d6b8"
+ },
+ "08730CA8": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (down): start",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730CB4": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (down): start (frame 2)",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730CC0": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (down): start mirror",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730CCC": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (down): body 8",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730CD8": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (down): body 16",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730CE4": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (down): body 32",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730CF0": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (down): body (2nd gfx)",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730CFC": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (down): head",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730D08": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (down): head (frame 2)",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730D14": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (down): head mirror",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730D20": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (down): impact",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730D2C": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (down): impact (frame 2)",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730D38": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (down): impact mirror",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730D44": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (down): tail",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730D50": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (down): tail (frame 2)",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730D5C": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (down): tail mirror",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730D68": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (up): start",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730D74": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (up): start (frame 2)",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730D80": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (up): start mirror",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730D8C": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (up): body 8",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730D98": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (up): body 16",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730DA4": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (up): body 32",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730DB0": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (up): body (2nd gfx)",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730DBC": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (up): head",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730DC8": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (up): head (frame 2)",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730DD4": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (up): head mirror",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730DE0": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (up): impact",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730DEC": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (up): impact (frame 2)",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730DF8": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (up): impact mirror",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730E04": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (up): tail",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730E10": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (up): tail (frame 2)",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730E1C": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (up): tail mirror",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730E28": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (left): start",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730E34": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (left): start (frame 2)",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730E40": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (left): start mirror",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730E4C": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (left): body 8",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730E58": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (left): body 16",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730E64": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (left): body 32",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730E70": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (left): body (2nd gfx)",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730E7C": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (left): head",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730E88": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (left): head (frame 2)",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730E94": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (left): head mirror",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730EA0": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (left): impact",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730EAC": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (left): impact (frame 2)",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730EB8": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (left): impact mirror",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730EC4": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (left): tail",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730ED0": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (left): tail (frame 2)",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730EDC": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (left): tail mirror",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730EE8": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (right): start",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730EF4": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (right): start (frame 2)",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730F00": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (right): start mirror",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730F0C": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (right): body 8",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730F18": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (right): body 16",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730F24": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (right): body 32",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730F30": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (right): body (2nd gfx)",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730F3C": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (right): head",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730F48": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (right): head (frame 2)",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730F54": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (right): head mirror",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730F60": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (right): impact",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730F6C": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (right): impact (frame 2)",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730F78": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (right): impact mirror",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730F84": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (right): tail",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730F90": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (right): tail (frame 2)",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730F9C": {
+  "confidence": "high",
+  "name": "Kamekameha Lv1 (right): tail mirror",
+  "notes": "beam piece table 0x08730ca8 (level definition 0x087315a8); drawn as buu_beam_kamekameha_1"
+ },
+ "08730FA8": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (down): start",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08730FB4": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (down): start (frame 2)",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08730FC0": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (down): start mirror",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08730FCC": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (down): body 8",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08730FD8": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (down): body 16",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08730FE4": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (down): body 32",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08730FF0": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (down): body (2nd gfx)",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08730FFC": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (down): head",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08731008": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (down): head (frame 2)",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08731014": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (down): head mirror",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08731020": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (down): impact",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "0873102C": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (down): impact (frame 2)",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08731038": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (down): impact mirror",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08731044": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (down): tail",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08731050": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (down): tail (frame 2)",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "0873105C": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (down): tail mirror",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08731068": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (up): start",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08731074": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (up): start (frame 2)",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08731080": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (up): start mirror",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "0873108C": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (up): body 8",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08731098": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (up): body 16",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "087310A4": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (up): body 32",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "087310B0": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (up): body (2nd gfx)",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "087310BC": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (up): head",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "087310C8": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (up): head (frame 2)",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "087310D4": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (up): head mirror",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "087310E0": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (up): impact",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "087310EC": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (up): impact (frame 2)",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "087310F8": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (up): impact mirror",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08731104": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (up): tail",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08731110": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (up): tail (frame 2)",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "0873111C": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (up): tail mirror",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08731128": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (left): start",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08731134": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (left): start (frame 2)",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08731140": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (left): start mirror",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "0873114C": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (left): body 8",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08731158": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (left): body 16",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08731164": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (left): body 32",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08731170": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (left): body (2nd gfx)",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "0873117C": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (left): head",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08731188": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (left): head (frame 2)",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08731194": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (left): head mirror",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "087311A0": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (left): impact",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "087311AC": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (left): impact (frame 2)",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "087311B8": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (left): impact mirror",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "087311C4": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (left): tail",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "087311D0": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (left): tail (frame 2)",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "087311DC": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (left): tail mirror",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "087311E8": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (right): start",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "087311F4": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (right): start (frame 2)",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08731200": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (right): start mirror",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "0873120C": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (right): body 8",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08731218": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (right): body 16",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08731224": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (right): body 32",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08731230": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (right): body (2nd gfx)",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "0873123C": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (right): head",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08731248": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (right): head (frame 2)",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08731254": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (right): head mirror",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08731260": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (right): impact",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "0873126C": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (right): impact (frame 2)",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08731278": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (right): impact mirror",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08731284": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (right): tail",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "08731290": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (right): tail (frame 2)",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "0873129C": {
+  "confidence": "high",
+  "name": "Kamekameha Lv2 (right): tail mirror",
+  "notes": "beam piece table 0x08730fa8 (level definition 0x087315b8); drawn as buu_beam_kamekameha_2"
+ },
+ "087312A8": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (down): start",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "087312B4": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (down): start (frame 2)",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "087312C0": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (down): start mirror",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "087312CC": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (down): body 8",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "087312D8": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (down): body 16",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "087312E4": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (down): body 32",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "087312F0": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (down): body (2nd gfx)",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "087312FC": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (down): head",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "08731308": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (down): head (frame 2)",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "08731314": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (down): head mirror",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "08731320": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (down): impact",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "0873132C": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (down): impact (frame 2)",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "08731338": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (down): impact mirror",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "08731344": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (down): tail",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "08731350": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (down): tail (frame 2)",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "0873135C": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (down): tail mirror",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "08731368": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (up): start",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "08731374": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (up): start (frame 2)",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "08731380": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (up): start mirror",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "0873138C": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (up): body 8",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "08731398": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (up): body 16",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "087313A4": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (up): body 32",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "087313B0": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (up): body (2nd gfx)",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "087313BC": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (up): head",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "087313C8": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (up): head (frame 2)",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "087313D4": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (up): head mirror",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "087313E0": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (up): impact",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "087313EC": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (up): impact (frame 2)",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "087313F8": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (up): impact mirror",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "08731404": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (up): tail",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "08731410": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (up): tail (frame 2)",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "0873141C": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (up): tail mirror",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "08731428": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (left): start",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "08731434": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (left): start (frame 2)",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "08731440": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (left): start mirror",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "0873144C": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (left): body 8",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "08731458": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (left): body 16",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "08731464": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (left): body 32",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "08731470": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (left): body (2nd gfx)",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "0873147C": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (left): head",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "08731488": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (left): head (frame 2)",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "08731494": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (left): head mirror",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "087314A0": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (left): impact",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "087314AC": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (left): impact (frame 2)",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "087314B8": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (left): impact mirror",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "087314C4": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (left): tail",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "087314D0": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (left): tail (frame 2)",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "087314DC": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (left): tail mirror",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "087314E8": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (right): start",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "087314F4": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (right): start (frame 2)",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "08731500": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (right): start mirror",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "0873150C": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (right): body 8",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "08731518": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (right): body 16",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "08731524": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (right): body 32",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "08731530": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (right): body (2nd gfx)",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "0873153C": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (right): head",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "08731548": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (right): head (frame 2)",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "08731554": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (right): head mirror",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "08731560": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (right): impact",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "0873156C": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (right): impact (frame 2)",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "08731578": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (right): impact mirror",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "08731584": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (right): tail",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "08731590": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (right): tail (frame 2)",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "0873159C": {
+  "confidence": "high",
+  "name": "Kamekameha Lv3 (right): tail mirror",
+  "notes": "beam piece table 0x087312a8 (level definition 0x087315c8); drawn as buu_beam_kamekameha_3"
+ },
+ "0874E614": {
+  "confidence": "high",
+  "name": "Rifle bullet",
+  "notes": "class 0x080276A8 (Hessian, Marauder, Mercenary): records 0-3 by direction, 4-6 smoke trail"
+ },
+ "0874E968": {
+  "confidence": "high",
+  "name": "Gun bullet",
+  "notes": "class 0x080274B4 (Assassin, Gunman, Sniper): record dir + 4f, f = 0,1,2,1 every 4 ticks"
+ },
+ "0874ED7C": {
+  "confidence": "high",
+  "name": "Candy beam",
+  "notes": "Majin Buu 0x080286D4: 5 records per direction (muzzle 0/1, body 2, head 3/4)"
+ },
+ "0874EFEC": {
+  "confidence": "high",
+  "name": "Stretch arm",
+  "notes": "Majin Buu / Super Buu 0x08028C04: 2 records per direction (arm, fist)"
+ },
+ "087501EC": {
+  "confidence": "high",
+  "name": "Burning Attack",
+  "notes": "class 0x08029384: records (t >> 3) & 1 in flight, 2/3 at the end (16 ticks)"
+ },
+ "0875043C": {
+  "confidence": "high",
+  "name": "Energy wave",
+  "notes": "enemy wave 0x0802A2EC: 3 records per direction (muzzle 0/1, body 2)"
+ },
+ "087520D4": {
+  "confidence": "high",
+  "name": "Super Saiyan swirl",
+  "notes": "transform effect when script flag 0x03002BB0 is set: 7 records, rate 0xC88"
+ },
+ "08752D28": {
+  "confidence": "high",
+  "name": "Super Saiyan aura",
+  "notes": "transform aura: 3 records looping at rate 0x4000"
+ },
+ "08754A1C": {
+  "confidence": "high",
+  "name": "Shuriken",
+  "notes": "class 0x0802C790 (Ninja, Shadow Warrior, Shinobi): record (t >> 3) & 1"
+ },
+ "087568B4": {
+  "confidence": "high",
+  "name": "Flame Kamehameha",
+  "notes": "links 0x0802DB6C: 7 records per direction (0x54 bytes)"
+ },
+ "0875723C": {
+  "confidence": "high",
+  "name": "Mummy bandage (diagonal)",
+  "notes": "records 6-11 of fx_087571f4"
+ },
+ "087579B8": {
+  "confidence": "high",
+  "name": "Dabura spit",
+  "notes": "class 0x0802E444: 5 aim sectors x 2 frames"
+ },
+ "08759620": {
+  "confidence": "high",
+  "name": "Mini-Yakon lunge",
+  "notes": "object around 0x08035670 (vtable 0x0804C098)"
+ },
+ "0875A6A8": {
+  "confidence": "high",
+  "name": "Super Janemba energy wave",
+  "notes": "class 0x080359D4: record = direction"
+ },
+ "0875F7AC": {
+  "confidence": "high",
+  "name": "Broly floor rock",
+  "notes": "class 0x08036A44: 0 intact, 1 cracked, 2 broken, 3-5 regrowing"
+ },
+ "0875FE2C": {
+  "confidence": "high",
+  "name": "Final Flash (weak)",
+  "notes": "class 0x08036FA2 table 0: start 2*dir, body 2*dir + 1"
+ },
+ "08760A8C": {
+  "confidence": "high",
+  "name": "Final Flash (medium)",
+  "notes": "class 0x08036FA2 table 1"
+ },
+ "087616EC": {
+  "confidence": "high",
+  "name": "Final Flash",
+  "notes": "class 0x08036FA2 table 2 (player Lv3, Majin Vegeta, Yakon)"
+ },
+ "08762270": {
+  "confidence": "high",
+  "name": "Energy Punch aura",
+  "notes": "Energy Punch Lv3 record object: 3 records per direction"
+ },
+ "08764E00": {
+  "confidence": "high",
+  "name": "Big Bang ball (down)",
+  "notes": "ball 0x08037480 Lv1/Lv2: record f (0..6)"
+ },
+ "08764E78": {
+  "confidence": "high",
+  "name": "Big Bang ball (up)",
+  "notes": "ball 0x08037480 Lv1/Lv2"
+ },
+ "08764EF0": {
+  "confidence": "high",
+  "name": "Big Bang ball (left)",
+  "notes": "ball 0x08037480 Lv1/Lv2"
+ },
+ "08764F68": {
+  "confidence": "high",
+  "name": "Big Bang ball (right)",
+  "notes": "ball 0x08037480 Lv1/Lv2"
+ },
+ "0876AAE0": {
+  "confidence": "high",
+  "name": "Big Bang ball (Lv3)",
+  "notes": "ball 0x08037480 Lv3: record dir*10 + f (7..9 cycling)"
+ },
+ "0876B72C": {
+  "confidence": "high",
+  "name": "Banshee Blast (down): start",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B738": {
+  "confidence": "high",
+  "name": "Banshee Blast (down): start (frame 2)",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B744": {
+  "confidence": "high",
+  "name": "Banshee Blast (down): start mirror",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B750": {
+  "confidence": "high",
+  "name": "Banshee Blast (down): body 8",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B75C": {
+  "confidence": "high",
+  "name": "Banshee Blast (down): body 16",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B768": {
+  "confidence": "high",
+  "name": "Banshee Blast (down): body 32",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B774": {
+  "confidence": "high",
+  "name": "Banshee Blast (down): body (2nd gfx)",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B780": {
+  "confidence": "high",
+  "name": "Banshee Blast (down): head",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B78C": {
+  "confidence": "high",
+  "name": "Banshee Blast (down): head (frame 2)",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B798": {
+  "confidence": "high",
+  "name": "Banshee Blast (down): head mirror",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B7A4": {
+  "confidence": "high",
+  "name": "Banshee Blast (down): impact",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B7B0": {
+  "confidence": "high",
+  "name": "Banshee Blast (down): impact (frame 2)",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B7BC": {
+  "confidence": "high",
+  "name": "Banshee Blast (down): impact mirror",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B7C8": {
+  "confidence": "high",
+  "name": "Banshee Blast (down): tail",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B7D4": {
+  "confidence": "high",
+  "name": "Banshee Blast (down): tail (frame 2)",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B7E0": {
+  "confidence": "high",
+  "name": "Banshee Blast (down): tail mirror",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B7EC": {
+  "confidence": "high",
+  "name": "Banshee Blast (up): start",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B7F8": {
+  "confidence": "high",
+  "name": "Banshee Blast (up): start (frame 2)",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B804": {
+  "confidence": "high",
+  "name": "Banshee Blast (up): start mirror",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B810": {
+  "confidence": "high",
+  "name": "Banshee Blast (up): body 8",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B81C": {
+  "confidence": "high",
+  "name": "Banshee Blast (up): body 16",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B828": {
+  "confidence": "high",
+  "name": "Banshee Blast (up): body 32",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B834": {
+  "confidence": "high",
+  "name": "Banshee Blast (up): body (2nd gfx)",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B840": {
+  "confidence": "high",
+  "name": "Banshee Blast (up): head",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B84C": {
+  "confidence": "high",
+  "name": "Banshee Blast (up): head (frame 2)",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B858": {
+  "confidence": "high",
+  "name": "Banshee Blast (up): head mirror",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B864": {
+  "confidence": "high",
+  "name": "Banshee Blast (up): impact",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B870": {
+  "confidence": "high",
+  "name": "Banshee Blast (up): impact (frame 2)",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B87C": {
+  "confidence": "high",
+  "name": "Banshee Blast (up): impact mirror",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B888": {
+  "confidence": "high",
+  "name": "Banshee Blast (up): tail",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B894": {
+  "confidence": "high",
+  "name": "Banshee Blast (up): tail (frame 2)",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B8A0": {
+  "confidence": "high",
+  "name": "Banshee Blast (up): tail mirror",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B8AC": {
+  "confidence": "high",
+  "name": "Banshee Blast (left): start",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B8B8": {
+  "confidence": "high",
+  "name": "Banshee Blast (left): start (frame 2)",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B8C4": {
+  "confidence": "high",
+  "name": "Banshee Blast (left): start mirror",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B8D0": {
+  "confidence": "high",
+  "name": "Banshee Blast (left): body 8",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B8DC": {
+  "confidence": "high",
+  "name": "Banshee Blast (left): body 16",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B8E8": {
+  "confidence": "high",
+  "name": "Banshee Blast (left): body 32",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B8F4": {
+  "confidence": "high",
+  "name": "Banshee Blast (left): body (2nd gfx)",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B900": {
+  "confidence": "high",
+  "name": "Banshee Blast (left): head",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B90C": {
+  "confidence": "high",
+  "name": "Banshee Blast (left): head (frame 2)",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B918": {
+  "confidence": "high",
+  "name": "Banshee Blast (left): head mirror",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B924": {
+  "confidence": "high",
+  "name": "Banshee Blast (left): impact",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B930": {
+  "confidence": "high",
+  "name": "Banshee Blast (left): impact (frame 2)",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B93C": {
+  "confidence": "high",
+  "name": "Banshee Blast (left): impact mirror",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B948": {
+  "confidence": "high",
+  "name": "Banshee Blast (left): tail",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B954": {
+  "confidence": "high",
+  "name": "Banshee Blast (left): tail (frame 2)",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B960": {
+  "confidence": "high",
+  "name": "Banshee Blast (left): tail mirror",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B96C": {
+  "confidence": "high",
+  "name": "Banshee Blast (right): start",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B978": {
+  "confidence": "high",
+  "name": "Banshee Blast (right): start (frame 2)",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B984": {
+  "confidence": "high",
+  "name": "Banshee Blast (right): start mirror",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B990": {
+  "confidence": "high",
+  "name": "Banshee Blast (right): body 8",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B99C": {
+  "confidence": "high",
+  "name": "Banshee Blast (right): body 16",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B9A8": {
+  "confidence": "high",
+  "name": "Banshee Blast (right): body 32",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B9B4": {
+  "confidence": "high",
+  "name": "Banshee Blast (right): body (2nd gfx)",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B9C0": {
+  "confidence": "high",
+  "name": "Banshee Blast (right): head",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B9CC": {
+  "confidence": "high",
+  "name": "Banshee Blast (right): head (frame 2)",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B9D8": {
+  "confidence": "high",
+  "name": "Banshee Blast (right): head mirror",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B9E4": {
+  "confidence": "high",
+  "name": "Banshee Blast (right): impact",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B9F0": {
+  "confidence": "high",
+  "name": "Banshee Blast (right): impact (frame 2)",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876B9FC": {
+  "confidence": "high",
+  "name": "Banshee Blast (right): impact mirror",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876BA08": {
+  "confidence": "high",
+  "name": "Banshee Blast (right): tail",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876BA14": {
+  "confidence": "high",
+  "name": "Banshee Blast (right): tail (frame 2)",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876BA20": {
+  "confidence": "high",
+  "name": "Banshee Blast (right): tail mirror",
+  "notes": "beam piece table 0x0876b72c (level definition 0x0876ba2c); drawn as buu_beam_banshee_blast"
+ },
+ "0876CBD8": {
+  "confidence": "high",
+  "name": "Energy Sword",
+  "notes": "class 0x08037C1C: charge 0-4 (right 5-9), slash 10-17"
+ },
+ "0876DFF8": {
+  "confidence": "high",
+  "name": "Grapple arm",
+  "notes": "Bio Mech 0x08037EA8: 4 records per direction (chain, open hand, closed back / front)"
+ },
+ "0876E264": {
+  "confidence": "high",
+  "name": "Ultra Volleyball Attack wave",
+  "notes": "class 0x080383D4: 3 records per direction (tail, body, head)"
+ },
+ "08770CF4": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha ball + flare (down)",
+  "notes": "records 0-1 ball, 2-5 flare (down)"
+ },
+ "08770D48": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha flare (up)",
+  "notes": "flare records + mirror piece"
+ },
+ "08770D84": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha flare (left)",
+  "notes": "flare records + mirror piece"
+ },
+ "08770DC0": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha flare (right)",
+  "notes": "flare records + mirror piece"
+ },
+ "08770DFC": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (down): start",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770E08": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (down): start (frame 2)",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770E14": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (down): start mirror",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770E20": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (down): body 8",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770E2C": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (down): body 16",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770E38": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (down): body 32",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770E44": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (down): body (2nd gfx)",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770E50": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (down): head",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770E5C": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (down): head (frame 2)",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770E68": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (down): head mirror",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770E74": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (down): impact",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770E80": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (down): impact (frame 2)",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770E8C": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (down): impact mirror",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770E98": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (down): tail",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770EA4": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (down): tail (frame 2)",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770EB0": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (down): tail mirror",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770EBC": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (up): start",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770EC8": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (up): start (frame 2)",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770ED4": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (up): start mirror",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770EE0": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (up): body 8",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770EEC": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (up): body 16",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770EF8": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (up): body 32",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770F04": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (up): body (2nd gfx)",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770F10": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (up): head",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770F1C": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (up): head (frame 2)",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770F28": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (up): head mirror",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770F34": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (up): impact",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770F40": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (up): impact (frame 2)",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770F4C": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (up): impact mirror",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770F58": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (up): tail",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770F64": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (up): tail (frame 2)",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770F70": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (up): tail mirror",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770F7C": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (left): start",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770F88": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (left): start (frame 2)",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770F94": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (left): start mirror",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770FA0": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (left): body 8",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770FAC": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (left): body 16",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770FB8": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (left): body 32",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770FC4": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (left): body (2nd gfx)",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770FD0": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (left): head",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770FDC": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (left): head (frame 2)",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770FE8": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (left): head mirror",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08770FF4": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (left): impact",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08771000": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (left): impact (frame 2)",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "0877100C": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (left): impact mirror",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08771018": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (left): tail",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08771024": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (left): tail (frame 2)",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08771030": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (left): tail mirror",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "0877103C": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (right): start",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08771048": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (right): start (frame 2)",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08771054": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (right): start mirror",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08771060": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (right): body 8",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "0877106C": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (right): body 16",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08771078": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (right): body 32",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08771084": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (right): body (2nd gfx)",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "08771090": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (right): head",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "0877109C": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (right): head (frame 2)",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "087710A8": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (right): head mirror",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "087710B4": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (right): impact",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "087710C0": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (right): impact (frame 2)",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "087710CC": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (right): impact mirror",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "087710D8": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (right): tail",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "087710E4": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (right): tail (frame 2)",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "087710F0": {
+  "confidence": "high",
+  "name": "Big Bang Kamehameha (right): tail mirror",
+  "notes": "beam piece table 0x08770dfc (level definition 0x087710fc); drawn as buu_beam_big_bang_kamehameha"
+ },
+ "0877AD10": {
+  "confidence": "high",
+  "name": "Dragon Fist Explosion",
+  "notes": "segment chain 0x08038AD8: 4 records per direction (body, head, head dying 2-3)"
+ },
+ "0877B4F8": {
+  "confidence": "high",
+  "name": "Red beam charge",
+  "notes": "charge sparkles of the red story beam 0x0877C41C"
+ },
+ "0877C11C": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (down): start",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C128": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (down): start (frame 2)",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C134": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (down): start mirror",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C140": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (down): body 8",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C14C": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (down): body 16",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C158": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (down): body 32",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C164": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (down): body (2nd gfx)",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C170": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (down): head",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C17C": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (down): head (frame 2)",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C188": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (down): head mirror",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C194": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (down): impact",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C1A0": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (down): impact (frame 2)",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C1AC": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (down): impact mirror",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C1B8": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (down): tail",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C1C4": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (down): tail (frame 2)",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C1D0": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (down): tail mirror",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C1DC": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (up): start",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C1E8": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (up): start (frame 2)",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C1F4": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (up): start mirror",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C200": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (up): body 8",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C20C": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (up): body 16",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C218": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (up): body 32",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C224": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (up): body (2nd gfx)",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C230": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (up): head",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C23C": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (up): head (frame 2)",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C248": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (up): head mirror",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C254": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (up): impact",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C260": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (up): impact (frame 2)",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C26C": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (up): impact mirror",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C278": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (up): tail",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C284": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (up): tail (frame 2)",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C290": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (up): tail mirror",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C29C": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (left): start",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C2A8": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (left): start (frame 2)",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C2B4": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (left): start mirror",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C2C0": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (left): body 8",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C2CC": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (left): body 16",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C2D8": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (left): body 32",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C2E4": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (left): body (2nd gfx)",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C2F0": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (left): head",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C2FC": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (left): head (frame 2)",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C308": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (left): head mirror",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C314": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (left): impact",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C320": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (left): impact (frame 2)",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C32C": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (left): impact mirror",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C338": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (left): tail",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C344": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (left): tail (frame 2)",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C350": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (left): tail mirror",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C35C": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (right): start",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C368": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (right): start (frame 2)",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C374": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (right): start mirror",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C380": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (right): body 8",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C38C": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (right): body 16",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C398": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (right): body 32",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C3A4": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (right): body (2nd gfx)",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C3B0": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (right): head",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C3BC": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (right): head (frame 2)",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C3C8": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (right): head mirror",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C3D4": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (right): impact",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C3E0": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (right): impact (frame 2)",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C3EC": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (right): impact mirror",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C3F8": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (right): tail",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C404": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (right): tail (frame 2)",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ },
+ "0877C410": {
+  "confidence": "high",
+  "name": "Enemy beam (red) (right): tail mirror",
+  "notes": "beam piece table 0x0877c11c (level definition 0x0877c41c); drawn as buu_beam_enemy_beam_red"
+ }
+}

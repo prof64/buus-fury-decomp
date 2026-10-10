@@ -1,0 +1,31 @@
+[package]
+name = "wf-mcp"
+description = "Agent interface to the deterministic Buu's Fury core: MCP server (stdio), tool API, Rhai controllers, C ABI for Python"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[[bin]]
+name = "wf-mcp"
+path = "src/bin/wf-mcp.rs"
+
+[dependencies]
+wf-core = { path = "../wf-core" }
+wf-import = { path = "../wf-import" }
+wf-script-core = { path = "../wf-script-core" }
+wf-view = { path = "../wf-view" }
+wf-content = { path = "../wf-content" }
+wf-render = { path = "../wf-render" }
+wf-extract = { path = "../wf-extract" }
+# mods: the base pack + mod folders (wf_app::mods, battle::load_data), the mod checker, content ids
+wf-app = { path = "../wf-app" }
+wf-replay = { path = "../wf-replay" }
+serde.workspace = true
+serde_json.workspace = true
+png.workspace = true
+# integer-only, no clock, no modules (the feature set of wf-script-rhai): deterministic agent controllers
+rhai = { version = "1.26", default-features = false, features = ["std", "no_float", "no_time", "no_module", "no_custom_syntax", "only_i32"] }
+

@@ -1,0 +1,424 @@
+{
+ "rec": {
+  "stops": 20,
+  "rule": 16,
+  "import": 4,
+  "known": 0,
+  "groups": [
+   {
+    "owner": "Super Buu agent",
+    "kind": "rule",
+    "field": "rng",
+    "chapter": "superbuu",
+    "count": 11,
+    "stops": [
+     {
+      "row": 1339017,
+      "stretch": "062_m_inside_buu",
+      "what": "app [b460ebed, 721626b0] game [699cd8d3, d8087ea9]",
+      "menu": false,
+      "started": [
+       "s473",
+       "inline_0x08711151"
+      ],
+      "from": 1122008
+     },
+     {
+      "row": 1339177,
+      "stretch": "062_m_inside_buu",
+      "what": "app [075f7bd2, 4552fb5d] game [fd587251, 077b5510]",
+      "menu": false,
+      "started": [],
+      "from": 1339018
+     },
+     {
+      "row": 1339418,
+      "stretch": "062_m_inside_buu",
+      "what": "app [241fe664, 8f5fc246] game [4df29375, 74a1a982]",
+      "menu": false,
+      "started": [],
+      "from": 1339178
+     },
+     {
+      "row": 1339637,
+      "stretch": "062_m_inside_buu",
+      "what": "app [73f516da, f2ef07d5] game [79de3589, 0f5ce720]",
+      "menu": false,
+      "started": [],
+      "from": 1339419
+     },
+     {
+      "row": 1340687,
+      "stretch": "062_m_inside_buu",
+      "what": "app [6eee4018, 29f01e28] game [5849e2a1, 0dfa2bf1]",
+      "menu": false,
+      "started": [
+       "s474"
+      ],
+      "from": 1339638
+     },
+     {
+      "row": 1341068,
+      "stretch": "062_m_inside_buu",
+      "what": "app [7200100b, e25cde53] game [40797251, 31453ec9]",
+      "menu": false,
+      "started": [],
+      "from": 1340688
+     },
+     {
+      "row": 1341250,
+      "stretch": "062_m_inside_buu",
+      "what": "app [7643016b, 73b05615] game [86ef5215, fff80fed]",
+      "menu": false,
+      "started": [],
+      "from": 1341069
+     },
+     {
+      "row": 1341895,
+      "stretch": "062_m_inside_buu",
+      "what": "app [61298198, 65aeb332] game [1c174e5a, 7fca8b53]",
+      "menu": false,
+      "started": [],
+      "from": 1341251
+     },
+     {
+      "row": 1342031,
+      "stretch": "062_m_inside_buu",
+      "what": "app [6ae4a4d1, e3ed753c] game [b7f2bf79, d05adf3b]",
+      "menu": false,
+      "started": [],
+      "from": 1341896
+     },
+     {
+      "row": 1342158,
+      "stretch": "062_m_inside_buu",
+      "what": "app [de6596d0, 05e05eb2] game [a2040c69, 7aaa5e0a]",
+      "menu": false,
+      "started": [],
+      "from": 1342032
+     },
+     {
+      "row": 1342466,
+      "stretch": "062_m_inside_buu",
+      "what": "app [6f78923c, 85b83e2d] game [311d6c4b, 5c91ba80]",
+      "menu": false,
+      "started": [],
+      "from": 1342159
+     }
+    ]
+   },
+   {
+    "owner": "side-content agent",
+    "kind": "rule",
+    "field": "flags",
+    "chapter": "janemba",
+    "count": 2,
+    "stops": [
+     {
+      "row": 1111492,
+      "stretch": "042_h_statues",
+      "what": "flag 284 app only",
+      "menu": false,
+      "started": [
+       "inline_0x0808C880",
+       "inline_0x0808C728"
+      ],
+      "from": 848748
+     },
+     {
+      "row": 1121863,
+      "stretch": "044_h_back1",
+      "what": "flag 284 app only",
+      "menu": false,
+      "started": [
+       "inline_0x0808C880",
+       "inline_0x0808C728"
+      ],
+      "from": 1111523
+     }
+    ]
+   },
+   {
+    "owner": "dungeon agents A / B",
+    "kind": "rule",
+    "field": "flags",
+    "chapter": "fat",
+    "count": 1,
+    "stops": [
+     {
+      "row": 848743,
+      "stretch": "017_db6_fukurou",
+      "what": "flag 187 app only",
+      "menu": false,
+      "started": [
+       "inline_0x08072A48",
+       "inline_0x0808566C"
+      ],
+      "from": 0
+     }
+    ]
+   },
+   {
+    "owner": "dungeon agents A / B",
+    "kind": "rule",
+    "field": "pos",
+    "chapter": "fat",
+    "count": 1,
+    "stops": [
+     {
+      "row": 848747,
+      "stretch": "017_db6_fukurou",
+      "what": "app (30720, 30720, 1) game (204800, 225280, 1)",
+      "menu": false,
+      "started": [
+       "inline_0x08072A48",
+       "s515@0"
+      ],
+      "from": 848744
+     }
+    ]
+   },
+   {
+    "owner": "side-content agent",
+    "kind": "rule",
+    "field": "rng",
+    "chapter": "janemba",
+    "count": 1,
+    "stops": [
+     {
+      "row": 1121917,
+      "stretch": "044_h_back1",
+      "what": "app [be62dcff, 5b07fbc6] game [e2b8d8a9, 5be649e5]",
+      "menu": false,
+      "started": [],
+      "from": 1121894
+     }
+    ]
+   },
+   {
+    "owner": "importer agent",
+    "kind": "import",
+    "field": "rng",
+    "chapter": "janemba",
+    "count": 3,
+    "stops": [
+     {
+      "row": 1121864,
+      "stretch": "044_h_back1",
+      "what": "app [af435554, 21224f53] game [ccb45104, c0b2bf81]",
+      "menu": false,
+      "started": [
+       "inline_0x0808C880"
+      ],
+      "from": 1121864
+     },
+     {
+      "row": 1121919,
+      "stretch": "044_h_back1",
+      "what": "app [bb591593, 75fbf993] game [7f8b5b7c, 390e027e]",
+      "menu": false,
+      "started": [],
+      "from": 1121918
+     },
+     {
+      "row": 1121949,
+      "stretch": "044_h_back1",
+      "what": "app [e86515d2, 7f98e45f] game [3790ba8c, d239632f]",
+      "menu": false,
+      "started": [],
+      "from": 1121948
+     }
+    ]
+   },
+   {
+    "owner": "importer agent",
+    "kind": "import",
+    "field": "flags",
+    "chapter": "janemba",
+    "count": 1,
+    "stops": [
+     {
+      "row": 1111493,
+      "stretch": "042_h_statues",
+      "what": "flag 284 game only",
+      "menu": false,
+      "started": [
+       "inline_0x0808C880"
+      ],
+      "from": 1111493
+     }
+    ]
+   }
+  ]
+ },
+ "none": {
+  "stops": 10,
+  "rule": 5,
+  "import": 4,
+  "known": 1,
+  "groups": [
+   {
+    "owner": "side-content agent",
+    "kind": "rule",
+    "field": "flags",
+    "chapter": "janemba",
+    "count": 2,
+    "stops": [
+     {
+      "row": 1111492,
+      "stretch": "042_h_statues",
+      "what": "flag 284 app only",
+      "menu": false,
+      "started": [
+       "inline_0x0808C880",
+       "inline_0x0808C728"
+      ],
+      "from": 848748
+     },
+     {
+      "row": 1121863,
+      "stretch": "044_h_back1",
+      "what": "flag 284 app only",
+      "menu": false,
+      "started": [
+       "inline_0x0808C880",
+       "inline_0x0808C728"
+      ],
+      "from": 1111523
+     }
+    ]
+   },
+   {
+    "owner": "dungeon agents A / B",
+    "kind": "rule",
+    "field": "flags",
+    "chapter": "fat",
+    "count": 1,
+    "stops": [
+     {
+      "row": 848743,
+      "stretch": "017_db6_fukurou",
+      "what": "flag 187 app only",
+      "menu": false,
+      "started": [
+       "inline_0x08072A48",
+       "inline_0x0808566C"
+      ],
+      "from": 0
+     }
+    ]
+   },
+   {
+    "owner": "dungeon agents A / B",
+    "kind": "rule",
+    "field": "pos",
+    "chapter": "fat",
+    "count": 1,
+    "stops": [
+     {
+      "row": 848747,
+      "stretch": "017_db6_fukurou",
+      "what": "app (30720, 30720, 1) game (204800, 225280, 1)",
+      "menu": false,
+      "started": [
+       "inline_0x08072A48",
+       "s515@0"
+      ],
+      "from": 848744
+     }
+    ]
+   },
+   {
+    "owner": "side-content agent",
+    "kind": "rule",
+    "field": "rng",
+    "chapter": "janemba",
+    "count": 1,
+    "stops": [
+     {
+      "row": 1121917,
+      "stretch": "044_h_back1",
+      "what": "app [be62dcff, 5b07fbc6] game [e2b8d8a9, 5be649e5]",
+      "menu": false,
+      "started": [],
+      "from": 1121894
+     }
+    ]
+   },
+   {
+    "owner": "importer agent",
+    "kind": "import",
+    "field": "rng",
+    "chapter": "janemba",
+    "count": 3,
+    "stops": [
+     {
+      "row": 1121864,
+      "stretch": "044_h_back1",
+      "what": "app [af435554, 21224f53] game [ccb45104, c0b2bf81]",
+      "menu": false,
+      "started": [
+       "inline_0x0808C880"
+      ],
+      "from": 1121864
+     },
+     {
+      "row": 1121919,
+      "stretch": "044_h_back1",
+      "what": "app [bb591593, 75fbf993] game [7f8b5b7c, 390e027e]",
+      "menu": false,
+      "started": [],
+      "from": 1121918
+     },
+     {
+      "row": 1121949,
+      "stretch": "044_h_back1",
+      "what": "app [e86515d2, 7f98e45f] game [3790ba8c, d239632f]",
+      "menu": false,
+      "started": [],
+      "from": 1121948
+     }
+    ]
+   },
+   {
+    "owner": "importer agent",
+    "kind": "import",
+    "field": "flags",
+    "chapter": "janemba",
+    "count": 1,
+    "stops": [
+     {
+      "row": 1111493,
+      "stretch": "042_h_statues",
+      "what": "flag 284 game only",
+      "menu": false,
+      "started": [
+       "inline_0x0808C880"
+      ],
+      "from": 1111493
+     }
+    ]
+   },
+   {
+    "owner": "Super Buu agent",
+    "kind": "known",
+    "field": "rng",
+    "chapter": "superbuu",
+    "count": 1,
+    "stops": [
+     {
+      "row": 1339017,
+      "stretch": "062_m_inside_buu",
+      "what": "app [b460ebed, 721626b0] game [699cd8d3, d8087ea9]",
+      "menu": false,
+      "started": [
+       "s473",
+       "inline_0x08711151"
+      ],
+      "from": 1122008
+     }
+    ]
+   }
+  ]
+ }
+}

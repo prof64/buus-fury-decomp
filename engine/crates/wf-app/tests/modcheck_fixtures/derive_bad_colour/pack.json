@@ -1,0 +1,8 @@
+{
+ "id": "derive_bad_colour",
+ "name": "derive_bad_colour",
+ "format_version": 1,
+ "depends": [
+  "base"
+ ]
+}

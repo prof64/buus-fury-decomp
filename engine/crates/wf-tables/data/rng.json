@@ -1,0 +1,31 @@
+{
+ "address": "0x0803FAAC",
+ "state": {
+  "s0": "IWRAM 0x03004A5C",
+  "s1": "IWRAM 0x03004A60"
+ },
+ "algorithm": [
+  "a = (s0 + 0x02CBBC71) ^ s1",
+  "b = (rol32(s1, 3) + 0x0632D80F) ^ a",
+  "s0 = a; s1 = b",
+  "return (a - b) mod 2^32"
+ ],
+ "helpers": {
+  "rand(n) 0x0803FACC": "((next() & 0xFFFF) * n) >> 16",
+  "chance(p) 0x0803FADE": "(next() & 0xFFFF) < p (p in 1/65536)",
+  "script native 0x19": "rand(n)",
+  "script native 0x1A": "chance(n*0x28F5D>>8) = n percent"
+ },
+ "python": "re/buu/rng.py",
+ "status": "VERIFIED (used to reproduce level-up and damage rolls exactly)",
+ "uses": [
+  "damage spread rand(26)",
+  "melee crit chance",
+  "level-up growth rand(256) x4",
+  "random punch animation 4+rand(3)",
+  "knockback speed rand(64)",
+  "loot scripts",
+  "AI Chance nodes",
+  "kazoo sound"
+ ]
+}

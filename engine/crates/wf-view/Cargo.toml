@@ -1,0 +1,8 @@
+[package]
+name = "wf-view"
+description = "The seam between the simulation and the frontend: inputs in, a read-only RenderView + events out (no deps)"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]

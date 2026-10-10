@@ -1,0 +1,23 @@
+# Dev-only workspace for wf-script-core: builds the adapter against the last committed wf-core (copied into
+# crates/wf-core, crates/wf-view; gitignored) while wf-core is mid-edit in engine/crates. Other crates are
+# symlinks to engine/crates/*. The real build is the engine workspace.
+[workspace]
+resolver = "2"
+members = ["crates/wf-script-core"]
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+license = "MIT"
+
+[workspace.dependencies]
+wf-rom = { path = "crates/wf-rom" }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+png = "0.17"
+sha1 = { version = "0.10", default-features = false }
+
+[profile.test]
+opt-level = 2
+[profile.dev]
+opt-level = 1

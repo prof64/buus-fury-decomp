@@ -1,0 +1,50 @@
+{
+ "meta": {
+  "generator": "re/buu/extract_items.py",
+  "supply_table": "0x83bd2f8",
+  "equipment_table": "0x86f82ec",
+  "supply_layout": {
+   "+0x00": "u16 0=consumable 1=story item",
+   "+0x02": "u16 short name string id",
+   "+0x04": "u16 name",
+   "+0x06": "u16 plural",
+   "+0x08": "u32 description string id",
+   "+0x0C..+0x2B": "icon/graphics descriptors",
+   "+0x2C": "s32 price (Zenie)",
+   "+0x30": "ptr use-script (bytecode)"
+  },
+  "equipment_layout": {
+   "+0x00": "u16 name",
+   "+0x02": "u16 description",
+   "+0x04..+0x13": "icon descriptors",
+   "+0x14": "u8 slot 0 body 1 hands 2 feet 3 accessory",
+   "+0x15": "u8 required level",
+   "+0x16..+0x1A": "s8 STR, POW, END (melee def), END2 (energy def), SPD",
+   "+0x1C": "u32 XP bonus in 1/256 (added to the 256 base multiplier)",
+   "+0x20": "s32 price (-1 for the \"None\" placeholders)",
+   "+0x24": "u32 flags OR-ed into record+0x13 (bit0: recompute stats when HP changes, Crisis Ring)",
+   "+0x28": "ptr effect script run by RecalcStats (0x08013C66 -> 0x08013C02)"
+  },
+  "stat_recalc": "RecalcStats 0x08013C66: start from base STR/POW/END/END(=END)/SPD, add each equipped item's s8 modifiers and run its effect script, add Holy Water bonuses (0x080046AE), clamp negatives to 0, store at record+0x4C..",
+  "status": "tables VERIFIED (disasm); stat application VERIFIED (emu Status screen); effects from scripts VERIFIED (disasm)"
+ },
+ "extra_effects": {
+  "28": "melee hit that deals damage: EP +2 instead of +1 (script #2)",
+  "15": "melee hit that deals damage: HP +1 instead of EP +1 (script #2)",
+  "152": "melee hit that deals damage: HP +1 instead of EP +1 (script #2)",
+  "141": "melee hit that deals damage: extra EP +1 (script #2)",
+  "56": "melee hit that deals damage: Zenie +1 (script #2)",
+  "144": "melee hit: plays a random kazoo sound (7/10/11/59/61) (script #2)",
+  "121": "enemy loot: +1 drop roll, tested twice in script #497 -> effectively +2 (owning one is enough)",
+  "136": "enemy loot: +2 drop rolls (script #497, owning one is enough)",
+  "151": "enemy loot: +3 drop rolls (script #497)",
+  "138": "enemy loot: -1 drop roll (script #497)",
+  "143": "enemy loot: -2 drop rolls (script #497)",
+  "131": "enemy loot: -3 drop rolls (script #497)  [fake Rabbit's Foot]",
+  "119": "while equipped (native 0xD5): food items restore 25% more",
+  "118": "while equipped (native 0xD5): drink items restore 25% more -- BUG: the straw branch writes the result to HP (setter 0x0C) instead of EP",
+  "40": "part of Saiyan set (Saiyan Armor script): Armor+Gloves(73)+Boots(107) all equipped -> +50 STR, +50 END/END2, +50 POW",
+  "73": "Saiyan set piece (see Saiyan Armor)",
+  "107": "Saiyan set piece (see Saiyan Armor)"
+ }
+}

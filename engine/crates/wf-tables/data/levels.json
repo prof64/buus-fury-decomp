@@ -1,0 +1,8 @@
+{
+ "meta": {
+  "table": "0x86b7084",
+  "generator": "re/buu/extract_levels.py",
+  "note": "u32[151] at 0x086B7084; entry i (0..150) = total XP needed for level 50+i (entry 0 = 0). GetLevel 0x080135D2: level = 50 + max{i : XP >= t[i]} (binary search over 0..150), capped at 200 (GainExp stops adding levels at 200; XP keeps accumulating). XP-to-next 0x0801361C = t[L-49] - XP (0 at level >= 200).",
+  "status": "VERIFIED (disasm + emu: XP 2200 -> LVL 60, NXT LVL 675; level-up 60->62 at XP 4099)"
+ }
+}

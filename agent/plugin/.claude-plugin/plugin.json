@@ -1,0 +1,7 @@
+{
+  "name": "buu-battle",
+  "version": "0.2.0",
+  "description": "Play Dragon Ball Z: Buu's Fury headlessly: an MCP server over the deterministic Rust core (battles, field areas, co-op slots, screenshots, time travel, replays, metered Rhai controllers, multi-seed evaluation) plus the skill that explains how to play.",
+  "author": { "name": "prof64" },
+  "keywords": ["game", "gba", "dragon-ball", "agents", "mcp", "rhai"]
+}

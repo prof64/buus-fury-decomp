@@ -1,0 +1,8 @@
+{
+  "name": "wf-web-browser-tests",
+  "private": true,
+  "type": "module",
+  "description": "Headless, muted browser checks of the wasm build (see browser_check.mjs)",
+  "scripts": { "check": "node browser_check.mjs" },
+  "devDependencies": { "playwright-core": "1.62.1" }
+}

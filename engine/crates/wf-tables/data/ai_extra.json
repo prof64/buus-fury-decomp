@@ -1,0 +1,178 @@
+{
+ "source": "tools/battle/gen_buu_ai_extra.py (ROM decode)",
+ "onhit_protocol": "(disassembly, this script's comments): 0 = not handled, 1 = handled, 2 = stop the\nsurrounding Sequence. Sequence 0x0801900B: runs children until one returns 2, result = AND of the results;\nSelector 0x08018FDB: first non-zero child result; ApplyDamage 0x080187A5: hit mult 0 -> 0, else damage\n(vfunc +0x58) -> 2 if it killed the enemy else 1.",
+ "onhit_fns": {
+  "0x8019299": "SubState: onHit of state <state> aux",
+  "0x8018921": "GotoState: replace top, 1",
+  "0x801900b": "Sequence",
+  "0x8018fdb": "Selector",
+  "0x800a9b5": "Idle: 0",
+  "0x80188cb": "Chance: chance(p) -> child",
+  "0x8039877": "IfTimeInState: now - obj+0x210 > frames -> child",
+  "0x801d0a1": "Succeed: 2",
+  "0x801888d": "PushState: push, 1",
+  "0x8029e9f": "IfCounterEq: counter == n -> child",
+  "0x802ffdd": "AbsorbPose: world msg 0x1D, 1",
+  "0x802aa0d": "MarkTime: obj+0x1E8 = now, 0",
+  "0x8029ec5": "IncCounter: counter++, 0",
+  "0x802aa5f": "IfCooldownOver: now - obj+0x1E8 > frames -> child",
+  "0x80296a3": "SetCounter: counter = n, 0",
+  "0x801883b": "Block: guard anim 7, blocking = 1, 1",
+  "0x80299cb": "StunHold: hold controller, 1",
+  "0x803123b": "HoverDrift: impulse along the hit dir, 1",
+  "0x803c08d": "GlideToWaypoint: 1 if the player swings (anim slot 0x13) else 2",
+  "0x8018e63": "PopState: pop, 2"
+ },
+ "aux_only": {
+  "0x8029a41": {
+   "name": "IfAttack",
+   "params": [
+    [
+     12,
+     "atk",
+     "raw"
+    ]
+   ],
+   "children": [
+    16
+   ],
+   "sem": "hit attack type byte0 or byte1 == atk -> child"
+  },
+  "0x80187a5": {
+   "name": "ApplyDamage",
+   "sem": "hit mult 0 -> 0; else take damage: 2 if it killed the enemy, else 1"
+  },
+  "0x803999d": {
+   "name": "JanembaPartFlash",
+   "sem": "Janemba body: flash the linked part (cosmetic); 0"
+  },
+  "0x803044d": {
+   "name": "FreezeHelperHit",
+   "sem": "freeze helper 0x0E: message 5 to the world, 1"
+  },
+  "0x802d329": {
+   "name": "ShieldHit",
+   "sem": "shield soldier: turn around / shield graphics (cosmetic), 1"
+  },
+  "0x803c8e1": {
+   "name": "SetHitDir",
+   "sem": "obj+0x290 = hit direction (knockback dir), 1"
+  },
+  "0x8034109": {
+   "name": "IfHitFromFront",
+   "children": [
+    12
+   ],
+   "sem": "(hit dir ^ 1) == facing -> child"
+  },
+  "0x803a79d": {
+   "name": "HealFraction",
+   "params": [
+    [
+     12,
+     "frac",
+     "frac16"
+    ]
+   ],
+   "sem": "heal final damage * frac >> 16 (mult 0 -> 1)"
+  },
+  "0x8032f85": {
+   "name": "TankDamage",
+   "sem": "tank armour: hit mult 0 -> 0; obj+0x290 = hit dir; damage / 4 when the hit dir == facing; then as ApplyDamage"
+  }
+ },
+ "extra_nodes": {
+  "0x8018e5f": {
+   "name": "PopState",
+   "sem": "pop the AI stack (vfunc +0x70); onHit pops and returns 2"
+  },
+  "0x80299c5": {
+   "name": "StunHold",
+   "sem": "hold controller 0x03002FF0 (stunned, no movement) - Burning Attack stun"
+  },
+  "0x8029e5d": {
+   "name": "DeathBlink",
+   "params": [
+    [
+     12,
+     "frames",
+     "frames"
+    ]
+   ],
+   "sem": "death blink for <frames> frames (rand flicker)"
+  },
+  "0x8039bfd": {
+   "name": "ShockStun",
+   "sem": "electric shock stun (Electric Kamehameha reaction) until the anim ends"
+  },
+  "0x803c8bf": {
+   "name": "VolleyballTransform",
+   "sem": "turn into a volleyball (Ultra Volleyball Attack)"
+  },
+  "0x803c7ff": {
+   "name": "VolleyballRestore",
+   "params": [
+    [
+     12,
+     "launched",
+     "raw"
+    ]
+   ],
+   "sem": "turn back from a volleyball; launched=1 when it was punched (flies, hits other enemies with melee 0x086B8098)"
+  },
+  "0x803c72f": {
+   "name": "VolleyballLaunch",
+   "sem": "the ball was punched: fly along the hit direction"
+  },
+  "0x802ae19": {
+   "name": "PlayAnimHold",
+   "params": [],
+   "sem": "anim 21 on hold controller 0x0300301C (never finishes) [INFERRED]",
+   "anim": 21
+  },
+  "0x802aef9": {
+   "name": "PlayAnimTimed",
+   "params": [],
+   "sem": "anim 20, controller 0x03003030 ends at frame 32 [INFERRED]",
+   "anim": 20,
+   "frames": 32
+  },
+  "0x8033bbd": {
+   "name": "PlayAnimOnce",
+   "params": [],
+   "sem": "anim 17 played once (controller 0x03001B38) [INFERRED]",
+   "anim": 17
+  },
+  "0x8033d7d": {
+   "name": "PlayAnimOnce",
+   "params": [],
+   "sem": "anim 18 played once (controller 0x03001B38) [INFERRED]",
+   "anim": 18
+  },
+  "0x8034aa5": {
+   "name": "PlayAnimTimed",
+   "params": [],
+   "sem": "anims 20 then 18, controller 0x03003234 ends at frame 36 [INFERRED]",
+   "anim": 20,
+   "frames": 36
+  },
+  "0x8036329": {
+   "name": "IfMeleeHit",
+   "children": [
+    12
+   ],
+   "sem": "melee hit (0x086B8098) in front -> child (variant of 0x08036303) [INFERRED]"
+  },
+  "0x8037c07": {
+   "name": "RandomStep",
+   "sem": "random-direction step (uses rand) [INFERRED]"
+  },
+  "0x803ce71": {
+   "name": "IfUnknown",
+   "children": [
+    12
+   ],
+   "sem": "condition 0x0804EE25 not decoded: treated as false [INFERRED]"
+  }
+ }
+}

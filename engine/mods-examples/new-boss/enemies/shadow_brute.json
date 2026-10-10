@@ -1,0 +1,21 @@
+{
+  "$extends": "enemies/majin_fighter.json",
+  "id": "shadow_brute",
+  "type": 150,
+  "name": "Shadow Brute",
+  "display_name": "Shadow Brute",
+  "hp": 900,
+  "exp": 4000,
+  "STR": 34,
+  "END": 40,
+  "ai_state": 8192,
+  "anim_as": 68,
+  "gfx_ids": [910],
+  "gfx_defs": null,
+  "spawn_points": [],
+  "spawns": [],
+  "database": null,
+  "ai": null,
+  "ai_tree": null,
+  "boss": null
+}

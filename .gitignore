@@ -1,0 +1,23 @@
+# Copyrighted inputs and anything derived from them stay local
+roms/
+*.gba
+*.GBA
+*.ss
+work/
+site/public/assets/
+# Tooling
+.venv/
+tools/mgba/
+tools/emu/libemu.dylib
+node_modules/
+dist/
+.DS_Store
+__pycache__/
+re/buu/ui/out/
+re/buu/ui/ws/
+work/ls/
+engine/experiments/*/target/
+engine/experiments/*/crates/
+engine/experiments/*/annotations/
+re/buu/menu/__pycache__/
+*.orig

@@ -1,0 +1,6 @@
+{
+  "id": "new-boss",
+  "name": "New enemy type: Shadow Brute (mini-boss with a scripted phase change)",
+  "format_version": 1,
+  "depends": ["base"]
+}

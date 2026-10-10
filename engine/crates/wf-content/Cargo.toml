@@ -1,0 +1,13 @@
+[package]
+name = "wf-content"
+description = "Runtime content loading: base pack + mods overlay (override / JSON merge patch / delete), typed loaders for sprites, maps, collision and the sound bank"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+wf-audio = { path = "../wf-audio" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+png = { workspace = true }
+miniz_oxide = "0.8"

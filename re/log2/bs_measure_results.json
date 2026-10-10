@@ -1,0 +1,1695 @@
+{
+ "android17@30": {
+  "cls": 3,
+  "gfx": 9,
+  "start_dist": 30,
+  "frames": 900,
+  "hits": 11,
+  "damage": [
+   34,
+   44,
+   45,
+   46,
+   47,
+   48
+  ],
+  "mean_interval": 84.0,
+  "projectiles": {
+   "enemy_ki_blast": {
+    "count": 10,
+    "lives": [
+     34,
+     37,
+     44,
+     47,
+     47,
+     47,
+     47,
+     54,
+     47,
+     47
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   22,
+   23,
+   24,
+   25,
+   26,
+   27,
+   28
+  ]
+ },
+ "android17@100": {
+  "cls": 3,
+  "gfx": 9,
+  "start_dist": 100,
+  "frames": 900,
+  "hits": 13,
+  "damage": [
+   44,
+   45,
+   46,
+   47,
+   48
+  ],
+  "mean_interval": 67.2,
+  "projectiles": {
+   "enemy_ki_blast": {
+    "count": 13,
+    "lives": [
+     41,
+     48,
+     47,
+     54,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   22,
+   23,
+   24
+  ]
+ },
+ "android18@30": {
+  "cls": 4,
+  "gfx": 11,
+  "start_dist": 30,
+  "frames": 900,
+  "hits": 11,
+  "damage": [
+   30,
+   37,
+   38,
+   39,
+   40
+  ],
+  "mean_interval": 84.0,
+  "projectiles": {
+   "enemy_ki_blast": {
+    "count": 10,
+    "lives": [
+     34,
+     37,
+     44,
+     47,
+     47,
+     47,
+     47,
+     54,
+     47,
+     47
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   22,
+   23,
+   24,
+   25,
+   26,
+   27,
+   28
+  ]
+ },
+ "android18@100": {
+  "cls": 4,
+  "gfx": 11,
+  "start_dist": 100,
+  "frames": 900,
+  "hits": 13,
+  "damage": [
+   37,
+   38,
+   39,
+   40
+  ],
+  "mean_interval": 67.2,
+  "projectiles": {
+   "enemy_ki_blast": {
+    "count": 13,
+    "lives": [
+     41,
+     48,
+     47,
+     54,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   22,
+   23,
+   24
+  ]
+ },
+ "android19@30": {
+  "cls": 5,
+  "gfx": 12,
+  "start_dist": 30,
+  "frames": 900,
+  "hits": 11,
+  "damage": [
+   13,
+   14,
+   15,
+   21
+  ],
+  "mean_interval": 84.0,
+  "projectiles": {
+   "enemy_ki_blast": {
+    "count": 10,
+    "lives": [
+     34,
+     37,
+     44,
+     47,
+     47,
+     47,
+     47,
+     54,
+     47,
+     47
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   22,
+   23,
+   24,
+   25,
+   26,
+   27,
+   28
+  ]
+ },
+ "android19@100": {
+  "cls": 5,
+  "gfx": 12,
+  "start_dist": 100,
+  "frames": 900,
+  "hits": 13,
+  "damage": [
+   13,
+   14,
+   15
+  ],
+  "mean_interval": 67.2,
+  "projectiles": {
+   "enemy_ki_blast": {
+    "count": 13,
+    "lives": [
+     41,
+     48,
+     47,
+     54,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   22,
+   23,
+   24
+  ]
+ },
+ "android20@30": {
+  "cls": 6,
+  "gfx": 14,
+  "start_dist": 30,
+  "frames": 900,
+  "hits": 11,
+  "damage": [
+   19,
+   20,
+   24
+  ],
+  "mean_interval": 84.0,
+  "projectiles": {
+   "enemy_ki_blast": {
+    "count": 10,
+    "lives": [
+     34,
+     37,
+     44,
+     47,
+     47,
+     47,
+     47,
+     54,
+     47,
+     47
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   22,
+   23,
+   24,
+   25,
+   26,
+   27,
+   28
+  ]
+ },
+ "android20@100": {
+  "cls": 6,
+  "gfx": 14,
+  "start_dist": 100,
+  "frames": 900,
+  "hits": 13,
+  "damage": [
+   19,
+   20
+  ],
+  "mean_interval": 67.2,
+  "projectiles": {
+   "enemy_ki_blast": {
+    "count": 13,
+    "lives": [
+     41,
+     48,
+     47,
+     54,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   22,
+   23,
+   24
+  ]
+ },
+ "android20_b@30": {
+  "cls": 7,
+  "gfx": 14,
+  "start_dist": 30,
+  "frames": 900,
+  "hits": 11,
+  "damage": [
+   21,
+   22,
+   23,
+   26
+  ],
+  "mean_interval": 84.0,
+  "projectiles": {
+   "enemy_ki_blast": {
+    "count": 10,
+    "lives": [
+     34,
+     37,
+     44,
+     47,
+     47,
+     47,
+     47,
+     54,
+     47,
+     47
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   22,
+   23,
+   24,
+   25,
+   26,
+   27,
+   28
+  ]
+ },
+ "android20_b@100": {
+  "cls": 7,
+  "gfx": 14,
+  "start_dist": 100,
+  "frames": 900,
+  "hits": 13,
+  "damage": [
+   21,
+   22,
+   23
+  ],
+  "mean_interval": 67.2,
+  "projectiles": {
+   "enemy_ki_blast": {
+    "count": 13,
+    "lives": [
+     41,
+     48,
+     47,
+     54,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   22,
+   23,
+   24
+  ]
+ },
+ "cooler@30": {
+  "cls": 29,
+  "gfx": 34,
+  "start_dist": 30,
+  "frames": 900,
+  "hits": 11,
+  "damage": [
+   141,
+   144,
+   145,
+   152,
+   188,
+   195,
+   197,
+   201
+  ],
+  "mean_interval": 86.7,
+  "projectiles": {
+   "enemy_ki_blast": {
+    "count": 6,
+    "lives": [
+     31,
+     39,
+     46,
+     44,
+     44,
+     44
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   22,
+   23,
+   24,
+   25,
+   26,
+   27,
+   28
+  ]
+ },
+ "cooler@100": {
+  "cls": 29,
+  "gfx": 34,
+  "start_dist": 100,
+  "frames": 900,
+  "hits": 14,
+  "damage": [
+   186,
+   188,
+   189,
+   190,
+   193,
+   196,
+   199,
+   201,
+   203
+  ],
+  "mean_interval": 64.4,
+  "projectiles": {
+   "enemy_ki_blast": {
+    "count": 14,
+    "lives": [
+     38,
+     45,
+     44,
+     52,
+     44,
+     44,
+     44,
+     44,
+     44,
+     44,
+     44,
+     44,
+     44,
+     44
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   22,
+   23,
+   24
+  ]
+ },
+ "cell_imperfect@30": {
+  "cls": 60,
+  "gfx": 28,
+  "start_dist": 30,
+  "frames": 900,
+  "hits": 9,
+  "damage": [
+   34,
+   35,
+   36,
+   37
+  ],
+  "mean_interval": 109.1,
+  "projectiles": {
+   "enemy_ki_blast": {
+    "count": 2,
+    "lives": [
+     30,
+     30
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   81,
+   82,
+   83,
+   84,
+   85,
+   86,
+   87,
+   88,
+   90
+  ]
+ },
+ "cell_imperfect@100": {
+  "cls": 60,
+  "gfx": 28,
+  "start_dist": 100,
+  "frames": 900,
+  "hits": 15,
+  "damage": [
+   34,
+   35,
+   36,
+   37
+  ],
+  "mean_interval": 59.4,
+  "projectiles": {
+   "enemy_ki_blast": {
+    "count": 15,
+    "lives": [
+     36,
+     36,
+     36,
+     36,
+     36,
+     36,
+     36,
+     36,
+     36,
+     36,
+     36,
+     36,
+     36,
+     36,
+     36
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   81,
+   82,
+   83
+  ]
+ },
+ "cell_nonperfect@30": {
+  "cls": 76,
+  "gfx": 29,
+  "start_dist": 30,
+  "frames": 900,
+  "hits": 13,
+  "damage": [
+   24,
+   36,
+   45,
+   52
+  ],
+  "mean_interval": 73.5,
+  "projectiles": {
+   "beam_80143a8": {
+    "count": 4,
+    "lives": [
+     119,
+     129,
+     129,
+     120
+    ],
+    "speeds": [
+     0.004,
+     0.008,
+     0.012,
+     0.177
+    ]
+   },
+   "enemy_ki_blast": {
+    "count": 1,
+    "lives": [
+     42
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   117,
+   118,
+   119,
+   120,
+   121,
+   122,
+   123,
+   124,
+   125,
+   126,
+   128
+  ]
+ },
+ "cell_nonperfect@100": {
+  "cls": 76,
+  "gfx": 29,
+  "start_dist": 100,
+  "frames": 900,
+  "hits": 16,
+  "damage": [
+   24,
+   36,
+   48,
+   50,
+   52
+  ],
+  "mean_interval": 57.0,
+  "projectiles": {
+   "beam_80143a8": {
+    "count": 5,
+    "lives": [
+     124,
+     127,
+     115,
+     115,
+     115
+    ],
+    "speeds": [
+     0.004,
+     0.008,
+     0.012,
+     0.016,
+     0.165,
+     0.177
+    ]
+   },
+   "enemy_ki_blast": {
+    "count": 4,
+    "lives": [
+     42,
+     42,
+     42,
+     42
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   117,
+   118,
+   119,
+   120,
+   121
+  ]
+ },
+ "perfect_cell_78@30": {
+  "cls": 78,
+  "gfx": 30,
+  "start_dist": 30,
+  "frames": 900,
+  "hits": 11,
+  "damage": [
+   53,
+   54,
+   55,
+   57,
+   61
+  ],
+  "mean_interval": 89.0,
+  "projectiles": {
+   "enemy_ki_blast": {
+    "count": 1,
+    "lives": [
+     28
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   139,
+   140,
+   141,
+   143,
+   144,
+   145,
+   146,
+   147
+  ]
+ },
+ "perfect_cell_78@100": {
+  "cls": 78,
+  "gfx": 30,
+  "start_dist": 100,
+  "frames": 900,
+  "hits": 14,
+  "damage": [
+   36,
+   59,
+   60,
+   61
+  ],
+  "mean_interval": 57.8,
+  "projectiles": {
+   "beam_80143a8": {
+    "count": 4,
+    "lives": [
+     124,
+     126,
+     114,
+     114
+    ],
+    "speeds": [
+     0.004,
+     0.008,
+     0.012,
+     0.016,
+     0.159,
+     0.171
+    ]
+   },
+   "enemy_ki_blast": {
+    "count": 5,
+    "lives": [
+     41,
+     41,
+     41,
+     41,
+     41
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   139,
+   140,
+   141,
+   142,
+   143
+  ]
+ },
+ "perfect_cell_21@30": {
+  "cls": 21,
+  "gfx": 30,
+  "start_dist": 30,
+  "frames": 900,
+  "hits": 11,
+  "damage": [
+   65,
+   66,
+   67,
+   70,
+   83
+  ],
+  "mean_interval": 89.0,
+  "projectiles": {
+   "enemy_ki_blast": {
+    "count": 1,
+    "lives": [
+     28
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   139,
+   140,
+   141,
+   143,
+   144,
+   145,
+   146,
+   147
+  ]
+ },
+ "perfect_cell_21@100": {
+  "cls": 21,
+  "gfx": 30,
+  "start_dist": 100,
+  "frames": 900,
+  "hits": 14,
+  "damage": [
+   48,
+   60,
+   79,
+   80,
+   81,
+   82,
+   83
+  ],
+  "mean_interval": 57.8,
+  "projectiles": {
+   "beam_80143a8": {
+    "count": 4,
+    "lives": [
+     124,
+     126,
+     114,
+     114
+    ],
+    "speeds": [
+     0.004,
+     0.008,
+     0.012,
+     0.016,
+     0.159,
+     0.171
+    ]
+   },
+   "enemy_ki_blast": {
+    "count": 5,
+    "lives": [
+     41,
+     41,
+     41,
+     41,
+     41
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   139,
+   140,
+   141,
+   142,
+   143
+  ]
+ },
+ "perfect_cell_25@30": {
+  "cls": 25,
+  "gfx": 30,
+  "start_dist": 30,
+  "frames": 900,
+  "hits": 11,
+  "damage": [
+   89,
+   90,
+   91,
+   92,
+   93,
+   94,
+   97
+  ],
+  "mean_interval": 89.0,
+  "projectiles": {
+   "enemy_ki_blast": {
+    "count": 1,
+    "lives": [
+     28
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   139,
+   140,
+   141,
+   143,
+   144,
+   145,
+   146,
+   147
+  ]
+ },
+ "perfect_cell_25@100": {
+  "cls": 25,
+  "gfx": 30,
+  "start_dist": 100,
+  "frames": 900,
+  "hits": 14,
+  "damage": [
+   60,
+   90,
+   91,
+   93,
+   94
+  ],
+  "mean_interval": 57.8,
+  "projectiles": {
+   "beam_80143a8": {
+    "count": 4,
+    "lives": [
+     124,
+     126,
+     114,
+     114
+    ],
+    "speeds": [
+     0.004,
+     0.008,
+     0.012,
+     0.016,
+     0.159,
+     0.171
+    ]
+   },
+   "enemy_ki_blast": {
+    "count": 5,
+    "lives": [
+     41,
+     41,
+     41,
+     41,
+     41
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   139,
+   140,
+   141,
+   142,
+   143
+  ]
+ },
+ "cell_jr@30": {
+  "cls": 26,
+  "gfx": 31,
+  "start_dist": 30,
+  "frames": 900,
+  "hits": 11,
+  "damage": [
+   57,
+   65,
+   66,
+   67,
+   68,
+   70,
+   71
+  ],
+  "mean_interval": 84.1,
+  "projectiles": {
+   "enemy_ki_blast": {
+    "count": 10,
+    "lives": [
+     34,
+     37,
+     45,
+     47,
+     47,
+     47,
+     47,
+     55,
+     47,
+     47
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   22,
+   23,
+   24,
+   25,
+   26,
+   27,
+   28
+  ]
+ },
+ "cell_jr@100": {
+  "cls": 26,
+  "gfx": 31,
+  "start_dist": 100,
+  "frames": 900,
+  "hits": 14,
+  "damage": [
+   65,
+   66,
+   67,
+   68,
+   69,
+   70,
+   71
+  ],
+  "mean_interval": 64.2,
+  "projectiles": {
+   "enemy_ki_blast": {
+    "count": 14,
+    "lives": [
+     41,
+     48,
+     47,
+     55,
+     48,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   22,
+   23,
+   24
+  ]
+ },
+ "general_tao@30": {
+  "cls": 44,
+  "gfx": 50,
+  "start_dist": 30,
+  "frames": 900,
+  "hits": 14,
+  "damage": [
+   48,
+   60,
+   66,
+   79,
+   81,
+   83
+  ],
+  "mean_interval": 67.2,
+  "projectiles": {
+   "beam_80143a8": {
+    "count": 4,
+    "lives": [
+     121,
+     132,
+     118,
+     118
+    ],
+    "speeds": [
+     0.004,
+     0.008,
+     0.012,
+     0.113
+    ]
+   },
+   "enemy_ki_blast": {
+    "count": 3,
+    "lives": [
+     47,
+     54,
+     47
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   130,
+   131,
+   132,
+   133,
+   134,
+   135,
+   136,
+   137
+  ]
+ },
+ "general_tao@100": {
+  "cls": 44,
+  "gfx": 50,
+  "start_dist": 100,
+  "frames": 900,
+  "hits": 13,
+  "damage": [
+   48,
+   60,
+   79,
+   80,
+   83
+  ],
+  "mean_interval": 66.7,
+  "projectiles": {
+   "enemy_ki_blast": {
+    "count": 3,
+    "lives": [
+     41,
+     47,
+     47
+    ],
+    "speeds": [
+     3.0
+    ]
+   },
+   "beam_80143a8": {
+    "count": 4,
+    "lives": [
+     131,
+     125,
+     117,
+     117
+    ],
+    "speeds": [
+     0.004,
+     0.008,
+     0.012,
+     0.109,
+     0.113
+    ]
+   }
+  },
+  "states_seen": [
+   130,
+   131,
+   132,
+   133
+  ]
+ },
+ "triceratops_king@30": {
+  "cls": 101,
+  "gfx": 127,
+  "start_dist": 30,
+  "frames": 900,
+  "hits": 9,
+  "damage": [
+   21,
+   22,
+   23
+  ],
+  "mean_interval": 97.0,
+  "projectiles": {},
+  "states_seen": [
+   59,
+   60,
+   61,
+   62,
+   63,
+   64,
+   65
+  ]
+ },
+ "triceratops_king@100": {
+  "cls": 101,
+  "gfx": 127,
+  "start_dist": 100,
+  "frames": 900,
+  "hits": 13,
+  "damage": [
+   21,
+   22
+  ],
+  "mean_interval": 62.0,
+  "projectiles": {},
+  "states_seen": [
+   59,
+   60,
+   61,
+   62,
+   63,
+   64,
+   65
+  ]
+ },
+ "yamcha@30": {
+  "cls": 106,
+  "gfx": 156,
+  "start_dist": 30,
+  "frames": 900,
+  "hits": 11,
+  "damage": [
+   11,
+   12,
+   13,
+   18
+  ],
+  "mean_interval": 84.0,
+  "projectiles": {
+   "enemy_ki_blast": {
+    "count": 10,
+    "lives": [
+     34,
+     37,
+     44,
+     47,
+     47,
+     47,
+     47,
+     54,
+     47,
+     47
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   22,
+   23,
+   24,
+   25,
+   26,
+   27,
+   28
+  ]
+ },
+ "yamcha@100": {
+  "cls": 106,
+  "gfx": 156,
+  "start_dist": 100,
+  "frames": 900,
+  "hits": 13,
+  "damage": [
+   11,
+   12,
+   13
+  ],
+  "mean_interval": 67.2,
+  "projectiles": {
+   "enemy_ki_blast": {
+    "count": 13,
+    "lives": [
+     41,
+     48,
+     47,
+     54,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   22,
+   23,
+   24
+  ]
+ },
+ "krillin@30": {
+  "cls": 64,
+  "gfx": 76,
+  "start_dist": 30,
+  "frames": 900,
+  "hits": 8,
+  "damage": [
+   23,
+   24,
+   25,
+   26
+  ],
+  "mean_interval": 121.4,
+  "projectiles": {
+   "enemy_ki_blast": {
+    "count": 2,
+    "lives": [
+     34,
+     34
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   99,
+   100,
+   101,
+   102,
+   103,
+   104,
+   105
+  ]
+ },
+ "krillin@100": {
+  "cls": 64,
+  "gfx": 76,
+  "start_dist": 100,
+  "frames": 900,
+  "hits": 15,
+  "damage": [
+   24,
+   25,
+   26
+  ],
+  "mean_interval": 58.0,
+  "projectiles": {
+   "enemy_ki_blast": {
+    "count": 15,
+    "lives": [
+     41,
+     41,
+     41,
+     41,
+     41,
+     41,
+     41,
+     41,
+     41,
+     41,
+     41,
+     41,
+     41,
+     41,
+     41
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   99,
+   100,
+   101
+  ]
+ },
+ "tien@30": {
+  "cls": 98,
+  "gfx": 121,
+  "start_dist": 30,
+  "frames": 900,
+  "hits": 8,
+  "damage": [
+   31,
+   32,
+   38,
+   39,
+   41
+  ],
+  "mean_interval": 121.4,
+  "projectiles": {
+   "enemy_ki_blast": {
+    "count": 2,
+    "lives": [
+     34,
+     34
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   99,
+   100,
+   101,
+   102,
+   103,
+   104,
+   105
+  ]
+ },
+ "tien@100": {
+  "cls": 98,
+  "gfx": 121,
+  "start_dist": 100,
+  "frames": 900,
+  "hits": 15,
+  "damage": [
+   30,
+   31,
+   32,
+   33
+  ],
+  "mean_interval": 58.0,
+  "projectiles": {
+   "enemy_ki_blast": {
+    "count": 15,
+    "lives": [
+     41,
+     41,
+     41,
+     41,
+     41,
+     41,
+     41,
+     41,
+     41,
+     41,
+     41,
+     41,
+     41,
+     41,
+     41
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   99,
+   100,
+   101
+  ]
+ },
+ "destroyer@30": {
+  "cls": 31,
+  "gfx": 37,
+  "start_dist": 30,
+  "frames": 900,
+  "hits": 377,
+  "damage": [
+   2,
+   34,
+   35,
+   36,
+   37
+  ],
+  "mean_interval": 2.3,
+  "projectiles": {
+   "boss_proj_dcfc": {
+    "count": 60,
+    "lives": [
+     121,
+     121,
+     121,
+     121,
+     121,
+     120,
+     120,
+     120,
+     120,
+     120,
+     120,
+     120,
+     120,
+     120,
+     120,
+     120,
+     141,
+     141,
+     141,
+     141,
+     120,
+     120,
+     120,
+     120,
+     120,
+     120,
+     120,
+     120,
+     120,
+     120,
+     120,
+     120,
+     120,
+     120,
+     120,
+     120,
+     140,
+     140,
+     140,
+     140,
+     120,
+     120,
+     120,
+     120,
+     120,
+     120,
+     120,
+     120,
+     120,
+     120,
+     120,
+     120,
+     120,
+     120,
+     120,
+     120,
+     140,
+     140,
+     140,
+     140
+    ],
+    "speeds": [
+     1.629,
+     1.642,
+     1.653,
+     1.657,
+     1.66,
+     1.662
+    ]
+   }
+  },
+  "states_seen": [
+   92,
+   93,
+   94,
+   95,
+   96,
+   97
+  ]
+ },
+ "destroyer@100": {
+  "cls": 31,
+  "gfx": 37,
+  "start_dist": 100,
+  "frames": 900,
+  "hits": 0,
+  "damage": [],
+  "mean_interval": null,
+  "projectiles": {},
+  "states_seen": [
+   91
+  ]
+ },
+ "frieza_dream_41@30": {
+  "cls": 41,
+  "gfx": 48,
+  "start_dist": 30,
+  "frames": 900,
+  "hits": 11,
+  "damage": [
+   2,
+   3
+  ],
+  "mean_interval": 84.0,
+  "projectiles": {
+   "enemy_ki_blast": {
+    "count": 10,
+    "lives": [
+     34,
+     37,
+     44,
+     47,
+     47,
+     47,
+     47,
+     54,
+     47,
+     47
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   22,
+   23,
+   24,
+   25,
+   26,
+   27,
+   28
+  ]
+ },
+ "frieza_dream_41@100": {
+  "cls": 41,
+  "gfx": 48,
+  "start_dist": 100,
+  "frames": 900,
+  "hits": 13,
+  "damage": [
+   2
+  ],
+  "mean_interval": 67.2,
+  "projectiles": {
+   "enemy_ki_blast": {
+    "count": 13,
+    "lives": [
+     41,
+     48,
+     47,
+     54,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47,
+     47
+    ],
+    "speeds": [
+     3.0
+    ]
+   }
+  },
+  "states_seen": [
+   22,
+   23,
+   24
+  ]
+ },
+ "newman_74@30": {
+  "cls": 74,
+  "gfx": 146,
+  "start_dist": 30,
+  "frames": 900,
+  "hits": 6,
+  "damage": [
+   10,
+   11,
+   22
+  ],
+  "mean_interval": 139.4,
+  "projectiles": {},
+  "states_seen": [
+   74,
+   75,
+   76,
+   77,
+   78,
+   79
+  ]
+ },
+ "newman_74@100": {
+  "cls": 74,
+  "gfx": 146,
+  "start_dist": 100,
+  "frames": 900,
+  "hits": 5,
+  "damage": [
+   10,
+   11
+  ],
+  "mean_interval": 96.2,
+  "projectiles": {},
+  "states_seen": [
+   74,
+   75,
+   76,
+   77,
+   78,
+   79
+  ]
+ }
+}

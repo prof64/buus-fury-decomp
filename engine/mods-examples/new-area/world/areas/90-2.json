@@ -1,0 +1,18 @@
+{
+  "key": "90-2",
+  "name": "Hidden Grove",
+  "maps": ["mod_hidden_grove"],
+  "song": 28,
+  "combat": false,
+  "objects": [
+    {
+      "type": "npc",
+      "comment": "the hermit (sprite 6 'Robed Elder' = script sprite id 15); talking runs event s910",
+      "condition": { "always": true },
+      "pos": [160, 96],
+      "sprite_index": 15,
+      "talk": { "event": "s910" },
+      "behaviour": []
+    }
+  ]
+}

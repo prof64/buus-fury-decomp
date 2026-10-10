@@ -1,0 +1,82 @@
+{
+ "tree": "9fb67ca",
+ "modes": [
+  {
+   "lag": "recorded",
+   "rows": 1668052,
+   "exact_to": 1339017,
+   "exact_stretch": "062_m_inside_buu",
+   "first": "rng: app [b460ebed, 721626b0] game [699cd8d3, d8087ea9]",
+   "lasting": {
+    "area": {
+     "row": 1340399,
+     "stretch": "062_m_inside_buu",
+     "what": "app (18, 13) game (20, 7)"
+    },
+    "depth": {
+     "row": 1339675,
+     "stretch": "062_m_inside_buu",
+     "what": "app 0 game 1"
+    },
+    "flags": {
+     "row": 1340399,
+     "stretch": "062_m_inside_buu",
+     "what": "flag 125 game only"
+    },
+    "pos": {
+     "row": 1339278,
+     "stretch": "062_m_inside_buu",
+     "what": "app (67616, 65888, 1) game (66208, 62176, 1)"
+    },
+    "rng": {
+     "row": 1339017,
+     "stretch": "062_m_inside_buu",
+     "what": "app [1ef9a3fb, 690f82db] game [fd587251, 077b5510]"
+    }
+   },
+   "sim_lag": 0,
+   "sim_lag_on_logic": 0,
+   "recorded_lag_replayed": 0,
+   "script_errors": 0
+  },
+  {
+   "lag": "none",
+   "rows": 1668052,
+   "exact_to": 1339017,
+   "exact_stretch": "062_m_inside_buu",
+   "first": "rng: app [b460ebed, 721626b0] game [699cd8d3, d8087ea9]",
+   "lasting": {
+    "area": {
+     "row": 1340399,
+     "stretch": "062_m_inside_buu",
+     "what": "app (18, 13) game (20, 7)"
+    },
+    "depth": {
+     "row": 1339675,
+     "stretch": "062_m_inside_buu",
+     "what": "app 0 game 1"
+    },
+    "flags": {
+     "row": 1340399,
+     "stretch": "062_m_inside_buu",
+     "what": "flag 125 game only"
+    },
+    "pos": {
+     "row": 1339278,
+     "stretch": "062_m_inside_buu",
+     "what": "app (67616, 65888, 1) game (66208, 62176, 1)"
+    },
+    "rng": {
+     "row": 1339017,
+     "stretch": "062_m_inside_buu",
+     "what": "app [1ef9a3fb, 690f82db] game [fd587251, 077b5510]"
+    }
+   },
+   "sim_lag": 0,
+   "sim_lag_on_logic": 0,
+   "recorded_lag_replayed": 0,
+   "script_errors": 0
+  }
+ ],
+ "note": ""
+}
