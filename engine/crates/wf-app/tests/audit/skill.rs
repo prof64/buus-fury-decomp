@@ -21,10 +21,29 @@ pub struct Skill {
     pub picture: Vec<usize>,
 }
 
-/// `game(k, ours)`: whether our picture of video frame `k` is the game's (`None`: no game picture of that frame)
-pub fn check(data: &Arc<wf_core::content::GameData>, files: &BTreeMap<String, String>, packs: &Packs, renderer: &mut Renderer, doc: &Value, game: &mut dyn FnMut(usize, &[u32]) -> Option<bool>) -> Skill {
+/// the tear rule's candidates here (`pack::torn_spec`): 'h' the previous frame's HUD (its update copies the gauge
+/// tiles straight into sprite memory, 0x0800BCBC, on some frames after the screen drew those rows - playtest.md
+/// "HUD gauge steps a frame late": emulator breakpoint, VCOUNT 26-27 against 215), 'o' the previous palette
+pub const TEARS: [char; 2] = ['h', 'o'];
+
+fn with_prev(view: &RenderView, from: &RenderView, l: char) -> RenderView {
+    let mut o = view.clone();
+    if l == 'h' {
+        o.hud = from.hud.clone();
+    } else {
+        o.palette_fade = from.palette_fade;
+        o.palette_scale = from.palette_scale;
+        o.fade_black = from.fade_black;
+    }
+    o
+}
+
+/// `game(k, ours, cand)`: whether our picture of video frame `k` is the game's (`None`: no game picture of that
+/// frame); `cand(l)` renders the frame with the previous frame's state `l` (`TEARS`) for the tear rule
+pub fn check(data: &Arc<wf_core::content::GameData>, files: &BTreeMap<String, String>, packs: &Packs, renderer: &mut Renderer, tear_renderer: &mut Renderer, doc: &Value, game: &mut dyn FnMut(usize, &[u32], &mut dyn FnMut(char) -> Vec<u32>) -> Option<bool>) -> Skill {
     let mut presenter = wf_core::view::Presenter::default();
     let mut picture = vec![];
+    let mut prev: Option<RenderView> = None;
     let rep = wf_import::segment::replay_with(data, files, doc, &mut |f| match f {
         wf_import::segment::Frame::Before(_, w) => presenter.before_step(w),
         wf_import::segment::Frame::After(k, w) => {
@@ -36,7 +55,12 @@ pub fn check(data: &Arc<wf_core::content::GameData>, files: &BTreeMap<String, St
             if let Some(m) = view.map.as_mut() {
                 m.layers.get_or_insert_with(|| wf_view::BgLayers { visible: [true; 4], ..Default::default() }).visible[0] = false;
             }
-            if game(k, renderer.render(packs, &view, 0, 240, 160)) == Some(false) {
+            let before = prev.replace(view.clone());
+            let mut cand = |l: char| match &before {
+                Some(b) => tear_renderer.render(packs, &with_prev(&view, b, l), 0, 240, 160).to_vec(),
+                None => vec![],
+            };
+            if game(k, renderer.render(packs, &view, 0, 240, 160), &mut cand) == Some(false) {
                 picture.push(k);
             }
         }

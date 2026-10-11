@@ -17,6 +17,8 @@
 
 #[path = "../tests/audit/opp.rs"]
 mod opp;
+#[path = "../tests/audit/pack.rs"]
+mod pack;
 
 use std::sync::Arc;
 
@@ -53,7 +55,8 @@ fn main() {
         let r = opp::audit(&t, &opp::Pictures::Game(game), &packs, Some((&out_dir, max_png)), &mut tile_hint);
         println!("{}", r.summary);
         if let Some(p) = &pack {
-            t["pic"] = serde_json::json!({"tile_off": r.tile_off, "hash": hashes});
+            let torn: serde_json::Map<String, serde_json::Value> = r.torn.iter().map(|(f, s)| (f.to_string(), serde_json::json!(s))).collect();
+            t["pic"] = serde_json::json!({"tile_off": r.tile_off, "hash": hashes, "torn": torn});
             let z = miniz_oxide::deflate::compress_to_vec_zlib(&serde_json::to_vec(&t).unwrap(), 9);
             std::fs::write(p.join(format!("{name}.json.z")), z).unwrap();
         }

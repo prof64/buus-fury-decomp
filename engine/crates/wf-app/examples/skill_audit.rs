@@ -59,6 +59,7 @@ fn main() {
     let set = wf_script::ScriptSet::load_all(&rom);
     let (files, _) = wf_script::export::export(&rom, &set);
     let mut renderer = wf_render::Renderer::new();
+    let mut tear_renderer = wf_render::Renderer::new();
     for a in &args {
         let Ok(mut doc) = wf_import::segment::load(Path::new(a)) else {
             println!("{a}: no segment");
@@ -75,11 +76,29 @@ fn main() {
             continue;
         }
         skill::strip_vram(&mut doc);
-        let r = skill::check(&data, &files, &packs, &mut renderer, &doc, &mut |k, ours| game.get(k).map(|g| g.as_slice() == ours));
-        println!("{name}: {} frames | state {} | picture {} | picture-diff frames {}", r.frames, r.state.as_ref().map(|s| format!("{} ({})", s.0, s.2)).unwrap_or("-".into()), r.picture.first().map(|f| f.to_string()).unwrap_or("-".into()), r.picture.len());
+        // (a frame the tear rule explains - `pack::torn_spec` - counts as the game's, its line specs kept for the gate)
+        let mut torn = serde_json::Map::new();
+        let r = skill::check(&data, &files, &packs, &mut renderer, &mut tear_renderer, &doc, &mut |k, ours, cand| {
+            let g = game.get(k)?;
+            if g.as_slice() == ours {
+                return Some(true);
+            }
+            if k == 0 || std::env::var_os("SA_NOTEAR").is_some() {
+                return Some(false);
+            }
+            let cands: Vec<(char, Vec<u32>)> = skill::TEARS.into_iter().map(|l| (l, cand(l))).filter(|c| c.1 != ours).collect();
+            match pack::torn_spec(g, ours, &cands) {
+                Some(spec) => {
+                    torn.insert(k.to_string(), serde_json::json!(spec));
+                    Some(true)
+                }
+                None => Some(false),
+            }
+        });
+        println!("{name}: {} frames | state {} | picture {} | picture-diff frames {}{}", r.frames, r.state.as_ref().map(|s| format!("{} ({})", s.0, s.2)).unwrap_or("-".into()), r.picture.first().map(|f| f.to_string()).unwrap_or("-".into()), r.picture.len(), if torn.is_empty() { String::new() } else { format!(" | torn (hardware) {}", torn.len()) });
         if let Some(p) = &pack_dir {
             let h: Vec<u64> = game.iter().map(|g| pack::hash(g)).collect();
-            doc["pic"] = serde_json::json!({"hash": pack::hex(&h)});
+            doc["pic"] = serde_json::json!({"hash": pack::hex(&h), "torn": torn});
             pack::write(&p.join(format!("{name}.json.z")), &doc);
         }
     }

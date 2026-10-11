@@ -1260,7 +1260,9 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         }
         // BeamDodge 0x08029778 (state 0x15A, pushed by IfInPlayerBeamLine): away from the player's line - the player
         // facing down / up: left when the player's x (24.8) is greater, else right; facing left / right: up when
-        // the player's y is greater, else down; SetAnim(0x12) under the controller vt 0x0804A758 (real run 14-2)
+        // the player's y is greater, else down; SetAnimRaw(0x12) (enter 0x080297FA: raw 19 - opponent audit oa_t16_ki
+        // f6, the Elite Majin Soldier's dodge cels; ours asked for raw 18 and showed the idle) under the controller vt
+        // 0x0804A758 (real run 14-2)
         K::BeamDodge => {
             if let Some(pi) = en::player(w, i) {
                 let pa = &w.pl_ref(pi).a;
@@ -1278,7 +1280,7 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
                 };
             }
             let h = w.data.anim.hold;
-            set_anim_r(w, i, &[an(17)], true, h);
+            set_anim_r(w, i, &[an(18)], true, h);
             r.d[6] = w.en_ref(i).anim_seq as i32;
         }
         // controller state 0x03003108 (enter 0x0802F6A8: face, SetAnimRaw(0x12))

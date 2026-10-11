@@ -715,8 +715,47 @@ pub fn hash(px: &[u32]) -> u64 {
 /// fitted tile clock (the gate's committed data, `data/audits/opp`)
 pub enum Pictures {
     Game(Vec<Vec<u32>>),
-    Hashes { tile_off: u32, hashes: Vec<u64> },
+    Hashes { tile_off: u32, hashes: Vec<u64>, torn: std::collections::BTreeMap<usize, Vec<String>> },
 }
+
+/// `view` with `from`'s (the previous frame's) state, for the lines of a torn frame: 'o' the palette (fade / scale /
+/// BLDY); 'f' every BG's scroll (the objects stay where this frame's OAM has them - latched at VBlank: opponent audit
+/// oa_t15_idle f123, the top lines' ground 1 px off under an unmoved HUD and rock), a hex digit 1..e the scroll of
+/// the BGs in that mask only (bit n = BGn: the scroll registers are written one BG after the other - there lines 0..8
+/// all four old, 9..33 BG3 / BG2 still old, from 34 the new picture); 't' the map's animated tiles (their copy into
+/// VRAM comes after those lines); 'u' both every scroll and the tiles
+fn with_prev(view: &wf_view::RenderView, from: &wf_view::RenderView, l: char) -> wf_view::RenderView {
+    let mut o = view.clone();
+    if l == 'o' {
+        o.palette_fade = from.palette_fade;
+        o.palette_scale = from.palette_scale;
+        o.fade_black = from.fade_black;
+        return o;
+    }
+    if l == 't' || l == 'u' {
+        if let (Some(m), Some(pm)) = (o.map.as_mut(), from.map.as_ref()) {
+            m.anim_frame = pm.anim_frame;
+            m.tile_frame = pm.tile_frame;
+        }
+    }
+    let mask = if l == 'f' || l == 'u' { 15 } else if l == 't' { 0 } else { l.to_digit(16).unwrap_or(0) };
+    if mask != 0 {
+        if let (Some(a), Some(b), Some(m)) = (view.cameras.first(), from.cameras.first(), o.map.as_mut()) {
+            let (dx, dy) = (b.x - a.x, b.y - a.y);
+            let ls = m.layers.get_or_insert_with(|| wf_view::BgLayers { visible: [true; 4], ..Default::default() });
+            for bg in 0..4 {
+                if mask >> bg & 1 != 0 {
+                    ls.offset[bg].0 += dx;
+                    ls.offset[bg].1 += dy;
+                }
+            }
+        }
+    }
+    o
+}
+
+/// the candidates of `with_prev`, in `torn_spec`'s order
+pub const TEARS: [char; 18] = ['f', 'u', 't', 'o', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e'];
 
 /// one scenario's result
 pub struct Audit {
@@ -729,6 +768,8 @@ pub struct Audit {
     /// the frames with a state difference (player / dmg / enemy / anim / ai / others) and with a picture difference
     pub state: Vec<usize>,
     pub picture: Vec<usize>,
+    /// the frames accepted by the tear rule, with their line specs (`torn_spec`)
+    pub torn: std::collections::BTreeMap<usize, Vec<String>>,
     pub summary: String,
 }
 
@@ -751,6 +792,30 @@ pub fn audit(t: &Value, pics: &Pictures, packs: &wf_app::wf_content::Packs, out:
     // the tracked enemy's emulator object (its pointer at frame 0)
     let ety = i(&t["init"]["enemy"]["type"]);
     let tracked = t["vis0"]["en"].as_array().and_then(|a| a.iter().map(emu_en).find(|(e, _)| e.ty == ety)).map(|(_, o)| o);
+    // the enemy's parts our spawn made that the emulator's frame 0 does not have: its enemy waits in the inert state
+    // 0xC until frame 1 (emu_lockstep.py `setup_enemy_records`), so what the type's initial AI state makes (the Worm
+    // Head's five segments, WormSpawnBody) exists only from frame 1 on
+    {
+        let mut have: Vec<i64> = t["vis0"]["en"].as_array().map(|a| a.iter().map(emu_en).filter(|(_, o)| Some(*o) != tracked).map(|(e, _)| e.ty).collect()).unwrap_or_default();
+        let w = &mut s.world;
+        for (id, e) in our_live(w) {
+            if Some(id) == enemy || e.ty == 0x36 {
+                continue;
+            }
+            if let Some(k) = have.iter().position(|&t| t == e.ty) {
+                have.swap_remove(k);
+                continue;
+            }
+            if let Some(k) = w.find(id) {
+                wf_core::enemy::unmark_self(w, k);
+                w.ents[k].removed = true;
+            }
+        }
+        if let Some((k, _)) = enemy.and_then(|id| w.enemy_by_id(id)) {
+            let gone: Vec<EntityId> = w.en_ref(k).children.iter().copied().filter(|&c| w.find(c).is_none_or(|j| w.ents[j].removed)).collect();
+            w.en(k).children.retain(|c| !gone.contains(c));
+        }
+    }
     let mut renderer = wf_render::Renderer::new();
     let mut presenter = wf_core::view::Presenter::default();
     let mut first = First::default();
@@ -817,6 +882,11 @@ pub fn audit(t: &Value, pics: &Pictures, packs: &wf_app::wf_content::Packs, out:
                     for e in s.world.ents.iter().filter(|e| !e.removed) {
                         if let Body::Shot(sh) = &e.body {
                             eprintln!("f{fi} shot {} x {} y {} t {} dir {} owner {}", sh.kind_name(), sh.px(), sh.py(), sh.t, sh.dir, sh.owner);
+                        }
+                    }
+                    for k in 0..s.world.ents.len() {
+                        if !s.world.ents[k].removed {
+                            eprintln!("f{fi} key e{} {:?}", s.world.ents[k].id, wf_core::view::draw_key(&s.world, k));
                         }
                     }
                     let mut v = wf_view::RenderView::default();
@@ -1006,17 +1076,93 @@ pub fn audit(t: &Value, pics: &Pictures, packs: &wf_app::wf_content::Packs, out:
     *tile_hint = Some(tile_off);
     // (frames 0 and 1 are not compared: the emulator's enemy waits off-screen until it is placed at frame 0 and its OBJ
     // shows one frame late - the recording's set-up, not the game)
+    // (the tear candidates have their own renderer: a picture of an earlier state must not touch the main one's caches)
+    let mut tear_renderer = wf_render::Renderer::new();
+    let mut torn = std::collections::BTreeMap::new();
     for (f, v) in views.iter().filter(|(f, _)| *f >= 2) {
         let f = *f;
-        // (the gate: the picture's hash against the game's)
-        if let Pictures::Hashes { hashes, .. } = pics {
-            if hashes.get(f).is_some_and(|h| hash(&render(&mut renderer, v, f, tile_off).0) != *h) {
-                first.hit("pix", f);
+        let prev = &views[f - 1].1;
+        let mut cand = |l: char| render(&mut tear_renderer, &with_prev(v, prev, l), f, tile_off).0;
+        // (the gate: the picture's hash against the game's - a torn frame's from its line spec)
+        if let Pictures::Hashes { hashes, torn: specs, .. } = pics {
+            let Some(h) = hashes.get(f) else { continue };
+            let mut ours = render(&mut renderer, v, f, tile_off).0;
+            if hash(&ours) != *h {
+                if let Some(spec) = specs.get(&f) {
+                    crate::pack::compose(&mut ours, spec, &mut cand);
+                }
+                if hash(&ours) != *h {
+                    first.hit("pix", f);
+                }
             }
             continue;
         }
         let Some(g) = game.get(f) else { continue };
         let (ours, boxes) = render(&mut renderer, v, f, tile_off);
+        if &ours != g && std::env::var_os("OA_NOTEAR").is_none() {
+            let cands: Vec<(char, Vec<u32>)> = TEARS.into_iter().map(|l| (l, cand(l))).collect();
+            // OA_TEARDBG: per line whether the game's is ours ('.'), ours with every BG's previous scroll ('s'), the previous
+            // frame's whole picture ('p'), several ('='), or none ('x')
+            if std::env::var_os("OA_TEARDBG").is_some() {
+                let pv = render(&mut renderer, prev, f - 1, tile_off).0;
+                let rows: String = (0..H)
+                    .map(|y| {
+                        let rg = y * W..(y + 1) * W;
+                        let m = [g[rg.clone()] == ours[rg.clone()], g[rg.clone()] == cands[0].1[rg.clone()], g[rg.clone()] == pv[rg.clone()]];
+                        match m {
+                            [true, false, false] => '.',
+                            [false, true, false] => 's',
+                            [false, false, true] => 'p',
+                            [false, false, false] => 'x',
+                            _ => '=',
+                        }
+                    })
+                    .collect();
+                eprintln!("tear {name} f{f} {rows}");
+                eprintln!("  map layers {:?}", v.map.as_ref().map(|m| m.layers.clone()));
+                for mk in 1..15u32 {
+                    let c = cand(char::from_digit(mk, 16).unwrap());
+                    let bad: Vec<usize> = (20..36).map(|y| (0..W).filter(|&x| c[y * W + x] != g[y * W + x]).count()).collect();
+                    eprintln!("  BG mask {mk:x}: px off on lines 20..36 {bad:?}");
+                }
+                let d: Vec<u32> = (0..W * H).map(|k| if g[k] == cands[0].1[k] { 0xFF00_0000 } else { 0xFFFF_0000 }).collect();
+                save_png(&out_dir.join(format!("{name}_f{f:03}_tear.png")), &[g, &cands[0].1, &d]);
+                for y in 0..H {
+                    if g[y * W..(y + 1) * W] == ours[y * W..(y + 1) * W] {
+                        continue;
+                    }
+                    // per pixel: which pictures explain it (. ours, then the candidates' letters; ? none)
+                    let mut n: std::collections::BTreeMap<String, usize> = Default::default();
+                    for x in 0..W {
+                        let k = y * W + x;
+                        let mut t = String::new();
+                        if g[k] == ours[k] {
+                            t.push('.');
+                        }
+                        for c in &cands {
+                            if g[k] == c.1[k] {
+                                t.push(c.0);
+                            }
+                        }
+                        if g[k] == pv[k] {
+                            t.push('p');
+                        }
+                        if t.is_empty() {
+                            t.push('?');
+                        }
+                        *n.entry(t).or_default() += 1;
+                    }
+                    eprintln!("  line {y}: {n:?}");
+                }
+                eprintln!("  cams {:?} -> {:?} map {:?} -> {:?}", prev.cameras.first().map(|c| (c.x, c.y)), v.cameras.first().map(|c| (c.x, c.y)), prev.map.as_ref().map(|m| (m.anim_frame, m.tile_frame)), v.map.as_ref().map(|m| (m.anim_frame, m.tile_frame)));
+            }
+            // (a candidate equal to our picture is no earlier state: nothing of its kind changed this frame)
+            let live: Vec<(char, Vec<u32>)> = cands.iter().filter(|c| c.1 != ours).cloned().collect();
+            if let Some(spec) = crate::pack::torn_spec(g, &ours, &live) {
+                torn.insert(f, spec);
+                continue;
+            }
+        }
         if &ours == g {
             // (`OA_PNGAT` frames are saved even when equal: a reference to look at)
             if out.is_some() && std::env::var("OA_PNGAT").ok().is_some_and(|v| v.split(',').any(|x| x.trim().parse() == Ok(f))) {
@@ -1066,11 +1212,11 @@ pub fn audit(t: &Value, pics: &Pictures, packs: &wf_app::wf_content::Packs, out:
     }
     let n = f;
     let firsts: Vec<String> = CATS.iter().map(|c| format!("{c} {}", first.at.get(c).map(|v| v.to_string()).unwrap_or("-".into()))).collect();
-    let summary = format!("{name}: {n} frames | {} | OBJ-diff frames {obj_frames}", firsts.join(" "));
+    let summary = format!("{name}: {n} frames | {} | OBJ-diff frames {obj_frames}{}", firsts.join(" "), if torn.is_empty() { String::new() } else { format!(" | torn (hardware) {}", torn.len()) });
     if out.is_some() {
         let j = serde_json::json!({"name": name, "frames": n, "tile_off": tile_off, "first": first.at, "obj_diff_frames": obj_frames, "log": log});
         std::fs::write(out_dir.join(format!("{name}.json")), serde_json::to_vec(&j).unwrap()).unwrap();
     }
-    Audit { name, frames: n, tile_off, first: first.at, obj_frames, state: first.state.into_iter().collect(), picture: first.picture.into_iter().collect(), summary }
+    Audit { name, frames: n, tile_off, first: first.at, obj_frames, state: first.state.into_iter().collect(), picture: first.picture.into_iter().collect(), torn, summary }
 }
 

@@ -2,39 +2,39 @@
   "note": "audit gate (engine/crates/wf-app/tests/audits.rs): the scenarios that are not exact - [first frame with a state difference, count, first frame whose picture differs, count]; every other scenario is locked exact. Re-made by `AUDIT_RATCHET=write cargo test --release -p wf-app --test audits`",
   "scenarios": 538,
   "frames": 180160,
-  "exact": 249,
+  "exact": 265,
   "state_differences": 6872,
-  "picture_frames": 7199,
+  "picture_frames": 6958,
   "ratchet": {
     "sa_defuse_f32_idle": [
       null,
       0,
-      98,
-      36
+      108,
+      30
     ],
     "sa_defuse_f33_idle": [
       null,
       0,
-      98,
-      36
+      108,
+      30
     ],
     "sa_defuse_f42_idle": [
       null,
       0,
-      98,
-      31
+      108,
+      25
     ],
     "sa_defuse_f42_walk": [
       null,
       0,
-      98,
-      31
+      108,
+      25
     ],
     "sa_defuse_f43_idle": [
       null,
       0,
-      98,
-      31
+      108,
+      25
     ],
     "sa_f00_skill15_lv3_right": [
       null,
@@ -144,17 +144,11 @@
       9,
       2
     ],
-    "sa_f03_skill20_transform_right": [
-      null,
-      0,
-      288,
-      5
-    ],
     "sa_f03_skill22_transform_right": [
       null,
       0,
       6,
-      5
+      4
     ],
     "sa_f04_skill15_lv3_right": [
       null,
@@ -162,17 +156,11 @@
       9,
       2
     ],
-    "sa_f04_skill20_transform_right": [
-      null,
-      0,
-      288,
-      5
-    ],
     "sa_f04_skill22_transform_right": [
       null,
       0,
       6,
-      5
+      4
     ],
     "sa_f05_punch_right": [
       null,
@@ -552,12 +540,6 @@
       85,
       3
     ],
-    "sa_f16_skill20_transform_right": [
-      null,
-      0,
-      288,
-      5
-    ],
     "sa_f16_skill6_lv3_right": [
       null,
       0,
@@ -576,12 +558,6 @@
       85,
       3
     ],
-    "sa_f17_skill20_transform_right": [
-      null,
-      0,
-      288,
-      5
-    ],
     "sa_f17_skill6_lv3_right": [
       null,
       0,
@@ -599,12 +575,6 @@
       0,
       85,
       3
-    ],
-    "sa_f18_skill20_transform_right": [
-      null,
-      0,
-      288,
-      5
     ],
     "sa_f18_skill6_lv3_right": [
       null,
@@ -725,12 +695,6 @@
       0,
       9,
       2
-    ],
-    "sa_f20_skill20_transform_right": [
-      null,
-      0,
-      288,
-      5
     ],
     "sa_f20_skill8_lv3_right": [
       null,
@@ -894,12 +858,6 @@
       13,
       9
     ],
-    "sa_f22_skill20_transform_right": [
-      null,
-      0,
-      288,
-      5
-    ],
     "sa_f22_skill4_lv3_right": [
       null,
       0,
@@ -964,25 +922,25 @@
       null,
       0,
       13,
-      32
+      30
     ],
     "sa_f25_skill20_transform_right": [
       null,
       0,
-      288,
-      5
+      305,
+      1
     ],
     "sa_f25_skill4_lv3_right": [
       null,
       0,
       22,
-      5
+      3
     ],
     "sa_f25_skill7_lv1_right": [
       null,
       0,
       106,
-      3
+      1
     ],
     "sa_f26_skill10_lv1_down": [
       null,
@@ -1074,35 +1032,17 @@
       131,
       1
     ],
-    "sa_f28_skill20_transform_right": [
-      null,
-      0,
-      288,
-      5
-    ],
     "sa_f29_skill10_lv3_right": [
       null,
       0,
       131,
       1
     ],
-    "sa_f29_skill20_transform_right": [
-      null,
-      0,
-      288,
-      5
-    ],
     "sa_f30_skill10_lv3_right": [
       null,
       0,
       131,
       1
-    ],
-    "sa_f30_skill20_transform_right": [
-      null,
-      0,
-      288,
-      5
     ],
     "sa_f31_skill13_lv1_down": [
       21,
@@ -1203,62 +1143,62 @@
     "sa_f32_punch_right": [
       null,
       0,
-      98,
-      33
+      108,
+      27
     ],
     "sa_f32_skill13_lv3_right": [
       null,
       0,
-      98,
-      36
+      108,
+      30
     ],
     "sa_f32_skill20_transform_right": [
       null,
       0,
-      98,
-      36
+      108,
+      30
     ],
     "sa_f32_skill23_lv3_right": [
       null,
       0,
-      98,
-      36
+      108,
+      30
     ],
     "sa_f32_skill7_lv1_right": [
       null,
       0,
-      98,
-      36
+      108,
+      30
     ],
     "sa_f33_punch_right": [
       null,
       0,
-      98,
-      33
+      108,
+      27
     ],
     "sa_f33_skill13_lv3_right": [
       null,
       0,
-      98,
-      36
+      108,
+      30
     ],
     "sa_f33_skill20_transform_right": [
       null,
       0,
-      98,
-      36
+      108,
+      30
     ],
     "sa_f33_skill23_lv3_right": [
       null,
       0,
-      98,
-      36
+      108,
+      30
     ],
     "sa_f33_skill7_lv1_right": [
       null,
       0,
-      98,
-      36
+      108,
+      30
     ],
     "sa_f34_skill13_lv3_right": [
       21,
@@ -1266,17 +1206,11 @@
       null,
       0
     ],
-    "sa_f34_skill20_transform_right": [
-      null,
-      0,
-      288,
-      5
-    ],
     "sa_f34_skill22_transform_right": [
       null,
       0,
       6,
-      5
+      4
     ],
     "sa_f35_punch_right": [
       null,
@@ -1319,12 +1253,6 @@
       254,
       null,
       0
-    ],
-    "sa_f37_skill20_transform_right": [
-      null,
-      0,
-      288,
-      5
     ],
     "sa_f38_skill13_lv3_right": [
       21,
@@ -1428,12 +1356,6 @@
       13,
       10
     ],
-    "sa_f40_skill20_transform_right": [
-      null,
-      0,
-      288,
-      5
-    ],
     "sa_f40_skill9_steer_right": [
       null,
       0,
@@ -1512,77 +1434,59 @@
       9,
       9
     ],
-    "sa_f41_skill5_lv1_down": [
-      null,
-      0,
-      123,
-      1
-    ],
     "sa_f41_skill5_lv1_left": [
       null,
       0,
-      123,
-      52
+      207,
+      51
     ],
     "sa_f41_skill5_lv1_right": [
       null,
       0,
-      123,
-      52
+      207,
+      51
     ],
     "sa_f41_skill5_lv1_up": [
       null,
       0,
-      123,
-      220
-    ],
-    "sa_f41_skill5_lv2_down": [
-      null,
-      0,
-      123,
-      1
+      167,
+      219
     ],
     "sa_f41_skill5_lv2_left": [
       null,
       0,
-      123,
-      52
+      207,
+      51
     ],
     "sa_f41_skill5_lv2_right": [
       null,
       0,
-      123,
-      52
+      207,
+      51
     ],
     "sa_f41_skill5_lv2_up": [
       null,
       0,
-      123,
-      220
-    ],
-    "sa_f41_skill5_lv3_down": [
-      null,
-      0,
-      123,
-      1
+      167,
+      219
     ],
     "sa_f41_skill5_lv3_left": [
       null,
       0,
-      123,
-      52
+      207,
+      51
     ],
     "sa_f41_skill5_lv3_right": [
       null,
       0,
-      123,
-      52
+      207,
+      51
     ],
     "sa_f41_skill5_lv3_up": [
       null,
       0,
-      123,
-      220
+      167,
+      219
     ],
     "sa_f41_skill5_steer_right": [
       null,
@@ -1605,62 +1509,62 @@
     "sa_f42_punch_right": [
       null,
       0,
-      98,
-      28
+      108,
+      22
     ],
     "sa_f42_skill3_lv3_right": [
       null,
       0,
-      98,
-      31
+      108,
+      25
     ],
     "sa_f42_skill5_lv3_right": [
       null,
       0,
-      98,
-      31
+      108,
+      25
     ],
     "sa_f42_skill5_steer_right": [
       null,
       0,
-      98,
-      28
+      108,
+      22
     ],
     "sa_f42_skill7_lv1_right": [
       null,
       0,
-      98,
-      31
+      108,
+      25
     ],
     "sa_f43_punch_right": [
       null,
       0,
-      98,
-      28
+      108,
+      22
     ],
     "sa_f43_skill3_lv3_right": [
       null,
       0,
-      98,
-      31
+      108,
+      25
     ],
     "sa_f43_skill5_lv3_right": [
       null,
       0,
-      98,
-      31
+      108,
+      25
     ],
     "sa_f43_skill5_steer_right": [
       null,
       0,
-      98,
-      28
+      108,
+      22
     ],
     "sa_f43_skill7_lv1_right": [
       null,
       0,
-      98,
-      31
+      108,
+      25
     ],
     "sa_f44_skill3_lv3_right": [
       null,
@@ -1671,8 +1575,8 @@
     "sa_f44_skill5_lv3_right": [
       null,
       0,
-      123,
-      52
+      207,
+      51
     ],
     "sa_f44_skill5_steer_right": [
       null,

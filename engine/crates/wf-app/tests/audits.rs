@@ -150,7 +150,8 @@ fn opponent_audit_locked_and_ratcheted() {
     let d = wf_app::battle::load_data(&packs).expect("data");
     let _ = opp::DATA.set(std::sync::Arc::new((*d).clone()));
     let got = measure(&paths, &|| Packs::new(vec![Box::new(DirSource(content.clone())) as Box<dyn FileSource>]).unwrap(), &|packs, doc| {
-        let pics = opp::Pictures::Hashes { tile_off: doc["pic"]["tile_off"].as_u64().unwrap_or(0) as u32, hashes: pack::hashes(doc) };
+        let torn = doc["pic"]["torn"].as_object().map(|o| o.iter().filter_map(|(f, s)| Some((f.parse().ok()?, s.as_array()?.iter().map(|l| l.as_str().unwrap_or("").to_string()).collect()))).collect()).unwrap_or_default();
+        let pics = opp::Pictures::Hashes { tile_off: doc["pic"]["tile_off"].as_u64().unwrap_or(0) as u32, hashes: pack::hashes(doc), torn };
         let r = opp::audit(doc, &pics, packs, None, &mut None);
         (r.frames as usize, (r.state.first().copied(), r.state.len(), r.picture.first().copied(), r.picture.len()))
     });
@@ -176,10 +177,22 @@ fn skill_audit_locked_and_ratcheted() {
     }
     let set = wf_script::ScriptSet::load_all(&rom);
     let (files, _) = wf_script::export::export(&rom, &set);
-    let init = || (Packs::new(vec![Box::new(DirSource(content.clone())) as Box<dyn FileSource>]).unwrap(), wf_render::Renderer::new());
-    let got = measure(&paths, &init, &|(packs, renderer), doc| {
+    let init = || (Packs::new(vec![Box::new(DirSource(content.clone())) as Box<dyn FileSource>]).unwrap(), wf_render::Renderer::new(), wf_render::Renderer::new());
+    let got = measure(&paths, &init, &|(packs, renderer, tear_renderer), doc| {
         let h = pack::hashes(doc);
-        let r = skill::check(&data, &files, packs, renderer, doc, &mut |k, ours| h.get(k).map(|g| *g == pack::hash(ours)));
+        let torn = &doc["pic"]["torn"];
+        let r = skill::check(&data, &files, packs, renderer, tear_renderer, doc, &mut |k, ours, cand| {
+            let g = *h.get(k)?;
+            if g == pack::hash(ours) {
+                return Some(true);
+            }
+            // (a torn frame: our picture with the previous state on the lines its spec names)
+            let Some(spec) = torn[k.to_string().as_str()].as_array() else { return Some(false) };
+            let spec: Vec<String> = spec.iter().map(|l| l.as_str().unwrap_or("").to_string()).collect();
+            let mut px = ours.to_vec();
+            pack::compose(&mut px, &spec, cand);
+            Some(g == pack::hash(&px))
+        });
         (r.frames, (r.state.as_ref().map(|s| s.0), r.state.as_ref().map(|s| s.1).unwrap_or(0), r.picture.first().copied(), r.picture.len()))
     });
     gate("skill audit", &repo.join("data/audits/skill.json"), &got);
