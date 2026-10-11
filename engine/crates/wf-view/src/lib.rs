@@ -460,7 +460,7 @@ pub enum SpriteEffect {
     /// texture; negative = mirrored), clipped to the box.
     Affine { pa: i16, pd: i16 },
     /// Drawn plainly, but not at all while it is wrapped in from above the camera's screen (OAM y, a byte, >= 160) with
-    /// fewer than 5 of its `h` rows on screen: an enemy's shadow OBJ (16x8: none at tops -4 .. -7 though the hardware
+    /// fewer than 5 of its `h` rows on screen: an actor's shadow OBJ (16x8: none at tops -4 .. -7 though the hardware
     /// would show their last rows, shown from -3; 32x16: shown at -9).
     TopCull { h: u8 },
 }

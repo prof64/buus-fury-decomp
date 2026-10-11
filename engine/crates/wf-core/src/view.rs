@@ -414,17 +414,15 @@ fn actor_draw(
             y: a.py() + shadow_at(w, id, sp).1,
             priority: 3,
             mirror: false,
-            // an enemy's shadow going up off the screen is dropped while fewer than 5 of its OBJ's rows are on screen
-            // (the emulator, opponent audit oa_t4e_above f170 .. f182: a ninja walking up off the screen shows its 16x8
+            // a shadow going up off the screen is dropped while fewer than 5 of its OBJ's rows are on screen (the
+            // emulator, opponent audit oa_t4e_above f170 .. f182: a ninja walking up off the screen shows its 16x8
             // shadow at tops -1 .. -3, none at -4 .. -7 while its feet still show; oa_t30 / oa_t2c / oa_t6c above the
-            // same; pixel gate shipr_338_8-16 f4230: Super Buu's 32x16 one at -9 shows); the player's and an NPC's
-            // are not cut so (pixel gate db6_019 13-50 ..) - judged by the camera the picture is drawn with (the
-            // presenter's OBJ delay: pixel gate rsbi_010_21_11 f120)
-            effect: if w.find(id).is_some_and(|k| matches!(w.ents[k].body, Body::Enemy(_))) {
-                SpriteEffect::TopCull { h: if sh.as_str() == "shadow_24x10" { 16 } else { 8 } }
-            } else {
-                SpriteEffect::None
-            },
+            // same; pixel gate shipr_338_8-16 f4230: Super Buu's 32x16 one at -9 shows) - the player's and an NPC's
+            // too (the picture board: the World Tournament's watchers at the screen's top, rsbk_002 4-21 f12,780 ..
+            // / sb_044 4-20, their feet at rows 0 .. 1 and no shadow; 211 sampled frames over 25 segments, none
+            // lost) - judged by the camera the picture is drawn with (the presenter's OBJ delay: pixel gate
+            // rsbi_010_21_11 f120)
+            effect: SpriteEffect::TopCull { h: if sh.as_str() == "shadow_24x10" { 16 } else { 8 } },
         });
     }
 }
@@ -1671,17 +1669,20 @@ fn render_view_with(w: &World, link: Option<&LinkDraw>, out: &mut RenderView) {
                 .form(p.form)
                 .map(|f| f.name.clone())
                 .unwrap_or_default();
-            // experience line: steps 0..72 between this level's total and the next (0x0801363E(player, 72))
+            // experience line: steps 0..72 between this level's total and the next (0x0801363E(player, 72)); the
+            // level is the one the experience total gives (0x080135D2: a search of the table), not the record's level
+            // byte - a fused / scripted character's can differ (real route r052 6-9: Gotenks's line a quarter full)
             let lv = p.rec.level;
             let t = &w.data.xp_table;
-            let k = (lv - 50).max(0) as usize;
-            let xp72 = match (t.get(k), t.get(k + 1)) {
-                (Some(&a), Some(&b)) if b > a => {
-                    (((p.rec.xp - a).clamp(0, b - a) * 72) / (b - a)) as u8
+            let xp_line = |xp: i64| {
+                let k = t.iter().rposition(|&a| a <= xp).unwrap_or(0);
+                match (t.get(k), t.get(k + 1)) {
+                    (Some(&a), Some(&b)) if b > a => (((xp - a).clamp(0, b - a) * 72) / (b - a)) as u8,
+                    (Some(_), None) => 72,
+                    _ => 0,
                 }
-                (Some(_), None) => 72,
-                _ => 0,
             };
+            let xp72 = xp_line(p.rec.xp);
             let skill = p.skill();
             // (the bars: what the HUD's update read in the frame's pass - `World::hud_sample`)
             // (changed since the pass - a script's heal, a menu: the current values)
@@ -1712,6 +1713,21 @@ fn render_view_with(w: &World, link: Option<&LinkDraw>, out: &mut RenderView) {
                 })
                 .map(|m| (m.1, m.2))
                 .unwrap_or(gauge_now);
+            // a fusion component's level-up hook: the component is the current character, and the HUD draws the current
+            // character's record (0x0800B99C reads GameData +0's) - its HP / EP, gauges, experience line and skill
+            // (emulator, real route r052 6-9 f5,768 .. 6,015: current 3 (Trunks, 488 / 488, 237 / 237) under Gotenks)
+            let comp = w.story.levelup_char.and_then(|c| w.story.chars.get(c.max(0) as usize));
+            let (lv, xp72, bars, gauge, skill, cooldown) = match comp {
+                Some(c) => (
+                    c.rec.level,
+                    xp_line(c.rec.xp),
+                    (c.rec.hp, c.rec.max_hp, c.rec.ep, c.rec.max_ep),
+                    (c.ss_gauge, c.ss3_gauge),
+                    c.skills.get(c.sel.max(0) as usize).copied().unwrap_or(7),
+                    c.ss_cooldown,
+                ),
+                None => (lv, xp72, bars, gauge, skill, p.ss_cooldown),
+            };
             out.hud.push(HudView {
                 name,
                 level: lv.max(0) as u32,
@@ -1721,7 +1737,7 @@ fn render_view_with(w: &World, link: Option<&LinkDraw>, out: &mut RenderView) {
                 ep_max: bars.3,
                 ss: gauge.0,
                 ss3: gauge.1,
-                ss_cooldown: p.ss_cooldown,
+                ss_cooldown: cooldown,
                 xp72,
                 skill: (skill > 0).then_some(skill as u8),
                 // areas without combat (towns, offices) grey the icon out (emulator HUD)

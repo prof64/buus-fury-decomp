@@ -1180,6 +1180,15 @@ pub fn stat_mark(w: &mut World) {
     }
 }
 
+/// one more draw of the stat-points mark outside the field's iterations: a mode that draws the object world without
+/// updating it - Watch This!'s (emulator, real route r052 6-9 f3,452 .. 3,782: the mark's counter +0x14 one up per
+/// frame, 1,747 -> 2,077, the camera's clock +0x40 still at 1,747)
+pub fn stat_mark_drawn(w: &mut World) {
+    if let Some(v) = st(w) {
+        v.stat_at = v.stat_at.wrapping_sub(1);
+    }
+}
+
 /// the level signs' labels go (an area load)
 pub fn signs_gone(w: &mut World) {
     let Some(v) = st(w) else { return };

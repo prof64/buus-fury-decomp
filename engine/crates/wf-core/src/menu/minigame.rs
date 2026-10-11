@@ -225,6 +225,8 @@ impl Page for Minigame {
         self.c.drawn = false;
         self.counter = self.counter.wrapping_add(1);
         if let Some(wt) = &self.watch {
+            // (the drawn object world: the stat-points mark's draw counts on - `vram::stat_mark_drawn`)
+            crate::vram::stat_mark_drawn(w);
             // the mode's step returns the verdict: non-zero ends the mode
             let v = wt.verdict;
             return if v != 0 {
