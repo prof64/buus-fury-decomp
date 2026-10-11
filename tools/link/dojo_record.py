@@ -191,10 +191,21 @@ def main():
     if '--banner' in sys.argv:
         # keys from the round's banner on: does the game read them before the timer starts?
         fight = [('RIGHT', 'A', 200), ('-', '-', 60)]
+    # (`--reset-b-at N`: the guest's console is soft reset N video frames into the fight - the link is lost: the host
+    # freezes, then its link error's script fades the fight out; the recording's `lost` is the host's last fight
+    # logic frame, and 120 more video frames are recorded)
+    reset_at = int(sys.argv[sys.argv.index('--reset-b-at') + 1]) if '--reset-b-at' in sys.argv else None
+    lost_lf = None
+    if reset_at is not None:
+        fight = [('brain', None, reset_at), ('reset', None, 1), ('-', '-', 120)]
     held = (0, 0, 0)
     for phase, seq in (('menu', MENU), ('fight', fight)):
         for ka, kb, n in seq:
             for t in range(n):
+                if ka == 'reset':
+                    soft_reset(b)
+                    lost_lf = a.r32(0x03000F94)
+                    continue
                 if ka == 'brain':
                     # (a new decision every 6 frames, held between: presses register as presses)
                     if t % 6 == 0:
@@ -271,9 +282,14 @@ def main():
                     rows.append(last)
                 last, last_phase, last_k = snap, phase, len(keys_log)
                 lf_prev = lf
+    if lost_lf is not None and video:
+        # (the host's last fight logic frame: the one its counter stood on while it waited for the guest)
+        from collections import Counter
+        lost_lf = Counter(v[1] for v in video).most_common(1)[0][0]
     out = ROOT / 'data' / 'link' / f'dojo_{name}.json'
     out.write_text(json.dumps({'name': name, 'about': __doc__.split('\n')[0], 'mode': mode, 'rounds': rounds, 'pick': [pick_a, pick_b],
                                'video_keys': keys_log, 'recs': recs, 'rows': rows,
+                               **({'lost': lost_lf} if lost_lf is not None else {}),
                                **({'video': video} if video else {}), **({'video_b': video_b} if video_b else {})},
                               separators=(',', ':')))
     print(out, len(rows), 'logic frames')

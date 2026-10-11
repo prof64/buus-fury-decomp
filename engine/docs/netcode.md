@@ -352,6 +352,13 @@ network options, `--net-name`, `--net-key` apply); B (Cancel) leaves as in the g
   under the script's fade); `LinkSim` keeps the fight's last picture there instead when the link was lost in one
   (phase "lost"). Gated frame by frame, the scene's frames and the title after it included: menu_parity
   `link_lost_setup` / `link_lost_saves` / `link_lost_chars`. A trade in doubt keeps its page (the journal's lock).
+  In a fight the picture under the script is the fight going on as the game's does (`DojoGame::link_lost` /
+  `lost_step`): one more update of the fight, then the fighters held where they are, the cameras easing on with the
+  OBJs while the BG stays, the HUD and the friend's bar sliding out (`hide_hud`), the palette fading 16 a step -
+  recorded with the guest's emulator reset mid-fight (`tools/link/dojo_record.py --reset-b-at N`, the recording's
+  `lost`) and compared picture for picture (tests/dojo_pixels.rs `dojo_lost1` / `dojo_lost2`, exact). Open: a
+  fighter that was walking when the link broke stands idle from the script's 6th update in the game; ours keeps its
+  walking pose through the fade (one recording, kept out of the gate; the rule not found).
   On a link page a friend that stops answering without its connection closing (a dead network) is lost after 3 s
   without a packet (`LINK_TIMEOUT_MS`: the game's 180 updates; tests/link.rs `dojo_link_lost_on_a_page`).
 * **Leaving with B** (Select Saved Game's Cancel): the page becomes the title's Multiplayer page (menu_parity

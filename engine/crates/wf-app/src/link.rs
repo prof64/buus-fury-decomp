@@ -266,8 +266,8 @@ struct Flow {
     played: u32,
     result: Option<Ending>,
     to_chars: bool,
-    /// the link was lost in a fight: its last picture is what the link error's script fades out
-    lost_view: Option<Box<RenderView>>,    /// the song this flow started (the Dojo's, at its first fight)
+    /// the link was lost in a fight: the fight, as it goes on under the link error's script (its side)
+    lost_game: Option<(Box<DojoGame>, u8)>,    /// the song this flow started (the Dojo's, at its first fight)
     song: Option<u16>,
     /// the friend left the link with B (its hello says so), and the page was told (`menu::link::friend_left`)
     friend_left: bool,
@@ -347,7 +347,7 @@ impl Flow {
             played: 0,
             result: None,
             to_chars: false,
-            lost_view: None,
+            lost_game: None,
             song: None,
             friend_left: false,
             left_told: false,
@@ -643,6 +643,18 @@ impl Flow {
         }
     }
 
+    /// the link is lost in a fight: the fight stays on screen under the link error's script (`DojoGame::link_lost`)
+    fn lose_fight(&mut self) {
+        if let Phase::Match(m) = std::mem::replace(&mut self.phase, Phase::Lost) {
+            let m = *m;
+            let slot = m.m.slot;
+            let mut g = m.sess.game;
+            g.link_lost();
+            self.lost_game = Some((Box::new(g), slot));
+        }
+        self.t = 0;
+    }
+
     /// leaving the link with B: the friend is told (its page follows to the Multiplayer page)
     fn say_left(&mut self) {
         let h = LinkHello { link_id: self.link_id.clone(), dojo: None, left: true };
@@ -736,11 +748,8 @@ impl Flow {
             let faded = g.st.over_at.is_some_and(|o| g.st.frame >= o + 64);
             if dropped {
                 let e = m.m.disconnected().clone();
-                let mut v = RenderView::default();
-                m.sess.game.view(m.m.slot, &mut v);
-                self.lost_view = Some(Box::new(v));
                 self.result = Some(e);
-                self.set_phase(Phase::Lost);
+                self.lose_fight();
             } else if faded || *k > 64 + 90 {
                 self.result = m.ended.take().map(|e| e.0);
                 self.played += 1;
@@ -777,11 +786,9 @@ impl Flow {
             def: m.def.clone(),
         });
         if e == Ending::Disconnected {
-            let mut v = RenderView::default();
-            m.sess.game.view(m.m.slot, &mut v);
-            self.lost_view = Some(Box::new(v));
             self.result = Some(e);
-            self.set_phase(Phase::Lost);
+            self.lose_fight();
+            return Out::None;
         } else {
             m.ended = Some((e, 0));
         }
@@ -1093,9 +1100,9 @@ pub struct LinkSim {
     /// a wf-core link page is open on the title app (`inner`): the title's state from before, restored when the
     /// flow ends, and the page open
     page: Option<(Box<crate::story::StoryState>, &'static str)>,
-    /// the link is lost: the title app runs the game's link error (`menu::link::lost`) - with the fight's last
-    /// picture, when it was lost in one, until the script's scene loads
-    lost: Option<Option<Box<RenderView>>>,
+    /// the link is lost: the title app runs the game's link error (`menu::link::lost`) - with the fight, when it was
+    /// lost in one, going on under the script until its scene loads
+    lost: Option<Option<(Box<DojoGame>, u8)>>,
     /// a flow that left the link: its connection kept for a moment (the friend hears of it), steps left
     leaving: Option<(Box<Flow>, u32)>,
 }
@@ -1424,13 +1431,16 @@ impl LinkSim {
                 self.record = Some(r);
             }
             if self.lost.is_none() {
-                self.lost = Some(flow.lost_view.take());
+                self.lost = Some(flow.lost_game.take());
                 // (the title's state from before the link is not restored: the script ends on the title's first page)
                 self.page = None;
                 wf_core::menu::link::lost(&mut self.inner.session.world);
             }
             let result = flow.result.clone();
             self.inner.step(inputs, events);
+            if let Some(Some((g, _))) = self.lost.as_mut() {
+                g.lost_step(&[0, 0]);
+            }
             if matches!(self.inner.session.world.menu.stack.last(), Some(wf_core::menu::Screen::Title(_))) {
                 self.last = Some(match result {
                     Some(e) => format!("{e:?}"),
@@ -1599,17 +1609,11 @@ impl LinkSim {
     }
 
     fn view_inner(&self, out: &mut RenderView) {
-        // the link error's script: the title app's picture - under its first fade the fight's last picture, when the
-        // link was lost in one
+        // the link error's script: the title app's picture - under its first fade the fight (its own fade and HUD
+        // slide: `DojoGame::lost_step`), when the link was lost in one
         if let Some(fight) = &self.lost {
-            if let (Some(fv), true) = (fight, self.inner.session.world.under.is_some()) {
-                let mut iv = RenderView::default();
-                self.inner.view(&mut iv);
-                *out = (**fv).clone();
-                out.palette_scale = iv.palette_scale;
-                out.palette_fade = iv.palette_fade.or(iv.menu.as_ref().and_then(|m| m.fade));
-                out.fade_black = iv.fade_black;
-                return;
+            if let (Some((g, slot)), true) = (fight, self.inner.session.world.under.is_some()) {
+                return g.view(*slot, out);
             }
             return self.inner.view(out);
         }

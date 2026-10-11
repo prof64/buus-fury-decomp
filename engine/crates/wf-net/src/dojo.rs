@@ -428,6 +428,11 @@ pub struct DojoGame {
     shown: [Option<Vec<wf_view::SpriteDraw>>; 2],
     /// the damage numbers' shake pixels on each side (its own camera's, from the same build as `shown`)
     num_shake: [(i32, i32); 2],
+    /// the link is lost (`link_lost`): the updates since - the link error's script runs over the fight (its
+    /// `hide_hud`, its 16-step fade-out), the fighters going on without keys; not rollback state
+    lost: Option<i32>,
+    /// ... and each side's BG camera as the picture had it when the link was lost (it stays there under the script)
+    lost_cams: [(i32, i32); 2],
 }
 
 impl DojoGame {
@@ -442,6 +447,8 @@ impl DojoGame {
             s,
             shown: [None, None],
             num_shake: [(0, 0); 2],
+            lost: None,
+            lost_cams: [(0, 0); 2],
         }
     }
     /// the draw pass's sprites on both sides, before an update
@@ -455,6 +462,45 @@ impl DojoGame {
         });
         self.num_shake = num_shake;
     }
+    /// The link is lost: from here the game's link error script (s001) runs over the fight - `hide_hud` (the HUD and
+    /// the friend's bar slide out), `fade_out(16)` - while the fighters go on without keys (two linked emulators, the
+    /// guest reset mid-fight: wf-app tests/dojo_pixels.rs `dojo_lost*`). [`DojoGame::lost_step`] is one such update
+    pub fn link_lost(&mut self) {
+        if self.lost.is_none() {
+            self.lost = Some(0);
+            for s in 0..2 {
+                let cam = &self.s.world.cameras[s];
+                let c = if self.since_made().is_some_and(|k| k < 126) { cam.rect } else { cam.shown };
+                self.lost_cams[s] = (c.x0, c.y0);
+            }
+        }
+    }
+    /// one update under the link error's script (the app calls it once a frame until the script's scene loads): the
+    /// first one is the fight's next update (its OBJs are the last update's, a frame late as always); then the script
+    /// holds the fighters where they are, the cameras ease on (the OBJs follow them, the BG stays), the HUD and the
+    /// friend's bar slide out and the picture fades. (Open: a fighter that was walking stands idle from the 6th
+    /// update in the game - one recording, the rule not found; ours keeps its pose)
+    pub fn lost_step(&mut self, keys: &[u16]) {
+        match self.lost {
+            Some(0) => {
+                self.lost = Some(1);
+                <Self as Game>::advance(self, keys, true);
+            }
+            Some(j) => {
+                self.lost = Some(j + 1);
+                // (the cameras go on easing - the OBJs follow them, the BG does not)
+                for slot in 0..self.s.world.players.len().min(2) {
+                    wf_core::battle::camera(&mut self.s.world, slot);
+                }
+            }
+            None => {}
+        }
+    }
+    /// the fade-out is done (the screen is black: the script's scene follows)
+    pub fn lost_faded(&self) -> bool {
+        self.lost.is_some_and(|j| j >= 17)
+    }
+
     /// that side's world list beyond the props and fighters (their sort keys on our scale: layer 0x38 - the game's,
     /// depth the game's - 4): "Round N" (a title text: layer 0, depth 0) while it shows; from the fight's start the
     /// HUD and the boss bar (layer 16, depth 0) and the round timer (layer 0, depth 0x7FFFFFFF); the round's end
@@ -585,6 +631,10 @@ impl DojoGame {
         let cam = &self.s.world.cameras[s];
         let c = if self.since_made().is_some_and(|k| k < 126) { cam.rect } else { cam.shown };
         out.cameras = vec![wf_view::CameraView { x: c.x0, y: c.y0 }];
+        // (under the link error's script: the camera of the picture the link was lost on)
+        if self.lost.is_some_and(|j| j >= 1) {
+            out.cameras = vec![wf_view::CameraView { x: self.lost_cams[s].0, y: self.lost_cams[s].1 }];
+        }
         let hud = out.hud.get(s).cloned();
         out.hud = hud.into_iter().collect();
         // the OBJs in this side's draw order
@@ -593,6 +643,19 @@ impl DojoGame {
         }
         for n in out.damage_numbers.iter_mut() {
             n.shake = self.num_shake[s];
+        }
+        // under the link error's script the BG stays where the picture the link was lost on had it; the OBJs are
+        // placed by the camera as it goes on
+        if self.lost.is_some_and(|j| j >= 1) {
+            let (dx, dy) = (self.lost_cams[s].0 - c.x0, self.lost_cams[s].1 - c.y0);
+            for sp in out.sprites.iter_mut() {
+                sp.x += dx;
+                sp.y += dy;
+            }
+            for n in out.damage_numbers.iter_mut() {
+                n.x += dx;
+                n.y += dy;
+            }
         }
         // the HUD's bars as the frame leaves them (drawn from the fighters' records in the draw pass: an Energy
         // Blast's EP in its own frame - link recording dojo_px1)
@@ -617,9 +680,18 @@ impl DojoGame {
         if level > 0 {
             out.palette_fade = Some(wf_view::PaletteFade { level: level as u16, target: 0 });
         }
+        // (the link error's fade: the palette toward black, 16 a step)
+        if let Some(j) = self.lost.map(|j| j - 1).filter(|&j| j > 0) {
+            out.palette_fade = Some(wf_view::PaletteFade { level: (16 * j).clamp(0, 256) as u16, target: 0 });
+        }
         // the HUD and the boss bar: in from update 126 (y -16 / -8, +1 an update, to 8), out after the result
         // (from 8, -1 an update, gone above -16 / -8)
+        let lost = self.lost;
         let y = |lo: i32| -> Option<i32> {
+            // (the script's `hide_hud`: up a pixel an update, from its second iteration)
+            if let Some(j) = lost.map(|j| (j - 1).max(0)) {
+                return (8 - j >= lo).then_some(8 - j);
+            }
             match (made, result) {
                 (Some(k), _) if k >= 126 => Some((lo + k - 126).min(8)),
                 (_, Some(j)) if 9 - j >= lo => Some((9 - j).min(8)),

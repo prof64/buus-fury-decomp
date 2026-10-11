@@ -452,7 +452,54 @@ fn run(packs: &Packs, data: &Arc<GameData>, name: &str) -> Vec<(u8, usize, usize
             }
         }
     };
+    // `lost` (dojo_record.py `--reset-b-at`): the host's last fight logic frame before the link was lost - it stands on
+    // it while it waits, then the link error's script (s001) fades that picture out: 16 steps of the script's
+    // palette scale, to black
+    let lost = doc["lost"].as_i64();
+    let mut faded = 0u16;
     for (k, row) in rows.iter().enumerate() {
+        // (the script's first iteration still shows the fight's next picture: its OBJs are the last update's, a
+        // frame late as always - the picture that then fades)
+        if let Some(l) = lost.filter(|&l| v(&row["lf"]) > l) {
+            let lf = v(&row["lf"]);
+            for (si, side) in sides.iter().enumerate() {
+                if let Some(p) = pend[si].take() {
+                    let keep = (p.4.clone(), p.6.clone());
+                    judge(si, p, last[si].as_ref(), &mut res);
+                    last[si] = Some(keep);
+                }
+                if si == 0 {
+                    g.link_lost();
+                    let lk: Vec<u16> = row["keys"].as_array().unwrap().iter().map(|x| v(x) as u16).collect();
+                    g.lost_step(&lk);
+                }
+                let Some((h, vf)) = side.want.get(&lf) else { continue };
+                let mut nv = RenderView::default();
+                g.view(side.slot, &mut nv);
+                let ours = renderer.render(packs, &nv, 0, 240, 160).to_vec();
+                res[si].1 += 1;
+                let level = (hash(&ours) == *h).then_some((lf - l) as u16);
+                if let (None, Some(o), Some(emu)) = (level, &out, load_png(&side.dir.join(format!("{vf:06}.png")))) {
+                    let diff: Vec<u32> = emu.iter().zip(&ours).map(|(a, b)| if a == b { 0xFF00_0000 } else { 0xFFFF_00FF }).collect();
+                    save(&o.join(format!("{name}_{}_{lf}.png", side.slot)), &[&emu, &ours, &diff]);
+                }
+                match level {
+                    Some(lv) => {
+                        if log {
+                            eprintln!("dojo_{name} side {} lf {lf}: the lost link's fade, level {lv} / 16 ({} after the last fight frame)", side.slot, lf - l);
+                        }
+                        faded = lv * 16;
+                        let _ = &faded;
+                        res[si].2 += 1;
+                    }
+                    None => res[si].4.push(lf),
+                }
+            }
+            if faded >= 256 {
+                break;
+            }
+            continue;
+        }
         let keys: Vec<u16> = row["keys"].as_array().unwrap().iter().map(|x| v(x) as u16).collect();
         if k > 0 {
             let gap = v(&row["lf"]) - v(&rows[k - 1]["lf"]);
@@ -516,6 +563,7 @@ fn run(packs: &Packs, data: &Arc<GameData>, name: &str) -> Vec<(u8, usize, usize
                 let pp: Vec<_> = w.battle.popups.iter().map(|p| (p.0, p.1, p.2, p.4 >> 3, p.7)).collect();
                 eprintln!("   pickups {pk:?} popups {pp:?} next_id {} frame {} fighters {:?}", w.next_id, w.frame, w.players.iter().map(|&id| { let a = &w.pl_ref(w.find(id).unwrap()).a; (a.x >> 8, a.y >> 8, a.foot_h) }).collect::<Vec<_>>());
             }
+
             pend[si] = Some((lf, h.clone(), *vf, tear, ours, format!("{:?} t {} down {}", g.st.phase, g.st.t, g.st.down_for), view, long));
         }
     }
