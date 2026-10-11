@@ -619,7 +619,7 @@ no shadow for an off-screen actor - Dabura / Yamu), an Energy Blast fired up dra
 | G4 | 0x61 | Rapscallion | above / below / left / ki exact | digit centring | idle anim tick f556; ko: level-up | - |
 | G4 | (shared) | damage numbers | - | wf-render menu.rs: odd widths a pixel left, except a crit over an enemy (pixel gate db6_007 f90 - empirical split); vram.rs heal_number_shown + nodes.rs VampireGrab (green, top - 2, own reuse slot) | - | - |
 | G4 | (shared) | kill-HP remainder | - | harness only: our enemy object is gone at death, the game's stays listed at HP 0 (opp_audit.rs reports 0) | - | - |
-| G4 | (shared) | HUD HP / EP bars | - | World::hud_sample at the HUD's list place (field: its sprite-memory record; battle: HP after the pass, EP before); pixel gate earth_2_11_3 f150 / dr4_066 f390 now exact too | - | - |
+| G4 | (shared) | HUD HP / EP bars | - | the values as the frame leaves them (the HUD's draw 0x0800BCC8 runs in the draw pass, after the update pass); a bar a frame late is the draw landing after the scanout (earth_2_11_3 f150: scanline 11) - a tear the pixel gates accept (`view::hud_late`), not a list-place rule (2026-10-11) | - | - |
 | G5 | 0x20 | Ghost | AI, anim cels, facing, positions, HP/damage, death | harness: anim raw compared by canonical slot (opp_audit.rs) | dmg digits (G4); stump vs player foot priority (prop sort, not opponent) | - |
 | G5 | 0x58 | Phantom | as Ghost | as Ghost | as Ghost | - |
 | G5 | 0x5d | Poltergeist | as Ghost | as Ghost | as Ghost | - |

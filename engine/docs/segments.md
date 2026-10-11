@@ -7261,3 +7261,26 @@ What the 4,500 differing samples are (the board's classes; a frame counts once, 
 * **text boxes, ~260**: small (median ~20 px), mostly in the same scenes.
 Not on this board at all: the skill audit (528 scenarios) and the opponent audit (463) compare every frame but live
 in `work/` and are run by hand, not gated.
+*HUD pass (2026-10-11, branch hud-text; the same 503 segments, 27,714 samples: 22,686 exact before, 23,373 after).*
+What the HUD class outside the two boss scenes turned out to be - mostly not HUD: the board calls any difference in
+the top 24 lines "HUD". By cause, each from the emulator:
+* the experience line: the level it is drawn for is the one the total gives (`0x080135D2`), not the record's level
+  byte (+276 frames, Gotenks 6-9); a fusion component's record while its level-up hook runs (+31);
+* shadows (the watchers at the screen's top, Dabura): the actor draw's test `0x08010252` .. - header +0xC / +0xD
+  signed, the shadow's (w, h) box against the camera - for every actor (+211), `set_attachment`'s "none" (+104);
+* the stat-points mark: its draws under Watch This! (+13), first drawn the frame after it is made, gone in the frame
+  a script takes the points, its counter from the first draw after a load (+8);
+* **the bars' last pixels / the mark's cel / the gauge step a frame late: a tear, proven.** The HUD's draw
+  (`0x0800BCC8`, in the draw pass `0x080115B0`) runs after the frame's whole update pass (`0x08011A1E`) and normally
+  in VBlank (scanline 200 .. 227): every change shows in that frame. It shows a frame late exactly when the draw's
+  breakpoint scanline is past the HUD's lines (earth_2_11_3 f150: 11; earth_2_8_1 f3630: 39; shipr_338 f4,380: 50).
+  `World::hud_sample` (bars "read at the HUD's list place") was a rule fitted to those tears and is removed; the
+  board and `tests/pixels.rs` accept the frame before's HUD tiles down to a split line (`view::hud_late`,
+  `late_splits`; inside a long iteration the tiles from before its step). +79 / -0; 60 frames moved from plain to
+  torn, 265 from torn to plain (the old "stat mark's new cel early" rule is gone: the cel is never a frame late).
+Left in the class (`PIX_BBOX=1` gives each frame's box): the mark's place in OAM (its sort keys +4 / +8 are never
+set: heap leftovers - 1, 33, 52, 96, 206, 240 seen; as the last entry the emulator's OBJ priority quirk shows a
+priority-3 OBJ over BG0 inside the mark's box: 23 frames, not derivable); ~50 frames at the boss bar / timer side
+(the boss bar's end pixel, sprites passing the top lines); ~85 "wide band" frames that are the world map's sky; the
+Spirit Bomb's edge pixels (19-3); a text box's typed count one ahead for a frame (r052 6-9 f10,140) and the rest of
+the ~85 text-box frames (ow_1_15, earth_3_3_4, dr2_014: not looked at).
