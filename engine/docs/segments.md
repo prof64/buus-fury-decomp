@@ -7265,7 +7265,7 @@ in `work/` and are run by hand, not gated.
 What the HUD class outside the two boss scenes turned out to be - mostly not HUD: the board calls any difference in
 the top 24 lines "HUD". By cause, each from the emulator:
 * the experience line: the level it is drawn for is the one the total gives (`0x080135D2`), not the record's level
-  byte (+276 frames, Gotenks 6-9); a fusion component's record while its level-up hook runs (+31);
+  byte (+232 frames, Gotenks 6-9; +8 in 6-1); a fusion component's record while its level-up hook runs (+31);
 * shadows (the watchers at the screen's top, Dabura): the actor draw's test `0x08010252` .. - header +0xC / +0xD
   signed, the shadow's (w, h) box against the camera - for every actor (+211), `set_attachment`'s "none" (+104);
 * the stat-points mark: its draws under Watch This! (+13), first drawn the frame after it is made, gone in the frame
