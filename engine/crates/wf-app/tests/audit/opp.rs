@@ -718,35 +718,43 @@ pub enum Pictures {
     Hashes { tile_off: u32, hashes: Vec<u64>, torn: std::collections::BTreeMap<usize, Vec<String>> },
 }
 
-/// `view` with `from`'s (the previous frame's) state, for the lines of a torn frame: 'o' the palette (fade / scale /
-/// BLDY); 'f' every BG's scroll (the objects stay where this frame's OAM has them - latched at VBlank: opponent audit
-/// oa_t15_idle f123, the top lines' ground 1 px off under an unmoved HUD and rock), a hex digit 1..e the scroll of
-/// the BGs in that mask only (bit n = BGn: the scroll registers are written one BG after the other - there lines 0..8
-/// all four old, 9..33 BG3 / BG2 still old, from 34 the new picture); 't' the map's animated tiles (their copy into
-/// VRAM comes after those lines); 'u' both every scroll and the tiles
-fn with_prev(view: &wf_view::RenderView, from: &wf_view::RenderView, l: char) -> wf_view::RenderView {
+/// `view` with `from`'s (the previous frame's) state, for the lines of a torn frame; `code` = letters, each one
+/// thing still old: 'o' the palette (fade / scale / BLDY); 'f' every BG's scroll (the objects stay where this frame's
+/// OAM has them - latched at VBlank: opponent audit oa_t15_idle f123, the top lines' ground 1 px off under an unmoved
+/// HUD and rock), a hex digit 1..e the scroll of the BGs in that mask only (bit n = BGn: the scroll registers are
+/// written one BG after the other - there lines 0..8 all four old, 9..33 BG3 / BG2 still old, from 34 the new
+/// picture); 't' the map's animated tiles (their copy into VRAM comes after those lines); 'h' the
+/// HUD (its gauge tiles are copied straight into sprite memory, 0x0800BCBC, on some frames after the screen drew
+/// their rows - playtest.md "HUD gauge steps a frame late")
+fn with_prev(view: &wf_view::RenderView, from: &wf_view::RenderView, code: &str) -> wf_view::RenderView {
     let mut o = view.clone();
-    if l == 'o' {
-        o.palette_fade = from.palette_fade;
-        o.palette_scale = from.palette_scale;
-        o.fade_black = from.fade_black;
-        return o;
-    }
-    if l == 't' || l == 'u' {
-        if let (Some(m), Some(pm)) = (o.map.as_mut(), from.map.as_ref()) {
-            m.anim_frame = pm.anim_frame;
-            m.tile_frame = pm.tile_frame;
+    for l in code.chars() {
+        if l == 'o' {
+            o.palette_fade = from.palette_fade;
+            o.palette_scale = from.palette_scale;
+            o.fade_black = from.fade_black;
+            continue;
         }
-    }
-    let mask = if l == 'f' || l == 'u' { 15 } else if l == 't' { 0 } else { l.to_digit(16).unwrap_or(0) };
-    if mask != 0 {
-        if let (Some(a), Some(b), Some(m)) = (view.cameras.first(), from.cameras.first(), o.map.as_mut()) {
-            let (dx, dy) = (b.x - a.x, b.y - a.y);
-            let ls = m.layers.get_or_insert_with(|| wf_view::BgLayers { visible: [true; 4], ..Default::default() });
-            for bg in 0..4 {
-                if mask >> bg & 1 != 0 {
-                    ls.offset[bg].0 += dx;
-                    ls.offset[bg].1 += dy;
+        if l == 'h' {
+            o.hud = from.hud.clone();
+            continue;
+        }
+        if l == 't' {
+            if let (Some(m), Some(pm)) = (o.map.as_mut(), from.map.as_ref()) {
+                m.anim_frame = pm.anim_frame;
+                m.tile_frame = pm.tile_frame;
+            }
+        }
+        let mask = if l == 't' { 0 } else { l.to_digit(16).unwrap_or(0) };
+        if mask != 0 {
+            if let (Some(a), Some(b), Some(m)) = (view.cameras.first(), from.cameras.first(), o.map.as_mut()) {
+                let (dx, dy) = (b.x - a.x, b.y - a.y);
+                let ls = m.layers.get_or_insert_with(|| wf_view::BgLayers { visible: [true; 4], ..Default::default() });
+                for bg in 0..4 {
+                    if mask >> bg & 1 != 0 {
+                        ls.offset[bg].0 += dx;
+                        ls.offset[bg].1 += dy;
+                    }
                 }
             }
         }
@@ -754,8 +762,16 @@ fn with_prev(view: &wf_view::RenderView, from: &wf_view::RenderView, l: char) ->
     o
 }
 
-/// the candidates of `with_prev`, in `torn_spec`'s order
-pub const TEARS: [char; 18] = ['f', 'u', 't', 'o', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e'];
+/// the candidates of `with_prev`, in `pack::torn_spec`'s order: each scroll / tile state alone and with the old HUD
+pub fn tears() -> Vec<String> {
+    let scroll = ["f", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e"];
+    let mut v: Vec<String> = scroll.iter().map(|s| s.to_string()).collect();
+    v.extend(["t", "o", "h", "th"].map(String::from));
+    v.extend(scroll.iter().map(|s| format!("{s}t")));
+    v.extend(scroll.iter().map(|s| format!("{s}h")));
+    v.extend(scroll.iter().map(|s| format!("{s}th")));
+    v
+}
 
 /// one scenario's result
 pub struct Audit {
@@ -1082,7 +1098,7 @@ pub fn audit(t: &Value, pics: &Pictures, packs: &wf_app::wf_content::Packs, out:
     for (f, v) in views.iter().filter(|(f, _)| *f >= 2) {
         let f = *f;
         let prev = &views[f - 1].1;
-        let mut cand = |l: char| render(&mut tear_renderer, &with_prev(v, prev, l), f, tile_off).0;
+        let mut cand = |l: &str| render(&mut tear_renderer, &with_prev(v, prev, l), f, tile_off).0;
         // (the gate: the picture's hash against the game's - a torn frame's from its line spec)
         if let Pictures::Hashes { hashes, torn: specs, .. } = pics {
             let Some(h) = hashes.get(f) else { continue };
@@ -1100,7 +1116,19 @@ pub fn audit(t: &Value, pics: &Pictures, packs: &wf_app::wf_content::Packs, out:
         let Some(g) = game.get(f) else { continue };
         let (ours, boxes) = render(&mut renderer, v, f, tile_off);
         if &ours != g && std::env::var_os("OA_NOTEAR").is_none() {
-            let cands: Vec<(char, Vec<u32>)> = TEARS.into_iter().map(|l| (l, cand(l))).collect();
+            // (which candidates are worth drawing: a scroll / tile tear's old lines start at the screen's top; lower
+            // differing lines alone, all above scanline 27, can only be the HUD's)
+            let lines: Vec<usize> = (0..H).filter(|&y| g[y * W..(y + 1) * W] != ours[y * W..(y + 1) * W]).collect();
+            let codes: Vec<String> = match (lines.first(), lines.last()) {
+                (Some(&a), Some(&b)) if b == H - 1 || (a > 8 && b >= 27) => vec![],
+                (Some(&a), _) if a > 8 => vec!["h".into()],
+                _ => tears(),
+            };
+            let cands: Vec<(String, Vec<u32>)> = codes.into_iter().map(|l| (l.clone(), cand(&l))).collect();
+            if cands.is_empty() {
+                // (the debug below reads the candidates)
+            } else {
+
             // OA_TEARDBG: per line whether the game's is ours ('.'), ours with every BG's previous scroll ('s'), the previous
             // frame's whole picture ('p'), several ('='), or none ('x')
             if std::env::var_os("OA_TEARDBG").is_some() {
@@ -1121,7 +1149,7 @@ pub fn audit(t: &Value, pics: &Pictures, packs: &wf_app::wf_content::Packs, out:
                 eprintln!("tear {name} f{f} {rows}");
                 eprintln!("  map layers {:?}", v.map.as_ref().map(|m| m.layers.clone()));
                 for mk in 1..15u32 {
-                    let c = cand(char::from_digit(mk, 16).unwrap());
+                    let c = cand(&format!("{mk:x}"));
                     let bad: Vec<usize> = (20..36).map(|y| (0..W).filter(|&x| c[y * W + x] != g[y * W + x]).count()).collect();
                     eprintln!("  BG mask {mk:x}: px off on lines 20..36 {bad:?}");
                 }
@@ -1139,9 +1167,9 @@ pub fn audit(t: &Value, pics: &Pictures, packs: &wf_app::wf_content::Packs, out:
                         if g[k] == ours[k] {
                             t.push('.');
                         }
-                        for c in &cands {
+                        for c in cands.iter().filter(|c| c.0.len() == 1) {
                             if g[k] == c.1[k] {
-                                t.push(c.0);
+                                t.push_str(&c.0);
                             }
                         }
                         if g[k] == pv[k] {
@@ -1157,10 +1185,11 @@ pub fn audit(t: &Value, pics: &Pictures, packs: &wf_app::wf_content::Packs, out:
                 eprintln!("  cams {:?} -> {:?} map {:?} -> {:?}", prev.cameras.first().map(|c| (c.x, c.y)), v.cameras.first().map(|c| (c.x, c.y)), prev.map.as_ref().map(|m| (m.anim_frame, m.tile_frame)), v.map.as_ref().map(|m| (m.anim_frame, m.tile_frame)));
             }
             // (a candidate equal to our picture is no earlier state: nothing of its kind changed this frame)
-            let live: Vec<(char, Vec<u32>)> = cands.iter().filter(|c| c.1 != ours).cloned().collect();
+            let live: Vec<(String, Vec<u32>)> = cands.iter().filter(|c| c.1 != ours).cloned().collect();
             if let Some(spec) = crate::pack::torn_spec(g, &ours, &live) {
                 torn.insert(f, spec);
                 continue;
+            }
             }
         }
         if &ours == g {

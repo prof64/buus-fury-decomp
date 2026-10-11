@@ -180,7 +180,11 @@ pub fn draw_key(w: &World, i: usize) -> (i32, i32, u32) {
                 || matches!(&s.kind, ShotKind::Straight(o) if o.name == SName::Star)
                 // (the Mercenary's rifle bullet too: the new bullet behind him at its muzzle - opponent audit
                 // oa_t4b_idle f61, OAM 16x16 after his body)
-                || matches!(&s.kind, ShotKind::Straight(o) if o.name == SName::Rifle);
+                || matches!(&s.kind, ShotKind::Straight(o) if o.name == SName::Rifle)
+                // (the gun bullet 0x08049F0C too: emulator sort keys layer 0x38, depth its y - behind the Assassin's
+                // muzzle on its first frame and under the player's halo; opponent audit oa_t02_idle f87, oa_t02_above
+                // f108 .. f110)
+                || matches!(&s.kind, ShotKind::Straight(o) if o.name == SName::Gun);
             // a Kamikaze ghost is an actor object (layer 0x38, depth y + 4 like an actor: skill audit sa_f31_skill13,
             // Gotenks' fist in front of the shadow of a ghost above him)
             let ghost = matches!(&s.kind, ShotKind::Ghost(_));

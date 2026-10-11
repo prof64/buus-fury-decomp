@@ -86,7 +86,7 @@ fn main() {
             if k == 0 || std::env::var_os("SA_NOTEAR").is_some() {
                 return Some(false);
             }
-            let cands: Vec<(char, Vec<u32>)> = skill::TEARS.into_iter().map(|l| (l, cand(l))).filter(|c| c.1 != ours).collect();
+            let cands: Vec<(String, Vec<u32>)> = skill::TEARS.into_iter().map(|l| (l.to_string(), cand(l))).filter(|c| c.1 != ours).collect();
             match pack::torn_spec(g, ours, &cands) {
                 Some(spec) => {
                     torn.insert(k.to_string(), serde_json::json!(spec));

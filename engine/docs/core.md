@@ -206,6 +206,9 @@ scroll, `"b"` both, else a 240-bit hex mask of the previous-palette pixels) next
 The link fight's gate (`tests/dojo_pixels.rs`) applies the same rule to its recordings, checked against our own
 pictures: the last lines still the previous picture, the HUD's / the friend's bars still the frame before's (their
 tiles are drawn in the frame's draw pass), the lines above or below one split with the frame before's BG scroll.
+The audit gates (`tests/audits.rs`, tools/battle/LOCKSTEP.md "The audit gates") apply it too, with the old lines
+required above the new ones: the BGs' scroll one BG at a time, the map's animated tiles, the HUD's gauge above
+scanline 27.
 
 **The screen shake on the OBJs** (`view::obj_shake_baked`, segments.md "the screen shake on the OBJs"): actors and
 props move by ((camera + shake) >> 10) - (camera >> 10) of the side's own camera; **damage numbers too** (link

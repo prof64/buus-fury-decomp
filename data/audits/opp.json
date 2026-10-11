@@ -2,57 +2,21 @@
   "note": "audit gate (engine/crates/wf-app/tests/audits.rs): the scenarios that are not exact - [first frame with a state difference, count, first frame whose picture differs, count]; every other scenario is locked exact. Re-made by `AUDIT_RATCHET=write cargo test --release -p wf-app --test audits`",
   "scenarios": 462,
   "frames": 215555,
-  "exact": 253,
+  "exact": 298,
   "state_differences": 33310,
-  "picture_frames": 42460,
+  "picture_frames": 42360,
   "ratchet": {
-    "oa_t00_above": [
-      null,
-      0,
-      205,
-      1
-    ],
-    "oa_t00_below": [
-      null,
-      0,
-      85,
-      1
-    ],
     "oa_t00_ko": [
       6,
       360,
       7,
       359
     ],
-    "oa_t02_above": [
-      null,
-      0,
-      108,
-      3
-    ],
-    "oa_t02_idle": [
-      null,
-      0,
-      87,
-      2
-    ],
     "oa_t02_ko": [
       7,
       344,
       7,
       359
-    ],
-    "oa_t02_left": [
-      null,
-      0,
-      87,
-      2
-    ],
-    "oa_t02_punch": [
-      null,
-      0,
-      157,
-      1
     ],
     "oa_t06_above": [
       null,
@@ -108,35 +72,17 @@
       121,
       185
     ],
-    "oa_t0a_below": [
-      null,
-      0,
-      4,
-      1
-    ],
     "oa_t0a_fight": [
       656,
       839,
-      4,
-      1094
-    ],
-    "oa_t0a_ko": [
-      null,
-      0,
-      5,
-      1
+      511,
+      1093
     ],
     "oa_t0a_left": [
       null,
       0,
       64,
-      7
-    ],
-    "oa_t0a_punch": [
-      null,
-      0,
-      4,
-      1
+      6
     ],
     "oa_t0c_ko": [
       7,
@@ -174,23 +120,11 @@
       478,
       907
     ],
-    "oa_t12_idle": [
-      null,
-      0,
-      434,
-      1
-    ],
     "oa_t12_ko": [
       6,
       360,
       7,
       359
-    ],
-    "oa_t12_left": [
-      null,
-      0,
-      259,
-      1
     ],
     "oa_t12_punch": [
       null,
@@ -252,12 +186,6 @@
       21,
       94
     ],
-    "oa_t20_below": [
-      null,
-      0,
-      23,
-      1
-    ],
     "oa_t20_ko": [
       55,
       304,
@@ -300,18 +228,6 @@
       312,
       1
     ],
-    "oa_t2c_above": [
-      null,
-      0,
-      107,
-      3
-    ],
-    "oa_t2c_idle": [
-      null,
-      0,
-      84,
-      3
-    ],
     "oa_t2c_ki": [
       80,
       286,
@@ -324,17 +240,11 @@
       7,
       359
     ],
-    "oa_t2c_left": [
-      null,
-      0,
-      84,
-      1
-    ],
     "oa_t2c_punch": [
       242,
       184,
-      144,
-      196
+      235,
+      191
     ],
     "oa_t2f_above": [
       null,
@@ -388,13 +298,13 @@
       null,
       0,
       2,
-      42
+      40
     ],
     "oa_t33_below": [
       null,
       0,
       2,
-      29
+      27
     ],
     "oa_t33_fight": [
       6,
@@ -406,13 +316,13 @@
       578,
       15,
       2,
-      67
+      65
     ],
     "oa_t33_ki": [
       34,
       5,
       2,
-      42
+      40
     ],
     "oa_t33_ko": [
       6,
@@ -424,7 +334,7 @@
       null,
       0,
       2,
-      36
+      34
     ],
     "oa_t33_long": [
       578,
@@ -437,18 +347,6 @@
       18,
       2,
       17
-    ],
-    "oa_t38_above": [
-      null,
-      0,
-      83,
-      1
-    ],
-    "oa_t38_below": [
-      null,
-      0,
-      83,
-      1
     ],
     "oa_t38_fight": [
       7,
@@ -490,25 +388,25 @@
       180,
       4,
       29,
-      57
+      52
     ],
     "oa_t3c_below": [
       223,
       4,
       29,
-      127
+      126
     ],
     "oa_t3c_idle": [
       586,
       15,
-      113,
-      135
+      467,
+      134
     ],
     "oa_t3c_ki": [
       null,
       0,
       176,
-      77
+      75
     ],
     "oa_t3c_ko": [
       6,
@@ -519,14 +417,14 @@
     "oa_t3c_left": [
       null,
       0,
-      113,
-      3
+      257,
+      2
     ],
     "oa_t3c_punch": [
       294,
       132,
       89,
-      156
+      153
     ],
     "oa_t3f_ko": [
       6,
@@ -534,23 +432,11 @@
       7,
       359
     ],
-    "oa_t41_idle": [
-      null,
-      0,
-      543,
-      1
-    ],
     "oa_t42_ko": [
       7,
       344,
       7,
       359
-    ],
-    "oa_t44_above": [
-      null,
-      0,
-      273,
-      1
     ],
     "oa_t44_ki": [
       239,
@@ -622,19 +508,7 @@
       null,
       0,
       198,
-      8
-    ],
-    "oa_t4d_above": [
-      null,
-      0,
-      133,
-      1
-    ],
-    "oa_t4d_idle": [
-      null,
-      0,
-      292,
-      2
+      7
     ],
     "oa_t4d_ko": [
       7,
@@ -642,41 +516,11 @@
       7,
       359
     ],
-    "oa_t4d_left": [
-      null,
-      0,
-      293,
-      1
-    ],
-    "oa_t4e_idle": [
-      null,
-      0,
-      104,
-      2
-    ],
     "oa_t4e_ki": [
       265,
       101,
       265,
       101
-    ],
-    "oa_t4e_ko": [
-      null,
-      0,
-      193,
-      1
-    ],
-    "oa_t4e_punch": [
-      null,
-      0,
-      193,
-      1
-    ],
-    "oa_t50_below": [
-      null,
-      0,
-      83,
-      2
     ],
     "oa_t50_idle": [
       null,
@@ -726,23 +570,11 @@
       79,
       347
     ],
-    "oa_t58_above": [
-      null,
-      0,
-      303,
-      1
-    ],
     "oa_t58_ko": [
       55,
       304,
       55,
       311
-    ],
-    "oa_t58_left": [
-      null,
-      0,
-      343,
-      1
     ],
     "oa_t59_ko": [
       7,
@@ -756,41 +588,17 @@
       291,
       16
     ],
-    "oa_t5b_idle": [
-      null,
-      0,
-      144,
-      1
-    ],
     "oa_t5b_ko": [
       6,
       360,
       7,
       359
     ],
-    "oa_t5d_above": [
-      null,
-      0,
-      303,
-      1
-    ],
     "oa_t5d_ko": [
       55,
       304,
       55,
       311
-    ],
-    "oa_t5d_left": [
-      null,
-      0,
-      343,
-      1
-    ],
-    "oa_t60_above": [
-      null,
-      0,
-      273,
-      1
     ],
     "oa_t60_fight": [
       6,
@@ -894,17 +702,11 @@
       20,
       95
     ],
-    "oa_t68_below": [
-      null,
-      0,
-      83,
-      2
-    ],
     "oa_t68_idle": [
       null,
       0,
-      283,
-      104
+      440,
+      103
     ],
     "oa_t68_ko": [
       7,
@@ -915,32 +717,14 @@
     "oa_t6a_idle": [
       null,
       0,
-      124,
-      19
+      583,
+      18
     ],
     "oa_t6a_ko": [
       7,
       344,
       7,
       359
-    ],
-    "oa_t6b_below": [
-      null,
-      0,
-      263,
-      1
-    ],
-    "oa_t6c_above": [
-      null,
-      0,
-      108,
-      3
-    ],
-    "oa_t6c_idle": [
-      null,
-      0,
-      148,
-      2
     ],
     "oa_t6c_ki": [
       193,
@@ -954,47 +738,17 @@
       7,
       359
     ],
-    "oa_t6c_left": [
-      null,
-      0,
-      148,
-      1
-    ],
-    "oa_t6c_punch": [
-      null,
-      0,
-      157,
-      1
-    ],
-    "oa_t70_idle": [
-      null,
-      0,
-      113,
-      1
-    ],
     "oa_t70_ko": [
       6,
       360,
       7,
       359
     ],
-    "oa_t70_left": [
-      null,
-      0,
-      113,
-      1
-    ],
     "oa_t7a_above": [
       null,
       0,
-      151,
-      7
-    ],
-    "oa_t7a_below": [
-      null,
-      0,
-      3,
-      1
+      237,
+      6
     ],
     "oa_t7a_fight": [
       1216,
@@ -1007,12 +761,6 @@
       345,
       3,
       351
-    ],
-    "oa_t7a_left": [
-      null,
-      0,
-      92,
-      2
     ],
     "oa_t7a_punch": [
       388,
@@ -1104,23 +852,11 @@
       55,
       371
     ],
-    "oa_t81_idle": [
-      null,
-      0,
-      433,
-      2
-    ],
     "oa_t81_ko": [
       6,
       360,
       7,
       359
-    ],
-    "oa_t81_punch": [
-      null,
-      0,
-      83,
-      1
     ],
     "oa_t85_ki": [
       338,
@@ -1150,7 +886,7 @@
       null,
       0,
       2,
-      274
+      273
     ],
     "oa_t8e_fight": [
       null,
@@ -1174,7 +910,7 @@
       null,
       0,
       2,
-      21
+      18
     ],
     "oa_t8e_left": [
       null,
@@ -1229,12 +965,6 @@
       0,
       440,
       3
-    ],
-    "oa_t94_above": [
-      null,
-      0,
-      166,
-      1
     ],
     "oa_t94_below": [
       null,
