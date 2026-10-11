@@ -361,11 +361,10 @@ network options, `--net-name`, `--net-key` apply); B (Cancel) leaves as in the g
   compared picture for picture (tests/dojo_pixels.rs `dojo_lost1` / 2 / 3 / 7 / 8: standing, walking, attacking
   fighters, a blast in flight - all exact). Three more recordings are kept out of the gate
   (`work/link_fight/open/`): a prop just above the screen shows its last line a frame sooner in the game (6 pixels,
-  one frame of the fade); and two differences of the fight itself the recordings turned up - a blast leaving the top
-  of the screen shows one pixel a frame longer in the game, and a punch thrown through the other fighter's blast:
-  the game draws one more random number there (rand(2), before the hit's damage) and the blast goes on to a hit
-  message of its own next frame, ours takes no notice of the blast (state differs from that frame on; the game's
-  generator calls are written down in engine/docs/accuracy-log.md).
+  one frame of the fade); and a blast leaving the top of the screen shows one pixel a frame longer in the game. A
+  third recording (`dojo_lost5`: state gate only) turned up the punch that sends an Energy Blast back
+  (`shots::on_message`, the ki blast class): its match is exact in state to the end, one picture of the deflected
+  blast differs.
   On a link page a friend that stops answering without its connection closing (a dead network) is lost after 3 s
   without a packet (`LINK_TIMEOUT_MS`: the game's 180 updates; tests/link.rs `dojo_link_lost_on_a_page`).
 * **Leaving with B** (Select Saved Game's Cancel): the page becomes the title's Multiplayer page (menu_parity

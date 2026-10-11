@@ -3502,6 +3502,44 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
         // object overlapping its box bursts it (its spark, +0x4C = 16) and is taken (segment sb 6-6 f18799: Super
         // Buu's blast flies into Gotenks' beam head - both stop)
         ShotKind::Straight(o) if o.name == SName::KiBlast && o.fx_end == 16 && !o.fragile => {
+            // a punch (the melee's message: attack kind 0) of somebody else sends the blast back: it is the puncher's
+            // now - owner, facing, twice the speed (0x600 a frame), its counter at 0, the blast's fire sound drawn
+            // anew (20 + rand(2)) - and the message is taken (two linked emulators, a fighter punching through the
+            // other's blast: recording dojo_lost5 lf 2,168 - the blast object's owner +0x1C, velocity +0x40 / +0x44
+            // and counter +0x48 rewritten, the generator's rand(2) and sound 21 before the punch's own hit)
+            if msg.atk.kind == 0
+                && o.dead < 0
+                && !o.taken
+                && !msg.foot
+                && msg.source != me
+                && !w.ents[i].removed
+                && msg.attacker != w.shot_ref(i).owner
+                && overlaps(&msg.rect, &rect(w, i))
+            {
+                let Some(dir) = w.find(msg.attacker).and_then(|k| match &w.ents[k].body {
+                    Body::Player(p) => Some(p.a.facing),
+                    _ => None,
+                }) else {
+                    return false;
+                };
+                let team = if msg.att_is_player { 1 } else { 0 };
+                let (dx, dy) = DIR_VEC[dir as usize];
+                let sh = w.shot(i);
+                sh.owner = msg.attacker;
+                sh.dir = dir;
+                sh.team = team;
+                sh.t = 0;
+                let (x, y) = (sh.x, sh.y);
+                if let ShotKind::Straight(o) = &mut sh.kind {
+                    o.vx = dx * 0x600;
+                    o.vy = dy * 0x600;
+                    o.x0 = x;
+                    o.y0 = y;
+                    o.spawned = false;
+                }
+                spawn_rng(w, i);
+                return true;
+            }
             if o.dead >= 0
                 || msg.foot
                 || msg.source == me
