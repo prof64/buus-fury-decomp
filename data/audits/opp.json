@@ -2,8 +2,8 @@
   "note": "audit gate (engine/crates/wf-app/tests/audits.rs): the scenarios that are not exact - [first frame with a state difference, count, first frame whose picture differs, count]; every other scenario is locked exact. Re-made by `AUDIT_RATCHET=write cargo test --release -p wf-app --test audits`",
   "scenarios": 462,
   "frames": 215555,
-  "exact": 185,
-  "state_differences": 43966,
+  "exact": 201,
+  "state_differences": 39822,
   "picture_frames": 42658,
   "ratchet": {
     "oa_t00_above": [
@@ -295,44 +295,38 @@
       1
     ],
     "oa_t17_above": [
-      166,
-      4,
+      null,
+      0,
       124,
       10
     ],
     "oa_t17_below": [
-      163,
-      4,
+      null,
+      0,
       125,
       14
     ],
     "oa_t17_idle": [
-      15,
-      14,
+      null,
+      0,
       89,
       4
     ],
     "oa_t17_ki": [
-      15,
-      9,
+      null,
+      0,
       35,
       3
     ],
     "oa_t17_ko": [
-      86,
-      238,
+      127,
+      231,
       21,
       297
     ],
-    "oa_t17_left": [
-      15,
-      8,
-      null,
-      0
-    ],
     "oa_t17_punch": [
-      86,
-      7,
+      null,
+      0,
       21,
       95
     ],
@@ -565,32 +559,26 @@
       17
     ],
     "oa_t38_above": [
-      3,
-      354,
+      null,
+      0,
       83,
       2
     ],
     "oa_t38_below": [
-      3,
-      354,
+      null,
+      0,
       83,
       1
     ],
     "oa_t38_fight": [
-      3,
-      1787,
+      7,
+      1784,
       7,
       1799
     ],
-    "oa_t38_idle": [
-      3,
-      587,
-      null,
-      0
-    ],
     "oa_t38_ki": [
-      3,
-      35,
+      null,
+      0,
       38,
       16
     ],
@@ -600,21 +588,15 @@
       3,
       363
     ],
-    "oa_t38_left": [
-      3,
-      353,
-      null,
-      0
-    ],
     "oa_t38_long": [
-      3,
-      1771,
+      null,
+      0,
       944,
       1
     ],
     "oa_t38_punch": [
-      3,
-      305,
+      null,
+      0,
       103,
       33
     ],
@@ -1080,21 +1062,9 @@
       239,
       1
     ],
-    "oa_t62_above": [
-      69,
-      14,
-      null,
-      0
-    ],
-    "oa_t62_below": [
-      69,
-      12,
-      null,
-      0
-    ],
     "oa_t62_idle": [
-      69,
-      20,
+      null,
+      0,
       120,
       1
     ],
@@ -1104,33 +1074,9 @@
       7,
       359
     ],
-    "oa_t62_left": [
-      69,
-      14,
-      null,
-      0
-    ],
-    "oa_t62_punch": [
-      121,
-      19,
-      null,
-      0
-    ],
-    "oa_t63_above": [
-      68,
-      14,
-      null,
-      0
-    ],
-    "oa_t63_below": [
-      68,
-      12,
-      null,
-      0
-    ],
     "oa_t63_idle": [
-      68,
-      20,
+      null,
+      0,
       119,
       1
     ],
@@ -1139,18 +1085,6 @@
       344,
       7,
       359
-    ],
-    "oa_t63_left": [
-      68,
-      14,
-      null,
-      0
-    ],
-    "oa_t63_punch": [
-      121,
-      19,
-      null,
-      0
     ],
     "oa_t64_fight": [
       931,
@@ -1183,44 +1117,44 @@
       359
     ],
     "oa_t67_above": [
-      165,
-      4,
+      null,
+      0,
       123,
       10
     ],
     "oa_t67_below": [
-      162,
-      4,
+      null,
+      0,
       124,
       14
     ],
     "oa_t67_idle": [
-      165,
-      4,
+      null,
+      0,
       168,
       1
     ],
     "oa_t67_ki": [
-      14,
-      7,
+      null,
+      0,
       34,
       6
     ],
     "oa_t67_ko": [
-      86,
-      238,
+      127,
+      231,
       20,
       298
     ],
     "oa_t67_left": [
-      165,
-      4,
+      null,
+      0,
       127,
       1
     ],
     "oa_t67_punch": [
-      86,
-      7,
+      null,
+      0,
       20,
       96
     ],
@@ -1248,21 +1182,9 @@
       369,
       1
     ],
-    "oa_t6a_above": [
-      69,
-      14,
-      null,
-      0
-    ],
-    "oa_t6a_below": [
-      69,
-      12,
-      null,
-      0
-    ],
     "oa_t6a_idle": [
-      69,
-      18,
+      null,
+      0,
       124,
       19
     ],
@@ -1271,18 +1193,6 @@
       344,
       7,
       359
-    ],
-    "oa_t6a_left": [
-      69,
-      18,
-      null,
-      0
-    ],
-    "oa_t6a_punch": [
-      121,
-      19,
-      null,
-      0
     ],
     "oa_t6b_below": [
       null,
@@ -1429,44 +1339,38 @@
       1
     ],
     "oa_t7d_above": [
-      166,
-      4,
+      null,
+      0,
       124,
       10
     ],
     "oa_t7d_below": [
-      163,
-      6,
+      null,
+      0,
       125,
       14
     ],
     "oa_t7d_idle": [
-      15,
-      12,
+      null,
+      0,
       89,
       42
     ],
     "oa_t7d_ki": [
-      15,
-      9,
+      null,
+      0,
       35,
       3
     ],
     "oa_t7d_ko": [
-      86,
-      238,
+      127,
+      231,
       21,
       297
     ],
-    "oa_t7d_left": [
-      15,
-      8,
-      null,
-      0
-    ],
     "oa_t7d_punch": [
-      86,
-      7,
+      null,
+      0,
       21,
       95
     ],

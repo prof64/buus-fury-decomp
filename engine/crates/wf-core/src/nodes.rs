@@ -1128,10 +1128,8 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             kb_set(r, &kb);
         }
         // enter 0x08037A42 = SetAnimHold(4, 0): raw 5 under the hold state, frame 0 (no swing, no rand)
-        K::LungeStep => {
-            let h = w.data.anim.hold;
-            set_anim_r(w, i, &[an(4)], false, h);
-        }
+        // (the tick stays: opponent audit oa_t62_idle f69, tick 3 kept from the state before)
+        K::LungeStep => hold_pose(w, i, 5, 0),
         // RandomStep (create 0x08037C06, vtable 0x0804B1C0; the Skeleton's bones rattle before they rise): enter
         // 0x0804E824 keeps the position
         K::RandomStep => {
@@ -3311,6 +3309,8 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             hop_height(w, i, c0);
             r.d[0] = (r.d[0] + 8) & 0xff;
             let ph = r.d[0];
+            // (the counter is the object's animation tick, +0x12: opponent audit oa_t38_*, 8 16 .. 0xF8 0)
+            w.en(i).ea.pos.tick = ph;
             if ph == 0 && w.rng.chance(0x4000) {
                 mini_aim(w, i);
             }

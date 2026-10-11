@@ -873,7 +873,7 @@ pub fn audit(t: &Value, pics: &Pictures, packs: &wf_app::wf_content::Packs, out:
                         let fx = wf_core::enemy::fits(&mut s.world, k, x + 1, y);
                         eprintln!("f{fi} enemy ({x}, {y}) detached {det} fits(x+1) {fx} rng {} {} calls {}", s.world.rng.a, s.world.rng.b, s.world.rng.calls);
                         let e = s.world.en_ref(k);
-                        eprintln!("f{fi} enemy ea rule {} pos {:?} t {} done {} anim {:?} ai {:?}", e.ea.rule, (e.ea.pos.raw, e.ea.pos.frame, e.ea.pos.tick), e.ea.t, e.ea.done, e.a.anim, e.ai.stack.iter().map(|r| r.state).collect::<Vec<_>>());
+                        eprintln!("f{fi} enemy ea rule {} ({:?}) pos {:?} t {} done {} anim {:?} ai {:?}", e.ea.rule, s.world.data.anim.rules[e.ea.rule as usize], (e.ea.pos.raw, e.ea.pos.frame, e.ea.pos.tick), e.ea.t, e.ea.done, e.a.anim, e.ai.stack.iter().map(|r| r.state).collect::<Vec<_>>());
                     }
                     for e in s.world.ents.iter().filter(|e| !e.removed) {
                         if let Body::Shot(sh) = &e.body {
@@ -895,7 +895,11 @@ pub fn audit(t: &Value, pics: &Pictures, packs: &wf_app::wf_content::Packs, out:
                     (Some(a), Some(b)) => {
                         // two raw slots of one def can hold the same animation (Ghost 1 = 2): the recorder names the first
                         let spr = enemy.and_then(|id| s.world.enemy_by_id(id)).and_then(|(_, e)| e.a.sprite).and_then(|sp| s.world.data.sprite(sp));
-                        let same_raw = a.raw == b.raw || spr.and_then(|sp| sp.anim_raw(b.raw as i32)).is_some_and(|an| an.canon_raw == a.raw as i32);
+                        // (-1: the recorder could not name it - the animation pointer is not in the object's current
+                        // sprite def, for the two frames between a def swap and the SetAnim after it (the shield
+                        // types 0x17 / 0x67 / 0x7D, emulator oa_t17_idle f15: def 0x086ABD90 -> 0x086AFF44, pointer
+                        // 0x085B63D4 still the old def's idle); the frame, the tick and the picture are compared)
+                        let same_raw = a.raw == -1 || a.raw == b.raw || spr.and_then(|sp| sp.anim_raw(b.raw as i32)).is_some_and(|an| an.canon_raw == a.raw as i32);
                         // (a recorded frame sequence - rule `seq` - keeps the cels, not the state object's tick)
                         let seq = enemy.and_then(|id| s.world.enemy_by_id(id)).is_some_and(|(_, e)| s.world.data.anim.rules[e.ea.rule as usize].kind == wf_core::eanim::RuleKind::Seq);
                         if !same_raw || a.frame != b.frame || (a.tick != b.tick && !seq) || a.z != b.z {
