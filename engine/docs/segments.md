@@ -7261,3 +7261,49 @@ What the 4,500 differing samples are (the board's classes; a frame counts once, 
 * **text boxes, ~260**: small (median ~20 px), mostly in the same scenes.
 Not on this board at all: the skill audit (528 scenarios) and the opponent audit (463) compare every frame but live
 in `work/` and are run by hand, not gated.
+
+*Boss scenes helper (2026-10-10): sb_041 21-25 and rkb_168 14-1 on the picture board - 2,542 -> 3,658 of 4,071
+sampled frames exact (807 of them torn-accepted); state parity whole in both (actor match to the end).* Each cause
+measured on the emulator (segment replayed from its start state, `tools/emu`):
+* **Shadow cull** (view.rs `actor_draw`): the actor draw's `0x08010252` .. `0x080102B4` sets object +0x64 from the
+  shadow's own box (position + header dx / dy signed, size from the shadow table 4x2 / 10x4 / 16x6 / 24x10) against
+  the camera's unshaken rect (+0x18 .. +0x24), four strict compares; the OAM writer `0x0800F2E0` skips the shadow
+  when it is 0. The cocoon in 21-25: shadow box y 152 .. 156, shown with the camera at 151 .. 155, gone from 156 -
+  and under the shake that brings the OBJ back down. `SpriteEffect::TopCull` (the "< 5 rows" rule) is gone: it was
+  this rule seen through 16x8 / 32x16 OBJs. The camera is this frame's (`Camera::rect`).
+* **Script clouds** (`Cmd::Puff`): `0x08027C30` takes 0x0800FE34's box (the shown cel's) halved, plus the offset.
+* **Sphere full tiles** (wf-render `draw_sphere`): `0x0803AB6A` reads the array at sp + 0x58 for the full-tile test -
+  the inner circle (radius - 3) when there is a rim, a copy of the outer table without one.
+* **Sphere radius**: the view's radius is the redraw's (rim draws + 3): the redraw runs in `pre_step`, the script
+  grows the radius later in the frame.
+* **Tile animations after `return_to_field`** (field.rs `restore_world_inner`): the records at 0x03001A68 read
+  (0, 1) / (0, 2) at the return (rows 28,860 / 29,880 / 31,110 / 34,890 / 42,509 of rkb_168) with the camera's counter
+  running on; first tick the next iteration's. This was the "field iteration counter vs camera clock after loads"
+  item above.
+* **Script ki blast** (`VisualKind::KiBlast`, view.rs `script_blast`): object 0x0804D234 (ctor `0x08027CBC`, update
+  `0x08027D48`, end `0x08027D3E`), records 0x0871370C + 0x30 * dir + 12 * cel, dir from the step's larger axis
+  (`0x08027B84`), burst record 16 for 16 frames; layer 0x38, depth its y. `fire_ball_at`'s ball (`VisualKind::Ball`)
+  is still not drawn.
+* **Jump** (`Cmd::JumpTo`): start `0x08023DB2` sets the actor's +8 to 0x24 (sort layer; OAM priority = bits 4 - 5),
+  the step `0x08023DBA` writes the shadow offset +0x17C = sum(4 * air - 8 k) >> 8, the end `0x08023EF8` leaves +8
+  at 0x38. `set_actor_byte8` now sorts / prioritises an NPC the same way (view.rs `actor_layer`).
+* **Board / gate**: tear candidates "s3" / "s2" / "s1" (core.md "Per-layer scroll"); the gate's "u" now equals the
+  board's (previous palette, scroll, timer and sphere together); `PIX_GATE_LOCK=file` runs the gate on another lock
+  (a board lock of the two segments reproduces whole, 3,629 frames at that point); board aids `PIX_TORNDBG`,
+  `PIX_TILEFIT`.
+* **Lock**: sb_041_21_25 f56,370 no longer matches as locked (it was exact through the wrong tile phase: the cel
+  upload at line 71 leaves lines 21 - 24 / 53 - 56 on the previous cel) - a relock makes it torn ("s" lines).
+What is left there (413 frames), by cause:
+* **World map flights, ~130** (sb 11,010 .. 11,580 and 63,480 .. 66,150, rkb 720 .. 1,710 and 53,880 .. 55,290):
+  single mode-7 lines and the minimap's star / dot - the world-map helper's.
+* **screen_flash with the sphere up, ~110** (sb 55,710 .. 58,800 / 62,220 .. 62,490, rkb 44,520 .. 51,660): hardware.
+  The top lines match the previous flash level whole (candidates "o" / "u"); the frame fails on the one line the
+  palette rewrite runs through (line 69 .. 75), where 1 .. 36 pixels of the sphere's blend mix one layer's old colour
+  with the other's new one (f58,350 line 73 x 198: game edffff, new f5ffff, old ecffff) - a per-pixel candidate with
+  the two layers' palettes apart (the renderer fades top and bottom pixels separately) would accept them. Others fail
+  on line 0 with no palette change of ours in that row (the flash step falls on a lag row).
+* **Kid Buu fight / scene sprites, ~120 small** (sb 14,400 .. 37,590, rkb 4,650 .. 28,140): separate small causes,
+  not yet taken - a cel one step off under a damage number (sb f20,700), a smoke puff's cel (f21,090), a text box
+  typed a frame apart (f25,020), an aura's arc (f33,810), a blue flame over a Namekian (f15,180), a few pixels on
+  standing figures (f720, f14,400; rkb f14,250).
+* **Loads, 5** (rkb 330, 28,860, 29,880, 31,110, 34,890: "flat screen") and a handful of HUD frames.

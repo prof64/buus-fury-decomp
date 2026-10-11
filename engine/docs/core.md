@@ -203,6 +203,15 @@ the new state, the previous palette, the previous scroll or both previous; on a 
 runs, a pixel is accepted when it equals the new or the previous-palette picture. Such frames are reported as "torn
 (hardware)", and the pixel gate locks them with per-line specs (`""` new, `"o"` previous palette, `"s"` previous
 scroll, `"b"` both, else a 240-bit hex mask of the previous-palette pixels) next to the game picture's hash.
+**Per-layer scroll** (`"s3"` / `"s2"` / `"s1"`, 2026-10-10): the game writes each map layer's scroll registers from
+its main loop as it updates the layers, BG0 first - in a frame that takes long the writes fall inside the picture
+(emulator, real route rkb_168 14-1 f37,530, the countdown's sphere scene: BG0VOFS at line 210, BG1VOFS at 221,
+BG2VOFS at line 4 of the next picture, BG3VOFS at line 78), so the lines above a write show that layer and the ones
+after it one step behind the rest. The candidates keep the map layers from that BG on at the previous scroll (a
+layer offset of old - new scroll, `Renderer::bg_scrolls`), each also with the previous timer / sphere (`"s3t"`),
+palette (`"s3o"`) or both (`"s3u"`); a per-pixel mask over such a base is written `"s3|mask"`. An animated tile's
+new cel is uploaded from the main loop too (sb_041 21-25 f56,370: tiles 892 .. 895 written at line 71): the lines
+above show the previous cel, which the previous-scroll candidates carry (the previous map clock).
 The link fight's gate (`tests/dojo_pixels.rs`) applies the same rule to its recordings, checked against our own
 pictures: the last lines still the previous picture, the HUD's / the friend's bars still the frame before's (their
 tiles are drawn in the frame's draw pass), the lines above or below one split with the frame before's BG scroll.

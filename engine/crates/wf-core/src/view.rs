@@ -895,7 +895,10 @@ fn render_view_with(w: &World, link: Option<&LinkDraw>, out: &mut RenderView) {
     out.sphere = w.scene.visuals.iter().find(|v| v.kind == crate::scene::VisualKind::EnergySphere).map(|v| wf_view::SphereView {
         x: v.x,
         y: v.y,
-        radius: v.owner as i32,
+        // (the radius its tiles were drawn with: the frame's redraw comes before the objects and the script's
+        // growth after it - the rim's draws, radius - 3 of them, tell. Emulator, real route sb_041 21-25 f12,000:
+        // the tiles at radius 26 with the script's radius at 27)
+        radius: if w.scene.sphere_jitter.is_empty() { v.owner as i32 } else { w.scene.sphere_jitter.len() as i32 + 3 },
         // (the colour: the native's 4th argument, kept in `vid` - `t` counts on)
         colour: v.vid as u8,
         jitter: w.scene.sphere_jitter.clone(),
