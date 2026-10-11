@@ -250,30 +250,40 @@ pub fn prop(w: &World, k: usize, out: &mut RenderView) {
 
 /// the debris chips and the item-get icon (priority 2, rising 1 px per 16 frames above the player)
 pub fn front(w: &World, out: &mut RenderView) {
+    // a link fight's item-get: the same icon over the fighter holding the prize's supply
+    // (to the frame its fighter goes idle: link recording dojo_px3 lf 3,493, the icon gone)
     if let Some(g) = w.link_get.as_ref().filter(|g| g.left > 0) {
         if let (Some(pi), Some(item)) = (w.player_idx(g.slot as usize), g.supply) {
-            let a = &w.pl_ref(pi).a;
-            let k = (60 - g.left).max(0);
-            put(out, 0, "effects/field_items".into(), item_frame(item), a.px(), a.py() - 40 - ((k + 2) >> 4), 2, SpriteEffect::None);
+            item_icon(&w.pl_ref(pi).a, item, (60 - g.left).max(0), out);
+        }
+    }
+    // a script's `give_item` (the icon object 0x0802BD4C, vtable 0x0804B358: layer 0x28, 60 frames over its actor)
+    for v in &w.scene.visuals {
+        if let crate::scene::VisualKind::ItemIcon(item) = v.kind {
+            if let Some(a) = w.actor_by_id(v.owner) {
+                item_icon(a, item, v.t.max(0), out);
+            }
         }
     }
     let Some(f) = w.field.as_ref() else { return };
     if let Some(g) = &f.item_get {
         if let (Some(pi), Some(item)) = (w.player_idx(g.slot as usize), g.item) {
-            let a = &w.pl_ref(pi).a;
-            let k = (60 - g.left).max(0);
-            put(
-                out,
-                0,
-                "effects/field_items".into(),
-                item_frame(item),
-                a.px(),
-                a.py() - 40 - ((k + 2) >> 4),
-                2,
-                SpriteEffect::None,
-            );
+            item_icon(&w.pl_ref(pi).a, item, (60 - g.left).max(0), out);
         }
     }
+}
+
+/// the item-get icon `k` frames on: the item's field graphic centred over the actor's footprint, its bottom 24 px
+/// above the actor's y, rising 1 px per 16 frames; OBJ priority 2 (a 16x16 icon at (x, y - 40); a 32x32 crate at
+/// (x - 8, y - 56) - emulator, tour_desert_py25 f430: the rect (0x90, 0x1D) over Goten at (152, 88), 3 px risen)
+fn item_icon(a: &crate::actor::Actor, item: i32, k: i32, out: &mut RenderView) {
+    let (iw, ih) = match item {
+        9 => (16, 32),
+        34 | 43..=82 => (32, 32),
+        35 | 36 => (16, 8),
+        _ => (16, 16),
+    };
+    put(out, 0, "effects/field_items".into(), item_frame(item), a.px() + 8 - iw / 2, a.py() - 24 - ih - ((k + 2) >> 4), 2, SpriteEffect::None);
 }
 
 /// the first draw-order index of the debris chips (`debris_keys`; the props' are below it)
