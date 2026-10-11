@@ -7261,3 +7261,18 @@ What the 4,500 differing samples are (the board's classes; a frame counts once, 
 * **text boxes, ~260**: small (median ~20 px), mostly in the same scenes.
 Not on this board at all: the skill audit (528 scenarios) and the opponent audit (463) compare every frame but live
 in `work/` and are run by hand, not gated.
+
+*Coverage pass (2026-10-11): what the board never showed, and 201 more scenes on it.* `engine/docs/coverage.md`
+(made by `tools/coverage/run.sh` + `report.py`, numbers in `data/coverage.json`) sets what every gated comparison
+shows - recorded by counters behind `WF_COVERAGE` (`wf_view::coverage`: script natives, sheets, enemy types and AI
+states, forms / skills, areas, screens; no behaviour change) - against the game's content, ordered by how often the
+three whole runs meet a thing. New scenes: `cov_*` / `cov2_*` (81, cut from the whole runs at the first row an
+uncovered thing occurs: `tools/coverage/cuts.py CHAIN:ROW:N:NAME`, from the nearest state the whole-run check cut;
+on the state gate with `expect.matched`) and the 120 `tour_*` segments' screens (`tools/coverage/dump.py`; they
+were on the state gate only). Their exact sampled frames (25,561 of 30,101, every 10th frame) are locked in
+`data/segments/pixels_coverage.json`, which the pixel gate reads next to `pixels.json` - to fold into the main lock
+when it is re-made. Fixed on the way: the importer takes a prop's shown / hidden word from the game's prop objects
+(vt 0x0804D1E4 / 0x0804BA78, +0x14 index, +0x1C shown; +130 frames); a script-spawned actor's shadow offset is
+signed like an enemy's, and an actor whose shadow record a script detached (`set_attachment(actor, 0, 0, ..)`,
+actor+0x5C = 0) draws none (+246, none lost - s319's Dabura had none only because the unsigned offset put it off
+screen). The differences the new scenes show are listed in coverage.md with their first frame.

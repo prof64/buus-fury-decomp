@@ -1,4 +1,5 @@
-//! The pixel gate (headless, muted; skipped without the ROM): every segment in `data/segments/pixels.json` (written
+//! The pixel gate (headless, muted; skipped without the ROM): every segment in `data/segments/pixels.json` (and
+//! `pixels_coverage.json`, the coverage pass's scenes; written
 //! by `examples/pixels.rs` with `PIX_LOCK`: the segments whose sampled frames all matched the emulator's screen) is
 //! replayed by the segment harness and rendered by wf-render at its locked video frames (the view + the presenter's
 //! one-frame OBJ delay, 240x160); each picture's hash must equal the game's. A segment leaves the lock only by
@@ -141,7 +142,15 @@ fn locked_segments_render_as_the_game() {
     let repo = wf_rom::testutil::repo_root();
     let Ok(lock) = std::fs::read_to_string(repo.join("data/segments/pixels.json")) else { return };
     let Some(rom) = wf_rom::testutil::rom() else { return };
-    let lock: serde_json::Value = serde_json::from_str(&lock).unwrap();
+    let mut lock: serde_json::Value = serde_json::from_str(&lock).unwrap();
+    // the coverage pass's scenes (`data/segments/cov_*.json`, engine/docs/coverage.md): locked in their own file,
+    // written the same way, until the main lock is re-made with them (a segment in both is the main lock's)
+    if let Some(more) = std::fs::read_to_string(repo.join("data/segments/pixels_coverage.json")).ok().and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok()) {
+        let segs = lock["segments"].as_object_mut().unwrap();
+        for (k, v) in more["segments"].as_object().into_iter().flatten() {
+            segs.entry(k.clone()).or_insert_with(|| v.clone());
+        }
+    }
     // the segment harness's shared extraction (as tests/segments.rs)
     let only = ["tables", "sprites", "effects", "portraits", "maps", "audio", "ui", "world", "items", "scripts"];
     let content = repo.join("engine/target/tmp/wf-import-segment-content");

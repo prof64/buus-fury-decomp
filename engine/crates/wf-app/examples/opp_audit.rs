@@ -1040,6 +1040,8 @@ fn main() {
     let _ = DATA.set(Arc::new((*d).clone()));
     let mut tile_hint = std::env::var("OA_TILE").ok().and_then(|v| v.parse().ok());
     for a in &args {
+        // (diagnostics: the coverage report's recorder, off without WF_COVERAGE)
+        wf_core::coverage::context(std::path::Path::new(a).file_stem().and_then(|s| s.to_str()).unwrap_or("?"));
         println!("{}", audit(std::path::Path::new(a), &packs, &out_dir, max_png, &mut tile_hint));
     }
 }

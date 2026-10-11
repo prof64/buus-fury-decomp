@@ -80,6 +80,10 @@ fn mv(x: i32, y: i32, speed: i32, state: i32) -> Cmd {
 pub fn call(h: &mut CoreHost, c: &Call) -> R {
     let n = c.native;
     let a = c.args;
+    // (diagnostics: the coverage report's recorder, off without WF_COVERAGE)
+    if wf_core::coverage::on() {
+        wf_core::coverage::note("native", format!("0x{n:02x}"));
+    }
     // the warps, return to title and refresh_map_triggers set the no-save word 0x03002A58 (0x0800232C / 0x080023EA /
     // 0x0800286A / 0x08002714): the running event's end does not write its exit value to its starter's resume slot
     if matches!(n, 0x76 | 0x77 | 0x8b | 0x8e) {

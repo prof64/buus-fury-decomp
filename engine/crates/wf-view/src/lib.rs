@@ -12,6 +12,8 @@
 //! No dependencies, so `wf-core` can implement [`Sim`] without pulling in any frontend code.
 
 /// GBA KEYINPUT bit layout (bit set = pressed; the hardware register is active-low, this is not).
+pub mod coverage;
+
 pub mod buttons {
     pub const A: u16 = 1 << 0;
     pub const B: u16 = 1 << 1;
