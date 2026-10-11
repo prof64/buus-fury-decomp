@@ -6,7 +6,7 @@
 //! * `effects/coin_<size>` (size 0..3): the 4 animation cels of the coin def `[0x086FC250 + 4 size]` (+0x18, raw 8bpp
 //!   w×h, OBJ palette); anchor (w/2, h): drawn at (x, y - z) of the coin (`0x08018284`).
 //! * `effects/field_items`: frame = supply index (0..82) for supplies, `EQUIPMENT_FRAME0 + index` for equipment; the
-//!   16×16 icons (record's LZ blob, as `icons/`), anchor (0, 0) = top-left.
+//!   field graphic of the record (its first def: 16×16, the crates 32×32 - `field_icon`), anchor (0, 0) = top-left.
 //! * `effects/props_<map id>`: frame k = map header prop k (+0x24 count, +0x28 0x18-byte records; graphics = the
 //!   header's +0x2C LZ blob at tile offset record +0x14 low half × 32 bytes, OBJ shape from record +0x10); anchor (0, 0)
 //!   = the prop rect's top-left. `maps/<id>/objects.json` props gain `gfx`, `visible`, `priority`, `pixel_bbox` and
@@ -75,6 +75,20 @@ fn icon(rom: &Rom, kind: (u32, u32, u32, u32), i: u32, pal: &[Rgb]) -> Option<(I
     None
 }
 
+/// An item's field graphic: the record's first def {w, h, OAM attributes, LZ blob} (supplies +0xC, equipment +4 - what
+/// the map item 0x0804A314, the dropped item and the item-get icon draw; the menus' 16x16 icon is the supplies'
+/// second def). Supplies 34 and 43 .. 82 are 32x32 (the crates), 9 is 16x32, 35 / 36 16x8.
+fn field_icon(rom: &Rom, kind: (u32, u32, u32, u32), i: u32, pal: &[Rgb]) -> Option<(Image, u32)> {
+    let (tbl, _, stride, _) = kind;
+    let r = tbl + stride * i + if stride == SUPPLIES.2 { 0xC } else { 4 };
+    let (w, h, p) = (rom.u32(r), rom.u32(r + 4), rom.u32(r + 12));
+    if !(rom.isptr(p) && p & 3 == 0 && matches!(rom.u32(p), 1 | 2) && (8..=64).contains(&w) && (8..=64).contains(&h) && rom.u32(p + 4) == w * h) {
+        return None;
+    }
+    let d = rom.lz(p).ok()?;
+    (d.len() == (w * h) as usize).then(|| (linear_image(&d, w, h, pal, false), p))
+}
+
 /// `effects` category: coins and the item icon sheet.
 pub fn effects(rom: &Rom, out: &mut Content) {
     let pal = palette(rom, OBJ_PALETTE, 256);
@@ -111,7 +125,7 @@ pub fn effects(rom: &Rom, out: &mut Content) {
             while frames.len() <= k {
                 frames.push((blank.clone(), 0, 0));
             }
-            if let Some((im, p)) = icon(rom, def, i, &pal) {
+            if let Some((im, p)) = field_icon(rom, def, i, &pal).or_else(|| icon(rom, def, i, &pal)) {
                 frames[k] = (im, 0, 0);
                 map.push(json!({"kind": kind, "index": i, "frame": k, "gfx": hx(p)}));
             }
@@ -124,7 +138,7 @@ pub fn effects(rom: &Rom, out: &mut Content) {
         "Item icons (dropped / map items, item-get)",
         &frames,
         json!({"frame_of": {"supply": "index", "equipment": format!("{EQUIPMENT_FRAME0} + index")}, "icons": map,
-               "notes": "16x16, anchor = top-left; dropped item: at (x0, y0 - (z >> 10)) of its box + shadow_10x4 at (x0, y0 + 10); map item: at the def (x, y); item-get: above the player"}),
+               "notes": "the field def's size (16x16; the crates 32x32), anchor = top-left; dropped item: at (x0, y0 - (z >> 10)) of its box + shadow_10x4 at (x0, y0 + 10); map item: at the def (x, y); item-get: above the player"}),
     );
 }
 

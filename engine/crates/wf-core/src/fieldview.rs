@@ -46,7 +46,7 @@ pub fn pickup(w: &World, id: u32, p: &Pickup, out: &mut RenderView) {
     match p.kind {
         PickupKind::Zenie(s) => {
             // hidden on frames with fc & 4 once older than 480 frames
-            if p.t > 0x1E0 && w.frame & 4 != 0 {
+            if p.t > 0x1E0 && w.g.clock(w.frame) & 4 != 0 {
                 return;
             }
             let mut cel = (((p.phase as i32).wrapping_add(p.t + p.spin)) & 0xFF) >> 3;
@@ -132,7 +132,8 @@ pub fn map_sprite(w: &World, id: u32, m: &MapSprite, out: &mut RenderView) {
     if prop >= 0 && !prop_visible(w, prop) {
         return;
     }
-    let bob = SIN256[(w.frame & 0xFF) as usize] >> 14;
+    // (the frame counter 0x03000F94: `Globals::clock`, not the world's own frame - tour_earth_east_a f1130)
+    let bob = SIN256[(w.g.clock(w.frame) & 0xFF) as usize] >> 14;
     put(
         out,
         id,
