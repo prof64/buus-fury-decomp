@@ -513,6 +513,9 @@ fn main() {
                         tear_renderer.m7_line = 0;
                     }
                     if !olds.is_empty() {
+                        if std::env::var_os("PIX_TEARDBG").is_some() {
+                            eprintln!("  tear: {name} f{k} ..");
+                        }
                         if let Some(rows) = torn(&game[i], &ours, &olds) {
                             torn_rows.insert(k, rows);
                             class = "torn (hardware)".into();

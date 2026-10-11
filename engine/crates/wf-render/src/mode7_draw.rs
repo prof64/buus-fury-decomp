@@ -209,6 +209,7 @@ impl Renderer {
                 }
             }
         }
+        let flyer_n = world.len();
         // the other actors (patrolling enemies), drawn the same way
         if let Some(wm) = wm {
             for a in &wm.actors {
@@ -221,6 +222,7 @@ impl Renderer {
                 }
             }
         }
+        let flyers = world.len();
         if let Some(props) = self.sheet(packs, &data.props_sheet) {
             for p in &data.props {
                 let i = p.index as u16;
@@ -242,6 +244,13 @@ impl Renderer {
                 world.push((depth, vec![M7Obj { prio: 3, x: x & 511, y: y & 255, w, h, double: true, affine: Some([s, 0, 0, s]), tex }]));
             }
         }
+        // (at equal depth the object list's order: the map's props, made at its load, before the flyer - OAM at
+        // earth_2_8_15 f300, the flyer taking off right over East District 439's house: the house first, the
+        // flyer's shadow behind it)
+        // (props, the patrols, the flyer: the order they were made in)
+        world.rotate_left(flyer_n);
+        let n = world.len() - flyer_n;
+        world[..n].rotate_left(flyers - flyer_n);
         world.sort_by_key(|(d, _)| *d);
         for (_, group) in world {
             if matrices >= 16 {

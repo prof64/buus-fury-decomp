@@ -1922,6 +1922,8 @@ pub struct Presenter {
         Vec<(u8, i32, i32)>,
     )>,
     prev_radar: Option<Option<([u8; 4], u8)>>,
+    /// the 3D map's other actors (the patrols) before the step
+    prev_actors: Option<Vec<wf_view::FlyerView>>,
     prev_mode7: Option<wf_view::Mode7View>,
     prev_shake: Option<(i32, i32)>,
 }
@@ -1933,6 +1935,7 @@ impl Presenter {
         self.prev_mode7 = v.map.as_ref().and_then(|m| m.mode7.clone());
         self.prev_shake = v.map.as_ref().map(|m| m.shake);
         self.prev_radar = Some(v.radar);
+        self.prev_actors = v.world_map.as_ref().map(|wm| wm.actors.clone());
         self.prev = Some((
             v.sprites,
             v.hud,
@@ -2022,8 +2025,19 @@ impl Presenter {
         if let (Some(wm), Some(c)) = (out.world_map.as_mut(), self.prev_mode7.clone()) {
             // (the label's OBJs are the previous build's - there or not; its tiles hold what its update drew since:
             // dr4_072 15-1 f599 the first message, on screen from f600 with its text; shipr_001 7-1 f539 -> f541)
+            // the 3D objects' OAM is the previous build's too - the flyer, the patrols, the mini-map's arrow: placed
+            // and scaled as they were before the step, through the camera of then (the props' and the ground's;
+            // rclose_002 4-1 f12,000, a descending airship a pixel off through this step's position)
             if let Some(m) = out.map.as_mut().and_then(|m| m.mode7.as_mut()) {
-                m.label = c.label.map(|_| m.label_drawn);
+                let label = c.label.map(|_| m.label_drawn);
+                *m = wf_view::Mode7View { label, label_drawn: m.label_drawn, ..c.clone() };
+            }
+            if let Some(pa) = self.prev_actors.as_ref().filter(|pa| pa.len() == wm.actors.len() && pa.iter().zip(&wm.actors).all(|(a, b)| a.sheet == b.sheet)) {
+                for (a, p) in wm.actors.iter_mut().zip(pa) {
+                    (a.x, a.y, a.z) = (p.x, p.y, p.z);
+                }
+            } else if let Some(pa) = &self.prev_actors {
+                wm.actors = pa.clone();
             }
             wm.bg_camera = Some(c);
         }
