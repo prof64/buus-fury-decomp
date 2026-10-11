@@ -416,7 +416,20 @@ fn main() {
                 // hardware's
                 let mut late_alt: Option<(RenderView, Vec<u32>)> = None;
                 if n > 0 && std::env::var_os("PIX_NOHUDLATE").is_none() {
-                    if let Some(v2) = prev_view.as_ref().and_then(|pv| wf_core::view::hud_late(&view, pv)) {
+                    // (the frame before's tiles - or, inside a long iteration, the ones from before its step: its draw
+                    // is still to come)
+                    let mut lates: Vec<RenderView> = vec![];
+                    for pv in [prev_view.as_ref(), iter_view.as_ref()].into_iter().flatten() {
+                        if let Some(v) = wf_core::view::hud_late(&view, pv) {
+                            if !lates.contains(&v) {
+                                lates.push(v);
+                            }
+                        }
+                    }
+                    for v2 in lates {
+                        if n == 0 {
+                            break;
+                        }
                         let late = renderer.render(&packs, &v2, 0, W, H).to_vec();
                         // (a split whose HUD pixels are the game's: the picture the other tear rules go on from)
                         let d: Vec<usize> = (0..W * H).filter(|&j| ours[j] != late[j]).collect();
@@ -426,7 +439,7 @@ fn main() {
                             let c2 = if n2 == 0 { "torn (hardware)".to_string() } else { classify(&view, &game[i], &px).0 };
                             (class, n, ours) = (c2, n2, px);
                             hud_torn += (n2 == 0) as usize;
-                        } else {
+                        } else if late_alt.is_none() {
                             // (... or the late tiles under another tear: the rules below from the late picture)
                             late_alt = Some((v2, late));
                         }

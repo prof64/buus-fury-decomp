@@ -220,11 +220,18 @@ fn check_segment(repo: &std::path::Path, data: &std::sync::Arc<wf_core::content:
             // the HUD's draw after the scanout passed its lines (`view::hud_late`: its tiles - the bars, the gauge
             // parts, the icon, the experience line, the stat mark's cel - still the frame before's, down to a split
             // line): the hardware's, as examples/pixels.rs takes it
-            let late = shown_before.as_ref().and_then(|pv| wf_core::view::hud_late(&view, pv)).map(|v| {
-                let p = renderer.render(packs, &v, 0, 240, 160).to_vec();
-                (v, p)
-            });
-            let splits = late.as_ref().map(|(_, p)| wf_core::view::late_splits(&new, p, 240)).unwrap_or_default();
+            // (the frame before's tiles - or, inside a long iteration, the ones from before its step: its draw is
+            // still to come)
+            let mut lates: Vec<(RenderView, Vec<u32>)> = vec![];
+            for pv in [shown_before.as_ref(), iter_view.as_ref()].into_iter().flatten() {
+                if let Some(v) = wf_core::view::hud_late(&view, pv) {
+                    if !lates.iter().any(|l| l.0 == v) {
+                        let p = renderer.render(packs, &v, 0, 240, 160).to_vec();
+                        lates.push((v, p));
+                    }
+                }
+            }
+            let splits: Vec<Vec<u32>> = lates.iter().flat_map(|(_, p)| wf_core::view::late_splits(&new, p, 240)).collect();
             let ok = hash(&new) == h
                 || splits.iter().any(|p| hash(p) == h)
                 || match (masks.get(&k), before) {
@@ -232,7 +239,7 @@ fn check_segment(repo: &std::path::Path, data: &std::sync::Arc<wf_core::content:
                     (Some(m), Some(b)) => {
                         hash(&compose(tear_renderer, packs, &view, &b, iter_view.as_ref(), &new, m)) == h
                             || splits.iter().any(|p| hash(&compose(tear_renderer, packs, &view, &b, iter_view.as_ref(), p, m)) == h)
-                            || late.as_ref().is_some_and(|(v, p)| hash(&compose(tear_renderer, packs, v, &b, iter_view.as_ref(), p, m)) == h)
+                            || lates.iter().any(|(v, p)| hash(&compose(tear_renderer, packs, v, &b, iter_view.as_ref(), p, m)) == h)
                     }
                     _ => false,
                 };
