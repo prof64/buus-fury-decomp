@@ -582,6 +582,13 @@ pub fn shadow_set(w: &mut World, i: usize, key: (i32, i32)) {
     }
 }
 
+/// the shadow a script's `set_attachment` left the actor with: `None` = never set (the sprite header's), `Some(None)`
+/// = no shadow, `Some(Some(k))` = the shared graphic `SHADOWS[k]`
+pub fn shadow_of(w: &World, id: EntityId) -> Option<Option<usize>> {
+    let v = w.field.as_ref()?.vram.as_ref()?;
+    v.shadow_set.iter().find(|o| o.0 == id).map(|o| o.1.map(|k| k as usize))
+}
+
 fn map_3d(w: &World) -> bool {
     w.field.as_ref().is_some_and(|f| {
         w.data

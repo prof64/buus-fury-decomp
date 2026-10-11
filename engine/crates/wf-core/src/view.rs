@@ -395,13 +395,20 @@ fn actor_draw(
         });
     }
     // a 0 x 0 header shadow is no shadow (Yemma's office NPCs requested effects/shadow_0x0)
-    // (an actor whose footprint is off every screen shows no shadow: the game makes no OAM for it, and the shadow's
-    // byte offsets (`Sprite::shadow_off`) would bring Dabura's back from 58 px left of the screen - pixel gate
-    // shipr_338_8-16 f450 - or from above it, shipr_238_8-16 f5010)
+    // (an actor whose footprint is off every screen shows no shadow: the game makes no OAM for it - pixel gate
+    // shipr_338_8-16 f450, shipr_238_8-16 f5010)
     let fp = crate::geom::Rect::new(a.px(), a.py(), a.px() + a.foot_w, a.py() + a.foot_h);
     let off_screen = !w.cameras.is_empty()
         && w.cameras.iter().all(|c| fp.x1 <= c.shown.x0 || fp.x0 >= c.shown.x1 || fp.y1 <= c.shown.y0 || fp.y0 >= c.shown.y1);
-    if let Some(sh) = sp.shadow.as_ref().filter(|sh| sh.as_str() != "shadow_0x0" && !off_screen) {
+    // (a script's `set_attachment` replaces the header's shadow record - none for a (w, h) the table 0x086B759C does
+    // not hold: emulator, shipr_238 8-16 f5,006: s-script's set_attachment clears Dabura's +0x5C four frames after
+    // his sprite is set, and he walks in at f5,040 with no shadow)
+    let set = crate::vram::shadow_of(w, id).map(|k| k.map(|k| format!("shadow_{}x{}", crate::vram::SHADOWS[k].0, crate::vram::SHADOWS[k].1)));
+    let shadow = match &set {
+        Some(s) => s.as_ref(),
+        None => sp.shadow.as_ref(),
+    };
+    if let Some(sh) = shadow.filter(|sh| sh.as_str() != "shadow_0x0" && !off_screen) {
         out.sprites.push(SpriteDraw {
             entity: id,
             sheet: format!("effects/{sh}"),
@@ -410,8 +417,8 @@ fn actor_draw(
                 flip: false,
             },
             // (offset by the header's shadow dx / dy: Super Janemba's at (8, 8) - OAM, real route 18-14)
-            x: a.px() + shadow_at(w, id, sp).0,
-            y: a.py() + shadow_at(w, id, sp).1,
+            x: a.px() + shadow_at(sp).0,
+            y: a.py() + shadow_at(sp).1,
             priority: 3,
             mirror: false,
             // a shadow going up off the screen is dropped while fewer than 5 of its OBJ's rows are on screen (the
@@ -427,17 +434,12 @@ fn actor_draw(
     }
 }
 
-/// The shadow's offset from the sprite header's dx / dy bytes: an enemy's shadow object takes them signed (Dabura
-/// fought in a battle: his at (-8, -4) under his feet - opponent audit oa_t12_idle; Yamu's dy 0xF8 8 px up -
-/// oa_t94), every other actor's (players, scene NPCs) unsigned - the story's Dabura (an NPC) shows none: dx 248 puts
-/// it off screen (pixel gate shipr_238_8-16 f5040 .., his dy 0xFC). Only these two sprites have a byte >= 0x80.
-fn shadow_at(w: &World, id: u32, sp: &crate::content::Sprite) -> (i32, i32) {
-    let enemy = w.find(id).is_some_and(|k| matches!(w.ents[k].body, Body::Enemy(_)));
-    if enemy {
-        (sp.shadow_off.0 as u8 as i8 as i32, sp.shadow_off.1 as u8 as i8 as i32)
-    } else {
-        sp.shadow_off
-    }
+/// The shadow's offset from the sprite header's dx / dy bytes, signed (the actor draw's test 0x08010278: `ldrsb` of
+/// header +0xC / +0xD) for every actor: Dabura's (-8, -4) under his feet - fought (opponent audit oa_t12_idle) and in
+/// the story (emulator, shipr_238 8-16 f2,940: his shadow's OAM at (40, 92), he at (48, 96)); Yamu's dy 0xF8 8 px up
+/// (oa_t94; 8-16: his rect 320 .. 330 at y 328). Only these two sprites have a byte >= 0x80.
+fn shadow_at(sp: &crate::content::Sprite) -> (i32, i32) {
+    (sp.shadow_off.0 as u8 as i8 as i32, sp.shadow_off.1 as u8 as i8 as i32)
 }
 
 fn record(w: &World, id: u32, addr: u32, x: i32, y: i32, out: &mut RenderView) {
