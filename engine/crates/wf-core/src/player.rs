@@ -1646,6 +1646,10 @@ pub fn gain_xp_levels(w: &mut World, i: usize, exp: i64) -> bool {
 // ---- update -----------------------------------------------------------------------------------------------------------
 
 pub fn update(w: &mut World, i: usize) {
+    // a link fight under the link error's script: the state's animation tick alone (`World::link_held`)
+    if w.link_held {
+        return anim_tick_only(w, i);
+    }
     // the world map's flying player (fieldworld.rs) replaces the 2D player's states
     if crate::fieldworld::flyer_update(w, i) {
         return;

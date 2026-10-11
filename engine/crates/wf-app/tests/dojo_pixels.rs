@@ -220,6 +220,18 @@ fn run(packs: &Packs, data: &Arc<GameData>, name: &str) -> Vec<(u8, usize, usize
                 e.3 += 1;
                 return;
             }
+            // the picture's first line still the frame before's (the OBJs' new places written as the scanout begins)
+            if {
+                let mut c = ours.clone();
+                c[..240].copy_from_slice(&n[..240]);
+                hash(&c) == h
+            } {
+                if log {
+                    eprintln!("dojo_{name} side {} lf {lf}: the first line the frame before's", side.slot);
+                }
+                e.3 += 1;
+                return;
+            }
             if let Some(y0) = (150..160).rev().find(|&y0| {
                 let mut c = ours.clone();
                 c[y0 * 240..].copy_from_slice(&n[y0 * 240..]);
@@ -456,11 +468,12 @@ fn run(packs: &Packs, data: &Arc<GameData>, name: &str) -> Vec<(u8, usize, usize
     // it while it waits, then the link error's script (s001) fades that picture out: 16 steps of the script's
     // palette scale, to black
     let lost = doc["lost"].as_i64();
+    let mut lost_prev: Vec<Option<Vec<u32>>> = vec![None; sides.len()];
     let mut faded = 0u16;
     for (k, row) in rows.iter().enumerate() {
         // (the script's first iteration still shows the fight's next picture: its OBJs are the last update's, a
         // frame late as always - the picture that then fades)
-        if let Some(l) = lost.filter(|&l| v(&row["lf"]) > l) {
+        if let Some(l) = lost.filter(|&l| v(&row["lf"]) >= l) {
             let lf = v(&row["lf"]);
             for (si, side) in sides.iter().enumerate() {
                 if let Some(p) = pend[si].take() {
@@ -470,15 +483,25 @@ fn run(packs: &Packs, data: &Arc<GameData>, name: &str) -> Vec<(u8, usize, usize
                 }
                 if si == 0 {
                     g.link_lost();
-                    let lk: Vec<u16> = row["keys"].as_array().unwrap().iter().map(|x| v(x) as u16).collect();
-                    g.lost_step(&lk);
+                    g.lost_step();
                 }
                 let Some((h, vf)) = side.want.get(&lf) else { continue };
                 let mut nv = RenderView::default();
                 g.view(side.slot, &mut nv);
                 let ours = renderer.render(packs, &nv, 0, 240, 160).to_vec();
                 res[si].1 += 1;
-                let level = (hash(&ours) == *h).then_some((lf - l) as u16);
+                let mut level = (hash(&ours) == *h).then_some((lf - l) as u16);
+                // (... or with its first line still the frame before's, as in the fight)
+                if let (None, Some(pv)) = (level, lost_prev[si].as_ref()) {
+                    let mut c = ours.clone();
+                    c[..240].copy_from_slice(&pv[..240]);
+                    if hash(&c) == *h {
+                        res[si].3 += 1;
+                        res[si].2 = res[si].2.wrapping_sub(1);
+                        level = Some((lf - l) as u16);
+                    }
+                }
+                lost_prev[si] = Some(ours.clone());
                 if let (None, Some(o), Some(emu)) = (level, &out, load_png(&side.dir.join(format!("{vf:06}.png")))) {
                     let diff: Vec<u32> = emu.iter().zip(&ours).map(|(a, b)| if a == b { 0xFF00_0000 } else { 0xFFFF_00FF }).collect();
                     save(&o.join(format!("{name}_{}_{lf}.png", side.slot)), &[&emu, &ours, &diff]);

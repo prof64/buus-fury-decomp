@@ -612,6 +612,10 @@ pub struct World {
     pub link_lost: u8,
     /// ... and the script running is the link error's (until its `return_to_title`: `Session::step_post`)
     pub link_error: bool,
+    /// a link fight under the link error's script (`wf-net` `DojoGame::lost_step`): the fighters are held - they take
+    /// no keys and do not move, their animations run on (an attack ends in the idle stance) and nothing hits them;
+    /// the other objects go on
+    pub link_held: bool,
     /// the HP / EP the HUD's bars show, per player slot (hp, max, ep, max): read by the HUD object's update at its
     /// place in the object pass (`hud_sample`) - not hashed (the view's)
     pub hud_bars: Vec<(i32, i32, i32, i32)>,
@@ -810,6 +814,7 @@ impl World {
             under_late: None,
             link_lost: 0,
             link_error: false,
+            link_held: false,
             hud_bars: Vec::new(),
             hud_bars_at: u32::MAX,
             hud_end: Vec::new(),

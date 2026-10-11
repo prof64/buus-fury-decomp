@@ -1439,7 +1439,7 @@ impl LinkSim {
             let result = flow.result.clone();
             self.inner.step(inputs, events);
             if let Some(Some((g, _))) = self.lost.as_mut() {
-                g.lost_step(&[0, 0]);
+                g.lost_step();
             }
             if matches!(self.inner.session.world.menu.stack.last(), Some(wf_core::menu::Screen::Title(_))) {
                 self.last = Some(match result {

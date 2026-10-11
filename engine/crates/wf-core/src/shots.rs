@@ -1690,7 +1690,7 @@ fn straight_update(w: &mut World, i: usize) {
     // field: while an event holds the field an enemy's shot flies on (its trail too) but sends no hit message
     // (Thieves Den 9-4: a Hessian's rocket crosses the player during the level-up popup; the player's handler
     // 0x08010DDE gets no kind-0 message in those frames)
-    if hit_p && w.field.as_ref().is_some_and(|f| f.busy) {
+    if hit_p && (w.field.as_ref().is_some_and(|f| f.busy) || w.link_held) {
         return;
     }
     if hit(w, i, r, o.a, o.mult, true) {

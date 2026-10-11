@@ -353,12 +353,19 @@ network options, `--net-name`, `--net-key` apply); B (Cancel) leaves as in the g
   (phase "lost"). Gated frame by frame, the scene's frames and the title after it included: menu_parity
   `link_lost_setup` / `link_lost_saves` / `link_lost_chars`. A trade in doubt keeps its page (the journal's lock).
   In a fight the picture under the script is the fight going on as the game's does (`DojoGame::link_lost` /
-  `lost_step`): one more update of the fight, then the fighters held where they are, the cameras easing on with the
-  OBJs while the BG stays, the HUD and the friend's bar sliding out (`hide_hud`), the palette fading 16 a step -
-  recorded with the guest's emulator reset mid-fight (`tools/link/dojo_record.py --reset-b-at N`, the recording's
-  `lost`) and compared picture for picture (tests/dojo_pixels.rs `dojo_lost1` / `dojo_lost2`, exact). Open: a
-  fighter that was walking when the link broke stands idle from the script's 6th update in the game; ours keeps its
-  walking pose through the fade (one recording, kept out of the gate; the rule not found).
+  `lost_step`, `World::link_held`): the update the host waited in changes nothing; then, an update a frame, the
+  fighters stay where they are and take no keys while their animations run on (an attack ends in the idle stance),
+  blasts fly and damage numbers rise, the cameras ease on with the OBJs while the BG stays where it was; from the
+  third update the HUD and the friend's bar slide out (`hide_hud`) and the palette fades 16 a step - recorded with
+  the guest's emulator reset mid-fight (`tools/link/dojo_record.py --reset-b-at N`, the recording's `lost`) and
+  compared picture for picture (tests/dojo_pixels.rs `dojo_lost1` / 2 / 3 / 7 / 8: standing, walking, attacking
+  fighters, a blast in flight - all exact). Three more recordings are kept out of the gate
+  (`work/link_fight/open/`): a prop just above the screen shows its last line a frame sooner in the game (6 pixels,
+  one frame of the fade); and two differences of the fight itself the recordings turned up - a blast leaving the top
+  of the screen shows one pixel a frame longer in the game, and a punch thrown through the other fighter's blast:
+  the game draws one more random number there (rand(2), before the hit's damage) and the blast goes on to a hit
+  message of its own next frame, ours takes no notice of the blast (state differs from that frame on; the game's
+  generator calls are written down in engine/docs/accuracy-log.md).
   On a link page a friend that stops answering without its connection closing (a dead network) is lost after 3 s
   without a packet (`LINK_TIMEOUT_MS`: the game's 180 updates; tests/link.rs `dojo_link_lost_on_a_page`).
 * **Leaving with B** (Select Saved Game's Cancel): the page becomes the title's Multiplayer page (menu_parity

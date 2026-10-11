@@ -469,36 +469,33 @@ impl DojoGame {
         if self.lost.is_none() {
             self.lost = Some(0);
             for s in 0..2 {
-                let cam = &self.s.world.cameras[s];
-                let c = if self.since_made().is_some_and(|k| k < 126) { cam.rect } else { cam.shown };
+                let c = self.s.world.cameras[s].rect;
                 self.lost_cams[s] = (c.x0, c.y0);
             }
         }
     }
-    /// one update under the link error's script (the app calls it once a frame until the script's scene loads): the
-    /// first one is the fight's next update (its OBJs are the last update's, a frame late as always); then the script
-    /// holds the fighters where they are, the cameras ease on (the OBJs follow them, the BG stays), the HUD and the
-    /// friend's bar slide out and the picture fades. (Open: a fighter that was walking stands idle from the 6th
-    /// update in the game - one recording, the rule not found; ours keeps its pose)
-    pub fn lost_step(&mut self, keys: &[u16]) {
-        match self.lost {
-            Some(0) => {
-                self.lost = Some(1);
-                <Self as Game>::advance(self, keys, true);
-            }
-            Some(j) => {
-                self.lost = Some(j + 1);
-                // (the cameras go on easing - the OBJs follow them, the BG does not)
-                for slot in 0..self.s.world.players.len().min(2) {
-                    wf_core::battle::camera(&mut self.s.world, slot);
-                }
-            }
-            None => {}
+    /// one update under the link error (the app calls it once a frame until the script's scene loads). The first is
+    /// the update the host waited in: nothing moves, the picture is the last update's. From the second - the
+    /// script's iterations - the fighters stay where they are and take no keys, but their animations run on (an
+    /// attack ends in the idle stance) and the other objects go on (a blast flies, a damage number rises); the
+    /// cameras ease on (the OBJs follow them, the BG stays where it was), and from the third the HUD and the
+    /// friend's bar slide out and the picture fades, 16 a step (two linked emulators, the guest reset mid-fight:
+    /// wf-app tests/dojo_pixels.rs `dojo_lost*`, the fighters' ticks in their rows)
+    pub fn lost_step(&mut self) {
+        let Some(j) = self.lost else { return };
+        self.lost = Some(j + 1);
+        self.s.presenter.before_step(&self.s.world);
+        self.draw_pass();
+        if j == 0 {
+            return;
         }
+        // (the fighters held - `World::link_held` -, the shots, the numbers, the cameras going on)
+        self.s.world.link_held = true;
+        self.s.step(&[0, 0]);
     }
     /// the fade-out is done (the screen is black: the script's scene follows)
     pub fn lost_faded(&self) -> bool {
-        self.lost.is_some_and(|j| j >= 17)
+        self.lost.is_some_and(|j| j >= 18)
     }
 
     /// that side's world list beyond the props and fighters (their sort keys on our scale: layer 0x38 - the game's,
@@ -632,9 +629,12 @@ impl DojoGame {
         let c = if self.since_made().is_some_and(|k| k < 126) { cam.rect } else { cam.shown };
         out.cameras = vec![wf_view::CameraView { x: c.x0, y: c.y0 }];
         // (under the link error's script: the camera of the picture the link was lost on)
-        if self.lost.is_some_and(|j| j >= 1) {
+        let c = if self.lost.is_some_and(|j| j >= 1) {
             out.cameras = vec![wf_view::CameraView { x: self.lost_cams[s].0, y: self.lost_cams[s].1 }];
-        }
+            cam.rect
+        } else {
+            c
+        };
         let hud = out.hud.get(s).cloned();
         out.hud = hud.into_iter().collect();
         // the OBJs in this side's draw order
@@ -681,7 +681,7 @@ impl DojoGame {
             out.palette_fade = Some(wf_view::PaletteFade { level: level as u16, target: 0 });
         }
         // (the link error's fade: the palette toward black, 16 a step)
-        if let Some(j) = self.lost.map(|j| j - 1).filter(|&j| j > 0) {
+        if let Some(j) = self.lost.map(|j| j - 2).filter(|&j| j > 0) {
             out.palette_fade = Some(wf_view::PaletteFade { level: (16 * j).clamp(0, 256) as u16, target: 0 });
         }
         // the HUD and the boss bar: in from update 126 (y -16 / -8, +1 an update, to 8), out after the result
@@ -689,7 +689,7 @@ impl DojoGame {
         let lost = self.lost;
         let y = |lo: i32| -> Option<i32> {
             // (the script's `hide_hud`: up a pixel an update, from its second iteration)
-            if let Some(j) = lost.map(|j| (j - 1).max(0)) {
+            if let Some(j) = lost.map(|j| (j - 2).max(0)) {
                 return (8 - j >= lo).then_some(8 - j);
             }
             match (made, result) {
