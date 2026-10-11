@@ -1686,35 +1686,19 @@ fn render_view_with(w: &World, link: Option<&LinkDraw>, out: &mut RenderView) {
             };
             let xp72 = xp_line(p.rec.xp);
             let skill = p.skill();
-            // (the bars: what the HUD's update read in the frame's pass - `World::hud_sample`)
-            // (changed since the pass - a script's heal, a menu: the current values)
-            let now = (p.hp(), p.max_hp(), p.ep(), p.max_ep());
-            let bars = w
-                .hud_bars
-                .get(s)
-                .copied()
-                .filter(|_| w.hud_bars_at == w.frame && w.hud_end.get(s) == Some(&now))
-                .unwrap_or(now);
-            // (the skill icon's grey and the SS / SS3 gauges: read there too - `World::more_values`)
-            // the skill icon (grey: not usable) and the EP bar's SS / SS3 gauge parts are tiles the HUD rebuilds from its
-            // read (`0x0800B99C`: skill def +0x10's check, then the 12-byte summary): the icon as the frame leaves it
-            // (skill audit sa_f26_skill2 f5 / f106: greyed in the press's frame; Masenko Lv3 f5), the gauges as read at
-            // the HUD's place in the pass (`World::hud_sample`: the form controller's drain and a punch's gain show a
-            // frame later - pixel gate earth_2_8_1 f3630), but a form change in the pass (a revert's end, a transform's)
-            // at once (skill audit sa_f02_skill20 f330, sa_f40_skill20 f69)
+            // the bars, the skill icon (grey: not usable) and the EP bar's SS / SS3 gauge parts are tiles the HUD's draw
+            // rebuilds every frame (`0x0800BCC8` -> `0x0800B99C`: the record's HP / EP by 41, skill def +0x10's check,
+            // the 12-byte summary) - in the draw pass `0x080115B0`, after the frame's whole update pass `0x08011A1E`:
+            // the values as the frame leaves them. The game's picture shows them in the same frame when that draw
+            // runs before the scanout reaches the HUD's lines (normally in VBlank: scanline 200 .. 227), and the frame
+            // before's tiles when it runs after them - a frame whose update took long, a hit's above all (emulator,
+            // the breakpoint's scanline: earth_2_11_3 f150, an enemy's hit, the draw at line 11; earth_2_8_1 f3630,
+            // a punch's gauge gain, at line 39; earth_2_10_1 f210, an Energy Blast's cost, at line 206: shown at
+            // once). That is a mid-frame tear of the hardware's, not a rule: `hud_late` is its picture, the picture
+            // board and the pixel gates accept it
+            let bars = (p.hp(), p.max_hp(), p.ep(), p.max_ep());
             let alt = !crate::player::can_use_skill(w, pi, skill) || w.field.as_ref().is_some_and(|f| !f.combat);
-            let gauge_now = (p.ss_gauge, (p.ss3_gauge >> 16) as i32);
-            let gauge = w
-                .hud_more
-                .get(s)
-                .copied()
-                .filter(|_| {
-                    w.hud_bars_at == w.frame
-                        && w.hud_more_end.get(s).is_some_and(|e| (e.1, e.2) == gauge_now)
-                        && w.hud_form.get(s) == Some(&p.form)
-                })
-                .map(|m| (m.1, m.2))
-                .unwrap_or(gauge_now);
+            let gauge = (p.ss_gauge, (p.ss3_gauge >> 16) as i32);
             // a fusion component's level-up hook: the component is the current character, and the HUD draws the current
             // character's record (0x0800B99C reads GameData +0's) - its HP / EP, gauges, experience line and skill
             // (emulator, real route r052 6-9 f5,768 .. 6,015: current 3 (Trunks, 488 / 488, 237 / 237) under Gotenks)
@@ -1998,28 +1982,27 @@ impl Presenter {
             // (the sprites carry their own shake from their build: `obj_shake_baked`)
             out.obj_shake = Some((0, 0));
             out.sprites = sprites.clone();
-            // (the cooldown triangle shows the frame's own value: shipr_001 7-1 f240, the record's 0x7FFF that frame
-            // and an empty step-0 triangle)
-            // (and the HP / EP bars: their tiles are drawn in the HUD's update, from what it read at its place in the
-            // pass - `World::hud_sample`; opponent audit oa_t44_left f115: down by the enemy's hit in the hit's frame,
-            // the damage number a frame later)
-            let cds: Vec<(i32, i32, i32, i32, i32, i32, i32, bool)> = out
-                .hud
-                .iter()
-                .map(|h| (h.ss_cooldown, h.ss, h.ss3, h.hp, h.hp_max, h.ep, h.ep_max, h.skill_alt))
-                .collect();
-            out.hud = hud.clone();
-            for (h, c) in out.hud.iter_mut().zip(cds) {
-                h.ss_cooldown = c.0;
-                // (the SS / SS3 gauge parts and the skill icon's grey: tiles drawn in the HUD's update from its read
-                // - `World::more_values`; skill audit sa_f26_skill2 f5 / f106, sa_f40_skill20 the gauge steps)
-                h.ss = c.1;
-                h.ss3 = c.2;
-                h.skill_alt = c.7;
-                h.hp = c.3;
-                h.hp_max = c.4;
-                h.ep = c.5;
-                h.ep_max = c.6;
+            // the HUD's OAM (its place, whether it is there) is a frame late; everything its tiles show is drawn by its
+            // draw in this frame (`render_view`'s HUD: the bars, the gauge parts, the icon and its grey, the cooldown
+            // triangle - shipr_001 7-1 f240, the record's 0x7FFF that frame and an empty step-0 triangle -, the
+            // experience line) - and the stat-points mark's cel, whose draw (`0x0800B55C`) copies the new cel's tiles
+            // at once (emulator, shipr_338 8-16: the draw at scanline 207, the new cel in that frame's picture; at
+            // f4,380 at line 50, the cel before's: the tear, `hud_late`)
+            let now = std::mem::replace(&mut out.hud, hud.clone());
+            for (h, c) in out.hud.iter_mut().zip(now) {
+                h.ss_cooldown = c.ss_cooldown;
+                h.ss = c.ss;
+                h.ss3 = c.ss3;
+                h.skill_alt = c.skill_alt;
+                h.skill = c.skill;
+                h.hp = c.hp;
+                h.hp_max = c.hp_max;
+                h.ep = c.ep;
+                h.ep_max = c.ep_max;
+                h.xp72 = c.xp72;
+                if h.stat_mark.is_some() && c.stat_mark.is_some() {
+                    h.stat_mark = c.stat_mark;
+                }
             }
             out.boss_bars = boss_bars.clone();
             // (its OAM a frame late; the digits are drawn into its tiles in the draw itself: the current value)
@@ -2040,6 +2023,44 @@ impl Presenter {
             wm.bg_camera = Some(c);
         }
     }
+}
+
+/// The HUD's tiles as the frame before left them (`prev`: the picture shown the frame before): what the screen
+/// shows when the HUD's draw runs after the scanout passed its lines (`render_view`'s HUD, the presenter) - the bars,
+/// the gauge parts, the icon, the experience line, the stat-points mark's cel. `None`: nothing of it changed.
+pub fn hud_late(view: &RenderView, prev: &RenderView) -> Option<RenderView> {
+    let mut v = view.clone();
+    for (h, o) in v.hud.iter_mut().zip(&prev.hud) {
+        h.ss_cooldown = o.ss_cooldown;
+        h.ss = o.ss;
+        h.ss3 = o.ss3;
+        h.skill_alt = o.skill_alt;
+        h.skill = o.skill;
+        h.hp = o.hp;
+        h.hp_max = o.hp_max;
+        h.ep = o.ep;
+        h.ep_max = o.ep_max;
+        h.xp72 = o.xp72;
+        if h.stat_mark.is_some() && o.stat_mark.is_some() {
+            h.stat_mark = o.stat_mark;
+        }
+    }
+    (v.hud != view.hud).then_some(v)
+}
+
+/// The pictures of a draw that raced the scanout: the lines above a split still `late`'s, from it on `new`'s - one
+/// per split line among the lines the two differ in (the last: every such line `late`'s).
+pub fn late_splits(new: &[u32], late: &[u32], w: usize) -> Vec<Vec<u32>> {
+    let rows: Vec<usize> = (0..new.len() / w).filter(|&y| new[y * w..(y + 1) * w] != late[y * w..(y + 1) * w]).collect();
+    let mut out = vec![];
+    for (i, _) in rows.iter().enumerate() {
+        let mut p = new.to_vec();
+        for &y in &rows[..=i] {
+            p[y * w..(y + 1) * w].copy_from_slice(&late[y * w..(y + 1) * w]);
+        }
+        out.push(p);
+    }
+    out
 }
 
 /// The dialogue box animation from the dialog state (measured against the emulator's OAM, affine PA = 2048 /

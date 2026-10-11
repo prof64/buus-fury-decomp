@@ -308,6 +308,7 @@ fn main() {
         let mut presenter = wf_core::view::Presenter::default();
         let mut results: Vec<(usize, String, usize)> = vec![];
         let mut bboxes: BTreeMap<usize, [usize; 4]> = BTreeMap::new();
+        let mut hud_torn = 0usize;
         let mut pngs = 0;
         // the previous video frame's palette state (the tear rule) and the torn-accepted frames' line hashes
         let mut prev_pal: Option<Pal> = None;
@@ -350,7 +351,6 @@ fn main() {
                 let mut view = RenderView::default();
                 wf_core::view::render_view(w, &mut view);
                 let old_pal = prev_pal.replace(pal_of(&view));
-                let cur_stat: Vec<Option<u8>> = view.hud.iter().map(|h| h.stat_mark).collect();
                 if std::env::var_os("PIX_NOPRES").is_none() {
                     presenter.apply(&mut view);
                 }
@@ -411,30 +411,40 @@ fn main() {
                     }
                 }
                 let (mut class, mut n) = classify(&view, &game[i], &ours);
-                // the stat mark's new cel copied to VRAM by this frame's draw before the beam reached it (the gate's
-                // `stat_now`, tests/pixels.rs): the hardware's
-                if n > 0 {
-                    let mut v2 = view.clone();
-                    let mut changed = false;
-                    for (h, c) in v2.hud.iter_mut().zip(&cur_stat) {
-                        if h.stat_mark.is_some() && c.is_some() && h.stat_mark != *c {
-                            h.stat_mark = *c;
-                            changed = true;
-                        }
-                    }
-                    if changed {
-                        let px = renderer.render(&packs, &v2, 0, W, H).to_vec();
-                        let (c2, n2) = classify(&v2, &game[i], &px);
-                        if n2 < n {
-                            (class, n, ours) = (if n2 == 0 { "torn (hardware)".to_string() } else { c2 }, n2, px);
+                // the HUD's draw after the scanout passed its lines (`view::hud_late`: the bars, the gauge parts, the
+                // icon, the experience line, the stat mark's cel still the frame before's, down to a split line): the
+                // hardware's
+                let mut late_alt: Option<(RenderView, Vec<u32>)> = None;
+                if n > 0 && std::env::var_os("PIX_NOHUDLATE").is_none() {
+                    if let Some(v2) = prev_view.as_ref().and_then(|pv| wf_core::view::hud_late(&view, pv)) {
+                        let late = renderer.render(&packs, &v2, 0, W, H).to_vec();
+                        // (a split whose HUD pixels are the game's: the picture the other tear rules go on from)
+                        let d: Vec<usize> = (0..W * H).filter(|&j| ours[j] != late[j]).collect();
+                        let fit = wf_core::view::late_splits(&ours, &late, W).into_iter().find(|px| d.iter().all(|&j| px[j] == game[i][j]));
+                        if let Some(px) = fit {
+                            let n2 = (0..W * H).filter(|&j| px[j] != game[i][j]).count();
+                            let c2 = if n2 == 0 { "torn (hardware)".to_string() } else { classify(&view, &game[i], &px).0 };
+                            (class, n, ours) = (c2, n2, px);
+                            hud_torn += (n2 == 0) as usize;
+                        } else {
+                            // (... or the late tiles under another tear: the rules below from the late picture)
+                            late_alt = Some((v2, late));
                         }
                     }
                 }
                 // the tear rule: a palette / BG scroll change this frame - lines matching the previous frame's are the
                 // hardware's
-                if n > 0 && std::env::var_os("PIX_NOTEAR").is_none() {
-                    let mut olds = match old_pal.as_ref().filter(|p| **p != pal_of(&view)) {
-                        Some(op) => tear_candidates(&mut tear_renderer, &packs, &view, op),
+                for attempt in 0..2 {
+                    if n == 0 || std::env::var_os("PIX_NOTEAR").is_some() {
+                        break;
+                    }
+                    let (tv, base): (&RenderView, &Vec<u32>) = match (attempt, late_alt.as_ref()) {
+                        (0, _) => (&view, &ours),
+                        (_, Some((v, p))) => (v, p),
+                        _ => break,
+                    };
+                    let mut olds = match old_pal.as_ref().filter(|p| **p != pal_of(tv)) {
+                        Some(op) => tear_candidates(&mut tear_renderer, &packs, tv, op),
                         None => vec![],
                     };
                     // ("v": inside a long iteration, the picture from before its step)
@@ -457,11 +467,11 @@ fn main() {
                     // (and the energy sphere's BG0 tilemap, rewritten by the update while the screen is drawn: the lines
                     // above show the previous radius, a line itself mixes tiles - rkb_168 14-1 f51360 .. f51630)
                     let prev_sphere = prev_view.as_ref().map(|v| v.sphere.clone());
-                    let sphere_changed = prev_sphere.as_ref().is_some_and(|s| *s != view.sphere) && std::env::var_os("PIX_NOSPHERETEAR").is_none();
-                    let timer_changed = matches!((old_timer, view.timer), (Some(a), Some(b)) if a != b) && std::env::var_os("PIX_NOTIMERTEAR").is_none();
+                    let sphere_changed = prev_sphere.as_ref().is_some_and(|s| *s != tv.sphere) && std::env::var_os("PIX_NOSPHERETEAR").is_none();
+                    let timer_changed = matches!((old_timer, tv.timer), (Some(a), Some(b)) if a != b) && std::env::var_os("PIX_NOTIMERTEAR").is_none();
                     if timer_changed || sphere_changed {
                         {
-                            let mut v2 = view.clone();
+                            let mut v2 = tv.clone();
                             if timer_changed {
                                 v2.timer = old_timer;
                             }
@@ -471,13 +481,13 @@ fn main() {
                             olds.push(("t", tear_renderer.render(&packs, &v2, 0, W, H).to_vec()));
                             // (both at once: a screen_flash's palette step and the sphere's tilemap in the same frame -
                             // the lines above the split show the previous level and radius, rkb_168 f51,360 ..)
-                            if let Some(op) = old_pal.as_ref().filter(|p| **p != pal_of(&view)) {
+                            if let Some(op) = old_pal.as_ref().filter(|p| **p != pal_of(tv)) {
                                 olds.push(("u", tear_renderer.render(&packs, &with_pal(&v2, op), 0, W, H).to_vec()));
                             }
                         }
                     }
                     if !olds.is_empty() {
-                        if let Some(rows) = torn(&game[i], &ours, &olds) {
+                        if let Some(rows) = torn(&game[i], base, &olds) {
                             torn_rows.insert(k, rows);
                             class = "torn (hardware)".into();
                             n = 0;
@@ -598,7 +608,7 @@ fn main() {
         let torn_n = counted.iter().filter(|r| r.1 == "torn (hardware)").count();
         tot_torn += torn_n;
         if torn_n > 0 {
-            println!("  {name}: {torn_n} of the exact frames torn (hardware: palette rewritten while drawn)");
+            println!("  {name}: {torn_n} of the exact frames torn (hardware: palette rewritten while drawn; {hud_torn} the HUD's tiles drawn after the scanout)");
         }
         // every exact sampled frame is locked (a segment with differences too: what matches today cannot regress
         // silently); PIX_LOCK_FULL_ONLY keeps the old rule (fully exact segments only)

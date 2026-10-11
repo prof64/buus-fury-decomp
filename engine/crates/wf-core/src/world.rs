@@ -616,19 +616,6 @@ pub struct World {
     /// no keys and do not move, their animations run on (an attack ends in the idle stance) and nothing hits them;
     /// the other objects go on
     pub link_held: bool,
-    /// the HP / EP the HUD's bars show, per player slot (hp, max, ep, max): read by the HUD object's update at its
-    /// place in the object pass (`hud_sample`) - not hashed (the view's)
-    pub hud_bars: Vec<(i32, i32, i32, i32)>,
-    /// the frame of that read (another frame's: the bars show the current values)
-    pub hud_bars_at: u32,
-    /// the values at the pass's end (changed since - a script's, a menu's: the bars show the current values)
-    pub hud_end: Vec<(i32, i32, i32, i32)>,
-    /// the skill icon's grey and the EP bar's SS / SS3 gauge parts at the HUD's read (the gauges show these - a drain
-    /// or a gain later in the pass a frame late: `view::render_view`'s HUD) - and at the pass's end
-    pub hud_more: Vec<(bool, i32, i32)>,
-    pub hud_more_end: Vec<(bool, i32, i32)>,
-    /// the leader's form at that read (a form change since: the gauges show the current values)
-    pub hud_form: Vec<i32>,
     /// inside a field step, before its iteration tick (`vram::iter_ticked`: a stat-points mark made now is not
     /// drawn by this step) - not hashed (the view's)
     pub stat_step: bool,
@@ -818,12 +805,6 @@ impl World {
             link_lost: 0,
             link_error: false,
             link_held: false,
-            hud_bars: Vec::new(),
-            hud_bars_at: u32::MAX,
-            hud_end: Vec::new(),
-            hud_more: Vec::new(),
-            hud_more_end: Vec::new(),
-            hud_form: Vec::new(),
             stat_step: false,
             g: Globals {
                 last_beep: -1000,
@@ -1046,10 +1027,6 @@ impl World {
         // the field's pixel-verified drawing). The TS reference mirrors it (core/world.ts `step`).
         let live = |w: &World| -> Vec<usize> { (0..w.ents.len()).filter(|&k| !w.ents[k].removed).collect() };
         let mut c = live(self).len() as i64 - 1;
-        // (the HUD's read: in the game's list a battle's HUD sits between the player (older) and the opponents (newer:
-        // the lockstep fights' enemy, spawned after the area's HUD) - ours holds the opponents first: the HP as the
-        // pass leaves it (their hits show at once), the EP as the pass found it (the player's own gains a frame late))
-        let pre = self.bar_values();
         let get_before = self.link_get.is_some();
         while c >= 0 {
             let l = live(self);
@@ -1076,67 +1053,9 @@ impl World {
             }
             c -= 1;
         }
-        self.hud_sample();
-        for (b, p) in self.hud_bars.iter_mut().zip(pre) {
-            b.2 = p.2;
-            b.3 = p.3;
-        }
-        self.hud_end = self.bar_values();
-        self.hud_more_end = self.more_values();
         self.battle.pass_at = 0;
         crate::vram::reap(self);
         self.ents.retain(|e| !e.removed);
-    }
-
-    /// the field HUD object's place in the world list: the id the next object got when it was made (its sprite-memory
-    /// record - the area load makes it after the area's enemies and the player; an enemy that comes later is newer).
-    /// None: no record (the bars show the values the pass started with)
-    pub fn hud_stamp(&self) -> Option<u32> {
-        self.field
-            .as_ref()
-            .and_then(|f| f.vram.as_ref())
-            .and_then(|v| v.objs.iter().find(|o| o.0 == crate::vram::Owner::Hud))
-            .map(|o| o.1)
-    }
-
-    /// the HUD's update (`0x0800BCC8`) draws the bars from the HP / EP it reads at its place in the pass: a hit by an
-    /// object updated before it (newer: a later spawn, a shot) shows in that frame's picture, one by an older object
-    /// (the player's own hits, the area's first enemies) a frame later - opponent audit oa_t44_left f115 (the
-    /// emulator's enemy, newer than the HUD: the bar down in the hit's frame) against earth_2_11_3 f150 (an area
-    /// enemy: a frame later)
-    pub fn hud_sample(&mut self) {
-        self.hud_bars_at = self.frame;
-        self.hud_bars = self.bar_values();
-        self.hud_more = self.more_values();
-        self.hud_form = (0..self.players.len())
-            .map(|s| self.player_idx(s).map(|pi| self.pl_ref(pi).form).unwrap_or(-1))
-            .collect();
-    }
-    /// the HUD's skill icon grey and the SS / SS3 gauges now, per player slot (`view::render_view`'s HUD)
-    pub fn more_values(&self) -> Vec<(bool, i32, i32)> {
-        (0..self.players.len())
-            .map(|s| match self.player_idx(s) {
-                Some(pi) => {
-                    let p = self.pl_ref(pi);
-                    let alt = !crate::player::can_use_skill(self, pi, p.skill())
-                        || self.field.as_ref().is_some_and(|f| !f.combat);
-                    (alt, p.ss_gauge, (p.ss3_gauge >> 16) as i32)
-                }
-                None => (false, 0, 0),
-            })
-            .collect()
-    }
-    /// the bars' values now, per player slot
-    pub fn bar_values(&self) -> Vec<(i32, i32, i32, i32)> {
-        (0..self.players.len())
-            .map(|s| match self.player_idx(s) {
-                Some(pi) => {
-                    let p = self.pl_ref(pi);
-                    (p.hp(), p.max_hp(), p.ep(), p.max_ep())
-                }
-                None => (0, 0, 0, 0),
-            })
-            .collect()
     }
 
     /// the field's world list (0x080115B0): updated from the last object to the first by index into a list that
@@ -1226,23 +1145,12 @@ impl World {
         // runs the presentation's loop from there: the objects after it are not updated this frame (4-30's capsule:
         // the scientist's idle tick stops for that frame)
         let item_get_before = self.field.as_ref().is_some_and(|f| f.item_get.is_some()) || self.link_get.is_some();
-        // (the HUD's read of the HP / EP: `hud_sample`)
-        let hud = self.hud_stamp();
-        let mut sampled = from.is_some();
-        if hud.is_none() && !sampled {
-            self.hud_sample();
-            sampled = true;
-        }
         while c >= 0 {
             let l = live(self);
             let Some(&Some(i)) = l.get(c as usize) else {
                 c -= 1;
                 continue;
             };
-            if !sampled && hud.is_some_and(|s| self.ents[i].id < s) {
-                self.hud_sample();
-                sampled = true;
-            }
             // a purge's suspended objects are out of the list (vram.rs); a cutscene actor keeps its animation
             // (the scene drives it: segment sb 4-24, a suspended actor's idle tick runs on)
             // (the death script's modal - the leader alone, `player::ko_freeze` - leaves the actors a script it runs
@@ -1308,12 +1216,6 @@ impl World {
                 break;
             }
         }
-        // (every object was newer than the HUD; a pass cut short leaves it unread)
-        if !sampled && c < 0 {
-            self.hud_sample();
-        }
-        self.hud_end = self.bar_values();
-        self.hud_more_end = self.more_values();
         // the HUD (an early object of the area's list: updated after the actors)
         // (a cut's interrupted pass: the HUD is a later list object here, its update was done - `finish_pass_from`)
         if from.is_none() {

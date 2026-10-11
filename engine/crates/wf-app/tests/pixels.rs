@@ -121,20 +121,6 @@ fn compose(r: &mut Renderer, packs: &Packs, view: &RenderView, prev: &RenderView
     out
 }
 
-/// the stat-points mark with this frame's cel: its draw (0x0800B55C) copies the new cel's tiles to VRAM at once, so a
-/// draw made before the beam reaches the mark's lines (y 9..15) shows on this frame under last frame's OAM (as the
-/// timer's digits); `None` when the cel did not change
-pub fn stat_now(view: &RenderView, cur: &[Option<u8>]) -> Option<RenderView> {
-    let mut v = view.clone();
-    let mut changed = false;
-    for (h, c) in v.hud.iter_mut().zip(cur) {
-        if h.stat_mark.is_some() && c.is_some() && h.stat_mark != *c {
-            h.stat_mark = *c;
-            changed = true;
-        }
-    }
-    changed.then_some(v)
-}
 
 #[test]
 fn locked_segments_render_as_the_game() {
@@ -226,23 +212,27 @@ fn check_segment(repo: &std::path::Path, data: &std::sync::Arc<wf_core::content:
             let mut view = RenderView::default();
             wf_core::view::render_view(w, &mut view);
             let before = prev.replace(view.clone());
-            let cur_stat: Vec<Option<u8>> = view.hud.iter().map(|h| h.stat_mark).collect();
             presenter.apply(&mut view);
-            last_view = Some(view.clone());
+            let shown_before = last_view.replace(view.clone());
             let Some(&h) = want.get(&k) else { return };
             seen += 1;
             let new = renderer.render(packs, &view, 0, 240, 160).to_vec();
+            // the HUD's draw after the scanout passed its lines (`view::hud_late`: its tiles - the bars, the gauge
+            // parts, the icon, the experience line, the stat mark's cel - still the frame before's, down to a split
+            // line): the hardware's, as examples/pixels.rs takes it
+            let late = shown_before.as_ref().and_then(|pv| wf_core::view::hud_late(&view, pv)).map(|v| {
+                let p = renderer.render(packs, &v, 0, 240, 160).to_vec();
+                (v, p)
+            });
+            let splits = late.as_ref().map(|(_, p)| wf_core::view::late_splits(&new, p, 240)).unwrap_or_default();
             let ok = hash(&new) == h
-                || stat_now(&view, &cur_stat).is_some_and(|v| hash(&renderer.render(packs, &v, 0, 240, 160).to_vec()) == h)
+                || splits.iter().any(|p| hash(p) == h)
                 || match (masks.get(&k), before) {
-                    // (the torn lines over our picture - or over the stat mark's early-copy picture, which the board
-                    // takes first when it is closer)
+                    // (the torn lines over our picture - over a late-HUD split, or the whole late picture's own)
                     (Some(m), Some(b)) => {
                         hash(&compose(tear_renderer, packs, &view, &b, iter_view.as_ref(), &new, m)) == h
-                            || stat_now(&view, &cur_stat).is_some_and(|v| {
-                                let sn = renderer.render(packs, &v, 0, 240, 160).to_vec();
-                                hash(&compose(tear_renderer, packs, &view, &b, iter_view.as_ref(), &sn, m)) == h
-                            })
+                            || splits.iter().any(|p| hash(&compose(tear_renderer, packs, &view, &b, iter_view.as_ref(), p, m)) == h)
+                            || late.as_ref().is_some_and(|(v, p)| hash(&compose(tear_renderer, packs, v, &b, iter_view.as_ref(), p, m)) == h)
                     }
                     _ => false,
                 };
