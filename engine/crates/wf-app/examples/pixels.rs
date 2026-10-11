@@ -7,7 +7,9 @@
 //! into classes; `PIX_OUT=dir` writes `game | ours | diff` PNGs of differing frames (`PIX_MAX` per segment, 4),
 //! `PIX_FB=dir` the .fb directory, `PIX_JSON=file` the per-frame results, `PIX_LOCK=file` the pixel gate's lock
 //! (`data/segments/pixels.json`, read by `tests/pixels.rs`): every segment whose sampled frames are all exact, with
-//! each frame's hash of the game's picture.
+//! each frame's hash of the game's picture. `PIX_TEARDBG` prints, per frame the tear rule did not accept, the first
+//! line no spec explains (its pixels against ours and each candidate); `PIX_M7LINE=-1 | 1` renders every world-map
+//! ground line with the line above's | below's parameters (the "h" | "n" tears' pictures).
 
 use std::collections::BTreeMap;
 use std::io::{BufRead, Read};

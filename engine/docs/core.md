@@ -333,7 +333,9 @@ content). `tests/field.rs`: conditions, exits, determinism + clone / byte snapsh
 * *World map* (map header "3D" flag = area_00_050): the flying player (`Field.flight`: altitude 22.10, heading, speed,
   turn; A/B altitude, UP/DOWN thrust, LEFT/RIGHT turn, wrap 3584 x 2560), the 3D camera (`Flight.cam`, exposed as
   `MapView.mode7`), the 64-frame arrival fade with control, altitude triggers on the flyer's z, message triggers =
-  the bottom label (`Field.label`, `Mode7View.label`), encounters (`IfPlayerOnTop`: px distance <= 16 and |dz| < 16 px;
+  the bottom label (`Field.label` the text asked for, `label_cnt` its object's countdown, `label_drawn` the text in its
+  tiles; `Mode7View.label`), the Dragon Radar (`scene.radar`: targets, arrow / centre states from
+  `fieldworld::radar_update`; `RenderView.radar`), encounters (`IfPlayerOnTop`: px distance <= 16 and |dz| < 16 px;
   `TriggerSelf` in the field = `field::trigger_self`: defeated event + on-defeat script, object kept). Landing and the
   capsule take-off are scripts (host). Visited record: loading an area sets story flag `0x1C0 + bit` from
   `world/visited.json` (table 0x0874CA24). The map screen (SELECT, a room map of visited rooms) is UI: no core state
