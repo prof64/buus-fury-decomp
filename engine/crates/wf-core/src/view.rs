@@ -415,7 +415,18 @@ fn actor_draw(
         Some(Body::Enemy(n)) if n.gfx_now >= 0 => w.data.enemy(n.ty).and_then(|t| t.sprite).and_then(|s| w.data.sprite(s)).unwrap_or(sp),
         _ => sp,
     };
-    if let Some(sh) = sp.shadow.as_ref().filter(|sh| sh.as_str() != "shadow_0x0" && !off_screen) {
+    // a script's `set_attachment` replaced the shadow record (`vram::shadow_set`: another size, or none)
+    let set = w.field.as_ref().and_then(|f| f.vram.as_ref()).and_then(|v| v.shadow_set.iter().find(|o| o.0 == id)).map(|o| o.1);
+    let set_name = match set {
+        Some(Some(k)) => crate::vram::SHADOWS.get(k as usize).map(|s| format!("shadow_{}x{}", s.0, s.1)),
+        _ => None,
+    };
+    let shadow = match set {
+        Some(None) => None,
+        Some(Some(_)) => set_name.as_ref(),
+        _ => sp.shadow.as_ref(),
+    };
+    if let Some(sh) = shadow.filter(|sh| sh.as_str() != "shadow_0x0" && !off_screen) {
         out.sprites.push(SpriteDraw {
             entity: id,
             sheet: format!("effects/{sh}"),
@@ -443,17 +454,12 @@ fn actor_draw(
     }
 }
 
-/// The shadow's offset from the sprite header's dx / dy bytes: an enemy's shadow object takes them signed (Dabura
-/// fought in a battle: his at (-8, -4) under his feet - opponent audit oa_t12_idle; Yamu's dy 0xF8 8 px up -
-/// oa_t94), every other actor's (players, scene NPCs) unsigned - the story's Dabura (an NPC) shows none: dx 248 puts
-/// it off screen (pixel gate shipr_238_8-16 f5040 .., his dy 0xFC). Only these two sprites have a byte >= 0x80.
-fn shadow_at(w: &World, id: u32, sp: &crate::content::Sprite) -> (i32, i32) {
-    let enemy = w.find(id).is_some_and(|k| matches!(w.ents[k].body, Body::Enemy(_)));
-    if enemy {
-        (sp.shadow_off.0 as u8 as i8 as i32, sp.shadow_off.1 as u8 as i8 as i32)
-    } else {
-        sp.shadow_off
-    }
+/// The shadow's offset from the sprite header's dx / dy bytes, signed (Dabura's (-8, -4) under his feet - opponent
+/// audit oa_t12_idle, and the story's Dabura as an NPC: emulator shipr_238 8-16 f3480, his shadow OBJ at (40, 92)
+/// under his place (48, 96); Yamu's dy 0xF8 8 px up - oa_t94). Only these two sprites have a byte >= 0x80. (Where
+/// the story's Dabura shows none - f5040 .. - a script's `set_attachment` took the shadow away.)
+fn shadow_at(_w: &World, _id: u32, sp: &crate::content::Sprite) -> (i32, i32) {
+    (sp.shadow_off.0 as u8 as i8 as i32, sp.shadow_off.1 as u8 as i8 as i32)
 }
 
 fn record(w: &World, id: u32, addr: u32, x: i32, y: i32, out: &mut RenderView) {
