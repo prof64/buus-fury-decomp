@@ -342,6 +342,25 @@ fn main() {
                         for v in &w.scene.visuals {
                             eprintln!("  visual {:?} at ({}, {}) owner {} t {} cam {:?}", v.kind, v.x, v.y, v.owner, v.t, (w.cameras[0].x, w.cameras[0].y));
                         }
+                        // (PIX_SPRITES: the frame's own sprite build, front first, on screen coordinates)
+                        if std::env::var_os("PIX_SPRITES").is_some() {
+                            let (cx, cy) = (w.cameras[0].rect.x0, w.cameras[0].rect.y0);
+                            for e in w.ents.iter().filter(|e| !e.removed) {
+                                if let wf_core::world::Body::Fx(f) = &e.body {
+                                    if let wf_core::fx::Fx::Anim { id, rec, left, rate, acc, .. } = f.as_ref() {
+                                        eprintln!("  fx {:#x} ent {} rec {rec} left {left} rate {rate:#x} acc {acc:#x} busy {:?}", id, e.id, w.field.as_ref().map(|f| (f.busy, f.busy_pre_pass, f.busy_since, f.break_owed)));
+                                    }
+                                }
+                            }
+                            for e in w.ents.iter().filter(|e| !e.removed) {
+                                if let wf_core::world::Body::Pickup(p) = &e.body {
+                                    eprintln!("  pickup ent {} {:?} at ({}, {}) z {} t {} phase {:#x} spin {} counter {:#x}", e.id, p.kind, p.x >> 8, p.y >> 8, p.z >> 8, p.t, p.phase, p.spin, (p.phase as i32).wrapping_add(p.t + p.spin) & 0xFF);
+                                }
+                            }
+                            for s in &view.sprites {
+                                eprintln!("  sprite {} {:?} at ({}, {}) ent {} {:?}", s.sheet, s.frame, s.x - cx, s.y - cy, s.entity, s.effect);
+                            }
+                        }
                         eprintln!("trace {k} frame {} fc0 {} play {} menu {} anim {:?} stat {:?} boss {:?} screen {:?} fade_black {} pal {:?} dmg {:?}", w.frame, w.g.fc0, w.story.play_frames, view.menu.is_some(), view.map.as_ref().map(|m| (m.anim_frame, m.tile_frame)), (view.hud.first().map(|h| h.stat_mark), w.field.as_ref().and_then(|f| f.vram.as_ref()).map(|v| v.stat_at)), view.boss_bars, w.scene.screen, view.fade_black, view.palette_fade, view.damage_numbers);
                     }
                 }

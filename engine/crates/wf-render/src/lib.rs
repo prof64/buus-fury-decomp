@@ -573,6 +573,8 @@ impl Renderer {
 
         // screen-space OBJs (HUD, dialogue box): (priority, x, y, w, h, ARGB)
         let mut screen: Vec<(u8, i32, i32, usize, usize, Vec<u32>)> = Vec::new();
+        // the same, drawn under the world's OBJs of their priority (the last OAM entries)
+        let mut under: Vec<(u8, i32, i32, usize, usize, Vec<u32>)> = Vec::new();
         if self.ui.is_none() {
             let u = ui::Ui::load(packs);
             if let Err(e) = &u {
@@ -626,6 +628,20 @@ impl Renderer {
             for &(k, mx, my) in &view.markers {
                 if let Some(px) = u.marker(k) {
                     screen.push((0, gx + mx, gy + my, 8, 8, px));
+                }
+            }
+            // emote balloons: 8x8 OBJs at their world place (on the GBA screen from -7: 0x080163E6's rectangle)
+            for ev in &view.emotes {
+                let (sx, sy) = (ev.x - cx, ev.y - cy);
+                if !(-7..GBA_W).contains(&sx) || !(-7..GBA_H).contains(&sy) {
+                    continue;
+                }
+                if let Some(px) = u.emote(ev.kind, ev.cel) {
+                    if ev.front {
+                        screen.push((ev.priority, ev.x - vx, ev.y - vy, 8, 8, px));
+                    } else {
+                        under.push((ev.priority, ev.x - vx, ev.y - vy, 8, 8, px));
+                    }
                 }
             }
             // boss HP bars: OAM x 160 (two 32x8 OBJs), priority 1; anchored to the view's top-right corner
@@ -726,6 +742,11 @@ impl Renderer {
                 if view.sphere.is_some() && prio == bg0 {
                     let sp = view.sphere.as_ref().unwrap();
                     self.draw_sphere(m, sp, cx + shake.0, cy + shake.1, vx, vy);
+                }
+            }
+            for (p, x, y, sw, sh, px) in &under {
+                if *p == prio {
+                    self.draw_argb(px, *sw, *sh, *x, *y);
                 }
             }
             // OBJs of this priority, last OAM entry first

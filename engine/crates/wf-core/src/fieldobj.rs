@@ -349,9 +349,16 @@ pub fn breakable_message(w: &mut World, k: usize, msg: &mut HitMsg) -> bool {
     }
     b.broken = true;
     let bx = b.bx;
+    let prop = b.prop;
     let id = w.ents[k].id;
+    // the breaking hit (0x0800C99A): the bound prop's draw flag (+0x1C) cleared at once, a smoke puff (the generic
+    // effect 0x0802A81C: run 0x086FD9D0, layer 0x38 - sorted with the actors by its y) at the box centre, then the
+    // 16-frame timer to the callback (whose loot script makes the explosion cloud) - emulator, HFIL 18-10's boulder
+    // (rj_back1 f187: the rock's OAM entry gone, the white puff's first cel; the explosion 0x08712FDC at f203)
+    hide_prop(w, prop);
     let rate = 0x1000 + w.rng.rand(0x1000);
-    crate::fx::explosion(w, (bx[0] + bx[2]) >> 1, (bx[1] + bx[3]) >> 1, rate);
+    let e = crate::fx::fx_anim(w, 0x086f_d9d0, (bx[0] + bx[2]) >> 1, (bx[1] + bx[3]) >> 1, 0, 4, rate);
+    crate::fx::set_sorted(w, e);
     let at = w.frame + 16;
     if let Some(f) = w.field.as_mut() {
         f.deferred.push(Deferred::Break { at, entity: id });
@@ -416,6 +423,18 @@ pub fn run_deferred(w: &mut World) {
     }
 }
 
+/// a breakable's bound prop no longer drawn (its +0x1C flag): the field's prop, and a script's record of it - a prop
+/// a script showed (HFIL 18-10: the boulder swapped in by the area's trigger) would come back with `sync_props`
+fn hide_prop(w: &mut World, prop: i32) {
+    let loads = w.field.as_ref().map(|f| f.loads);
+    if let Some(p) = w.field.as_mut().and_then(|f| f.props.get_mut(prop.max(0) as usize)) {
+        p.visible = false;
+    }
+    for sp in w.scene.props.iter_mut().filter(|sp| sp.id == prop && Some(sp.load) == loads) {
+        sp.visible = false;
+    }
+}
+
 /// `0x0800C628`: loot position (centre x, bottom y), loot velocity = the last hit direction << 8, the grids under the
 /// box walkable again, the breakable gone, then the def's callback (usually the loot script s497)
 fn break_done(w: &mut World, id: EntityId) {
@@ -425,14 +444,8 @@ fn break_done(w: &mut World, id: EntityId) {
     };
     let (obj, bx, dir, prop) = (b.obj, b.bx, b.last_dir, b.prop);
     w.ents[k].removed = true;
-    // the bound map prop goes with it (it was still drawn: frontend objects_breakable_drops_8_1)
-    if let Some(p) = w
-        .field
-        .as_mut()
-        .and_then(|f| f.props.get_mut(prop.max(0) as usize))
-    {
-        p.visible = false;
-    }
+    // (the bound map prop went with the breaking hit; kept for a break made without one)
+    hide_prop(w, prop);
     if let Some(c) = w.col.as_mut() {
         c.mark_both(bx, 1);
     }
@@ -1080,7 +1093,8 @@ pub fn debris_end_before(w: &mut World, id: u32) {
     }
 }
 
-/// the chips' motion (+1 / +2 per frame on the velocity, INFERRED as acceleration away from the centre and down)
+/// the chips' motion (update 0x0800C4A6: the velocity + (1, 2) - right and down, whatever its sign - then the position
+/// by it; emulator, HFIL 18-10 f187: the first hit's chips 25 updates on at vx 121 / -71, vy 114 / -14)
 pub fn debris_step(w: &mut World) {
     // (the frame a break's callback event takes: no object is updated, see fx::update)
     if w.field
@@ -1093,10 +1107,14 @@ pub fn debris_step(w: &mut World) {
     let Some(f) = w.field.as_mut() else { return };
     for _ in 0..1 + twice as i32 {
         for d in f.debris.iter_mut() {
-            d.x += d.vx;
-            d.y += d.vy;
-            d.vx += d.vx.signum();
-            d.vy += 2;
+            // (a chip made in this frame's pass is past the pass: it moves from the next frame on - emulator, 18-10
+            // f162 / f163: 0x20 updates left and still at the centre, then 0x1F one step out)
+            if d.t > 0 {
+                d.vx += 1;
+                d.vy += 2;
+                d.x += d.vx;
+                d.y += d.vy;
+            }
             d.t += 1;
         }
     }

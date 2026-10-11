@@ -77,6 +77,8 @@ pub struct RenderView {
     /// A script's markers (`0x9E` / `0x9F`, object 0x08050690): 8x8 OBJs at screen (x, y) (origin applied), priority
     /// 0; kind 0 = A (def 0x08055000), 1 = B (0x0805500C: the world map's destination star)
     pub markers: Vec<(u8, i32, i32)>,
+    /// Emote balloons over actors' heads (script `emote` 0x5A / 0x5B, object vtable 0x0804A298).
+    pub emotes: Vec<EmoteView>,
     /// Screen brightness fade: 0 = normal, 16 = black (GBA BLDY semantics, applied after composition).
     pub fade_black: u8,
     /// The dialogue box, if one is open (drawn above everything, like the game's priority-0 OBJs).
@@ -352,6 +354,7 @@ impl RenderView {
         self.sphere = None;
         self.timer = None;
         self.damage_numbers.clear();
+        self.emotes.clear();
         self.title.clear();
         self.banner = None;
         self.world_map = None;
@@ -521,6 +524,21 @@ pub struct DamageNumberView {
     pub enemy: bool,
     /// the screen shake's pixels at its build (`wf-core` `obj_shake_baked`): the OBJ is drawn that much up-left
     pub shake: (i32, i32),
+}
+
+/// An emote balloon (draw 0x08016428): one 8x8 OBJ (256 colours) at world (x, y), cel `cel` of strip `kind`
+/// (`ui/images/emote_*.png`: 0 sparkle, 1 bubble, 2 marks, 3 heart, 4 drop), its actor's priority.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub struct EmoteView {
+    /// the balloon object's key (the same balloon across frames)
+    pub id: u32,
+    pub kind: u8,
+    pub cel: u8,
+    pub x: i32,
+    pub y: i32,
+    pub priority: u8,
+    /// drawn over the world's sprites of its priority (else under them)
+    pub front: bool,
 }
 
 /// A script's title text (see `RenderView::title`).

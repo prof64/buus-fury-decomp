@@ -905,6 +905,7 @@ fn field_from_ram(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
         }
     }
     import_death_effects(w, ram, notes);
+    import_prop_flags(w, ram);
     import_breakables(w, ram, notes);
     import_player_blasts(w, ram);
     import_rocks(w, ram);
@@ -3095,6 +3096,28 @@ fn import_death_effects(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
         let d = (due, wf_core::world::EntityId::MAX, ty, ram.s32(o + 8), ram.s32(o + 0xC), ram.s32(o + 0x10), ram.s32(o + 0x14));
         if let Some(f) = w.field.as_mut() {
             f.pending_drops.push(d);
+        }
+    }
+}
+
+/// the map props' draw flags as the cut has them (prop object vt 0x0804BA78: +0x14's low half its index in the map's
+/// list, +0x1C the flag its draw check 0x0800CF42 and a breakable's grid marks read; a breakable holds its prop out
+/// of the world list at +0x2C): what the area's scripts set before the cut - HFIL 18-10's boulder stands as prop 13
+/// (breakable) with the solid look-alike prop 12 hidden, the map's records the other way round (rj_back1 18-10)
+fn import_prop_flags(w: &mut World, ram: &GbaRam) {
+    let mut objs: Vec<u32> = ram.objects();
+    let bound: Vec<u32> = objs.iter().filter(|&&o| ram.r32(o) == 0x0804_CE00).map(|&o| ram.r32(o + 0x2C)).collect();
+    objs.extend(bound);
+    let Some(f) = w.field.as_mut() else { return };
+    for o in objs.into_iter().filter(|&o| ram.valid(o) && ram.r32(o) == 0x0804_BA78) {
+        let (k, on) = ((ram.r32(o + 0x14) & 0xFFFF) as usize, ram.r32(o + 0x1C) != 0);
+        if let Some(p) = f.props.get_mut(k) {
+            if p.visible != on {
+                p.visible = on;
+                for sp in w.scene.props.iter_mut().filter(|sp| sp.id == k as i32 && sp.load == f.loads) {
+                    sp.visible = on;
+                }
+            }
         }
     }
 }

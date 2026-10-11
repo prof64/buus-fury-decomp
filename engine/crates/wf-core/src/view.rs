@@ -283,13 +283,18 @@ pub fn draw_key(w: &World, i: usize) -> (i32, i32, u32) {
 /// segment harness compares with the game's (animation, cel, facing) - a player / NPC by its animation state (a
 /// script's puppet first for a player), an enemy / hand by its animation index and time
 pub fn actor_cel(w: &World, i: usize) -> Option<(u16, bool, Option<(i32, i32)>)> {
-    let pick = |sp: &crate::content::Sprite, raw: i32, frame: i32, facing: u8| {
+    let hand = matches!(w.ents[i].body, Body::Hand(_));
+    actor_step(w, i).map(|s| (s.frame, s.flip, if hand { None } else { s.attach }))
+}
+
+/// the animation step [`actor_cel`] shows (its frame record's box too: an emote's place)
+fn actor_step(w: &World, i: usize) -> Option<&crate::content::AnimStep> {
+    fn pick(sp: &crate::content::Sprite, raw: i32, frame: i32, facing: u8) -> Option<&crate::content::AnimStep> {
         sp.anim_raw(raw).or_else(|| sp.anim_raw(1)).and_then(|an| {
             let st = an.steps(facing);
             st.get((frame.max(0) as usize).min(st.len().saturating_sub(1)))
-                .map(|s| (s.frame, s.flip, s.attach))
         })
-    };
+    }
     match &w.ents[i].body {
         Body::Player(p) => {
             // the player state's animation (a script's commands reach it too: `player::script_pose`, the frame-range
@@ -329,13 +334,7 @@ pub fn actor_cel(w: &World, i: usize) -> Option<(u16, bool, Option<(i32, i32)>)>
                 .and_then(|s| w.data.sprite(s))
                 .and_then(|sp| h.a.anim.and_then(|k| sp.anims.get(k as usize)))
                 .and_then(|a| {
-                    a.step_index_at(h.a.facing, h.a.anim_t, false).map(|k| {
-                        (
-                            a.steps(h.a.facing)[k].frame,
-                            a.steps(h.a.facing)[k].flip,
-                            None,
-                        )
-                    })
+                    a.step_index_at(h.a.facing, h.a.anim_t, false).map(|k| &a.steps(h.a.facing)[k])
                 })
         }
         _ => None,
@@ -832,6 +831,33 @@ fn render_view_with(w: &World, link: Option<&LinkDraw>, out: &mut RenderView) {
             _ => None,
         })
         .collect();
+    // the emote balloons (draw check 0x080163E6 / draw 0x08016428): the actor's place (its vtable +0x38, 0x0800FFA2:
+    // x + the sprite header's byte +8 - 8, y + the shown frame record's box top), cel = age >> 3
+    out.emotes = w
+        .scene
+        .visuals
+        .iter()
+        .filter_map(|v| {
+            let crate::scene::VisualKind::Emote(k) = v.kind else { return None };
+            let i = w.find(v.owner)?;
+            let a = w.actor(i)?;
+            let sp = a.sprite.and_then(|s| w.data.sprite(s))?;
+            let top = actor_step(w, i).and_then(|s| s.fbox).map_or(0, |b| b[1]);
+            Some(wf_view::EmoteView {
+                id: v.vid,
+                kind: k as u8,
+                cel: (v.t >> 3) as u8,
+                x: a.px() + sp.foot.0 - 8,
+                y: a.py() + top,
+                priority: 3,
+                // (the balloon never sets its sort keys - 0x08052EE0's layer +8 / depth +4 are what the heap block held:
+                // layer 4 / 14 in front of every actor, 78 / 177 / 214 behind them all, 56 with a smaller depth behind
+                // its own actor, on the emulator - so its place among the sprites is not derivable; in front here: the
+                // pixel board's sampled frames, 163 gained / 18 lost in front, 131 / 4 behind)
+                front: true,
+            })
+        })
+        .collect();
     out.sphere = w.scene.visuals.iter().find(|v| v.kind == crate::scene::VisualKind::EnergySphere).map(|v| wf_view::SphereView {
         x: v.x,
         y: v.y,
@@ -937,6 +963,12 @@ fn render_view_with(w: &World, link: Option<&LinkDraw>, out: &mut RenderView) {
             .into_iter()
             .map(|(k, l, d)| ((l, d, 0), None, k)),
     );
+    // (and a breakable's debris chips, the list's newest objects)
+    order.extend(
+        crate::fieldview::debris_keys(w)
+            .into_iter()
+            .map(|(k, d)| ((0, d, 0xC000_0000 + k as u32), None, crate::fieldview::DEBRIS_BASE + k)),
+    );
     // (the game sorts the frame's draw array with an unstable quicksort - 0x080115B0 / 0x080531A4, median of three,
     // comparator 0x08052EE0 - over the drawable world-list objects from the list's last to its first; an equal key
     // comes out where the partitions leave it, which depends on every object in the array: the emulator's arrays
@@ -978,12 +1010,16 @@ fn render_view_with(w: &World, link: Option<&LinkDraw>, out: &mut RenderView) {
         merged.extend(rest);
         order = merged;
     }
-    // field: the debris chips, the item-get icon (front-most), then the actors and props
+    // field: the item-get icon (front-most), then the actors, props and debris chips
     crate::fieldview::front(w, out);
     // OAM order: front-most first
     for &(_, ent, prop) in order.iter().rev() {
         let Some(i) = ent else {
-            crate::fieldview::prop(w, prop, out);
+            if prop >= crate::fieldview::DEBRIS_BASE {
+                crate::fieldview::debris(w, prop - crate::fieldview::DEBRIS_BASE, out);
+            } else {
+                crate::fieldview::prop(w, prop, out);
+            }
             continue;
         };
         let e = &w.ents[i];
@@ -1917,6 +1953,7 @@ pub struct Presenter {
         Vec<wf_view::TitleView>,
         Vec<wf_view::DamageNumberView>,
         Vec<(u8, i32, i32)>,
+        Vec<wf_view::EmoteView>,
     )>,
     prev_mode7: Option<wf_view::Mode7View>,
     prev_shake: Option<(i32, i32)>,
@@ -1939,6 +1976,7 @@ impl Presenter {
             v.title,
             v.damage_numbers,
             v.markers,
+            v.emotes,
         ));
     }
     /// the session started mid-area (harnesses): nothing of the previous build to show
@@ -1946,10 +1984,17 @@ impl Presenter {
         *self = Presenter::default();
     }
     pub fn apply(&self, out: &mut RenderView) {
-        if let Some((sprites, hud, banner, dialog, anim, boss_bars, timer, title, nums, marks)) = &self.prev {
+        if let Some((sprites, hud, banner, dialog, anim, boss_bars, timer, title, nums, marks, emotes)) = &self.prev {
             // (an OBJ: a frame late)
             out.title = title.clone();
             out.markers = marks.clone();
+            // (an emote balloon's OAM entry too; its cel's tiles are copied to sprite memory in its draw, at once:
+            // db7_001 14-2 f281 .. f320, the 40-frame sparkle a frame after its object, each cel on its own frame)
+            let now = std::mem::take(&mut out.emotes);
+            out.emotes = emotes
+                .iter()
+                .map(|e| wf_view::EmoteView { cel: now.iter().find(|c| c.id == e.id).map_or(e.cel, |c| c.cel), ..*e })
+                .collect();
             // (damage numbers too: dr4_009 15-9 f316, made at f315)
             // (but a number already shown takes a later hit's sum at once: the hit redraws its digit tiles in sprite
             // memory, the OAM is unchanged - opponent audit oa_t01_left f8 .., the Annihilator's flame: the game's

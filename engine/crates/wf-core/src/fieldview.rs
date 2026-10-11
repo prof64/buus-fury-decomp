@@ -239,8 +239,6 @@ pub fn prop(w: &World, k: usize, out: &mut RenderView) {
 
 /// the debris chips and the item-get icon (priority 2, rising 1 px per 16 frames above the player)
 pub fn front(w: &World, out: &mut RenderView) {
-    // a link fight's item-get: the same icon over the fighter holding the prize's supply
-    // (to the frame its fighter goes idle: link recording dojo_px3 lf 3,493, the icon gone)
     if let Some(g) = w.link_get.as_ref().filter(|g| g.left > 0) {
         if let (Some(pi), Some(item)) = (w.player_idx(g.slot as usize), g.supply) {
             let a = &w.pl_ref(pi).a;
@@ -265,16 +263,22 @@ pub fn front(w: &World, out: &mut RenderView) {
             );
         }
     }
-    for d in f.debris.iter().filter(|d| d.t < 32) {
-        put(
-            out,
-            0,
-            "effects/debris".into(),
-            0,
-            d.x >> 8,
-            d.y >> 8,
-            3,
-            SpriteEffect::None,
-        );
+}
+
+/// the first draw-order index of the debris chips (`debris_keys`; the props' are below it)
+pub const DEBRIS_BASE: usize = 1 << 20;
+
+/// a breakable's debris chips in the draw order: world-list objects (0x0800C454: layer 0x38, their depth set by
+/// the draw check 0x0800C4DA to their y) sorted with the actors and props - behind the rock they chip off while it
+/// stands (emulator, HFIL 18-10 f163 ..: depths 64 .. 76 against the boulder's 80). Returned as (chip, depth on the
+/// actors' y scale)
+pub fn debris_keys(w: &World) -> Vec<(usize, i32)> {
+    let Some(f) = w.field.as_ref() else { return vec![] };
+    f.debris.iter().enumerate().map(|(k, d)| (k, (d.y >> 8) - 4)).collect()
+}
+
+pub fn debris(w: &World, k: usize, out: &mut RenderView) {
+    if let Some(d) = w.field.as_ref().and_then(|f| f.debris.get(k)) {
+        put(out, 0, "effects/debris".into(), 0, d.x >> 8, d.y >> 8, 3, SpriteEffect::None);
     }
 }
