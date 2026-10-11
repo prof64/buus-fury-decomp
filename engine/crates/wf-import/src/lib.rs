@@ -1877,7 +1877,7 @@ fn import_waves(w: &mut World, ei: usize, ram: &GbaRam, o: u32) {
         // (+0x44: 0 growing, 1 pulling back after a wall / its life, 2 pulling back after a hit - both retract 4 a
         // frame from the tail, ours is mode 1: tour castle_ship_42, a wave in mode 2 from 0x20 gone at f8)
         let mode = if ram.s32(b + 0x44) != 0 { 1 } else { 0 };
-        let kind = wf_core::shots::ShotKind::EnergyWave { len: ram.s32(b + 0x40), mode, life: ram.s32(b + 0x1C) };
+        let kind = wf_core::shots::ShotKind::EnergyWave { len: ram.s32(b + 0x40), mode, life: ram.s32(b + 0x1C), depth: ram.s32(b + 4) };
         let mut s = wf_core::shots::Shot::new(me, ram.r8(b + 0x10) & 3, 0, ram.s32(b + 0x20) << 8, ram.s32(b + 0x24) << 8, kind);
         s.t = ram.s32(b + 0x14) as i64;
         wf_core::shots::add(w, s);

@@ -200,6 +200,15 @@ pub fn draw_key(w: &World, i: usize) -> (i32, i32, u32) {
             // (the robots' flame 0x080246B4 too: behind the player it burns - opponent audit oa_t01_left f7 ..: the
             // first flame hidden behind Goku's head, then his red hit flash over the flames)
             let ki = ki || matches!(&s.kind, ShotKind::Flame { .. });
+            // the energy wave 0x08049C98 (the soldiers' / turrets' growing beam): layer 0x38 too, its depth set once
+            // by its constructor (0x0802A340: +8 = 0x38, +4 = the start y, + 0x2C when fired down; emulator sort keys
+            // oa_t17_above f119 .. f128: 279 throughout = 235 + 44, oa_t16_below f42: 305) - under the player's halo
+            // it reaches, behind a soldier below
+            let wave_low = match &s.kind {
+                ShotKind::EnergyWave { depth, .. } => Some(*depth),
+                _ => None,
+            };
+            let ki = ki || wave_low.is_some();
             (
                 if matches!(s.kind, ShotKind::DarkSphere { .. }) {
                     2
@@ -211,6 +220,8 @@ pub fn draw_key(w: &World, i: usize) -> (i32, i32, u32) {
                 // (a star at its thrower's depth sorts behind it - the new object at an equal key: oa_t4e_above f128)
                 if matches!(&s.kind, ShotKind::Straight(o) if o.name == SName::Star) {
                     s.py() - 5
+                } else if let Some(y) = wave_low {
+                    y - 4
                 } else if ki {
                     s.py() - 4
                 } else {
