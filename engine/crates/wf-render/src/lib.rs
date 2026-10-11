@@ -636,6 +636,12 @@ impl Renderer {
                     screen.push((0, gx + mx, gy + my, 8, 8, px));
                 }
             }
+            // the Dragon Radar: a 32x32 OBJ at (8, 8) under its five pieces, priority 1; anchored top-left
+            if let Some((dir, centre)) = view.radar {
+                if let Some(px) = u.radar(dir, centre) {
+                    screen.push((1, 8, 8, 32, 32, px));
+                }
+            }
             // boss HP bars: OAM x 160 (two 32x8 OBJs), priority 1; anchored to the view's top-right corner
             for bb in &view.boss_bars {
                 if let Some(px) = u.boss_bar(bb.fill) {

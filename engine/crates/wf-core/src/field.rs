@@ -1717,6 +1717,9 @@ pub fn pre_step(w: &mut World) {
             f.label_drawn = f.label.unwrap_or(0);
         }
     }
+    if w.scene.radar.is_some() && w.field.as_ref().is_some_and(|f| !f.busy) {
+        crate::fieldworld::radar_update(w);
+    }
     let pos: Vec<(i32, i32)> = (0..w.players.len())
         .filter_map(|s| w.player_idx(s))
         .map(|i| (w.pl_ref(i).a.x, w.pl_ref(i).a.y))

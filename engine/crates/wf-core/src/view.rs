@@ -821,6 +821,8 @@ fn render_view_with(w: &World, link: Option<&LinkDraw>, out: &mut RenderView) {
         });
         out.world_map = Some(wm);
     }
+    // the Dragon Radar: an object of the 3D map
+    out.radar = w.scene.radar.as_ref().filter(|_| crate::fieldworld::flying(w)).map(|r| (r.dir, r.centre));
     // the BG sphere effect (its tiles are drawn in the update, before the objects)
     // the script markers: screen positions less the def's origin ((1, 1) / (3, 3))
     out.markers = w
@@ -1919,6 +1921,7 @@ pub struct Presenter {
         Vec<wf_view::DamageNumberView>,
         Vec<(u8, i32, i32)>,
     )>,
+    prev_radar: Option<Option<([u8; 4], u8)>>,
     prev_mode7: Option<wf_view::Mode7View>,
     prev_shake: Option<(i32, i32)>,
 }
@@ -1929,6 +1932,7 @@ impl Presenter {
         render_view(w, &mut v);
         self.prev_mode7 = v.map.as_ref().and_then(|m| m.mode7.clone());
         self.prev_shake = v.map.as_ref().map(|m| m.shake);
+        self.prev_radar = Some(v.radar);
         self.prev = Some((
             v.sprites,
             v.hud,
@@ -1951,6 +1955,9 @@ impl Presenter {
             // (an OBJ: a frame late)
             out.title = title.clone();
             out.markers = marks.clone();
+            if let Some(r) = self.prev_radar {
+                out.radar = r;
+            }
             // (damage numbers too: dr4_009 15-9 f316, made at f315)
             // (but a number already shown takes a later hit's sum at once: the hit redraws its digit tiles in sprite
             // memory, the OAM is unchanged - opponent audit oa_t01_left f8 .., the Annihilator's flame: the game's

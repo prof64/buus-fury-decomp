@@ -1229,9 +1229,28 @@ pub enum VisualKind {
     KiBlast,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Radar {
     pub targets: Vec<(i32, i32)>,
+    /// the four arrows' states (object vtable 0x0804B400 +0x15: behind, ahead, left, right; 0 near .. 2 far / none)
+    /// and the centre's (+0x19), set by its update (`fieldworld::radar_update`)
+    #[serde(default = "radar_far")]
+    pub dir: [u8; 4],
+    #[serde(default = "radar_far1")]
+    pub centre: u8,
+}
+
+fn radar_far() -> [u8; 4] {
+    [2; 4]
+}
+fn radar_far1() -> u8 {
+    2
+}
+
+impl Default for Radar {
+    fn default() -> Radar {
+        Radar { targets: vec![], dir: [2; 4], centre: 2 }
+    }
 }
 
 // ---------------------------------------------------------------------------------------------------------------

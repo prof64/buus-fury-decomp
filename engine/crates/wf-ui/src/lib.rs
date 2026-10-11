@@ -121,6 +121,24 @@ pub fn extract(rom: &Rom, out: &mut Content) -> wf_rom::Result<()> {
         }
     }
     out.put("ui/hud/markers.png", mk.png(&pal, true));
+    // the Dragon Radar (`show_radar` 0xAB, object 0x0802B9A8, draw 0x0802BB40; 8bpp OBJ tiles): the 32x32 base at
+    // 0x08753008, the centre's three 16x16 states at 0x08753408 (0x100 each), the ahead / behind arrow's three 16x8
+    // at 0x08753708 (0x80 each), the side arrow's three 8x16 at 0x08753888. One sheet: the base at (0, 0), the
+    // centres at (32 + 16 k, 0), the ahead arrows at (32 + 16 k, 16), the side arrows at (80 + 8 k, 0)
+    let mut rd = Surface::new(104, 32);
+    let mut obj = |at: u32, tw: u32, th: u32, x0: u32, y0: u32| {
+        for (o, &c) in rom.bytes(at, (tw * th * 64) as usize).iter().enumerate() {
+            let (t, p) = (o as u32 / 64, o as u32 % 64);
+            rd.set((x0 + (t % tw) * 8 + p % 8) as i32, (y0 + (t / tw) * 8 + p / 8) as i32, c);
+        }
+    };
+    obj(0x0875_3008, 4, 4, 0, 0);
+    for k in 0..3u32 {
+        obj(0x0875_3408 + 0x100 * k, 2, 2, 32 + 16 * k, 0);
+        obj(0x0875_3708 + 0x80 * k, 2, 1, 32 + 16 * k, 16);
+        obj(0x0875_3888 + 0x80 * k, 1, 2, 80 + 8 * k, 0);
+    }
+    out.put("ui/hud/radar.png", rd.png(&pal, true));
     // the boss HP bar (draw 0x08019658): base 0x200 bytes at 0x087196E4 (8 tiles 8x8 8bpp: two 32x8 OBJs); fill f
     // clears steps f..53 to colour 1 (4 byte offsets each at 0x087198E4 + 16 step); row f of the sheet = fill f
     let base = rom.bytes(0x0871_96E4, 0x200).to_vec();

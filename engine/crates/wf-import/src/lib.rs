@@ -903,6 +903,16 @@ fn field_from_ram(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
             // (the camera object caches the altitude of its last pitch: the pitch stays until z changes)
             fl.zc = Some(fl.z);
         }
+        // the Dragon Radar's object (vtable 0x0804B400): +0x1C the target count, +0x20.. the targets (x, y), +0x15 the
+        // arrows' states, +0x19 the centre's
+        if let Some(o) = ram.objects().into_iter().find(|&o| ram.r32(o) == 0x0804_B400) {
+            let n = ram.r32(o + 0x1C).min(15);
+            w.scene.radar = Some(wf_core::scene::Radar {
+                targets: (0..n).map(|k| (ram.s32(o + 0x20 + 8 * k), ram.s32(o + 0x24 + 8 * k))).collect(),
+                dir: [ram.r8(o + 0x15).min(2), ram.r8(o + 0x16).min(2), ram.r8(o + 0x17).min(2), ram.r8(o + 0x18).min(2)],
+                centre: ram.r8(o + 0x19).min(2),
+            });
+        }
         // the bottom label's object (vtable 0x0804D8C8): +0x10 its countdown, +0x14 the string drawn, +0x18 asked for
         if let Some(o) = ram.objects().into_iter().find(|&o| ram.r32(o) == 0x0804_D8C8) {
             if let Some(f) = w.field.as_mut() {
@@ -918,6 +928,7 @@ fn field_from_ram(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     import_rocks(w, ram);
     import_coins(w, ram);
     import_emotes(w, ram);
+    import_markers(w, ram);
     // the camera as the field left it (`return_to_field` puts the saved one back)
     w.scene.cam.mode = wf_core::scene::CamMode::Player;
     wf_core::battle::set_camera(w, 0, ram.s32(CAM), ram.s32(CAM + 4));
@@ -2723,6 +2734,27 @@ fn import_cam_pan(w: &mut World, ram: &GbaRam) {
     }
     if hit {
         wf_core::battle::set_camera(w, 0, ram.s32(CAM), ram.s32(CAM + 4));
+    }
+}
+
+/// a script's markers alive at the cut (`spawn_marker_a` / `_b`, ctor 0x08050690, vt 0x0804BA50: +0x20 / +0x24 the
+/// position, +0x28 the picture's record - 0x08055000 the star, 0x0805500C the other, +0xC the tile handle, 0x40
+/// bytes): our marker visuals (rkb_014 0-50, a cut on the world map with the destination's star on its mini-map -
+/// ours had none through the segment)
+fn import_markers(w: &mut World, ram: &GbaRam) {
+    use wf_core::scene::{Visual, VisualKind};
+    for o in ram.objects().into_iter().filter(|&o| ram.r32(o) == 0x0804_BA50) {
+        let kind = match ram.r32(o + 0x28) {
+            0x0805_5000 => VisualKind::MarkerA,
+            0x0805_500C => VisualKind::MarkerB,
+            _ => continue,
+        };
+        let (x, y) = (ram.s32(o + 0x20), ram.s32(o + 0x24));
+        if w.scene.visuals.iter().any(|v| v.kind == kind && (v.x, v.y) == (x, y)) {
+            continue;
+        }
+        let vid = w.next_serial();
+        w.scene.visuals.push(Visual { kind, x, y, owner: 0, t: 0, life: -1, vid });
     }
 }
 
@@ -5369,6 +5401,17 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
                 owners.push((h, Owner::Ent(w.ents[k].id)));
             }
             continue;
+        }
+        // a script's marker (vt 0x0804BA50, `import_markers`): its block belongs to the marker visual at its position
+        if vt == 0x0804_BA50 {
+            let h = ram.r16(o + 0xC);
+            let (x, y) = (ram.s32(o + 0x20), ram.s32(o + 0x24));
+            if let Some(vid) = w.scene.visuals.iter().find(|v| matches!(v.kind, wf_core::scene::VisualKind::MarkerA | wf_core::scene::VisualKind::MarkerB) && v.vid != 0 && (v.x, v.y) == (x, y) && !owners.iter().any(|ow| ow.1 == Owner::Visual(v.vid))).map(|v| v.vid) {
+                if h != 0xFFFF {
+                    owners.push((h, Owner::Visual(vid)));
+                    continue;
+                }
+            }
         }
         // an emote bubble (vt 0x0804A298, `import_emotes`): its block belongs to the emote visual at its position
         if vt == 0x0804_A298 {
