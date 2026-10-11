@@ -166,15 +166,16 @@ pub fn draw_key(w: &World, i: usize) -> (i32, i32, u32) {
             // down its layer is 0x37, in front - skill audit sa_f21_skill4)
             // (the player's blasts only: an enemy's Energy Blast is another object, in front of the actors - pixel
             // gate sb_010_20_04 f150, Pui Pui's blast over the explosion clouds)
-            // (an Energy Blast fired up is in front again, over an explosion cloud - pixel gate earth_2_10_2 f690:
-            // Gohan's blast up the screen over the cloud of the one before)
+            // (fired up too: layer 0x38, depth its y on the emulator - Desert tour_desert_c f1265 .., Goten's blast up
+            // at a rock: depth 101, its impact behind his head; the pixel board 91 sampled frames more exact, none
+            // fewer - earth_2_10_2 f690 with them)
             // (an enemy's blast of the player's class 0x0804B454 - `shots::ki_blast`, the KiBlast node - is sorted the
             // same: Pikkon's behind his arm, emulator sort node layer 0x38 depth y; opponent audit oa_t5b_idle f273)
             let by_player = w.find(s.owner).is_some_and(|k| matches!(w.ents[k].body, Body::Player(_)))
                 || matches!(&s.kind, ShotKind::Straight(o) if o.name == SName::KiBlast && o.fx_end == 16 && !o.fragile);
             let ki = mz_up
                 || (by_player
-                    && matches!(&s.kind, ShotKind::Straight(o) if (o.name == SName::KiBlast && s.dir != 1) || (o.name == SName::Burning && s.dir != 0)))
+                    && matches!(&s.kind, ShotKind::Straight(o) if o.name == SName::KiBlast || (o.name == SName::Burning && s.dir != 0)))
                 // (the ninja star 0x0804BAA0: layer 0x38, depth its y - behind a ninja throwing it down at an equal
                 // depth; opponent audit oa_t4e_above f128)
                 || matches!(&s.kind, ShotKind::Straight(o) if o.name == SName::Star)

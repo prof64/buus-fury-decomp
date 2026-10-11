@@ -3109,7 +3109,8 @@ fn import_prop_flags(w: &mut World, ram: &GbaRam) {
     let bound: Vec<u32> = objs.iter().filter(|&&o| ram.r32(o) == 0x0804_CE00).map(|&o| ram.r32(o + 0x2C)).collect();
     objs.extend(bound);
     let Some(f) = w.field.as_mut() else { return };
-    for o in objs.into_iter().filter(|&o| ram.valid(o) && ram.r32(o) == 0x0804_BA78) {
+    // (0x0804D1E4: the map's first prop, the same fields)
+    for o in objs.into_iter().filter(|&o| ram.valid(o) && matches!(ram.r32(o), 0x0804_BA78 | 0x0804_D1E4)) {
         let (k, on) = ((ram.r32(o + 0x14) & 0xFFFF) as usize, ram.r32(o + 0x1C) != 0);
         if let Some(p) = f.props.get_mut(k) {
             if p.visible != on {
