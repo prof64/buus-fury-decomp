@@ -2,9 +2,9 @@
   "note": "audit gate (engine/crates/wf-app/tests/audits.rs): the scenarios that are not exact - [first frame with a state difference, count, first frame whose picture differs, count]; every other scenario is locked exact. Re-made by `AUDIT_RATCHET=write cargo test --release -p wf-app --test audits`",
   "scenarios": 462,
   "frames": 215555,
-  "exact": 298,
+  "exact": 302,
   "state_differences": 33310,
-  "picture_frames": 42360,
+  "picture_frames": 40002,
   "ratchet": {
     "oa_t00_ko": [
       6,
@@ -246,47 +246,23 @@
       235,
       191
     ],
-    "oa_t2f_above": [
-      null,
-      0,
-      2,
-      359
-    ],
-    "oa_t2f_below": [
-      null,
-      0,
-      2,
-      359
-    ],
-    "oa_t2f_idle": [
-      null,
-      0,
-      2,
-      599
-    ],
     "oa_t2f_ki": [
       266,
       100,
-      2,
-      364
+      266,
+      100
     ],
     "oa_t2f_ko": [
       7,
       344,
-      2,
-      364
-    ],
-    "oa_t2f_left": [
-      null,
-      0,
-      2,
+      7,
       359
     ],
     "oa_t2f_punch": [
       415,
       11,
-      2,
-      424
+      415,
+      11
     ],
     "oa_t31_ko": [
       6,

@@ -370,6 +370,13 @@ fn setup(t: &Value) -> Setup {
             .position(|e| matches!(&e.body, Body::Enemy(x) if x.parent == 0))
         {
             wf_core::enemy::unmark_self(w, ei);
+            // the recording's enemy has its type's own spawn record's graphics (re/buu/forcespawn.py `own_record`,
+            // the record's +0x10): the Hooligan's is gfx 141 (sprite 132), not its type's first id (70, the
+            // Criminal's sheet, which a battle spawns it with) - the only audited type where the two differ
+            if w.en_ref(ei).ty == 0x2f {
+                let dd = Arc::clone(&w.data);
+                w.en(ei).a.set_sprite(&dd, Some(141 - 9));
+            }
             {
                 let e = w.en(ei);
                 e.a.x = i(&ie["x"]) as i32;
