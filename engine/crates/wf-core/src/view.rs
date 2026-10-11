@@ -686,7 +686,8 @@ fn render_view_with(w: &World, link: Option<&LinkDraw>, out: &mut RenderView) {
             height: fl.cam[2],
             heading: fl.cam[3],
             pitch: fl.cam[4],
-            label: f.label.map(|l| l as i32),
+            label: (f.label_cnt != 0).then_some(f.label_drawn as i32),
+            label_drawn: f.label_drawn as i32,
         })
     });
     // the map's clock: the camera object's counter (0x030019A4 +0x40, +1 per map update 0x080092BC - every field
@@ -2012,6 +2013,11 @@ impl Presenter {
             });
         }
         if let (Some(wm), Some(c)) = (out.world_map.as_mut(), self.prev_mode7.clone()) {
+            // (the label's OBJs are the previous build's - there or not; its tiles hold what its update drew since:
+            // dr4_072 15-1 f599 the first message, on screen from f600 with its text; shipr_001 7-1 f539 -> f541)
+            if let Some(m) = out.map.as_mut().and_then(|m| m.mode7.as_mut()) {
+                m.label = c.label.map(|_| m.label_drawn);
+            }
             wm.bg_camera = Some(c);
         }
     }

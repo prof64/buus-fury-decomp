@@ -323,7 +323,12 @@ impl Renderer {
                     continue;
                 }
                 let (pa, pc, x0, y0) = if line >= HORIZON_LINE as i32 {
-                    f.bg_cam.scanline(&d, line as usize)
+                    // (`m7_line`: another line's registers. The line above's, not rewritten, have moved on by PB / PD:
+                    // the handler stores the table's 32-bit PA / PC over PA+PB / PC+PD, so they are the signs, 0 or -1)
+                    let other = if line < 160 { (line + self.m7_line).max(HORIZON_LINE as i32) } else { line };
+                    let (pa, pc, x0, y0) = f.bg_cam.scanline(&d, other as usize);
+                    let kept = (line - other).max(0);
+                    (pa, pc, x0.wrapping_add((pa >> 16) * kept), y0.wrapping_add((pc >> 16) * kept))
                 } else {
                     // above the table: the last values written (all -1), PB = PD = -1 per line
                     (-1, -1, -1 - line.max(0), -1 - line.max(0))

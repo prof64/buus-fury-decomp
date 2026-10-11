@@ -903,6 +903,14 @@ fn field_from_ram(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
             // (the camera object caches the altitude of its last pitch: the pitch stays until z changes)
             fl.zc = Some(fl.z);
         }
+        // the bottom label's object (vtable 0x0804D8C8): +0x10 its countdown, +0x14 the string drawn, +0x18 asked for
+        if let Some(o) = ram.objects().into_iter().find(|&o| ram.r32(o) == 0x0804_D8C8) {
+            if let Some(f) = w.field.as_mut() {
+                f.label_cnt = ram.r8(o + 0x10);
+                f.label_drawn = ram.s32(o + 0x14) as i64;
+                f.label = (f.label_cnt != 0 || ram.s32(o + 0x18) != 0).then_some(ram.s32(o + 0x18) as i64);
+            }
+        }
     }
     import_death_effects(w, ram, notes);
     import_breakables(w, ram, notes);

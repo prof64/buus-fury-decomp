@@ -8,7 +8,7 @@ use wf_view::Mode7View;
 
 fn v7(c: &serde_json::Value) -> Mode7View {
     let g = |i: usize| c[i].as_i64().unwrap() as i32;
-    Mode7View { x: g(0), y: g(1), height: g(2), heading: g(3), pitch: g(4), label: None }
+    Mode7View { x: g(0), y: g(1), height: g(2), heading: g(3), pitch: g(4), label: None, label_drawn: 0 }
 }
 
 fn main() {

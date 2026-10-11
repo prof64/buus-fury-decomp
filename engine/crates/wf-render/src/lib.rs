@@ -185,6 +185,13 @@ pub struct Renderer {
     /// The area-name banner (`ui/banner.json`); `Some(None)` = content missing.
     banner: Option<Option<banner::Banner>>,
     pub blend_math: BlendMath,
+    /// The world map's ground with every line showing another line's BG2 parameters (0 = its own). -1, the line
+    /// above's: its HBlank handler (`0x08008098`) was not run - the game's interrupt dispatcher drops it when the
+    /// sound DMA's interrupt arrives with it (IF 0x602). +1, the line below's: the sound interrupt came inside the
+    /// dispatcher, the handler ran a line late, read the next line's VCOUNT and wrote that line's row while this one
+    /// was still being drawn. Which lines depends on the sound timer's phase against the beam, not on game state: only
+    /// the picture checks use it, per line (the pixel board's "h" / "n" tear specs). 0 in the app.
+    pub m7_line: i32,
     /// world-map data per map id (mode7.rs)
     mode7: HashMap<String, Option<Arc<wf_content::mode7::Mode7Data>>>,
     strings: Option<Vec<String>>,
@@ -332,6 +339,7 @@ impl Renderer {
             flash: None,
             banner: None,
             blend_math: BlendMath::default(),
+            m7_line: 0,
             mode7: HashMap::new(),
             strings: None,
             menu: None,

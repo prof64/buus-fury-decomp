@@ -409,6 +409,9 @@ pub struct Mode7View {
     pub pitch: i32,
     /// the bottom label's string id (message triggers 0x17), None = none
     pub label: Option<i32>,
+    /// the string the label's tiles hold, shown or not (its OBJs are a frame late, its tiles are not:
+    /// `Presenter::apply`)
+    pub label_drawn: i32,
 }
 
 /// Which pixels of a sprite sheet to draw.

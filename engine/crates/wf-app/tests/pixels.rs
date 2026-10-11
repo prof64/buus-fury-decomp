@@ -43,6 +43,17 @@ fn with_prev(view: &RenderView, from: &RenderView, pal: bool, scroll: bool) -> R
     o
 }
 
+/// the world map's label with the text its tiles held a frame before (its update draws the new one while the screen
+/// is drawn: examples/pixels.rs "t")
+fn prev_label(v: &mut RenderView, prev: &RenderView) {
+    let old = prev.map.as_ref().and_then(|m| m.mode7.as_ref()).map(|m| m.label_drawn);
+    if let (Some(l), Some(m)) = (old, v.map.as_mut().and_then(|m| m.mode7.as_mut())) {
+        if m.label.is_some() {
+            m.label = Some(l);
+        }
+    }
+}
+
 /// a torn frame from our pictures and the lock's line specs: "" the new line, "v" the picture before the running
 /// iteration's step, "k" black (a fade to black's last step before a long iteration), "o" / "s" / "b" the line with the
 /// previous palette / BG scroll / both, else a hex mask of the pixels showing the previous palette ("o"'s picture)
@@ -63,8 +74,14 @@ fn compose(r: &mut Renderer, packs: &Packs, view: &RenderView, prev: &RenderView
                         }
                         // (the energy sphere's tilemap is rewritten during the frame too: its previous radius)
                         v.sphere = prev.sphere.clone();
+                        prev_label(&mut v, prev);
                         v
                     }
+                    // a world-map ground line with the line above's ("h") / below's ("n") BG2 parameters - the line's
+                    // HBlank handler not run / run a line late (the sound DMA's interrupt, `Renderer::m7_line`); "j" /
+                    // "m" under the previous palette
+                    "h" | "n" => view.clone(),
+                    "j" | "m" => with_prev(view, prev, true, false),
                     // both at once: the previous timer / sphere and the previous palette (a screen_flash's step in
                     // the same frame as the sphere's tilemap - examples/pixels.rs "u")
                     "u" => {
@@ -73,11 +90,19 @@ fn compose(r: &mut Renderer, packs: &Packs, view: &RenderView, prev: &RenderView
                             v.timer = prev.timer;
                         }
                         v.sphere = prev.sphere.clone();
+                        prev_label(&mut v, prev);
                         with_prev(&v, prev, true, false)
                     }
                     _ => with_prev(view, prev, true, false),
                 };
-                r.render(packs, &v, 0, 240, 160).to_vec()
+                r.m7_line = match l {
+                    "h" | "j" => -1,
+                    "n" | "m" => 1,
+                    _ => 0,
+                };
+                let px = r.render(packs, &v, 0, 240, 160).to_vec();
+                r.m7_line = 0;
+                px
             })
             .clone()
     };
@@ -88,13 +113,17 @@ fn compose(r: &mut Renderer, packs: &Packs, view: &RenderView, prev: &RenderView
             "" => {}
             // (the late present of a fade to black's last step: the line black)
             "k" => out[rg].iter_mut().for_each(|p| *p = 0xFF00_0000),
-            "o" | "s" | "b" | "v" | "t" | "u" => {
+            "o" | "s" | "b" | "v" | "t" | "u" | "h" | "j" | "n" | "m" => {
                 let l: &'static str = match m.as_str() {
                     "o" => "o",
                     "s" => "s",
                     "v" => "v",
                     "t" => "t",
                     "u" => "u",
+                    "h" => "h",
+                    "j" => "j",
+                    "n" => "n",
+                    "m" => "m",
                     _ => "b",
                 };
                 let p = pic(r, l);
