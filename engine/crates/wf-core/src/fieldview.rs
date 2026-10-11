@@ -216,6 +216,16 @@ pub fn prop(w: &World, k: usize, out: &mut RenderView) {
         None => def.rect,
     };
     let Some(frame) = def.frame else { return };
+    // the prop's draw check (0x0800CF42): its rect against the camera's rect without the screen shake (0x030019A4
+    // +0x18; the OAM is placed with the shaken position +0x28) - a prop just off the screen is not drawn though the
+    // shake's offset brings its edge onto it (emulator, HFIL 18-10 f163 .. f170: the right column's props, the
+    // rect's x1 582 against their 584, under the punch's (3, 3) shake)
+    if w.field.is_some()
+        && !w.cameras.is_empty()
+        && w.cameras.iter().all(|c| rect.x1 <= c.rect.x0 || rect.x0 >= c.rect.x1 || rect.y1 <= c.rect.y0 || rect.y0 >= c.rect.y1)
+    {
+        return;
+    }
     let (mut dx, mut dy) = (0, 0);
     for e in &w.ents {
         if let Body::Breakable(b) = &e.body {

@@ -588,6 +588,10 @@ fn actor_mut(w: &mut World, i: usize) -> Option<&mut Actor> {
 /// SetAnim(id) (actor vtable +0x28) with a script anim id, including the state's enter (idle: a random tick, one
 /// RNG draw; punches: SFX 50 + rand(2))
 pub fn set_state(w: &mut World, i: usize, id: i32) {
+    // (the state's enter writes the draw layer: 0x38 - `Actor::layer`)
+    if let Some(a) = actor_mut(w, i) {
+        a.layer = 0x38;
+    }
     if matches!(w.ents[i].body, Body::Player(_)) {
         make_puppet(w, i);
         // a new state replaces a frame-range animation the player was playing (s464: play_anim_frames(0, 17, ..)
@@ -620,6 +624,9 @@ pub fn set_state(w: &mut World, i: usize, id: i32) {
 
 /// SetPose (vtable +0x30): state `id`'s animation frozen on `frame`
 pub fn set_pose(w: &mut World, i: usize, id: i32, frame: i32) {
+    if let Some(a) = actor_mut(w, i) {
+        a.layer = 0x38;
+    }
     if matches!(w.ents[i].body, Body::Player(_)) {
         make_puppet(w, i);
         crate::player::script_pose(w, i, id.clamp(0, 24) as usize, frame);
@@ -2299,6 +2306,9 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
             if let Some(i) = i {
                 if let Body::Npc(n) = &mut w.ents[i].body {
                     n.byte8 = *v;
+                }
+                if let Some(a) = actor_mut(w, i) {
+                    a.layer = *v as u8;
                 }
             }
         }

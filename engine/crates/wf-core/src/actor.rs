@@ -33,6 +33,14 @@ pub struct Actor {
     pub flash_map: i8,
     /// cosmetic opacity in 1/256
     pub alpha: i32,
+    /// the draw layer (object +8; 0x38 unless a script's `set_actor_byte8` changed it): the sort's first key, lower
+    /// in front, and - its bits 4 .. 5 - the OBJ priority (0x24: priority 2, over the BGs the actors stand behind)
+    #[serde(default = "plain_layer")]
+    pub layer: u8,
+}
+
+fn plain_layer() -> u8 {
+    0x38
 }
 
 fn no_map() -> i8 {
@@ -64,6 +72,7 @@ impl Default for Actor {
             flash: 0,
             flash_map: -1,
             alpha: 256,
+            layer: 0x38,
         }
     }
 }

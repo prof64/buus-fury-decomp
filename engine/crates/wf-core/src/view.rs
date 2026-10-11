@@ -276,6 +276,11 @@ pub fn draw_key(w: &World, i: usize) -> (i32, i32, u32) {
         Body::Hand(_) => 0x7fff_ffff - e.id.min(0x7fff_ffff),
         _ => e.id | 0x8000_0000,
     };
+    // (an actor on a layer of its own - a script's `set_actor_byte8`: ours = 0x38 - the game's)
+    let layer = match w.actor(i) {
+        Some(a) if a.layer != 0x38 => 0x38 - a.layer as i32,
+        _ => layer,
+    };
     (layer, depth, tie)
 }
 
@@ -351,6 +356,9 @@ fn actor_draw(
     let Some(sp) = a.sprite.and_then(|s| w.data.sprite(s)) else {
         return;
     };
+    // the OBJ priority: the layer byte's bits 4 .. 5 (0x0800E0xx's OAM build, as the emote's 0x0801645A: 0x38 -> 3; a
+    // script's 0x24 -> 2 - Airship 12-25's deck crew over the deck's BG, emulator db5_019 f330)
+    let prio = (a.layer >> 4) & 3;
     // the hit flash (0x0800E8E6): the tiles through colour-index map counter >> 2 (2 = the red ramp) while the
     // counter runs (`ui/hit_flash.json`; sb_007 6-9 f19380: Super Buu red under Gohan's Kamehameha)
     // (the map the last tick set: a hit's 12 shows the earlier map until its first tick - sb_006 6-6 f24179 ..
@@ -377,7 +385,7 @@ fn actor_draw(
                 },
                 x: a.px() + hx,
                 y: a.py() + a.z + hy,
-                priority: 3,
+                priority: prio,
                 mirror: false,
                 effect: SpriteEffect::None,
             });
@@ -388,7 +396,7 @@ fn actor_draw(
             frame: FrameSel::Frame { index, flip },
             x: a.px(),
             y: a.py() + a.z,
-            priority: 3,
+            priority: prio,
             mirror: false,
             effect,
         });
@@ -400,6 +408,13 @@ fn actor_draw(
     let fp = crate::geom::Rect::new(a.px(), a.py(), a.px() + a.foot_w, a.py() + a.foot_h);
     let off_screen = !w.cameras.is_empty()
         && w.cameras.iter().all(|c| fp.x1 <= c.shown.x0 || fp.x0 >= c.shown.x1 || fp.y1 <= c.shown.y0 || fp.y0 >= c.shown.y1);
+    // an enemy whose graphics set a node swapped keeps the shadow it was made with (the shadow record is taken in the
+    // actor's constructor): a Mechanoid rolled into its ball (set 179, header shadow 16 x 6) shows the walker's 10 x 4
+    // - emulator, Airship 12-19: its shadow OBJ on the same tiles as Goten's (rclose_012 f210)
+    let sp = match w.find(id).map(|k| &w.ents[k].body) {
+        Some(Body::Enemy(n)) if n.gfx_now >= 0 => w.data.enemy(n.ty).and_then(|t| t.sprite).and_then(|s| w.data.sprite(s)).unwrap_or(sp),
+        _ => sp,
+    };
     if let Some(sh) = sp.shadow.as_ref().filter(|sh| sh.as_str() != "shadow_0x0" && !off_screen) {
         out.sprites.push(SpriteDraw {
             entity: id,
@@ -411,7 +426,7 @@ fn actor_draw(
             // (offset by the header's shadow dx / dy: Super Janemba's at (8, 8) - OAM, real route 18-14)
             x: a.px() + shadow_at(w, id, sp).0,
             y: a.py() + shadow_at(w, id, sp).1,
-            priority: 3,
+            priority: prio,
             mirror: false,
             // an enemy's shadow going up off the screen is dropped while fewer than 5 of its OBJ's rows are on screen
             // (the emulator, opponent audit oa_t4e_above f170 .. f182: a ninja walking up off the screen shows its 16x8

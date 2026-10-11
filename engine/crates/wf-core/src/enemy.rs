@@ -370,6 +370,12 @@ impl Enemy {
             events,
         };
         self.ea.enter(&ar.rules, raw, r, &mut h);
+        // the state objects' enters write the draw layer (object +8): 0x38 (0x0800DE60 / 0x0800DEE8 / the idle's
+        // 0x0800DFBE), the loop state 0x03001B48's 0x24 (0x0800DEDC) - a script's `set_actor_byte8` lasts to the
+        // next state (emulator, Airship 12-25: the deck crew's 0x24 from f306 to their first move at f511)
+        if ar.rules[r as usize].kind != crate::eanim::RuleKind::Keep {
+            self.a.layer = if ar.generic.get("0x03001B48") == Some(&r) { 0x24 } else { 0x38 };
+        }
     }
     /// IsAnim(id) (vfunc +0x34, 0x0800FAC6): the state object is SetAnim(id)'s and the raw matches (a forced rule or a
     /// node's own state object is not)
