@@ -72,11 +72,29 @@ def main():
                         ups.append(dict(form=form, old=old, new=new, max_hp=mh, max_ep=me, points=pts, rng=list(seed),
                                         after=dict(hp=e.r16(REC + 0x16), max_hp=e.r16(REC + 0x18), ep=e.r16(REC + 0x1A), max_ep=e.r16(REC + 0x1C),
                                                    points=e.r16(REC + 0x2C))))
+    # the level cap: the routine on Goku's record with the XP set first - just under level 200's threshold, at it
+    # (level 200: the level check is skipped, the XP still counts), far past it, and at the 32-bit word's end (the add
+    # wraps); `level` = the game's level function 0x080135D2 on the record after
+    T = 0x086B7084
+    t199, t200 = e.r32(T + 4 * 149), e.r32(T + 4 * 150)
+    cap = []
+    for name, x0, amount in (('199 small', t199 + 5, 7), ('199 to the threshold - 1', t200 - 8, 7), ('200 small', t200, 7),
+                             ('200 big', t200 + 123, 1_000_000_000), ('200 huge', t200, 0x7FFFFFFF), ('200 wrap', 0xFFFFFF00, 0x200),
+                             ('past 200 small', t200 + 5_000_000, 99_999)):
+        e.load(st)
+        call(e, 0x08013C66, (REC, 0, 0, 0))
+        e.w32(REC + 0x24, x0)
+        before = dict(hp=e.r16(REC + 0x16), max_hp=e.r16(REC + 0x18), points=e.r16(REC + 0x2C))
+        call(e, 0x08013914, (REC, amount, 0, 0))
+        after = dict(hp=e.r16(REC + 0x16), max_hp=e.r16(REC + 0x18), points=e.r16(REC + 0x2C))
+        lv = call(e, 0x080135D2, (REC, 0, 0, 0)) & 0xFF
+        cap.append(dict(name=name, xp_before=x0, xp=amount, xp_after=e.r32(REC + 0x24), level=lv, same=before == after))
+        print(cap[-1])
     for c in out:
         c.pop('level', None)
         print(c)
     print(len(ups), 'level-ups', ups[0], ups[-1])
-    (ROOT / 'data' / 'buu' / 'xp_routine.json').write_text(json.dumps(dict(xp=out, level_up=ups), separators=(',', ':')) + '\n')
+    (ROOT / 'data' / 'buu' / 'xp_routine.json').write_text(json.dumps(dict(xp=out, level_up=ups, cap=cap), separators=(',', ':')) + '\n')
 
 
 if __name__ == '__main__':

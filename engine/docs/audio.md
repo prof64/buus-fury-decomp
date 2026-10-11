@@ -130,6 +130,10 @@ the default extraction (`extract_rendered`).
   sequences identical, every sample (15 s each).
   Also the Options' volumes mid-song (`volume_change`: `0x0803F18C` / `0x0803E42A` - `Driver::set_music_volume` /
   `set_sfx_volume` - up, down under a running SFX, to 0 and back, new SFX after each): identical, every sample.
+* **Items really used, and the guest's console** (`re/fifo_live.py` `item_use`: a Rice Ball and a Holy Water used on
+  the Inventory page, the capture's `HOOKS` set the bag and check the game's memory afterwards - the counts down, HP
+  60 -> 100, the boost's frames running; `link_item_get_guest`: the second linked emulator's sound through the fight's
+  supply pick-up): identical, every sample.
 * **The running game** (`tests/fifo_exact.rs` `live_game_matches_fifo_capture`, captures by `re/fifo_live.py` -
   nothing injected, the game played by keys): the pause menu opened over the area's music, its cursor, its pages (an
   item's Use, the Options' volumes changed under the music), closed; an item picked up indoors (two in a row) and in

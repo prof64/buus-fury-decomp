@@ -1495,8 +1495,14 @@ pub fn gain_xp_raw(w: &mut World, i: usize, g: i64) {
             return;
         }
     }
-    p(w, i).rec.xp += g;
+    // (the XP is a 32-bit word: the add wraps, and the level - the game's function of the XP, 0x080135D2 - with it;
+    // at level 200 the XP still counts, without a level check: the routine called in the emulator at the cap,
+    // re/buu/xp_routine.py `cap`)
+    p(w, i).rec.xp = (pr(w, i).rec.xp + g) & 0xFFFF_FFFF;
     let nl = level_of(pr(w, i).rec.xp, &w.data.xp_table);
+    if nl < pr(w, i).rec.level {
+        p(w, i).rec.level = nl;
+    }
     if nl > pr(w, i).rec.level {
         let old = pr(w, i).rec.level;
         let ch = pr(w, i).form_ref(w).char_;
@@ -1585,9 +1591,10 @@ fn component_xp(w: &mut World, c: i32, g: i64) -> bool {
     if cs.rec.hp == 0 || !flag {
         return false;
     }
-    cs.rec.xp += g;
+    cs.rec.xp = (cs.rec.xp + g) & 0xFFFF_FFFF;
     let nl = level_of(cs.rec.xp, &xt.xp_table);
     if nl <= cs.rec.level {
+        cs.rec.level = nl;
         return false;
     }
     if let Some(gr) = growth {

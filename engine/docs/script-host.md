@@ -19,7 +19,9 @@ Made exact in round 2: cutscene beams 0x46 / 0x5C / 0x5E use the game's beam obj
 `shots::KameBeam` grows while on screen, retracts, its sounds); tint 0x52 picks from the full 20-entry table;
 props 0x63-0x69 drive the area's map props (`Field.props`: visibility + rect; jump arc in 1/256 px);
 refresh_map_triggers 0x8B / respawn_breakables 0xAD (`field::refresh_triggers` / `respawn_breakables`);
-give_xp 0xC2 runs the level-up hook #3 inline (`NativeResult::RunEvent`, both runtimes) and kill-XP level-ups in
+give_xp 0xC2 (MEASURED: segments `xp_scene_one_10-14` / `xp_scene_multi_10-14`, Pilaf's Castle's plate scene on the
+emulator with the XP set for one / eight levels - records, jingle, boxes and the scene's end frame for frame)
+runs the level-up hook #3 inline (`NativeResult::RunEvent`, both runtimes) and kill-XP level-ups in
 a hosted field queue #3 (`Cause::LevelUp`); boost_stats 0xF2 / start_timed_special 0xF7 set the timed buff
 (`Player.holy_left` + `Player.boost`, `progression::recalc_stats_with`); 0xF0 is the height (field).
 
