@@ -189,7 +189,7 @@ fn live_game_matches_fifo_capture() {
         .filter_map(|e| e.file_name().to_string_lossy().strip_prefix("live_").and_then(|n| n.strip_suffix(".json")).map(String::from))
         .collect();
     names.sort();
-    assert!(names.len() >= 5, "the live captures' references: {names:?}");
+    assert!(names.len() >= 7, "the live captures' references: {names:?}");
     let mut failures = Vec::new();
     for name in &names {
         let j: serde_json::Value = serde_json::from_slice(&std::fs::read(dir.join(format!("live_{name}.json"))).unwrap()).unwrap();

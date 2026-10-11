@@ -117,6 +117,24 @@ fn xp_routine_matches_the_game() {
         wf_core::player::gain_xp(&mut w, pi, amount);
         assert_eq!(w.pl_ref(pi).rec.xp - x1, (amount * mult + 255) >> 8, "{name}: a kill's XP");
     }
+    // the level cap: the XP still counts at level 200 (no level-up), the 32-bit add wraps
+    for c in doc["cap"].as_array().unwrap() {
+        let name = c["name"].as_str().unwrap();
+        let cfg = wf_core::battle::BattleConfig { arena: "forest".into(), players: vec![wf_core::battle::FighterSetup::default()], phases: Vec::new(), rng: wf_core::battle::RngInit::Seed(1), xp: true, spawn_near: None, arena_rules: false, even_level: None };
+        let mut w = wf_core::battle::create(data.clone(), &cfg);
+        let pi = w.player_idx(0).expect("player");
+        let x0 = i(&c["xp_before"]);
+        w.pl(pi).rec.xp = x0;
+        w.pl(pi).rec.level = wf_core::progression::level_of(x0, &data.xp_table);
+        let before = (w.pl_ref(pi).rec.max_hp, w.pl_ref(pi).rec.points);
+        wf_core::player::gain_xp_raw(&mut w, pi, i(&c["xp"]));
+        let r = &w.pl_ref(pi).rec;
+        let ours = (r.xp, r.level as i64, (r.max_hp, r.points) == before);
+        let game = (i(&c["xp_after"]), i(&c["level"]), c["same"].as_bool().unwrap());
+        if ours != game {
+            bad.push(format!("cap {name}: ours {ours:?} game {game:?}"));
+        }
+    }
     eprintln!("LevelUp: {} cases, {} differ", ups.len(), bad.len());
     for b in bad.iter().take(40) {
         eprintln!("  {b}");

@@ -54,6 +54,36 @@ SEQS = {
 }
 
 
+
+
+def _items_setup(e):
+    """a Rice Ball x2 (supply 1) and a Holy Water (20) in the bag, Goku at 60 HP"""
+    from menuhelp import SUPPLIES, rec
+    for i in range(0x40):
+        e.w8(SUPPLIES + i, 0)
+    e.w8(SUPPLIES + 1, 2)
+    e.w8(SUPPLIES + 20, 1)
+    e.w16(rec(0) + 0x16, 60)
+
+
+def _items_check(e):
+    """the uses really happened: a Rice Ball gone and its 40 HP there, the Holy Water gone and its 30 s running"""
+    from menuhelp import SUPPLIES, GD, rec
+    got = (e.r8(SUPPLIES + 1), e.r8(SUPPLIES + 20), e.r16(rec(0) + 0x16), e.r32(GD + 0x4DC))
+    assert got[:3] == (1, 0, 100) and 0 < got[3] <= 1800, f'items not used: rice balls, holy waters, HP, boost frames = {got}'
+    print('items used: rice balls', got[0], 'holy waters', got[1], 'HP', got[2], 'boost frames left', got[3], flush=True)
+
+
+# NAME: (setup, check) of a SEQS capture - RAM set before it, the outcome verified in RAM after it
+HOOKS = {
+    'item_use': (_items_setup, _items_check),
+}
+# the Inventory page's Use really consuming: a Rice Ball (HP 60 -> 100) and a Holy Water (the timed boost starts),
+# the menu closed, the field's music on
+SEQS['item_use'] = ('buu_snakeway_start.ss', ['-:10'],
+                    ['-:60', 'START:2', '-:90', 'R:2', '-:70', 'A:2', '-:45', 'A:2', '-:60', 'DOWN:2', '-:30', 'A:2', '-:45',
+                     'A:2', '-:60', 'START:2', '-:200'])
+
 DATA = ROOT / 'data' / 'audio'
 DATA.mkdir(parents=True, exist_ok=True)
 
@@ -92,7 +122,11 @@ def run(name, st_file, pre, keys):
     for k in pre:
         e.set_keys(k)
         e.run(1)
+    if name in HOOKS:
+        HOOKS[name][0](e)
     start(e, name, keys)
+    if name in HOOKS:
+        HOOKS[name][1](e)
 
 
 def start(e, name, keys, feed=None, step=None):
@@ -288,14 +322,18 @@ def link_capture(name, rec, at, lead=200, frames=700):
     for k in vk[:at - lead]:
         feed(k)
         dr.step(a, b)
-    a.set_volume(0)
+    # (`guest`: the second console's sound - the frames are still the host's video frames, the pair's step)
+    e = b if LINKS[name][2:] == ('guest',) else a
+    e.set_volume(0)
     rest = vk[at - lead:at - lead + frames] + [[0, 0]] * frames
-    start(a, name, iter(rest[:frames]), feed=feed, step=lambda: dr.step(a, b))
+    start(e, name, iter(rest[:frames]), feed=feed, step=lambda: dr.step(a, b))
 
 
 # NAME: (recording, the SFX) - the link fight's supply pick-up
 LINKS = {
     'link_item_get': ('c9', 45),
+    # the same stretch as the guest's console plays it
+    'link_item_get_guest': ('c9', 45, 'guest'),
 }
 
 
@@ -308,7 +346,7 @@ def main():
             # (the linked pair's library is loaded first: a process of its own)
             import subprocess
             if len(sys.argv) == 2:
-                link(n, *LINKS[n])
+                link(n, *LINKS[n][:2])
             else:
                 subprocess.run([sys.executable, __file__, n], check=True)
         elif n in LEGS:
