@@ -129,7 +129,7 @@ fn actor_depth(a: &crate::actor::Actor) -> i32 {
     a.py() + (a.foot_h >> 1) - 4
 }
 
-fn draw_key(w: &World, i: usize) -> (i32, i32, u32) {
+pub fn draw_key(w: &World, i: usize) -> (i32, i32, u32) {
     let e = &w.ents[i];
     let (layer, depth) = match &e.body {
         Body::Player(p) => (0, actor_depth(&p.a)),
@@ -246,7 +246,14 @@ fn draw_key(w: &World, i: usize) -> (i32, i32, u32) {
             _ => (1, 0),
         },
         Body::Injector(_) | Body::Breakable(_) => (9, 0),
-        Body::Pickup(p) => (0, p.bx[3]),
+        // the loot's sort depth, as a link fight's (`link_order`): a coin's its loot point y, a dropped item's its box
+        // bottom, on the actors' scale (the game's +4 less the usual 4) - a coin in front of the item dropped with it,
+        // the small coins over the big one (the pixel board: 138 sampled frames more exact, 4 fewer)
+        Body::Pickup(p) => match &p.kind {
+            crate::fieldobj::PickupKind::Zenie(_) => (0, (p.y >> 8) - 4),
+            crate::fieldobj::PickupKind::Supply(_) | crate::fieldobj::PickupKind::Equipment(_) => (0, p.bx[3] - 4),
+            _ => (0, p.bx[3]),
+        },
         // a level sign's label is keyed to its prop (`0x0800C300`: the prop object's layer, its depth + 1 - in front
         // of the gate it names; Earth 2-90 f60)
         Body::MapSprite(m) => match m.label.filter(|l| l.1 >= 0).and_then(|l| {

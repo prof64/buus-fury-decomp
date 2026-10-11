@@ -1219,7 +1219,7 @@ pub fn update(w: &mut World, i: usize) {
             if in_wall(w, i, &r) || hit(w, i, r, atk(1), 1024, true) {
                 w.ents[i].removed = true;
                 let (px, py) = (w.shot_ref(i).px(), w.shot_ref(i).py());
-                fx::explosion(w, px, py, 0x2000);
+                fx::explosion_sorted(w, px, py, 0x2000);
             }
         }
         ShotKind::DarkSphere { .. } => sphere_update(w, i),
@@ -1759,7 +1759,7 @@ fn straight_end(w: &mut World, i: usize, explode_fx: bool) {
         if matches!(&w.shot_ref(i).kind, ShotKind::Straight(o) if matches!(o.name, SName::Gun | SName::Rifle)) {
             fx::explosion_sorted(w, px, py, 0x2000);
         } else {
-            fx::explosion(w, px, py, 0x2000);
+            fx::explosion_sorted(w, px, py, 0x2000);
         }
     }
     w.ents[i].removed = true;
@@ -3586,7 +3586,7 @@ pub fn on_message(w: &mut World, i: usize, msg: &mut HitMsg) -> bool {
                 }
                 if explode {
                     let (px, py) = (w.shot_ref(i).px(), w.shot_ref(i).py());
-                    fx::explosion(w, px, py, 0x2000);
+                    fx::explosion_sorted(w, px, py, 0x2000);
                 }
                 // (the melee's crit slot is not written by a bullet either: alone, the punch shakes the screen as a
                 // crit - opponent audit oa_t02_punch f174, the shake task's draws 0x080079F2 / 0x08007A04)

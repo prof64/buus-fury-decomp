@@ -7240,3 +7240,24 @@ as story beats / not fighters: Super Buu with Gohan absorbed (scripted glide bet
 damage), Enzyme, Blood Cell, Mini-Yakon on their own; Blister stays (his Enzymes are his attack; beatable, KO-only).
 Enemy share of the even match and the per-hit cap retuned after the app runs (Janemba hit the cap every second):
 1/16 each way, cap 1/10 of max HP (`work/ub/arena/fair_final.tsv`).
+
+*Broad sweep (2026-10-10): the picture board over every dumped story segment, and what it still shows.*
+`examples/pixels.rs` over the 494 segments with a screen dump (every 30th video frame; frames inside each segment's
+matched prefix): **21,144 / 25,644 sampled frames exact (82.5%; 1,195 of them hardware tears the tear rule explains),
+213 segments exact on every sample** - from 20,534 (80.1%, 155 segments) before this sweep. Fixed here, each measured
+by the board's gained / lost frames: a dying enemy's cloud sorted with the actors (+326 / -0; a breakable's and a
+script's stay in front: -13 when sorted), the coins' spin by their draws (`fieldobj::coin_drawn`, +149 / -5), the
+loot's sort depth as a link fight's (+138 / -4). `data/segments/pixels.json` re-made (21,144 frames locked).
+What the 4,500 differing samples are (the board's classes; a frame counts once, by its largest difference):
+* **sprites, ~2,100 frames in ~280 segments, median ~35 px**: what is left after the fixes above is mixed - a coin's
+  cel in some cases (5 known), coin shadows, a breakable rock's burst (rj_back1: the cloud's timing and its white
+  flash), a hit spark present / absent for a frame, objects of two long boss scenes (sb_041 21-25, rkb_168 14-1:
+  ~900 frames between them, their BG priority / blend effects), the world map's flyer;
+* **HUD, ~1,250**: ~570 of them in the same two boss scenes; elsewhere the HP / EP bar's last pixels for a frame
+  (the known mid-frame tear, unmodelled), the stat-points mark, the countdown's digits in the Diablo Desert Express
+  cars (2 hundredths apart on some frames: not the previous frame's value - 495 frames worse when tried);
+* **BG, ~950**: the world map's ground under the flyer (mode 7: a pixel of perspective), its place-name label a
+  frame off, a map marker missing once (db5_040), the two boss scenes;
+* **text boxes, ~260**: small (median ~20 px), mostly in the same scenes.
+Not on this board at all: the skill audit (528 scenarios) and the opponent audit (463) compare every frame but live
+in `work/` and are run by hand, not gated.
