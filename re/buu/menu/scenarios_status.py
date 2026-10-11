@@ -24,4 +24,9 @@ SCENARIOS = {
     'status_level_200': ('buu_snakeway_start.ss', lambda e: e.w32(rec(0) + 0x24, XP200), ['-:2'], ['START:1', '-:50', 'B:1', '-:60']),
     'status_level_199': ('buu_snakeway_start.ss', lambda e: e.w32(rec(0) + 0x24, XP200 - 1), ['-:2'], ['START:1', '-:50', 'B:1', '-:60']),
     'status_level_past': ('buu_snakeway_start.ss', lambda e: e.w32(rec(0) + 0x24, XP200 + 123456789), ['-:2'], ['START:1', '-:50', 'B:1', '-:60']),
+    # ... and at the 32-bit word's ends: the signed boundary, its neighbours, the last values before the wrap
+    'status_xp_7fffffff': ('buu_snakeway_start.ss', lambda e: e.w32(rec(0) + 0x24, 0x7FFFFFFF), ['-:2'], ['START:1', '-:50', 'B:1', '-:60']),
+    'status_xp_80000000': ('buu_snakeway_start.ss', lambda e: e.w32(rec(0) + 0x24, 0x80000000), ['-:2'], ['START:1', '-:50', 'B:1', '-:60']),
+    'status_xp_fffffff0': ('buu_snakeway_start.ss', lambda e: e.w32(rec(0) + 0x24, 0xFFFFFFF0), ['-:2'], ['START:1', '-:50', 'B:1', '-:60']),
+    'status_xp_ffffffff': ('buu_snakeway_start.ss', lambda e: e.w32(rec(0) + 0x24, 0xFFFFFFFF), ['-:2'], ['START:1', '-:50', 'B:1', '-:60']),
 }
