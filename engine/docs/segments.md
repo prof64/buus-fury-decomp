@@ -7261,3 +7261,35 @@ What the 4,500 differing samples are (the board's classes; a frame counts once, 
 * **text boxes, ~260**: small (median ~20 px), mostly in the same scenes.
 Not on this board at all: the skill audit (528 scenarios) and the opponent audit (463) compare every frame but live
 in `work/` and are run by hand, not gated.
+
+*The world map and the countdown (helper `worldmap-digits`, 2026-10-10).* Board 21,144 -> **21,708 / 25,644** (+564,
+none lost; 19 world-map segments 3,652 -> 4,152 of 4,715, the two boss scenes +64). What the BG class was there:
+* **the ground's "pixel of perspective"** is a tear: per frame two or three ground lines, 41 apart and rolling, show
+  a neighbour's BG2 parameters. Emulator (dbx_002 15-1 f480 / f510 / f630, stepping the frame): at such a line's
+  HBlank IF = 0x602 (HBlank + the sound FIFO DMAs) and the dispatcher `0x03000B70` returns without calling the
+  handler `0x08008098` - the next line keeps the registers, moved on by PB / PD (the handler stores the table's
+  32-bit PA / PC over PA+PB / PC+PD: -1 for a negative one); or the sound interrupt comes inside the dispatcher,
+  the handler runs in the next line, reads its VCOUNT and writes the row after it before that line is drawn - the
+  line shows the line below's. The lines follow the sound timer's phase against the beam, not game state: the
+  board's tear specs "h" (the line above's) / "n" (below's), "j" / "m" under the previous palette
+  (`Renderer::m7_line`; +429 frames).
+* **the label**: its object (vtable 0x0804D8C8: +0x10 countdown, +0x14 drawn, +0x18 asked) - a message sets 2 and
+  the text; the update (before the pass's messages, not inside an event) takes 1 and redraws a changed text into the
+  tiles at once (a slow draw: that pass runs over a frame); OBJs a frame late (dr4_072 f599 -> f600, shipr_001 f539
+  -> f541, dbx_002 f1,136 .. the landing's fade). +7; the redraw frame's old / half-copied tiles are the "t" tear.
+* **the marker missing once** was the Dragon Radar, never drawn (db5_040): object 0x0802B9A8, update 0x0802BA18,
+  draw 0x0802BB40, table 0x08752FA4 - now `scene.radar` states, `RenderView.radar`, `ui/hud/radar.png` (+8). And a
+  cut on the world map lost the script's destination star (rkb_014: `import_markers`, +18).
+* **the flyer / airships (sprites class)**: all 3D OBJs are the build before the step's - camera and positions of
+  then (+34); props before the flyer at equal depth (+4, OAM at earth_2_8_15 f300).
+* Left on the world map (20 sampled frames): a fade's palette step written while a blended line is drawn (14: one
+  to six pixels of BG0's outline with one layer's colour old, the other's new - hardware), line 56's last one to
+  three pixels on three frames whose line 57 is torn (sub-line timing of the same late handler), frame 0 of a cut
+  inside a fade (2).
+* **The countdown's digits** are right: the display always draws the current counter (`(t * 53) >> 5`), into its
+  OBJ tiles during the frame - `PIX_TIMERFIT` over the Desert Express cars (db5_020 .. db5_038, pg_xj6_025) fits
+  offset 0 or +1 (the previous frame's value = 1.66 hundredths, "2 apart") on every frame, split by rows on some;
+  emulator (stepping db5_021 f118 .. f122, db5_020 f3,148 ..): the draw `0x0802FD16` starts at scanline 24, 35, 219,
+  227, 201 - where it lands against rows 8 .. 24 is the frame's CPU time. The "t" tear already accepts it; the
+  frames still differing in those segments differ elsewhere (the HP bar's end pixels, a sprite's pixels in the
+  car). The other countdown on the board follows the same rule (rkb_008 19-3: offsets 0 / +1 on its rows).

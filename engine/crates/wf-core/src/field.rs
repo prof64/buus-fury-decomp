@@ -252,8 +252,16 @@ pub struct Field {
     pub loot: (i32, i32, i32, i32),
     /// breakable debris chips (display)
     pub debris: Vec<crate::fieldobj::Debris>,
-    /// the bottom label of the world map (message trigger 0x17 string id)
+    /// the bottom label of the world map (message trigger 0x17 string id): the text its object was last asked for
+    /// (vtable 0x0804D8C8 +0x18)
     pub label: Option<i64>,
+    /// the label object's countdown (+0x10): a message sets 2, its update (`0x0800C1BC`) takes 1; shown while not 0
+    #[serde(default)]
+    pub label_cnt: u8,
+    /// the string its surface was last drawn with (+0x14): the update that follows a message with another id draws
+    /// it (`0x0800C144`: the bar picture, the text, the tiles at once)
+    #[serde(default)]
+    pub label_drawn: i64,
     /// the world map's flying player (3D map only)
     pub flight: Option<crate::fieldworld::Flight>,
     /// the blocking item-get presentation
@@ -665,6 +673,8 @@ fn new_field() -> Field {
         item_get_rest: Vec::new(),
         debris: vec![],
         label: None,
+        label_cnt: 0,
+        label_drawn: 0,
         flight: None,
         placed: vec![],
         placed_loot: vec![],
@@ -1164,6 +1174,8 @@ pub fn load_area_with(
         f.deferred.clear();
         f.debris.clear();
         f.label = None;
+        f.label_cnt = 0;
+        f.label_drawn = 0;
         f.flight = None;
         f.patrols.clear();
         f.item_get = None;
@@ -1697,6 +1709,16 @@ pub fn arrival_idle(w: &mut World) {
 pub fn pre_step(w: &mut World) {
     if let Some(f) = w.field.as_mut() {
         f.coins_moved = false;
+        // the world map's label object (update `0x0800C1BC`, before the pass's trigger messages): its countdown, and
+        // the text asked for since its last update drawn. An event's loop does not update it (it stays as it was
+        // through a landing's fade: dbx_002 15-1 f1,136 ..)
+        if f.label_cnt != 0 && !f.busy {
+            f.label_cnt -= 1;
+            f.label_drawn = f.label.unwrap_or(0);
+        }
+    }
+    if w.scene.radar.is_some() && w.field.as_ref().is_some_and(|f| !f.busy) {
+        crate::fieldworld::radar_update(w);
     }
     let pos: Vec<(i32, i32)> = (0..w.players.len())
         .filter_map(|s| w.player_idx(s))
@@ -2828,6 +2850,7 @@ fn fire(w: &mut World, slot: usize, k: usize, t: &TriggerRt) {
         TriggerKind::Message { value, .. } => {
             if let Some(f) = w.field.as_mut() {
                 f.label = Some(value);
+                f.label_cnt = 2;
             }
         }
         // the Computer Room's computer (4-22; ctor 0x08007543, vt 0x0804C11C, activate `0x080074EC`): the

@@ -47,7 +47,7 @@ pub struct WmResult {
 
 fn v7(c: &serde_json::Value, label: Option<i32>) -> Mode7View {
     let g = |i: usize| c[i].as_i64().unwrap() as i32;
-    Mode7View { x: g(0), y: g(1), height: g(2), heading: g(3), pitch: g(4), label }
+    Mode7View { x: g(0), y: g(1), height: g(2), heading: g(3), pitch: g(4), label, label_drawn: 0 }
 }
 
 /// The flyer's sheet + frame from the capture (sprite def address, raw anim, anim step, facing).

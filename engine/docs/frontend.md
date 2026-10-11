@@ -331,17 +331,31 @@ When `MapView.mode7` is set (area 0-50), the renderer draws the game's mode-1 pi
   camera the BG table was built from (`bg_camera`), the exact flyer (position, frame), script prop visibility and
   the mini-map box. Without it the flyer is derived from the camera (exact inversion of `0x08034124`) and found
   among the view's sprites (the player sprite; other sprites are ignored on the world map).
-* Timing (emulator captures): the BG table is built from an earlier camera than the OBJs, and the flyer's frame
-  graphics (VRAM tiles, uploaded immediately) can be newer than its OAM entry (copied at the next VBlank) — the
-  simulation should fill `world_map.bg_camera` / `flyer` accordingly.
+* Timing (story picture board, 2026-10-10): everything of the picture is the build before the step's - the ground
+  table, the props, the flyer, the patrols and the mini-map's arrow all go through the camera of before the step,
+  the patrols at their positions of then (`Presenter::apply` gives `MapView.mode7` that camera and
+  `world_map.actors` those positions; at equal depth the map's props come before the patrols and the flyer, the
+  object list's order). The bottom label is the game's object: a message sets its countdown to 2 and the text asked
+  for, its update (not run inside an event) takes 1 and draws a changed text into its tiles; shown while the
+  countdown is not 0, its OBJs a frame late, its tiles not (`Field::label_cnt` / `label_drawn`,
+  `Mode7View::label_drawn`).
+* The Dragon Radar (`show_radar`, object vtable 0x0804B400; `RenderView.radar`, `ui/hud/radar.png`): a 32x32 OBJ at
+  (8, 8) under four arrows and a centre, each in one of three states from the targets' distances through the
+  heading's rotation (`fieldworld::radar_update`).
+* The ground's HBlank lines (`Renderer::m7_line`, only the picture checks use it): the game's interrupt dispatcher
+  drops a line's HBlank handler when the sound DMA's interrupt arrives with it (IF 0x602: the line shows the line
+  above's parameters, moved on by PB / PD - the sign words of PA / PC), or runs it a line late when the sound
+  interrupt comes inside the dispatcher (it reads the next VCOUNT and writes that line's row before the line is
+  drawn: the line shows the line below's). Two or three lines of every frame, 41 lines apart, rolling with the
+  sound timer's phase - not game state, so the board accepts them per line as tears ("h" / "n").
 * Zoomed-out PC view: the GBA picture is centred; the ground continues below it (scanline angles extended with
   atan), the sky's top row above it, BG0's haze sideways with its left column; the label sits on the bottom edge.
 * Parity (`tests/emulator_parity.rs` `world_map_matches_emulator`, captures from
   `crates/wf-render/re/capture_worldmap.py` in `work/frontend_wm/`): 12 scenes (start, cruise, turns, climb,
   high / low altitude, reverse, far east / north / west, spin) — ground, sky, haze, mini-map, marker, label,
   billboards, flyer, halo and shadow pixel-identical; the only differences are 0–2 whole scanlines in some
-  frames where the HBlank IRQ ran late (the line shows its neighbour's affine parameters; sound-DMA timing, not
-  modelled) and one capture taken mid label-tile upload.
+  frames where the HBlank IRQ was dropped or ran late (the line shows its neighbour's affine parameters;
+  sound-DMA timing - the "h" / "n" tears above) and one capture taken mid label-tile upload.
 
 ## 10. Gaps
 
@@ -354,9 +368,9 @@ When `MapView.mode7` is set (area 0-50), the renderer draws the game's mode-1 pi
 * Fog / wrap overlay layers and semi-transparent OBJs have no emulator scene yet (no save state on such a map).
 * Mod `index.json` regeneration is not done by the loader (listing works via `files.json` / directory walk).
 * Gamepad buttons are rebindable only through `bindings.json` (the screen rebinds keys).
-* World map: wf-core does not fill `RenderView.world_map` yet (bg camera one frame older, exact flyer + frame, prop
-  visibility from `prop_show` / `prop_hide`, the `spawn_box` mini-map rect, the story destination markers
-  `spawn_marker_a/b` — the latter are not drawn at all); HBlank-IRQ scanline jitter is not modelled.
+* World map: what is left on the story picture board is hardware timing only - a fade's palette written while a
+  blended line is drawn (a pixel of BG0's outline over the sky with one layer's colour old and the other's new),
+  and a pixel or three at the right end of line 56 on frames whose line 57 is torn.
 
 ## 11. Runtime quality (measured 2026-10-06)
 

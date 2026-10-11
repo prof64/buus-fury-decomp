@@ -265,6 +265,8 @@ pub struct Ui {
     stat_mark: Option<Indexed>,
     /// the script markers A / B, 8x8 side by side (`ui/hud/markers.png`; older content has none)
     markers: Option<Indexed>,
+    /// the Dragon Radar's pieces (`ui/hud/radar.png`, wf-ui; older content has none)
+    radar: Option<Indexed>,
     /// the boss HP bar's 54 fill levels, 64x8 each, stacked (`ui/hud/boss_bar.png`)
     boss_bar: Option<Indexed>,
     /// the choice cursor (`ui/images/cursor.png`)
@@ -416,6 +418,7 @@ impl Ui {
             frame: png(packs, "ui/hud/frame.png")?,
             stat_mark: png(packs, "ui/hud/stat_mark.png").ok(),
             markers: png(packs, "ui/hud/markers.png").ok(),
+            radar: png(packs, "ui/hud/radar.png").ok(),
             boss_bar: png(packs, "ui/hud/boss_bar.png").ok(),
             cursor: png(packs, "ui/images/cursor.png").ok(),
             ss: png(packs, "ui/hud/gauge_ss.png")?,
@@ -460,6 +463,33 @@ impl Ui {
                 }
             }
         }
+        Some(out)
+    }
+
+    /// The Dragon Radar as 32x32 ARGB (as `marker`): the base under its pieces, in OAM order the arrows behind
+    /// (15, 27; the ahead arrow v-flipped), ahead (15, 11), left (11, 15), right (27, 15; the left one h-flipped) and
+    /// the centre (15, 15) - positions less the base's (8, 8) (draw `0x0802BB40`, table 0x08752FA4)
+    pub fn radar(&self, dir: [u8; 4], centre: u8) -> Option<Vec<u32>> {
+        let im = self.radar.as_ref()?;
+        let mut out = vec![0u32; 32 * 32];
+        let mut blit = |sx: usize, sy: usize, w: usize, h: usize, dx: usize, dy: usize, hf: bool, vf: bool| {
+            for y in 0..h {
+                for x in 0..w {
+                    let (ux, uy) = (if hf { w - 1 - x } else { x }, if vf { h - 1 - y } else { y });
+                    let c = im.idx.get((sy + uy) * im.w as usize + sx + ux).copied().unwrap_or(0);
+                    if c != 0 {
+                        out[(dy + y) * 32 + dx + x] = (im.palette.get(c as usize).copied().unwrap_or(0) & 0xFF_FFFF) | (c as u32) << 24;
+                    }
+                }
+            }
+        };
+        let st = |v: u8| v.min(2) as usize;
+        blit(0, 0, 32, 32, 0, 0, false, false);
+        blit(32 + 16 * st(centre), 0, 16, 16, 7, 7, false, false);
+        blit(80 + 8 * st(dir[3]), 0, 8, 16, 19, 7, true, false);
+        blit(80 + 8 * st(dir[2]), 0, 8, 16, 3, 7, false, false);
+        blit(32 + 16 * st(dir[1]), 16, 16, 8, 7, 3, false, false);
+        blit(32 + 16 * st(dir[0]), 16, 16, 8, 7, 19, false, true);
         Some(out)
     }
 

@@ -182,6 +182,46 @@ pub fn reset_state(w: &mut World) {
     }
 }
 
+/// the Dragon Radar's update (object vtable 0x0804B400, `0x0802BA18`; before the camera's): each target (in order -
+/// a later one overwrites) seen from the camera position (>> 10) through the heading's rotation (camera +0x44, made
+/// before the objects from the heading of the pass before) sets the arrow of its larger axis to its distance, the
+/// arrows show < 100 / < 400 / further, the centre the nearest target's squared distance < 625 / < 62,500 / further
+pub fn radar_update(w: &mut World) {
+    let Some(cam) = w.field.as_ref().and_then(|f| f.flight.as_ref()).map(|f| f.cam) else { return };
+    let Some(r) = w.scene.radar.as_mut() else { return };
+    let (x, y) = (cam[0] >> 10, cam[1] >> 10);
+    let (c, s) = (c_i(cam[3]) as i32, s_i(cam[3]) as i32);
+    // (behind, ahead, left, right)
+    let mut dist = [i32::MAX; 4];
+    let mut near = i32::MAX;
+    for &(tx, ty) in &r.targets {
+        let (dx, dy) = (tx.wrapping_sub(x), ty.wrapping_sub(y));
+        let d2 = dx.wrapping_mul(dx).wrapping_add(dy.wrapping_mul(dy));
+        if d2 < near {
+            near = d2;
+        }
+        let a = c.wrapping_mul(dx).wrapping_add(s.wrapping_mul(dy)) >> 10;
+        let b = s.wrapping_neg().wrapping_mul(dx).wrapping_add(c.wrapping_mul(dy)) >> 10;
+        if a.wrapping_abs() > b.wrapping_abs() {
+            match a.signum() {
+                1 => dist[3] = a,
+                -1 => dist[2] = a.wrapping_neg(),
+                _ => (dist[2], dist[3]) = (0, 0),
+            }
+        } else {
+            match b.signum() {
+                1 => dist[0] = b,
+                -1 => dist[1] = b.wrapping_neg(),
+                _ => (dist[0], dist[1]) = (0, 0),
+            }
+        }
+    }
+    for k in 0..4 {
+        r.dir[k] = if dist[k] < 100 { 0 } else if dist[k] < 400 { 1 } else { 2 };
+    }
+    r.centre = if near < 625 { 0 } else if near < 62_500 { 1 } else { 2 };
+}
+
 /// the 3D camera (`0x08034124`, after the objects, no easing): pitch when z changed, the eye 30 px behind the flyer;
 /// the 2D camera rect follows the flyer (culling, observation)
 pub fn camera(w: &mut World) {

@@ -77,6 +77,9 @@ pub struct RenderView {
     /// A script's markers (`0x9E` / `0x9F`, object 0x08050690): 8x8 OBJs at screen (x, y) (origin applied), priority
     /// 0; kind 0 = A (def 0x08055000), 1 = B (0x0805500C: the world map's destination star)
     pub markers: Vec<(u8, i32, i32)>,
+    /// The Dragon Radar on the world map (`show_radar` 0xAB, object vtable 0x0804B400; `ui/hud/radar.png`): a 32x32
+    /// OBJ at (8, 8) under its four arrows (behind, ahead, left, right) and centre, each 0 near .. 2 far; priority 1.
+    pub radar: Option<([u8; 4], u8)>,
     /// Screen brightness fade: 0 = normal, 16 = black (GBA BLDY semantics, applied after composition).
     pub fade_black: u8,
     /// The dialogue box, if one is open (drawn above everything, like the game's priority-0 OBJs).
@@ -409,6 +412,9 @@ pub struct Mode7View {
     pub pitch: i32,
     /// the bottom label's string id (message triggers 0x17), None = none
     pub label: Option<i32>,
+    /// the string the label's tiles hold, shown or not (its OBJs are a frame late, its tiles are not:
+    /// `Presenter::apply`)
+    pub label_drawn: i32,
 }
 
 /// Which pixels of a sprite sheet to draw.

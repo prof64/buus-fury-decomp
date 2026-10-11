@@ -686,7 +686,8 @@ fn render_view_with(w: &World, link: Option<&LinkDraw>, out: &mut RenderView) {
             height: fl.cam[2],
             heading: fl.cam[3],
             pitch: fl.cam[4],
-            label: f.label.map(|l| l as i32),
+            label: (f.label_cnt != 0).then_some(f.label_drawn as i32),
+            label_drawn: f.label_drawn as i32,
         })
     });
     // the map's clock: the camera object's counter (0x030019A4 +0x40, +1 per map update 0x080092BC - every field
@@ -820,6 +821,8 @@ fn render_view_with(w: &World, link: Option<&LinkDraw>, out: &mut RenderView) {
         });
         out.world_map = Some(wm);
     }
+    // the Dragon Radar: an object of the 3D map
+    out.radar = w.scene.radar.as_ref().filter(|_| crate::fieldworld::flying(w)).map(|r| (r.dir, r.centre));
     // the BG sphere effect (its tiles are drawn in the update, before the objects)
     // the script markers: screen positions less the def's origin ((1, 1) / (3, 3))
     out.markers = w
@@ -1918,6 +1921,9 @@ pub struct Presenter {
         Vec<wf_view::DamageNumberView>,
         Vec<(u8, i32, i32)>,
     )>,
+    prev_radar: Option<Option<([u8; 4], u8)>>,
+    /// the 3D map's other actors (the patrols) before the step
+    prev_actors: Option<Vec<wf_view::FlyerView>>,
     prev_mode7: Option<wf_view::Mode7View>,
     prev_shake: Option<(i32, i32)>,
 }
@@ -1928,6 +1934,8 @@ impl Presenter {
         render_view(w, &mut v);
         self.prev_mode7 = v.map.as_ref().and_then(|m| m.mode7.clone());
         self.prev_shake = v.map.as_ref().map(|m| m.shake);
+        self.prev_radar = Some(v.radar);
+        self.prev_actors = v.world_map.as_ref().map(|wm| wm.actors.clone());
         self.prev = Some((
             v.sprites,
             v.hud,
@@ -1950,6 +1958,9 @@ impl Presenter {
             // (an OBJ: a frame late)
             out.title = title.clone();
             out.markers = marks.clone();
+            if let Some(r) = self.prev_radar {
+                out.radar = r;
+            }
             // (damage numbers too: dr4_009 15-9 f316, made at f315)
             // (but a number already shown takes a later hit's sum at once: the hit redraws its digit tiles in sprite
             // memory, the OAM is unchanged - opponent audit oa_t01_left f8 .., the Annihilator's flame: the game's
@@ -2012,6 +2023,22 @@ impl Presenter {
             });
         }
         if let (Some(wm), Some(c)) = (out.world_map.as_mut(), self.prev_mode7.clone()) {
+            // (the label's OBJs are the previous build's - there or not; its tiles hold what its update drew since:
+            // dr4_072 15-1 f599 the first message, on screen from f600 with its text; shipr_001 7-1 f539 -> f541)
+            // the 3D objects' OAM is the previous build's too - the flyer, the patrols, the mini-map's arrow: placed
+            // and scaled as they were before the step, through the camera of then (the props' and the ground's;
+            // rclose_002 4-1 f12,000, a descending airship a pixel off through this step's position)
+            if let Some(m) = out.map.as_mut().and_then(|m| m.mode7.as_mut()) {
+                let label = c.label.map(|_| m.label_drawn);
+                *m = wf_view::Mode7View { label, label_drawn: m.label_drawn, ..c.clone() };
+            }
+            if let Some(pa) = self.prev_actors.as_ref().filter(|pa| pa.len() == wm.actors.len() && pa.iter().zip(&wm.actors).all(|(a, b)| a.sheet == b.sheet)) {
+                for (a, p) in wm.actors.iter_mut().zip(pa) {
+                    (a.x, a.y, a.z) = (p.x, p.y, p.z);
+                }
+            } else if let Some(pa) = &self.prev_actors {
+                wm.actors = pa.clone();
+            }
             wm.bg_camera = Some(c);
         }
     }

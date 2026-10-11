@@ -9,7 +9,7 @@ use wf_render::mode7::{billboard, flyer_from_camera, Camera3d};
 use wf_view::Mode7View;
 
 fn view(m: &[i64]) -> Mode7View {
-    Mode7View { x: m[0] as i32, y: m[1] as i32, height: m[2] as i32, heading: m[3] as i32, pitch: m[4] as i32, label: None }
+    Mode7View { x: m[0] as i32, y: m[1] as i32, height: m[2] as i32, heading: m[3] as i32, pitch: m[4] as i32, label: None, label_drawn: 0 }
 }
 
 fn main() {

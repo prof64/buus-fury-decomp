@@ -7,7 +7,9 @@
 //! into classes; `PIX_OUT=dir` writes `game | ours | diff` PNGs of differing frames (`PIX_MAX` per segment, 4),
 //! `PIX_FB=dir` the .fb directory, `PIX_JSON=file` the per-frame results, `PIX_LOCK=file` the pixel gate's lock
 //! (`data/segments/pixels.json`, read by `tests/pixels.rs`): every segment whose sampled frames are all exact, with
-//! each frame's hash of the game's picture.
+//! each frame's hash of the game's picture. `PIX_TEARDBG` prints, per frame the tear rule did not accept, the first
+//! line no spec explains (its pixels against ours and each candidate); `PIX_M7LINE=-1 | 1` renders every world-map
+//! ground line with the line above's | below's parameters (the "h" | "n" tears' pictures).
 
 use std::collections::BTreeMap;
 use std::io::{BufRead, Read};
@@ -137,6 +139,7 @@ fn torn(game: &[u32], new: &[u32], olds: &[(&str, Vec<u32>)]) -> Option<Vec<Stri
             }
         }
         if px_o.is_none() && px_t.is_none() {
+            tear_dbg(y, g, nw, olds);
             return None;
         }
         let (mut bits, mut tbits) = (vec![0u8; W / 8], vec![0u8; W / 8]);
@@ -149,6 +152,7 @@ fn torn(game: &[u32], new: &[u32], olds: &[(&str, Vec<u32>)]) -> Option<Vec<Stri
             } else if px_t.is_some_and(|o| g[x] == o[y * W + x]) {
                 tbits[x / 8] |= 1 << (x % 8);
             } else {
+                tear_dbg(y, g, nw, olds);
                 return None;
             }
         }
@@ -161,6 +165,17 @@ fn torn(game: &[u32], new: &[u32], olds: &[(&str, Vec<u32>)]) -> Option<Vec<Stri
         masks.push(m);
     }
     any_old.then_some(masks)
+}
+
+/// PIX_TEARDBG: the first line no tear spec explains - its differing pixels against ours and each candidate
+fn tear_dbg(y: usize, g: &[u32], nw: &[u32], olds: &[(&str, Vec<u32>)]) {
+    if std::env::var_os("PIX_TEARDBG").is_some() {
+        let n = |o: &[u32]| (0..W).filter(|&x| g[x] != o[x]).count();
+        let c: Vec<String> = olds.iter().map(|(l, o)| format!("{l} {}", n(&o[y * W..(y + 1) * W]))).collect();
+        let best = olds.iter().map(|(_, o)| &o[y * W..(y + 1) * W]).chain([nw]).min_by_key(|o| n(o)).unwrap();
+        let xs: Vec<String> = (0..W).filter(|&x| g[x] != best[x]).take(12).map(|x| format!("{x}:{:06x}/{:06x}/{:06x}", g[x] & 0xFF_FFFF, best[x] & 0xFF_FFFF, nw[x] & 0xFF_FFFF)).collect();
+        eprintln!("  tear: line {y} unexplained (px off: ours {}, {}; the closest's x:game/it/ours {})", n(nw), c.join(", "), xs.join(" "));
+    }
 }
 
 fn save(p: &Path, imgs: &[&[u32]]) {
@@ -395,6 +410,8 @@ fn main() {
                     };
                     eprintln!("timerrows {name} f{k} {rows:?}");
                 }
+                // PIX_M7LINE=-1 | 1: every world-map ground line with the line above's | below's parameters (the "h" | "n" tears' pictures)
+                renderer.m7_line = std::env::var("PIX_M7LINE").ok().and_then(|v| v.parse().ok()).unwrap_or(0);
                 let mut ours = renderer.render(&packs, &view, 0, W, H).to_vec();
                 // PIX_PREVROWS: per screen line, whether the game's line is ours ('.'), the previous frame's ('p'),
                 // both ('='), or neither ('x') - a mid-frame change shows as a 'p' prefix
@@ -457,9 +474,16 @@ fn main() {
                     let prev_sphere = prev_view.as_ref().map(|v| v.sphere.clone());
                     let sphere_changed = prev_sphere.as_ref().is_some_and(|s| *s != view.sphere) && std::env::var_os("PIX_NOSPHERETEAR").is_none();
                     let timer_changed = matches!((old_timer, view.timer), (Some(a), Some(b)) if a != b) && std::env::var_os("PIX_NOTIMERTEAR").is_none();
-                    if timer_changed || sphere_changed {
+                    // (and the world map's label: its update draws a new text into its tiles while the screen is drawn
+                    // - shipr_001 7-1 f540 the whole old text, dbx_002 15-1 f870 the last letters' lower rows)
+                    let m7 = |v: &RenderView| v.map.as_ref().and_then(|m| m.mode7.clone());
+                    let old_label = prev_view.as_ref().and_then(m7).map(|m| m.label_drawn).filter(|&l| m7(&view).is_some_and(|m| m.label.is_some_and(|n| n != l)));
+                    if timer_changed || sphere_changed || old_label.is_some() {
                         {
                             let mut v2 = view.clone();
+                            if let (Some(l), Some(m)) = (old_label, v2.map.as_mut().and_then(|m| m.mode7.as_mut())) {
+                                m.label = Some(l);
+                            }
                             if timer_changed {
                                 v2.timer = old_timer;
                             }
@@ -474,7 +498,26 @@ fn main() {
                             }
                         }
                     }
+                    // ("h": a world-map ground line whose HBlank handler was not run - the sound DMA's interrupt came
+                    // with it and the dispatcher dropped it (emulator: IF 0x602 at that line's HBlank, no call of
+                    // 0x08008098) - shows the line above's BG2 parameters; "n": the sound interrupt came inside the
+                    // dispatcher, the handler ran in the next line, read its VCOUNT and wrote the row after it before
+                    // that line was drawn - the line below's parameters; "j" / "m" the same under the previous palette)
+                    if view.map.as_ref().is_some_and(|m| m.mode7.is_some()) {
+                        let op = old_pal.as_ref().filter(|p| **p != pal_of(&view)).map(|op| Pal { cameras: pal_of(&view).cameras, map: pal_of(&view).map, ..op.clone() });
+                        for (off, l, lp) in [(-1, "h", "j"), (1, "n", "m")] {
+                            tear_renderer.m7_line = off;
+                            olds.push((l, tear_renderer.render(&packs, &view, 0, W, H).to_vec()));
+                            if let Some(p) = op.as_ref() {
+                                olds.push((lp, tear_renderer.render(&packs, &with_pal(&view, p), 0, W, H).to_vec()));
+                            }
+                        }
+                        tear_renderer.m7_line = 0;
+                    }
                     if !olds.is_empty() {
+                        if std::env::var_os("PIX_TEARDBG").is_some() {
+                            eprintln!("  tear: {name} f{k} ..");
+                        }
                         if let Some(rows) = torn(&game[i], &ours, &olds) {
                             torn_rows.insert(k, rows);
                             class = "torn (hardware)".into();

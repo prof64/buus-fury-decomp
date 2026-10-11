@@ -209,6 +209,7 @@ impl Renderer {
                 }
             }
         }
+        let flyer_n = world.len();
         // the other actors (patrolling enemies), drawn the same way
         if let Some(wm) = wm {
             for a in &wm.actors {
@@ -221,6 +222,7 @@ impl Renderer {
                 }
             }
         }
+        let flyers = world.len();
         if let Some(props) = self.sheet(packs, &data.props_sheet) {
             for p in &data.props {
                 let i = p.index as u16;
@@ -242,6 +244,13 @@ impl Renderer {
                 world.push((depth, vec![M7Obj { prio: 3, x: x & 511, y: y & 255, w, h, double: true, affine: Some([s, 0, 0, s]), tex }]));
             }
         }
+        // (at equal depth the object list's order: the map's props, made at its load, before the flyer - OAM at
+        // earth_2_8_15 f300, the flyer taking off right over East District 439's house: the house first, the
+        // flyer's shadow behind it)
+        // (props, the patrols, the flyer: the order they were made in)
+        world.rotate_left(flyer_n);
+        let n = world.len() - flyer_n;
+        world[..n].rotate_left(flyers - flyer_n);
         world.sort_by_key(|(d, _)| *d);
         for (_, group) in world {
             if matrices >= 16 {
@@ -323,7 +332,12 @@ impl Renderer {
                     continue;
                 }
                 let (pa, pc, x0, y0) = if line >= HORIZON_LINE as i32 {
-                    f.bg_cam.scanline(&d, line as usize)
+                    // (`m7_line`: another line's registers. The line above's, not rewritten, have moved on by PB / PD:
+                    // the handler stores the table's 32-bit PA / PC over PA+PB / PC+PD, so they are the signs, 0 or -1)
+                    let other = if line < 160 { (line + self.m7_line).max(HORIZON_LINE as i32) } else { line };
+                    let (pa, pc, x0, y0) = f.bg_cam.scanline(&d, other as usize);
+                    let kept = (line - other).max(0);
+                    (pa, pc, x0.wrapping_add((pa >> 16) * kept), y0.wrapping_add((pc >> 16) * kept))
                 } else {
                     // above the table: the last values written (all -1), PB = PD = -1 per line
                     (-1, -1, -1 - line.max(0), -1 - line.max(0))
