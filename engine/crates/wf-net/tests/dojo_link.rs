@@ -40,7 +40,17 @@ fn check(name: &str) -> (usize, usize, Option<String>) {
     let p = common::repo().join(format!("data/link/dojo_{name}.json"));
     let doc: serde_json::Value = serde_json::from_slice(&std::fs::read(&p).unwrap()).unwrap();
     // (from the fighters' creation on: the rows before it are the setup's last frames and the load)
-    let rows: Vec<&serde_json::Value> = doc["rows"].as_array().unwrap().iter().skip_while(|r| r["p"].as_array().is_none_or(|p| p.is_empty())).collect();
+    // (`lost`: the host's last fight logic frame of a recording whose guest was reset - the rows after it are the link
+    // error's script, not the fight: wf-app tests/dojo_pixels.rs compares their pictures)
+    let lost = doc["lost"].as_i64().unwrap_or(i64::MAX);
+    let rows: Vec<&serde_json::Value> = doc["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .skip_while(|r| r["p"].as_array().is_none_or(|p| p.is_empty()))
+        // (its own row is read while the host waits in the middle of the next update: the fighters a tick on)
+        .take_while(|r| r["lf"].as_i64().unwrap_or(0) < lost)
+        .collect();
     let fd = common::field_data();
     let r = DojoRules::default();
     let pick = |k: usize| doc["pick"].get(k).and_then(|x| x.as_u64()).unwrap_or(0) as usize;
