@@ -1819,7 +1819,14 @@ fn stat_mark_frame(w: &World) -> Option<u8> {
     // (the draw counts +0x14 up once per draw - every field iteration and the menu fades' camera ticks: the camera
     // clock; measured equal to the game's counter, real route rclose_067 14-2 / shipr_227 7-2 / dr1_001 9-2)
     let it = w.field.as_ref().map(|f| f.cam_iters()).unwrap_or(0);
-    Some(((it.wrapping_sub(v.stat_at) >> 3) & 3) as u8)
+    // (a mark the HUD's update made in this frame's pass is a new object at the list's end: the pass does not reach
+    // it, its first draw is the next frame's - emulator, rfat_033 6-1 f12,449: the points written, then the HUD's
+    // 0x0800BCC8, the mark's first 0x0800B55C at f12,450 with its counter 1)
+    let c = it.wrapping_sub(v.stat_at);
+    if c == 0 {
+        return None;
+    }
+    Some(((c >> 3) & 3) as u8)
 }
 
 /// the script screen fades as the palette writes they make each update (`t` steps of `len`, l = t * 256 / len):

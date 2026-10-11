@@ -980,7 +980,8 @@ impl StoryHost {
         }
         // the game runs a frame's scripts before its objects: a HUD a script showed gets its update (the
         // stat-points mark) in the same frame, after the script's own objects (segments sb 20-2 f1574, 20-5 f5212)
-        wf_core::vram::stat_mark(&mut sess.world);
+        // (and a mark whose points a script took - a level-up hook's end - goes in it: `vram::stat_mark_update`)
+        wf_core::vram::stat_mark_update(&mut sess.world);
     }
 }
 

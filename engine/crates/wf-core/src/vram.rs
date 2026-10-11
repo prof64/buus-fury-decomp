@@ -1187,6 +1187,24 @@ pub fn stat_mark(w: &mut World) {
     }
 }
 
+/// the HUD's update and the mark's own for the current character's points: made when there are points to spend,
+/// gone when there are none (`0x0800B530`). After a frame's scripts too (`wf-import` host: the game runs them before
+/// the objects) - a level-up hook's end hands the current character back and the component's mark goes in that
+/// frame's pass (emulator, rfat_033 6-1 f27,509: current 3 -> 5, points 12 -> 0, no draw of the mark from that frame)
+pub fn stat_mark_update(w: &mut World) {
+    let points = w
+        .story
+        .chars
+        .get(w.story.levelup_char.unwrap_or(w.story.current).max(0) as usize)
+        .map(|c| c.rec.points)
+        .unwrap_or(0);
+    if points == 0 {
+        release(w, Owner::StatMark);
+    } else {
+        stat_mark(w);
+    }
+}
+
 /// one more draw of the stat-points mark outside the field's iterations: a mode that draws the object world without
 /// updating it - Watch This!'s (emulator, real route r052 6-9 f3,452 .. 3,782: the mark's counter +0x14 one up per
 /// frame, 1,747 -> 2,077, the camera's clock +0x40 still at 1,747)
@@ -1589,17 +1607,7 @@ pub fn hud_tick(w: &mut World) {
     // the HUD's update (`0x0800BCC8`) makes the stat-points mark when the leader has points to spend and there is
     // none; the mark deletes itself when the points are spent (`0x0800B530`). (GameData +0's character: a fusion
     // component's level-up hook makes the component current - its points, Gotenks 6-9 tile +6,000)
-    let points = w
-        .story
-        .chars
-        .get(w.story.levelup_char.unwrap_or(w.story.current).max(0) as usize)
-        .map(|c| c.rec.points)
-        .unwrap_or(0);
-    if points == 0 {
-        release(w, Owner::StatMark);
-    } else {
-        stat_mark(w);
-    }
+    stat_mark_update(w);
     let Some(v) = st(w) else { return };
     if v.hud_out.is_empty() {
         return;
