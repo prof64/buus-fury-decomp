@@ -5603,7 +5603,7 @@ fn import_vram(w: &mut World, ram: &GbaRam) {
         // the stat-points mark's draw counter (vt 0x0804C070 +0x14)
         let it = f.iters;
         let stat_at = ram.objects().into_iter().find(|&o| ram.r32(o) == 0x0804_C070).map(|o| it.wrapping_sub(ram.r32(o + 0x14))).unwrap_or(0);
-        f.vram = Some(VramState { a, owners, shared_rc, suspended: vec![], hud_out, popups, popup_vis, keyed, stashed: None, delayed: vec![], objs, susp: vec![], shadow_set: vec![], popup_at, pass_at: 0, stat_at });
+        f.vram = Some(VramState { a, owners, shared_rc, suspended: vec![], hud_out, popups, popup_vis, keyed, stashed: None, delayed: vec![], objs, susp: vec![], shadow_set: vec![], popup_at, pass_at: 0, stat_at, stat_pending: false });
     }
     // the objects a purge suspended (world +0x40C, `GbaRam::suspended_objects`, in suspension order): our entities at
     // their positions are out of the world too - they come back when the text box closes (run 1 cut 195,432)

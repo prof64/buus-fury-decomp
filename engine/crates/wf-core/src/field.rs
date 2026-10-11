@@ -1695,6 +1695,7 @@ pub fn arrival_idle(w: &mut World) {
 /// before the entity update: the deferred calls due (start of the world update); the item-get presentation holds the
 /// players' input
 pub fn pre_step(w: &mut World) {
+    w.stat_step = true;
     if let Some(f) = w.field.as_mut() {
         f.coins_moved = false;
     }
@@ -2350,6 +2351,7 @@ pub fn post_step(w: &mut World) {
     if let Some(f) = w.field.as_mut() {
         f.iters = f.iters.wrapping_add(1);
     }
+    crate::vram::iter_ticked(w);
 }
 
 /// `vfunc+0x74(1, 0)` (TriggerSelf, `0x0800F866`): the defeated handler without loot; the object stays (the event's

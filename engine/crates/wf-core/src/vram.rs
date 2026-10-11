@@ -399,6 +399,10 @@ pub struct VramState {
     /// iteration, a world held by a scene too - real route 14-1 f300..570)
     #[serde(default)]
     pub stat_at: u32,
+    /// the mark was made inside a field step whose iteration tick is still to come: that tick is not one of its draws
+    /// (`iter_ticked`)
+    #[serde(default)]
+    pub stat_pending: bool,
     /// the entity the object pass is updating (0 outside the pass)
     #[serde(default)]
     pub pass_at: u32,
@@ -1179,10 +1183,17 @@ pub fn stat_mark(w: &mut World) {
         .unwrap_or((false, false));
     if hud && !mark && points != 0 {
         acquire(w, Owner::StatMark, 0x100);
-        // (made in the field frame, before its iteration tick)
+        // (a new object at the list's end: the pass of the frame it is made in does not reach it, its first draw -
+        // counter 1 - is the next pass's. Made inside a field step - an area load from the pass: the HUD's first
+        // update - the step's own iteration tick is still to come and is not a draw (emulator, shipr_338 8-16 f2,611:
+        // the load, the mark's first draw at f2,656 with 1); made after it - a frame's scripts, the game's next
+        // frame's - the next tick is the first draw (shipr_238 8-16 f6,605 / f6,649; rfat_033 6-1 f12,449 / f12,450)
+        // - `iter_ticked`)
         let f = w.field.as_ref().map(|f| f.cam_iters()).unwrap_or(0);
+        let pending = w.stat_step;
         if let Some(v) = st(w) {
             v.stat_at = f;
+            v.stat_pending = pending;
         }
     }
 }
@@ -1202,6 +1213,17 @@ pub fn stat_mark_update(w: &mut World) {
         release(w, Owner::StatMark);
     } else {
         stat_mark(w);
+    }
+}
+
+/// the field step's iteration counter went up (`Field.iters`): not a draw of a stat-points mark made earlier in this
+/// step
+pub fn iter_ticked(w: &mut World) {
+    w.stat_step = false;
+    if let Some(v) = st(w) {
+        if std::mem::take(&mut v.stat_pending) {
+            v.stat_at = v.stat_at.wrapping_add(1);
+        }
     }
 }
 

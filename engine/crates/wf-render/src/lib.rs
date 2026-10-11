@@ -592,6 +592,14 @@ impl Renderer {
                         let hy = hy + hv.y_off;
                         screen.push((u.layout.hud_priority, hx, hy, 80, 16, u.hud(packs, hv)));
                         // the stat-points mark beside it (OAM x 92 = the HUD's x + 84, the HUD's y, priority 1)
+                        // (its place in OAM is not a rule: the mark's constructor leaves the object's sort keys - layer
+                        // +8, depth +4 - as the heap block held them, so it is drawn before the HUD (layer byte 1,
+                        // db7_028 14-24 f1,740), between the HUD and the world (33, db5_019 12-25 f180) or after every
+                        // world OBJ (96 / 206 / 240: shipr_254 8-31 f1,470, shipr_242 8-21 f60, dr1_004 9-5 f270). Drawn
+                        // here as the first: in front. As the last entry it differs only inside its 16x16 box, where
+                        // the emulator's OBJ priority quirk lifts an earlier priority-3 OBJ's pixel over BG0 and an
+                        // earlier OBJ of its own priority - a damage number - stays in front: 23 sampled frames of the
+                        // picture board)
                         if let Some(px) = hv.stat_mark.and_then(|k| u.stat_mark(k)) {
                             screen.push((u.layout.hud_priority, hx + 84, hy, 16, 16, px));
                         }

@@ -629,6 +629,9 @@ pub struct World {
     pub hud_more_end: Vec<(bool, i32, i32)>,
     /// the leader's form at that read (a form change since: the gauges show the current values)
     pub hud_form: Vec<i32>,
+    /// inside a field step, before its iteration tick (`vram::iter_ticked`: a stat-points mark made now is not
+    /// drawn by this step) - not hashed (the view's)
+    pub stat_step: bool,
     pub g: Globals,
     pub col: Option<Collision>,
     pub arena: ArenaRt,
@@ -821,6 +824,7 @@ impl World {
             hud_more: Vec::new(),
             hud_more_end: Vec::new(),
             hud_form: Vec::new(),
+            stat_step: false,
             g: Globals {
                 last_beep: -1000,
                 ..Default::default()

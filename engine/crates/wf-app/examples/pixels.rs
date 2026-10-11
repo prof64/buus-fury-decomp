@@ -5,7 +5,8 @@
 //! compared pixel for pixel. Only frames inside the segment's matched prefix count (an actor difference is the
 //! harness's, not the picture's). Per segment: frames compared, pixel-exact frames, and the differing pixels sorted
 //! into classes; `PIX_OUT=dir` writes `game | ours | diff` PNGs of differing frames (`PIX_MAX` per segment, 4),
-//! `PIX_FB=dir` the .fb directory, `PIX_JSON=file` the per-frame results, `PIX_LOCK=file` the pixel gate's lock
+//! `PIX_FB=dir` the .fb directory, `PIX_JSON=file` the per-frame results (`PIX_BBOX`: with each differing frame's
+//! bounding box), `PIX_LOCK=file` the pixel gate's lock
 //! (`data/segments/pixels.json`, read by `tests/pixels.rs`): every segment whose sampled frames are all exact, with
 //! each frame's hash of the game's picture.
 
@@ -306,6 +307,7 @@ fn main() {
         let at: BTreeMap<usize, usize> = want.iter().enumerate().map(|(i, &k)| (k, i)).collect();
         let mut presenter = wf_core::view::Presenter::default();
         let mut results: Vec<(usize, String, usize)> = vec![];
+        let mut bboxes: BTreeMap<usize, [usize; 4]> = BTreeMap::new();
         let mut pngs = 0;
         // the previous video frame's palette state (the tear rule) and the torn-accepted frames' line hashes
         let mut prev_pal: Option<Pal> = None;
@@ -544,6 +546,18 @@ fn main() {
                     ks.dedup();
                     eprintln!("kinds {name} f{k} {n} {}", ks.join(","));
                 }
+                // PIX_BBOX: the differing pixels' bounding box [x0, y0, x1, y1] as a 4th element of the JSON rows
+                if n > 0 && std::env::var_os("PIX_BBOX").is_some() {
+                    let mut b = (W, H, 0usize, 0usize);
+                    for y in 0..H {
+                        for x in 0..W {
+                            if ours[y * W + x] != game[i][y * W + x] {
+                                b = (b.0.min(x), b.1.min(y), b.2.max(x), b.3.max(y));
+                            }
+                        }
+                    }
+                    bboxes.insert(k, [b.0, b.1, b.2, b.3]);
+                }
                 results.push((k, class, n));
             }
         });
@@ -600,7 +614,10 @@ fn main() {
                 .collect();
             lock.insert(name.clone(), serde_json::Value::Array(fr));
         }
-        json_out.push(serde_json::json!({"segment": name, "frames": counted.len(), "exact": exact, "results": counted.iter().map(|r| serde_json::json!([r.0, r.1, r.2])).collect::<Vec<_>>()}));
+        json_out.push(serde_json::json!({"segment": name, "frames": counted.len(), "exact": exact, "results": counted.iter().map(|r| match bboxes.get(&r.0) {
+            Some(b) => serde_json::json!([r.0, r.1, r.2, b]),
+            None => serde_json::json!([r.0, r.1, r.2]),
+        }).collect::<Vec<_>>()}));
     }
     println!("total: {tot_exact} / {tot_frames} sampled frames pixel-exact ({tot_torn} of them torn (hardware): accepted by the tear rule)");
     let mut errs = renderer.errors.clone();
