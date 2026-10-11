@@ -83,8 +83,9 @@ pub enum Fx {
         left: i32,
         rate: i32,
         acc: i32,
-        /// sorted with the actors by its y (a Kamikaze ghost's explosion: skill audit sa_f31_skill13); else in front
-        /// of them (a breakable's / an enemy's: pixel gate dr3_007_10-15 f210, sb_010_20_04 f150)
+        /// sorted with the actors by its y (a Kamikaze ghost's explosion: skill audit sa_f31_skill13; a dying
+        /// enemy's and the shots': the pixel board); else in front of them (a breakable's / a script's: pixel gate
+        /// dr3_007_10-15 f210, sb_010_20_04 f150)
         #[serde(default)]
         sorted: bool,
     },

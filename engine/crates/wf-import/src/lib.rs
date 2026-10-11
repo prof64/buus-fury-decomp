@@ -2936,7 +2936,8 @@ fn import_coins(w: &mut World, ram: &GbaRam) {
             t,
             mv: moves - t,
             landed: moves >= 60 && z == 0,
-            phase: ram.r32(o + 0x28),
+            // (the counter +0x28 holds the draws so far: the cel is phase + age + spin)
+            phase: ram.r32(o + 0x28).wrapping_sub(t as u32),
             bx: [ram.s32(o + 0x14), ram.s32(o + 0x18), ram.s32(o + 0x1C), ram.s32(o + 0x20)],
             solid: None,
             spawn: None,

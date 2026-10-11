@@ -3762,7 +3762,9 @@ pub fn die(w: &mut World, i: usize, explode: bool) {
         // the enemy's sprite instance is destroyed first (`0x0800EC34`): the explosion can take its tiles
         // (segments sb 20-6, side 18-2: a dying enemy's block is free before the explosion's is taken)
         crate::vram::entity_gone(w, i);
-        crate::fx::explosion(w, cx, cy, rate);
+        // (sorted with the actors by its y, as the shots' clouds: the pixel board over 494 recorded segments - the
+        // cloud behind the player, an enemy or a coin standing lower: 326 sampled frames more exact, none fewer)
+        crate::fx::explosion_sorted(w, cx, cy, rate);
     }
     // the object's destruction frees its enemy-grid cells (removed entities are not re-synced: story playthrough, a
     // fighter's path re-plan went around a dead one)

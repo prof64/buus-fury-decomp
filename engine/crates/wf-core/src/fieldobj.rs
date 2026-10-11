@@ -59,12 +59,12 @@ pub struct Pickup {
     /// completed pass (`Field::completing`) gives the coin its normal update instead
     #[serde(default)]
     pub held: Option<(u32, i32, i32, [i32; 4], i32, i32)>,
-    /// a link fight's coin: what its spin is ahead of its age. The spin's counter (+0x28, from the constructor's random
-    /// phase) counts the draws (0x08018284: +1, then the cel = (counter & 0xFF) >> 3, 0 beyond 3), the age (+0x24) the
-    /// updates: the item-get's hold draws without an update (link recording dojo_px3 lf 3,503 .. 3,508: after the 61
-    /// held frames the cel of age + 62), and the prize is drawn once before its first update (dojo_px1 lf 7,473 /
-    /// 7,481 / 7,489: the cel a frame before the age's). Not the field's holds: there the cel stays with the age
-    /// (pixel gate earth_2_9_5 f510 / f660, earth_2_8_1 f5,220, rclose_067_071_14-2 f1,380 / f2,340)
+    /// what the coin's spin is ahead of its age. The spin's counter (+0x28, from the constructor's random phase)
+    /// counts the draws (0x08018284: +1, then the cel = (counter & 0xFF) >> 3, 0 beyond 3), the age (+0x24) the
+    /// updates. The draw check (0x0801809E: the flight's move, then no draw on the blink's hidden frames or off the
+    /// camera - `coin_drawn`) runs every frame, under an event or an item-get's hold too: there the spin runs on
+    /// while the age stands (link recording dojo_px3 lf 3,503 .. 3,508); a frame without the draw leaves it behind.
+    /// One ahead from the making (link recording dojo_px1; the pixel board's coins)
     #[serde(default)]
     pub spin: i32,
 }
@@ -530,9 +530,17 @@ pub fn drop_zenie_from(w: &mut World, loot: (i32, i32, i32, i32), size: i32) -> 
     crate::vram::coin_created(w, id, big);
     // the first physics step in the frame it spawns: the world update gives it when it is created before that
     // update (deferred calls, drop scripts at the frame's start), else now
-    if !w.field.as_ref().is_some_and(|f| f.pre_update) {
+    let pre = w.field.as_ref().is_some_and(|f| f.pre_update);
+    if !pre {
         if let Some(k) = w.find(id) {
             pickup_update(w, k);
+        }
+    }
+    // (the spin's counter is one ahead of the age from the start: the pixel board over 494 recorded segments, with
+    // the draw check's rule - `coin_drawn` - 149 sampled frames more exact, 5 fewer)
+    if let Some(k) = w.find(id) {
+        if let Body::Pickup(p) = &mut w.ents[k].body {
+            p.spin += 1;
         }
     }
     Some(id)
@@ -646,6 +654,21 @@ pub fn held_moves(w: &mut World) {
     }
 }
 
+/// the coin's draw check (0x0801809E, after its flight's move): not on the blink's hidden frames (age over 480, the
+/// frame counter's bit 2), and only when its sprite / shadow rect overlaps the camera - the draw (0x08018284) counts
+/// the spin, so a frame without it leaves the spin behind the age
+fn coin_drawn(w: &World, p: &Pickup) -> bool {
+    if p.t > 0x1E0 && w.g.clock(w.frame) & 4 != 0 {
+        return false;
+    }
+    let PickupKind::Zenie(s) = p.kind else { return true };
+    let (sw, sh) = if s & 1 == 1 { (16, 16) } else { (8, 8) };
+    let (sx, sy) = (p.x >> 8, (p.y >> 8) - (p.z >> 8));
+    let r = [p.bx[0].min(sx - sw / 2), p.bx[1].min(sy - sh), p.bx[2].max(sx + sw / 2), p.bx[3].max(sy)];
+    let c = &w.cameras[0].rect;
+    r[0] < c.x1 && c.x0 < r[2] && r[1] < c.y1 && c.y0 < r[3]
+}
+
 pub fn pickup_update(w: &mut World, i: usize) {
     // the pass a held event interrupted completes in the frame the event ends (`Field::completing`): the game's
     // event returned at the top of that frame, so the coins' move of the frame is their normal update - not the held
@@ -678,6 +701,16 @@ pub fn pickup_update(w: &mut World, i: usize) {
             .is_some_and(|f| f.drop_held || !f.coins_moved)
         {
             coin_move(w, i);
+            // (the held frame's draw goes on, and counts the spin)
+            {
+                if let Body::Pickup(p) = &w.ents[i].body {
+                    if matches!(p.kind, PickupKind::Zenie(_)) && coin_drawn(w, p) {
+                        if let Body::Pickup(p) = &mut w.ents[i].body {
+                            p.spin += 1;
+                        }
+                    }
+                }
+            }
         }
         return;
     }
@@ -702,6 +735,10 @@ pub fn pickup_update(w: &mut World, i: usize) {
     match p.kind {
         PickupKind::Zenie(_) => {
             coin_fly(w, &mut p);
+            // (a frame without its draw: the spin's counter stays - `coin_drawn`)
+            if w.players.len() == 1 && !coin_drawn(w, &p) {
+                p.spin -= 1;
+            }
             // (the age counts its creation frame's update; the coin goes when it reaches 601 - MEASURED real run 20-6 r062_001
             // f21,213 .. f21,814: age 600 at f21,813, still alive)
             if p.t > 600 {

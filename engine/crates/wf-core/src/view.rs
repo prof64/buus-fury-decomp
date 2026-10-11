@@ -129,7 +129,7 @@ fn actor_depth(a: &crate::actor::Actor) -> i32 {
     a.py() + (a.foot_h >> 1) - 4
 }
 
-fn draw_key(w: &World, i: usize) -> (i32, i32, u32) {
+pub fn draw_key(w: &World, i: usize) -> (i32, i32, u32) {
     let e = &w.ents[i];
     let (layer, depth) = match &e.body {
         Body::Player(p) => (0, actor_depth(&p.a)),
