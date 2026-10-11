@@ -267,6 +267,11 @@ pub fn draw_key(w: &World, i: usize) -> (i32, i32, u32) {
         Body::Npc(n) => (0, n.a.py()),
         Body::Mod(m) => (1, m.y >> 8),
     };
+    // (an actor whose layer byte a script moved: `actor_layer`)
+    let layer = match &e.body {
+        Body::Player(_) | Body::Npc(_) | Body::Enemy(_) => layer.max(0x38 - actor_layer(w, e.id)),
+        _ => layer,
+    };
     // (an equal key: the later object in the world list in front - Majin Buu's eat respawns the player at the list's
     // end, shipr_338 8-16 f7050: Buu y + 8 = Vegeta y + 4, Vegeta in front)
     // (Janemba's strike hand joins the list's head: at an equal key behind the older objects - opponent audit
@@ -342,6 +347,37 @@ pub fn actor_cel(w: &World, i: usize) -> Option<(u16, bool, Option<(i32, i32)>)>
     }
 }
 
+/// an actor's sort-layer byte (object +8; 0x38 = the actors' own, lower in front - comparator `0x08052EE0`) where a
+/// script changed it: a `jump_to` in progress (0x24 from its start `0x08023DB2` to its end `0x08023EF8`, which
+/// leaves 0x38), else an NPC's `set_actor_byte8`. The OAM priority is its bits 4 - 5 (the actor draw `0x0800F330`).
+/// Emulator, real route sb_041 21-25 f9,540: Buu's fragment mid-jump at +8 = 0x24 - OAM priority 2, first in the
+/// OAM (ours behind Kid Buu's legs at f9,090)
+fn actor_layer(w: &World, id: u32) -> i32 {
+    if jump_shadow(w, id).is_some() {
+        return 0x24;
+    }
+    match w.find(id).map(|i| &w.ents[i].body) {
+        Some(Body::Npc(n)) if (1..=0x38).contains(&n.byte8) => n.byte8,
+        _ => 0x38,
+    }
+}
+
+/// a `jump_to` in progress on the actor: its shadow's y offset (px) - the jump's step `0x08023DBA` moves the actor
+/// along the arc and gives the shadow the arc's height back (object +0x17C = the sum of 4 * air - 8 k over the steps
+/// made, >> 8), so the shadow slides along the ground line; the end (tick air + 8) takes it away. Emulator, sb_041
+/// 21-25 f9,540: the fragment's shadow 6 px under it (+0x17C = 6 / 7)
+fn jump_shadow(w: &World, id: u32) -> Option<i32> {
+    let t = w.scene.tracks.iter().find(|t| t.started && t.owner == crate::scene::Owner::Entity(id))?;
+    match t.queue.first()? {
+        crate::scene::Cmd::JumpTo { air, t, .. } => {
+            let a = (*air).max(1);
+            let k = (*t - 7).clamp(0, a);
+            Some(if *t >= 8 + a { 0 } else { (4 * a * k - 4 * k * (k + 1)) >> 8 })
+        }
+        _ => None,
+    }
+}
+
 fn actor_draw(
     w: &World,
     id: u32,
@@ -352,6 +388,8 @@ fn actor_draw(
     let Some(sp) = a.sprite.and_then(|s| w.data.sprite(s)) else {
         return;
     };
+    let priority = ((actor_layer(w, id) >> 4) & 3) as u8;
+    let jump_dy = jump_shadow(w, id).unwrap_or(0);
     // the hit flash (0x0800E8E6): the tiles through colour-index map counter >> 2 (2 = the red ramp) while the
     // counter runs (`ui/hit_flash.json`; sb_007 6-9 f19380: Super Buu red under Gohan's Kamehameha)
     // (the map the last tick set: a hit's 12 shows the earlier map until its first tick - sb_006 6-6 f24179 ..
@@ -378,7 +416,7 @@ fn actor_draw(
                 },
                 x: a.px() + hx,
                 y: a.py() + a.z + hy,
-                priority: 3,
+                priority,
                 mirror: false,
                 effect: SpriteEffect::None,
             });
@@ -389,7 +427,7 @@ fn actor_draw(
             frame: FrameSel::Frame { index, flip },
             x: a.px(),
             y: a.py() + a.z,
-            priority: 3,
+            priority,
             mirror: false,
             effect,
         });
@@ -411,7 +449,7 @@ fn actor_draw(
     };
     let on_screen = |sh: &str| {
         let (sw, shh) = sh_size(sh);
-        let (x0, y0) = (a.px() + sp.shadow_off.0 as u8 as i8 as i32, a.py() + sp.shadow_off.1 as u8 as i8 as i32);
+        let (x0, y0) = (a.px() + sp.shadow_off.0 as u8 as i8 as i32, a.py() + sp.shadow_off.1 as u8 as i8 as i32 + jump_dy);
         w.cameras.is_empty() || w.cameras.iter().any(|c| x0 < c.rect.x1 && c.rect.x0 < x0 + sw && y0 < c.rect.y1 && c.rect.y0 < y0 + shh)
     };
     if let Some(sh) = sp.shadow.as_ref().filter(|sh| sh.as_str() != "shadow_0x0" && on_screen(sh)) {
@@ -424,8 +462,8 @@ fn actor_draw(
             },
             // (offset by the header's shadow dx / dy: Super Janemba's at (8, 8) - OAM, real route 18-14)
             x: a.px() + shadow_at(w, id, sp).0,
-            y: a.py() + shadow_at(w, id, sp).1,
-            priority: 3,
+            y: a.py() + shadow_at(w, id, sp).1 + jump_dy,
+            priority,
             mirror: false,
             effect: SpriteEffect::None,
         });
@@ -560,6 +598,25 @@ fn record_add(w: &World, id: u32, addr: u32, x: i32, y: i32, out: &mut RenderVie
 /// record `index` of the effect run at `run` (the run's step `index`: record run + 12 * index - its own frame and flip;
 /// the runs share frames between records, so the step is not the frame: the Energy Blast facing right is steps 12 ..
 /// 15 of run 0x0871370C, frames 9 .. 12 - drawn as the missing frames 12 .. 15 it was invisible)
+/// a script's ki blast (`scene::VisualKind::KiBlast`): its position (px) and its record in the run 0x0871370C - in
+/// flight the facing's group, cel age >> 3 (from 4 on 2 / 3 in turn: update `0x08027D48`), then the burst (record
+/// 16) where the flight ended. Emulator, real route sb_041 21-25 rows 8,619 .. 8,667 (Kid Buu's blasts at the
+/// Kais): 33 flight frames from the muzzle, the 16x16 cels for 16 of them, the burst 16 frames 4 px beside the
+/// last long cel's place (the burst keeps that cel's box, as the fighters' Energy Blast's)
+fn script_blast(v: &crate::scene::Visual) -> (i32, i32, i32) {
+    let crate::scene::VisualKind::KiBlast { dir, sx, sy, n } = v.kind else { return (v.x, v.y, 0) };
+    let age = v.t.clamp(0, n);
+    let (x, y) = (((v.x << 8) + sx * age) >> 8, ((v.y << 8) + sy * age) >> 8);
+    if v.t < n {
+        let f = age >> 3;
+        (x, y, dir * 4 + if f > 3 { 2 + (f & 1) } else { f })
+    } else if (n - 1) >> 3 >= 2 {
+        if dir < 2 { (x + 4, y, 16) } else { (x, y + 4, 16) }
+    } else {
+        (x, y, 16)
+    }
+}
+
 fn effect(w: &World, id: u32, run: u32, index: i32, x: i32, y: i32, out: &mut RenderView) {
     let addr = run.wrapping_add(12 * index.max(0) as u32);
     if w.data.record_frames.contains_key(&addr) {
@@ -940,6 +997,14 @@ fn render_view_with(w: &World, link: Option<&LinkDraw>, out: &mut RenderView) {
             .into_iter()
             .map(|(k, l, d)| ((l, d, 0), None, k)),
     );
+    // a script's ki blasts (`scene::VisualKind::KiBlast`, the object 0x0804D234: layer 0x38, depth its y - as the
+    // players' Energy Blast): entries with no entity, the visual's index counted down from `usize::MAX`
+    for (k, v) in w.scene.visuals.iter().enumerate() {
+        if let crate::scene::VisualKind::KiBlast { .. } = v.kind {
+            let (_, y, _) = script_blast(v);
+            order.push(((0, y - 4, u32::MAX), None, usize::MAX - k));
+        }
+    }
     // (the game sorts the frame's draw array with an unstable quicksort - 0x080115B0 / 0x080531A4, median of three,
     // comparator 0x08052EE0 - over the drawable world-list objects from the list's last to its first; an equal key
     // comes out where the partitions leave it, which depends on every object in the array: the emulator's arrays
@@ -986,7 +1051,13 @@ fn render_view_with(w: &World, link: Option<&LinkDraw>, out: &mut RenderView) {
     // OAM order: front-most first
     for &(_, ent, prop) in order.iter().rev() {
         let Some(i) = ent else {
-            crate::fieldview::prop(w, prop, out);
+            match w.scene.visuals.get(usize::MAX - prop).filter(|_| prop > usize::MAX / 2) {
+                Some(v) => {
+                    let (x, y, idx) = script_blast(v);
+                    effect(w, v.owner, 0x0871_370c, idx, x, y, out);
+                }
+                None => crate::fieldview::prop(w, prop, out),
+            }
             continue;
         };
         let e = &w.ents[i];

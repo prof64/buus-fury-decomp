@@ -205,6 +205,11 @@ fn torn(game: &[u32], new: &[u32], olds: &[(String, Vec<u32>)]) -> Option<Vec<St
             let d = |p: &[u32]| (0..W).filter(|&x| g[x] != p[y * W + x]).count();
             let xs: Vec<usize> = (0..W).filter(|&x| g[x] != nw[x]).collect();
             eprintln!("torndbg line {y}: new {} px (x {:?}..{:?}) {:?}", d(new), xs.first(), xs.last(), olds.iter().map(|(l, p)| (l.as_str(), d(p))).collect::<Vec<_>>());
+            // (the pixels on it that are neither the new picture's nor the best candidate's: x, game, new, candidate)
+            if let Some((l, p)) = olds.iter().min_by_key(|(_, p)| d(p)) {
+                let odd: Vec<String> = (0..W).filter(|&x| g[x] != nw[x] && g[x] != p[y * W + x]).take(12).map(|x| format!("{x}:{:06x}/{:06x}/{:06x}", g[x] & 0xFF_FFFF, nw[x] & 0xFF_FFFF, p[y * W + x] & 0xFF_FFFF)).collect();
+                eprintln!("torndbg   vs {l}: {}", odd.join(" "));
+            }
         }
         return None;
     }

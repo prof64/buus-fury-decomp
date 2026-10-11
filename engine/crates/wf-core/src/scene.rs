@@ -1226,7 +1226,10 @@ pub enum VisualKind {
     ItemIcon(i32),
     Beam { kind: BeamKind, dir: i32 },
     Ball,
-    KiBlast,
+    /// a script's ki blast in flight (`shoot_at` / `shoot_at_actor`, object vtable 0x0804D234): `x` / `y` its start
+    /// (px), `t` its age; `dir` the record group (facing), `sx` / `sy` its step (24.8 px), `n` the flight's frames -
+    /// then its burst for 16
+    KiBlast { dir: i32, sx: i32, sy: i32, n: i32 },
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -2261,11 +2264,19 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                         // the ki blast object (0x08027CBC): its sound is 20 + rand(2) (story segment sb_01_03, s025)
                         let snd = 20 + w.rng.rand(2);
                         w.sfx(snd, 64);
-                        let (nn, _, _) = step_math(*x - cx, *y - cy, *speed, 8);
+                        let (nn, sx, sy) = step_math(*x - cx, *y - cy, *speed, 8);
                         *n = nn;
                         // its object tiles (base ctor `0x08019B04`: 0x100) while it flies
                         let id = w.ents[i].id;
                         crate::vram::acquire(w, crate::vram::Owner::Blast(id), 0x100);
+                        // the object the picture shows (ctor `0x08027CBC`: position, step, the facing's record group
+                        // 0x0871370C + 0x30 * dir; update `0x08027D48`; its end `0x08027D3E`: the burst record for 16
+                        // frames) - `view.rs` draws it
+                        // (the group by the step's larger axis, `0x08027B84`: across 3 right / 2 left, else 1 up
+                        // (or level) / 0 down - not the shooter's facing: real route rfat_033 6-1 f24,660, a blast
+                        // flying left from a fighter facing down)
+                        let dir = if sx.abs() > sy.abs() { if sx > 0 { 3 } else { 2 } } else if sy <= 0 { 1 } else { 0 };
+                        w.scene.visuals.push(Visual { kind: VisualKind::KiBlast { dir, sx, sy, n: nn }, x: cx, y: cy, owner: id, t: 0, life: nn + 16, vid: 0 });
                     }
                     ShootKind::Ball => {
                         // start 0x0803C4DC: SetAnimRaw(0x14); the throw direction k (5-way, from the footprint
@@ -2539,6 +2550,10 @@ fn update_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) -> bool {
             }
             if *t >= a + 16 {
                 set_state(w, i, 0);
+                // (the jump's end `0x08023EF8` leaves the actor's layer byte at 0x38, whatever a script set before)
+                if let Body::Npc(n) = &mut w.ents[i].body {
+                    n.byte8 = 0x38;
+                }
                 return true;
             }
             false

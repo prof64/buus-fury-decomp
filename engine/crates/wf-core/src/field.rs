@@ -1103,6 +1103,7 @@ pub fn load_area_with(
             crate::scene::VisualKind::EnergySphere
                 | crate::scene::VisualKind::MarkerA
                 | crate::scene::VisualKind::MarkerB
+                | crate::scene::VisualKind::KiBlast { .. }
         )
     });
     crate::vram::release(w, crate::vram::Owner::Ending);
