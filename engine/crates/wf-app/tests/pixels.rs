@@ -43,43 +43,72 @@ fn with_prev(view: &RenderView, from: &RenderView, pal: bool, scroll: bool) -> R
     o
 }
 
-/// a torn frame from our pictures and the lock's line specs: "" the new line, "v" the picture before the running
-/// iteration's step, "k" black (a fade to black's last step before a long iteration), "o" / "s" / "b" the line with the
-/// previous palette / BG scroll / both, else a hex mask of the pixels showing the previous palette ("o"'s picture)
+/// `view` with the map layers on BG `from` .. 3 still at `prev`'s scroll (as `examples/pixels.rs`
+/// `with_layer_scroll`: the game writes the layers' scroll registers one after the other from its main loop)
+fn with_layer_scroll(r: &mut Renderer, packs: &Packs, view: &RenderView, prev: &RenderView, from: usize) -> RenderView {
+    let old_view = with_prev(view, prev, false, true);
+    let mut o = view.clone();
+    if view.map.as_ref().map(|m| &m.id) != old_view.map.as_ref().map(|m| &m.id) {
+        return o;
+    }
+    let (new, old) = (r.bg_scrolls(packs, view), r.bg_scrolls(packs, &old_view));
+    if let Some(m) = o.map.as_mut() {
+        let l = m.layers.get_or_insert_with(|| wf_view::BgLayers { visible: [true; 4], ..Default::default() });
+        for b in from..4 {
+            if let (Some(n), Some(p)) = (new[b], old[b]) {
+                l.offset[b].0 += p.0 - n.0;
+                l.offset[b].1 += p.1 - n.1;
+            }
+        }
+    }
+    o
+}
+
+/// the view a line label stands for: "v" the picture before the running iteration's step; else a scroll part ("s"
+/// the previous BG scroll, "b" that and the previous palette, "s3" / "s2" / "s1" the map layers from that BG on at
+/// the previous scroll) and after it "t" the previous timer / sphere, "o" the previous palette, "u" both
+fn label_view(r: &mut Renderer, packs: &Packs, view: &RenderView, prev: &RenderView, iter: Option<&RenderView>, l: &str) -> RenderView {
+    if l == "v" {
+        return iter.cloned().unwrap_or_else(|| view.clone());
+    }
+    let layered = l.strip_prefix('s').filter(|r| r.starts_with(['1', '2', '3']));
+    let (mut v, rest) = match (layered, l) {
+        (Some(rest), _) => (with_layer_scroll(r, packs, view, prev, rest[..1].parse().unwrap_or(3)), &rest[1..]),
+        (None, "s") => (with_prev(view, prev, false, true), ""),
+        (None, "b") => (with_prev(view, prev, true, true), ""),
+        _ => (view.clone(), l),
+    };
+    // the timer's previous value (its digits written into the tiles while the screen is drawn; the energy sphere's
+    // tilemap is rewritten during the frame too: its previous radius)
+    if matches!(rest, "t" | "u") {
+        if prev.timer.is_some() {
+            v.timer = prev.timer;
+        }
+        v.sphere = prev.sphere.clone();
+    }
+    // (both at once, "u": a screen_flash's step in the same frame as the sphere's tilemap - the plain "u" with the
+    // previous BG scroll too, as the board draws it: the previous register state whole)
+    if matches!(rest, "o" | "u") {
+        v = with_prev(&v, prev, true, l == "u");
+    }
+    v
+}
+
+/// a torn frame from our pictures and the lock's line specs: "" the new line, "k" black (a fade to black's last step
+/// before a long iteration), a label of `label_view`, else a hex mask of the pixels showing the previous palette
+/// ("o"'s picture; after ";t" the previous timer's; before "|" the layer-scroll base they lie over)
 fn compose(r: &mut Renderer, packs: &Packs, view: &RenderView, prev: &RenderView, iter: Option<&RenderView>, new: &[u32], masks: &[String]) -> Vec<u32> {
-    let mut pics: BTreeMap<&str, Vec<u32>> = BTreeMap::new();
-    let mut pic = |r: &mut Renderer, l: &'static str| -> Vec<u32> {
-        pics.entry(l)
-            .or_insert_with(|| {
-                let v = match l {
-                    "s" => with_prev(view, prev, false, true),
-                    "b" => with_prev(view, prev, true, true),
-                    "v" => iter.cloned().unwrap_or_else(|| view.clone()),
-                    // the timer's previous value (its digits written into the tiles while the screen is drawn)
-                    "t" => {
-                        let mut v = view.clone();
-                        if prev.timer.is_some() {
-                            v.timer = prev.timer;
-                        }
-                        // (the energy sphere's tilemap is rewritten during the frame too: its previous radius)
-                        v.sphere = prev.sphere.clone();
-                        v
-                    }
-                    // both at once: the previous timer / sphere and the previous palette (a screen_flash's step in
-                    // the same frame as the sphere's tilemap - examples/pixels.rs "u")
-                    "u" => {
-                        let mut v = view.clone();
-                        if prev.timer.is_some() {
-                            v.timer = prev.timer;
-                        }
-                        v.sphere = prev.sphere.clone();
-                        with_prev(&v, prev, true, false)
-                    }
-                    _ => with_prev(view, prev, true, false),
-                };
-                r.render(packs, &v, 0, 240, 160).to_vec()
-            })
-            .clone()
+    let mut pics: BTreeMap<String, Vec<u32>> = BTreeMap::new();
+    let mut pic = |r: &mut Renderer, l: &str| -> Vec<u32> {
+        if !pics.contains_key(l) {
+            let v = label_view(r, packs, view, prev, iter, l);
+            pics.insert(l.to_string(), r.render(packs, &v, 0, 240, 160).to_vec());
+        }
+        pics[l].clone()
+    };
+    let is_label = |m: &str| {
+        let rest = m.strip_prefix('s').filter(|r| r.starts_with(['1', '2', '3'])).map(|r| &r[1..]);
+        matches!(m, "o" | "s" | "b" | "v" | "t" | "u") || rest.is_some_and(|r| matches!(r, "" | "t" | "o" | "u"))
     };
     let mut out = new.to_vec();
     for (y, m) in masks.iter().enumerate().take(160) {
@@ -88,26 +117,24 @@ fn compose(r: &mut Renderer, packs: &Packs, view: &RenderView, prev: &RenderView
             "" => {}
             // (the late present of a fade to black's last step: the line black)
             "k" => out[rg].iter_mut().for_each(|p| *p = 0xFF00_0000),
-            "o" | "s" | "b" | "v" | "t" | "u" => {
-                let l: &'static str = match m.as_str() {
-                    "o" => "o",
-                    "s" => "s",
-                    "v" => "v",
-                    "t" => "t",
-                    "u" => "u",
-                    _ => "b",
-                };
+            l if is_label(l) => {
                 let p = pic(r, l);
                 out[rg.clone()].copy_from_slice(&p[rg]);
             }
             _ => {
-                // per pixel: the previous palette's picture, then (after ";t") the timer's previous value
-                let (mo, mt) = m.split_once(";t").unwrap_or((m.as_str(), ""));
+                // per pixel: the previous palette's picture, then (after ";t") the timer's previous value - over the
+                // new line, or over a layer-scroll base ("s3|..")
+                let (base, m) = m.split_once('|').unwrap_or(("", m.as_str()));
+                if !base.is_empty() {
+                    let p = pic(r, base);
+                    out[rg.clone()].copy_from_slice(&p[rg.clone()]);
+                }
+                let (mo, mt) = m.split_once(";t").unwrap_or((m, ""));
                 for (mk, l) in [(mo, "o"), (mt, "t")] {
                     if mk.is_empty() {
                         continue;
                     }
-                    let p = pic(r, l);
+                    let p = pic(r, &format!("{base}{l}"));
                     for x in 0..240 {
                         let b = u8::from_str_radix(mk.get(x / 8 * 2..x / 8 * 2 + 2).unwrap_or("00"), 16).unwrap_or(0);
                         if b >> (x % 8) & 1 != 0 {
@@ -139,7 +166,9 @@ pub fn stat_now(view: &RenderView, cur: &[Option<u8>]) -> Option<RenderView> {
 #[test]
 fn locked_segments_render_as_the_game() {
     let repo = wf_rom::testutil::repo_root();
-    let Ok(lock) = std::fs::read_to_string(repo.join("data/segments/pixels.json")) else { return };
+    // (PIX_GATE_LOCK: another lock file - a board run's `PIX_LOCK` output checked before it replaces the lock)
+    let lock_path = std::env::var("PIX_GATE_LOCK").map(PathBuf::from).unwrap_or_else(|_| repo.join("data/segments/pixels.json"));
+    let Ok(lock) = std::fs::read_to_string(lock_path) else { return };
     let Some(rom) = wf_rom::testutil::rom() else { return };
     let lock: serde_json::Value = serde_json::from_str(&lock).unwrap();
     // the segment harness's shared extraction (as tests/segments.rs)

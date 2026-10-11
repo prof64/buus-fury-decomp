@@ -395,13 +395,26 @@ fn actor_draw(
         });
     }
     // a 0 x 0 header shadow is no shadow (Yemma's office NPCs requested effects/shadow_0x0)
-    // (an actor whose footprint is off every screen shows no shadow: the game makes no OAM for it, and the shadow's
-    // byte offsets (`Sprite::shadow_off`) would bring Dabura's back from 58 px left of the screen - pixel gate
-    // shipr_338_8-16 f450 - or from above it, shipr_238_8-16 f5010)
-    let fp = crate::geom::Rect::new(a.px(), a.py(), a.px() + a.foot_w, a.py() + a.foot_h);
-    let off_screen = !w.cameras.is_empty()
-        && w.cameras.iter().all(|c| fp.x1 <= c.shown.x0 || fp.x0 >= c.shown.x1 || fp.y1 <= c.shown.y0 || fp.y0 >= c.shown.y1);
-    if let Some(sh) = sp.shadow.as_ref().filter(|sh| sh.as_str() != "shadow_0x0" && !off_screen) {
+    // The shadow's OAM entry is made only while the shadow's own box is on the screen (the actor draw's
+    // `0x08010252` .. `0x080102B4`, object +0x64; every actor class): the box at position + the header's dx / dy
+    // (signed here), as wide and high as the shadow (its table's bytes: 4x2 / 10x4 / 16x6 / 24x10 - not its 16x8 /
+    // 32x16 OBJ), against the camera's unshaken rect (camera +0x18 .. +0x24: this frame's, `Camera::rect` - the build the
+    // picture shows a frame later was judged by it), all four compares strict. Emulator,
+    // real route sb_041 21-25 f3,239 .. f4,603: the cocoon's 10x4 shadow at y 152 shows with the camera at 151 .. 155
+    // and not from 156 on - nor under the shake that brings its OBJ back down on the screen (f3,390: the shaken
+    // camera 154, the rect's 157). This is also why an enemy's 16x8 shadow OBJ is gone at tops -4 .. -7 and a 32x16
+    // one shows at -9 (opponent audit oa_t4e_above f170 .. f182; pixel gate shipr_338_8-16 f4230), and why Dabura's
+    // does not come back from left of / above the screen (shipr_338_8-16 f450, shipr_238_8-16 f5010).
+    let sh_size = |sh: &str| -> (i32, i32) {
+        let mut it = sh.trim_start_matches("shadow_").split('x').map(|v| v.parse::<i32>().unwrap_or(0));
+        (it.next().unwrap_or(0), it.next().unwrap_or(0))
+    };
+    let on_screen = |sh: &str| {
+        let (sw, shh) = sh_size(sh);
+        let (x0, y0) = (a.px() + sp.shadow_off.0 as u8 as i8 as i32, a.py() + sp.shadow_off.1 as u8 as i8 as i32);
+        w.cameras.is_empty() || w.cameras.iter().any(|c| x0 < c.rect.x1 && c.rect.x0 < x0 + sw && y0 < c.rect.y1 && c.rect.y0 < y0 + shh)
+    };
+    if let Some(sh) = sp.shadow.as_ref().filter(|sh| sh.as_str() != "shadow_0x0" && on_screen(sh)) {
         out.sprites.push(SpriteDraw {
             entity: id,
             sheet: format!("effects/{sh}"),
@@ -414,17 +427,7 @@ fn actor_draw(
             y: a.py() + shadow_at(w, id, sp).1,
             priority: 3,
             mirror: false,
-            // an enemy's shadow going up off the screen is dropped while fewer than 5 of its OBJ's rows are on screen
-            // (the emulator, opponent audit oa_t4e_above f170 .. f182: a ninja walking up off the screen shows its 16x8
-            // shadow at tops -1 .. -3, none at -4 .. -7 while its feet still show; oa_t30 / oa_t2c / oa_t6c above the
-            // same; pixel gate shipr_338_8-16 f4230: Super Buu's 32x16 one at -9 shows); the player's and an NPC's
-            // are not cut so (pixel gate db6_019 13-50 ..) - judged by the camera the picture is drawn with (the
-            // presenter's OBJ delay: pixel gate rsbi_010_21_11 f120)
-            effect: if w.find(id).is_some_and(|k| matches!(w.ents[k].body, Body::Enemy(_))) {
-                SpriteEffect::TopCull { h: if sh.as_str() == "shadow_24x10" { 16 } else { 8 } }
-            } else {
-                SpriteEffect::None
-            },
+            effect: SpriteEffect::None,
         });
     }
 }

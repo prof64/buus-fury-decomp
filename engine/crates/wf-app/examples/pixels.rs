@@ -87,23 +87,51 @@ fn with_pal(v: &RenderView, p: &Pal) -> RenderView {
 /// the gate locks for it. Returns those hashes when the frame is torn-accepted (some line only matches the old)
 /// our pictures of the frame with the previous frame's register state: "o" the palette, "s" the BG scroll, "b" both
 /// (the ones that differ from the new state)
-fn tear_candidates(renderer: &mut Renderer, packs: &Packs, view: &RenderView, prev: &Pal) -> Vec<(&'static str, Vec<u32>)> {
+fn tear_candidates(renderer: &mut Renderer, packs: &Packs, view: &RenderView, prev: &Pal) -> Vec<(String, Vec<u32>)> {
     let now = pal_of(view);
     let scroll_moved = (&prev.cameras, &prev.map) != (&now.cameras, &now.map);
     let pal_moved = (prev.fade, prev.scale, prev.black, prev.menu) != (now.fade, now.scale, now.black, now.menu);
     let mut out = vec![];
     if pal_moved {
         let p = Pal { cameras: now.cameras.clone(), map: now.map.clone(), ..prev.clone() };
-        out.push(("o", renderer.render(packs, &with_pal(view, &p), 0, W, H).to_vec()));
+        out.push(("o".to_string(), renderer.render(packs, &with_pal(view, &p), 0, W, H).to_vec()));
     }
     if scroll_moved {
         let s = Pal { fade: now.fade, scale: now.scale, black: now.black, menu: now.menu, ..prev.clone() };
-        out.push(("s", renderer.render(packs, &with_pal(view, &s), 0, W, H).to_vec()));
+        out.push(("s".to_string(), renderer.render(packs, &with_pal(view, &s), 0, W, H).to_vec()));
     }
     if scroll_moved && pal_moved {
-        out.push(("b", renderer.render(packs, &with_pal(view, prev), 0, W, H).to_vec()));
+        out.push(("b".to_string(), renderer.render(packs, &with_pal(view, prev), 0, W, H).to_vec()));
     }
     out
+}
+
+/// `view` with the map layers on BG `from` .. 3 still at the previous frame's scroll (`prev`'s cameras / map): the
+/// game writes each layer's scroll registers from its main loop as it updates the layers, BG0 first - in a frame that
+/// takes long (the countdown's sphere scene, real route rkb_168 14-1 f37,530 on the emulator: BG0VOFS at line 210,
+/// BG1VOFS at 221, BG2VOFS at line 4 of the next picture, BG3VOFS at 78) the lines above a write show that layer
+/// and the ones after it one step behind the others. `None` when no such layer's scroll changed.
+fn with_layer_scroll(renderer: &mut Renderer, packs: &Packs, view: &RenderView, prev: &Pal, from: usize) -> Option<RenderView> {
+    let mut old_view = view.clone();
+    old_view.cameras = prev.cameras.clone();
+    old_view.map = prev.map.clone();
+    if view.map.as_ref().map(|m| &m.id) != old_view.map.as_ref().map(|m| &m.id) {
+        return None;
+    }
+    let (new, old) = (renderer.bg_scrolls(packs, view), renderer.bg_scrolls(packs, &old_view));
+    let mut o = view.clone();
+    let l = o.map.as_mut()?.layers.get_or_insert_with(|| wf_view::BgLayers { visible: [true; 4], ..Default::default() });
+    let mut any = false;
+    for b in from..4 {
+        if let (Some(n), Some(p)) = (new[b], old[b]) {
+            if n != p {
+                l.offset[b].0 += p.0 - n.0;
+                l.offset[b].1 += p.1 - n.1;
+                any = true;
+            }
+        }
+    }
+    any.then_some(o)
 }
 
 /// a view in a fade toward black (a palette fade / scale with a black target, or the BLDY darken), not yet black
@@ -112,17 +140,17 @@ fn fading_to_black(v: &RenderView) -> bool {
     f(&v.palette_fade) || f(&v.palette_scale) || v.fade_black > 0 || v.menu.as_ref().is_some_and(|m| f(&m.fade) || m.fade_black > 0)
 }
 
-fn torn(game: &[u32], new: &[u32], olds: &[(&str, Vec<u32>)]) -> Option<Vec<String>> {
+fn torn(game: &[u32], new: &[u32], olds: &[(String, Vec<u32>)]) -> Option<Vec<String>> {
     let mut any_old = false;
     // a whole line may show a previous register state: the candidates in order - "o" the previous palette, "s" the
-    // previous BG scroll, "b" both. The line drawn while the palette rewrite runs mixes the two palettes per colour
-    // (each pixel's entry flips at its own time): per pixel then against the previous palette's picture ("o") - a
-    // hex mask of the pixels showing it
+    // previous BG scroll, "b" both, "s3" / "s2" / "s1" the map layers from that BG on at the previous scroll (with
+    // "t" / "o" / "u" after it: the previous timer / sphere, palette, both). The line drawn while the palette
+    // rewrite runs mixes the two palettes per colour (each pixel's entry flips at its own time): per pixel then
+    // against the previous palette's picture ("o") - a hex mask of the pixels showing it
     let mut masks = vec![];
     // (the timer's previous value "t" too: its digits are written tile by tile while the line is drawn - its pixels
-    // in a second mask after ";t")
-    let px_o = olds.iter().find(|c| c.0 == "o").map(|c| &c.1);
-    let px_t = olds.iter().find(|c| c.0 == "t").map(|c| &c.1);
+    // in a second mask after ";t"; over a layer-scroll base "s3" .. the mask is written "s3|mask")
+    let find = |l: &str| olds.iter().find(|c| c.0 == l).map(|c| &c.1);
     'line: for y in 0..H {
         let (g, nw) = (&game[y * W..(y + 1) * W], &new[y * W..(y + 1) * W]);
         if g == nw {
@@ -132,33 +160,53 @@ fn torn(game: &[u32], new: &[u32], olds: &[(&str, Vec<u32>)]) -> Option<Vec<Stri
         for (label, o) in olds {
             if g == &o[y * W..(y + 1) * W] {
                 any_old = true;
-                masks.push((*label).to_string());
+                masks.push(label.clone());
                 continue 'line;
             }
         }
-        if px_o.is_none() && px_t.is_none() {
-            return None;
-        }
-        let (mut bits, mut tbits) = (vec![0u8; W / 8], vec![0u8; W / 8]);
-        for x in 0..W {
-            if g[x] == nw[x] {
+        'base: for base in ["", "s3", "s2", "s1"] {
+            let pb: &[u32] = if base.is_empty() {
+                new
+            } else {
+                match find(base) {
+                    Some(p) => p,
+                    None => continue,
+                }
+            };
+            let (px_o, px_t) = (find(&format!("{base}o")), find(&format!("{base}t")));
+            if px_o.is_none() && px_t.is_none() {
                 continue;
             }
-            if px_o.is_some_and(|o| g[x] == o[y * W + x]) {
-                bits[x / 8] |= 1 << (x % 8);
-            } else if px_t.is_some_and(|o| g[x] == o[y * W + x]) {
-                tbits[x / 8] |= 1 << (x % 8);
-            } else {
-                return None;
+            let (mut bits, mut tbits) = (vec![0u8; W / 8], vec![0u8; W / 8]);
+            for x in 0..W {
+                if g[x] == pb[y * W + x] {
+                    continue;
+                }
+                if px_o.is_some_and(|o| g[x] == o[y * W + x]) {
+                    bits[x / 8] |= 1 << (x % 8);
+                } else if px_t.is_some_and(|o| g[x] == o[y * W + x]) {
+                    tbits[x / 8] |= 1 << (x % 8);
+                } else {
+                    continue 'base;
+                }
             }
+            any_old = true;
+            let mut m: String = if base.is_empty() { String::new() } else { format!("{base}|") };
+            m.extend(bits.iter().map(|b| format!("{b:02x}")));
+            if tbits.iter().any(|&b| b != 0) {
+                m.push_str(";t");
+                m.extend(tbits.iter().map(|b| format!("{b:02x}")));
+            }
+            masks.push(m);
+            continue 'line;
         }
-        any_old = true;
-        let mut m: String = bits.iter().map(|b| format!("{b:02x}")).collect();
-        if tbits.iter().any(|&b| b != 0) {
-            m.push_str(";t");
-            m.extend(tbits.iter().map(|b| format!("{b:02x}")));
+        // PIX_TORNDBG: the first line no candidate explains, with each candidate's differing pixels on it
+        if std::env::var_os("PIX_TORNDBG").is_some() {
+            let d = |p: &[u32]| (0..W).filter(|&x| g[x] != p[y * W + x]).count();
+            let xs: Vec<usize> = (0..W).filter(|&x| g[x] != nw[x]).collect();
+            eprintln!("torndbg line {y}: new {} px (x {:?}..{:?}) {:?}", d(new), xs.first(), xs.last(), olds.iter().map(|(l, p)| (l.as_str(), d(p))).collect::<Vec<_>>());
         }
-        masks.push(m);
+        return None;
     }
     any_old.then_some(masks)
 }
@@ -395,6 +443,23 @@ fn main() {
                     };
                     eprintln!("timerrows {name} f{k} {rows:?}");
                 }
+                // PIX_TILEFIT: which offsets of the map's tile-animation clock leave the fewest differing pixels
+                if let (Some(m), true) = (view.map.as_ref(), std::env::var_os("PIX_TILEFIT").is_some()) {
+                    let base = m.tile_frame.unwrap_or(m.anim_frame);
+                    let mut fit: Vec<(usize, i32)> = (-12..=12)
+                        .map(|d| {
+                            let mut v2 = view.clone();
+                            v2.map.as_mut().unwrap().tile_frame = Some(base.wrapping_add(d as u32));
+                            let px = tear_renderer.render(&packs, &v2, 0, W, H).to_vec();
+                            (px.iter().zip(&game[i]).filter(|(a, b)| a != b).count(), d)
+                        })
+                        .collect();
+                    let at0 = fit[12].0;
+                    fit.sort();
+                    if at0 != fit[0].0 {
+                        eprintln!("tilefit {name} f{k} clock {base}: {at0} px, best {:?}", &fit[..3]);
+                    }
+                }
                 let mut ours = renderer.render(&packs, &view, 0, W, H).to_vec();
                 // PIX_PREVROWS: per screen line, whether the game's line is ours ('.'), the previous frame's ('p'),
                 // both ('='), or neither ('x') - a mid-frame change shows as a 'p' prefix
@@ -440,12 +505,12 @@ fn main() {
                     let long = lfs.get(k + 1).is_some_and(|n| Some(n) == lfs.get(k));
                     if (stepped != k || long) && std::env::var_os("PIX_NOLATE").is_none() {
                         if let Some(v) = iter_view.as_ref() {
-                            olds.push(("v", tear_renderer.render(&packs, v, 0, W, H).to_vec()));
+                            olds.push(("v".to_string(), tear_renderer.render(&packs, v, 0, W, H).to_vec()));
                             // ("k": the picture before the step was in a fade to black, whose last step is written at
                             // the iteration's start - the screen black through the long iteration that follows, the
                             // pause page's build: rclose_067_071 f1,860)
                             if fading_to_black(v) {
-                                olds.push(("k", vec![0xFF00_0000; W * H]));
+                                olds.push(("k".to_string(), vec![0xFF00_0000; W * H]));
                             }
                         }
                     }
@@ -457,24 +522,65 @@ fn main() {
                     let prev_sphere = prev_view.as_ref().map(|v| v.sphere.clone());
                     let sphere_changed = prev_sphere.as_ref().is_some_and(|s| *s != view.sphere) && std::env::var_os("PIX_NOSPHERETEAR").is_none();
                     let timer_changed = matches!((old_timer, view.timer), (Some(a), Some(b)) if a != b) && std::env::var_os("PIX_NOTIMERTEAR").is_none();
+                    // the previous timer / sphere in a view
+                    let with_t = |v: &RenderView| -> RenderView {
+                        let mut v2 = v.clone();
+                        if timer_changed {
+                            v2.timer = old_timer;
+                        }
+                        if sphere_changed {
+                            v2.sphere = prev_sphere.clone().flatten();
+                        }
+                        v2
+                    };
+                    let old_p = old_pal.as_ref().filter(|p| **p != pal_of(&view));
+                    let pal_moved = old_p.is_some_and(|p| {
+                        let now = pal_of(&view);
+                        (p.fade, p.scale, p.black, p.menu) != (now.fade, now.scale, now.black, now.menu)
+                    });
+                    // the previous palette alone (the scroll stays the view's)
+                    let with_o = |v: &RenderView| -> RenderView {
+                        let op = old_p.unwrap();
+                        let p = Pal { cameras: v.cameras.clone(), map: v.map.clone(), ..op.clone() };
+                        with_pal(v, &p)
+                    };
                     if timer_changed || sphere_changed {
-                        {
-                            let mut v2 = view.clone();
-                            if timer_changed {
-                                v2.timer = old_timer;
+                        let v2 = with_t(&view);
+                        olds.push(("t".to_string(), tear_renderer.render(&packs, &v2, 0, W, H).to_vec()));
+                        // (both at once: a screen_flash's palette step and the sphere's tilemap in the same frame -
+                        // the lines above the split show the previous level and radius, rkb_168 f51,360 ..)
+                        if let Some(op) = old_p {
+                            olds.push(("u".to_string(), tear_renderer.render(&packs, &with_pal(&v2, op), 0, W, H).to_vec()));
+                        }
+                    }
+                    // ("s3" / "s2" / "s1": the map layers from that BG on still at the previous scroll - the game
+                    // writes the layers' scroll registers one after the other from its main loop, `with_layer_scroll`;
+                    // each also with the previous timer / sphere "t", palette "o", both "u")
+                    if let Some(op) = old_p.filter(|_| std::env::var_os("PIX_NOLAYERTEAR").is_none()) {
+                        let mut seen: Vec<RenderView> = vec![];
+                        for from in [3usize, 2, 1] {
+                            let Some(base) = with_layer_scroll(&mut tear_renderer, &packs, &view, op, from) else { continue };
+                            if seen.contains(&base) {
+                                continue;
                             }
-                            if sphere_changed {
-                                v2.sphere = prev_sphere.clone().flatten();
+                            let l = format!("s{from}");
+                            olds.push((l.clone(), tear_renderer.render(&packs, &base, 0, W, H).to_vec()));
+                            if timer_changed || sphere_changed {
+                                olds.push((format!("{l}t"), tear_renderer.render(&packs, &with_t(&base), 0, W, H).to_vec()));
                             }
-                            olds.push(("t", tear_renderer.render(&packs, &v2, 0, W, H).to_vec()));
-                            // (both at once: a screen_flash's palette step and the sphere's tilemap in the same frame -
-                            // the lines above the split show the previous level and radius, rkb_168 f51,360 ..)
-                            if let Some(op) = old_pal.as_ref().filter(|p| **p != pal_of(&view)) {
-                                olds.push(("u", tear_renderer.render(&packs, &with_pal(&v2, op), 0, W, H).to_vec()));
+                            if pal_moved {
+                                olds.push((format!("{l}o"), tear_renderer.render(&packs, &with_o(&base), 0, W, H).to_vec()));
+                                if timer_changed || sphere_changed {
+                                    olds.push((format!("{l}u"), tear_renderer.render(&packs, &with_o(&with_t(&base)), 0, W, H).to_vec()));
+                                }
                             }
+                            seen.push(base);
                         }
                     }
                     if !olds.is_empty() {
+                        if std::env::var_os("PIX_TORNDBG").is_some() {
+                            eprintln!("torndbg {name} f{k} ({n} px, {class})");
+                        }
                         if let Some(rows) = torn(&game[i], &ours, &olds) {
                             torn_rows.insert(k, rows);
                             class = "torn (hardware)".into();

@@ -2036,7 +2036,11 @@ fn start_cmd(w: &mut World, owner: Owner, cmd: &mut Cmd) {
                 let (cx, cy) = if *absolute {
                     (*x, *y)
                 } else {
-                    let (bx, by) = box_center(w, i);
+                    // (the centre of the shown cel's box, `0x08027C30`: 0x0800FE34's rect halved, then the script's
+                    // offset - not the facing's body box: emulator, real route sb_041 21-25 f3,756 .. f3,892, s-script
+                    // clouds around Super Buu in his hit pose at (64, 184) / (28, 235) / (59, 220), ours 8 px right
+                    // and 2 px down of them)
+                    let (bx, by) = if cel_box(w, i).is_some() { target_center(w, i) } else { box_center(w, i) };
                     (bx + *x, by + *y)
                 };
                 // the cloud is the explosion 0x08712FDC at rate 0x1000 + rand(0x1000) (0x0801952C: its run at

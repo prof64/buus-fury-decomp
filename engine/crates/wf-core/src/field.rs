@@ -3463,6 +3463,15 @@ fn restore_world_inner(w: &mut World, s: SavedWorld) {
     w.ents = s.ents;
     w.enemies = s.enemies;
     w.field = s.field;
+    // the return rebuilds the map's graphics as a closed menu does: the tile animations start over (`0x08009B80`:
+    // frame 0, countdown k + 1) while the camera's clock runs on - emulator, real route rkb_168 14-1 row 28,860
+    // (19-3 back from the 0-19 scene: the records (0, 1) / (0, 2) with the camera's counter at 22,837, ours kept
+    // the phase of before the scene), rows 29,880 / 31,110 / 34,890 / 42,509 the same. The return runs inside a
+    // field frame, after its animation tick: the first tick is the next iteration's (as `load_area_with`)
+    tile_anims_restart(w);
+    if let Some(f) = w.field.as_mut() {
+        f.entered_iter = f.cam_iters().wrapping_add(1);
+    }
     // script-moved props of the scenes loaded since the save are gone with them (they are keyed by the load count,
     // which the restored field turns back: the next real load would reuse the scene's count and its props - 14-22's
     // switch shrine s415 -> 14-21: the bridge props started from the shrine's positions; app soak of dungeon 7)

@@ -384,6 +384,24 @@ impl Renderer {
         m
     }
 
+    /// The map layers' scroll registers for `view`'s first camera, per BG 0..3 (`None`: the map has no layer on that
+    /// BG): `Layer::scroll_with` plus the shake and a script's `set_bg_offset` - what `draw_layer` scrolls by. For
+    /// the picture board's / the pixel gate's tear candidates (a layer still at the previous frame's scroll).
+    pub fn bg_scrolls(&mut self, packs: &Packs, view: &RenderView) -> [Option<(i32, i32)>; 4] {
+        let mut out = [None; 4];
+        let Some(mv) = view.map.as_ref() else { return out };
+        let Some(m) = self.map(packs, &mv.id) else { return out };
+        let cam = view.cameras.first().copied().unwrap_or_default();
+        for l in &m.layers {
+            let (sx, sy) = l.scroll_with(cam.x, cam.y, mv.anim_frame, mv.shake_sub);
+            let (bx, by) = mv.layers.as_ref().and_then(|s| s.offset.get(l.bg as usize).copied()).unwrap_or((0, 0));
+            if let Some(o) = out.get_mut(l.bg as usize) {
+                *o = Some((sx + mv.shake.0 + bx, sy + mv.shake.1 + by));
+            }
+        }
+        out
+    }
+
     fn resize(&mut self, w: usize, h: usize) {
         let n = w * h;
         self.w = w;
@@ -736,14 +754,6 @@ impl Renderer {
                     // on: Gotenks' cut-short crit shake leaves (3, -3); the actors drawn 3 px off without it). The
                     // screen-space OBJs (HUD, boss bar, numbers' screen items) stay put
                     let (shx, shy) = view.obj_shake.or(map.as_ref().map(|m| m.2)).unwrap_or((0, 0));
-                    // (`SpriteEffect::TopCull`: its OAM y - the camera-relative top as a byte - >= 160 with fewer than 5 of
-                    // its rows wrapped in at the top: none)
-                    if let SpriteEffect::TopCull { h } = s.effect {
-                        let y8 = (s.y - cy - shy) & 0xFF;
-                        if y8 >= 160 && y8 + h as i32 - 256 < 5 {
-                            continue;
-                        }
-                    }
                     self.ghost_on = view.see_through.contains(&s.entity);
                     self.draw_obj(sheet, *fi, *flip, s.x - vx - shx, s.y - vy - shy, s.effect);
                     self.ghost_on = false;
@@ -1003,11 +1013,17 @@ impl Renderer {
         let r = sp.radius.clamp(0, 128);
         let outer = circle(r);
         let mut rim = vec![0i32; 129];
+        // (the full-tile test reads the inner circle's table when there is a rim - the stack array at sp + 0x58,
+        // `0x0803AB6A`; without one that array is a copy of the outer table, `0x0803AB00`. Emulator, real route
+        // sb_041 21-25 f12,090, radius 33: the tiles (1, 2) / (2, 1) of the quadrant are not full - their corner
+        // pixel is rim)
+        let mut full = outer.clone();
         if r > 3 && !sp.jitter.is_empty() {
             let inner = circle(r - 3);
             for i in 0..r as usize {
                 rim[i] = if i < (r - 3) as usize { sp.jitter.get(i).copied().unwrap_or(0) as i32 + outer[i] - inner[i] } else { outer[i] };
             }
+            full = inner;
         }
         let pal = |ix: u8| (m.tileset.palette.get(ix as usize).copied().unwrap_or(0) & 0xFF_FFFF) | (ix as u32) << 24;
         let (fill, edge) = (pal(sp.colour), pal(2));
@@ -1017,7 +1033,7 @@ impl Renderer {
                 return 0;
             }
             let (tr, tc) = (qy >> 3, qx >> 3);
-            let last = outer[(tr * 8 + 7) as usize];
+            let last = full[(tr * 8 + 7) as usize];
             if tc < (last - 3) >> 3 {
                 return sp.colour;
             }
