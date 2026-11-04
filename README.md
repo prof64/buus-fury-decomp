@@ -1,20 +1,43 @@
 # Buu's Fury decomp
 
-A faithful recreation of *Dragon Ball Z: Buu's Fury* (GBA) in Rust, rebuilt from reverse engineering the original
-game, plus the research on all three Webfoot DBZ GBA games (The Legacy of Goku, The Legacy of Goku II, Buu's Fury).
+A playable Rust recreation of *Dragon Ball Z: Buu's Fury* for the Game Boy Advance. This repository is the reference
+implementation and includes reverse-engineering research on all three Webfoot Dragon Ball Z GBA games. Legacy of
+Goku X is a separate game that develops its own snapshot of this engine.
 
-This repo is the reference: Story mode matches the original frame for frame (three full recorded playthroughs replay
-exactly; see `tools/wholerun/check.sh`), and the engine crates here are what new games build on. New design work
-(UI, online battle game, new content) lives in **Legacy of Goku X** (`github.com/prof64/legacy-of-goku-x`), which uses
-the mechanics from this repo.
+## How it was built
 
-ROMs are not in the repo. Put them in `roms/` as `log1.gba`, `log2.gba`, `buu.gba`.
-Everything derived from them (images, emulator save states) is gitignored and rebuilt locally.
+This was a human-directed, AI-assisted reverse-engineering project. Claude Opus 5.5 contributed to the research,
+implementation, and tests. We read the original game's disassembly and used a scriptable build of mGBA to step
+through the game, record input and game state, and trace memory reads and writes with breakpoints and watchpoints.
+The [research notes](re/buu/notes.md) record ROM addresses, observations, and the scripts used to check them.
 
-## Setup (fresh checkout)
+The Rust engine implements the resulting rules. We tested changes by replaying the same inputs in the original game
+and the recreation, comparing state, sound events, and selected rendered frames. Short recordings isolate particular
+behaviors, while whole-game recordings catch changes that only show up after a long sequence of play.
+
+## Current state
+
+- **Playable.** The Buu's Fury campaign runs from the title screen through the credits. The engine also includes
+  battles, saves, replays, mods, and a multiplayer lobby. See the [engine quickstart](engine/README.md) for the
+  macOS and web builds.
+- **Measured accuracy.** The [whole-run checker](tools/wholerun/check.sh) compares three recorded playthroughs
+  on game-logic ticks in its default mode. It checks area, position, random-number state, story flags, script
+  depth, and audio events. Each run has a documented exception for Vegeta's movement inside Buu, where the
+  original reads bytes left over from freed objects. The checker skips that interval and resumes from the
+  original game's recorded state. The November 3, 2026 check passed all six compared legs, covering 5.88
+  million logic iterations outside those exceptions.
+- **Known differences.** Some visual details, including scanline-level HUD effects and world-map drawing, differ.
+  The [replay and coverage notes](engine/docs/segments.md) and [accuracy log](engine/docs/accuracy-log.md) describe
+  the evidence and remaining differences. The replays cover specific paths and inputs.
+
+To play, bring a Buu's Fury ROM. The engine extracts its game content locally. The repository contains decoded
+research tables, recorded test inputs, and test fixtures. ROMs, generated graphics and audio for the research site,
+and local emulator saves are kept outside Git.
+
+## Research dashboard setup
 
 Needs Python 3, Node 20+, (macOS) Homebrew `ninja libpng freetype xz` for the emulator build, and `ffmpeg` (with
-libmp3lame) for the Buu's Fury audio rip.
+libmp3lame) for the Buu's Fury audio rip. Put your ROMs in `roms/` as `log1.gba`, `log2.gba`, and `buu.gba`.
 
     python3 -m venv .venv && .venv/bin/pip install capstone numpy pillow cmake
     sh tools/emu/build.sh                      # builds mGBA + the headless emulator shim
