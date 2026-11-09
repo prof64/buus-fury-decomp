@@ -628,6 +628,8 @@ fn replay(t: &Value) -> Vec<Row> {
                     eprintln!("{line}");
                 }
             }
+            // (diagnostics: the coverage report's recorder, off without WF_COVERAGE - every row is compared)
+            wf_core::coverage::commit_world(&s.world);
             let mut r = row(&s.world, sfx, dmg, enemy);
             if r.e.is_none() {
                 r.e = last_e;
@@ -709,6 +711,7 @@ fn lockstep_vs_emulator() {
                 skipped += 1;
                 continue;
             }
+            wf_core::coverage::context(&name);
             let exp = expand(t);
             let got = replay(t);
             frames += exp.len();

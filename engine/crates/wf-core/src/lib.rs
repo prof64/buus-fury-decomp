@@ -9,6 +9,7 @@ pub mod actor;
 pub mod ai;
 pub mod battle;
 pub mod content;
+pub mod coverage;
 pub mod damage;
 pub mod eanim;
 pub mod enemy;

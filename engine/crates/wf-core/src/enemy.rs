@@ -419,6 +419,8 @@ impl Enemy {
                 ((t - 0x80) >> 5) & 1
             };
             self.roll_ctl = (t + 8) & 0xffff;
+            // (the counter is the object's animation tick, +0x12: opponent audit oa_t38_*)
+            self.ea.pos.tick = self.roll_ctl;
         }
         if self.hover_ctl {
             self.a.z = (self.a.z - 1).max(-50);

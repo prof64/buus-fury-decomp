@@ -478,6 +478,10 @@ pub enum Frame<'a> {
 }
 
 pub fn replay_with(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: &Value, hook: &mut dyn FnMut(Frame)) -> Report {
+    // (diagnostics: the coverage report's recorder, off without WF_COVERAGE; level `state` = the actor comparison -
+    // every frame of the matched prefix counts as compared)
+    wf_core::coverage::context(doc["name"].as_str().unwrap_or("?"));
+    let cover_state = wf_core::coverage::level() == Some("state");
     let frames = doc["frames"].as_array().cloned().unwrap_or_default();
     let mut rep = Report { frames: frames.len(), ..Default::default() };
     let (imp, mut host) = match start(data, files, doc) {
@@ -856,6 +860,9 @@ pub fn replay_with(data: &Arc<GameData>, files: &BTreeMap<String, String>, doc: 
         }
         if fr.get("vram").is_some() {
             game_vram = fr["vram"].clone();
+        }
+        if cover_state && rep.first.is_none() {
+            wf_core::coverage::commit_world(&sess.world);
         }
         hook(Frame::After(k, &sess.world));
         // (the recording's last row is taken as an iteration's end: a recording that stops inside a long iteration -

@@ -450,6 +450,8 @@ impl Renderer {
 
     /// Compose the view for local player `player` into `self.fb` (`w` x `h` world pixels).
     pub fn render(&mut self, packs: &Packs, view: &RenderView, player: usize, w: usize, h: usize) -> &[u32] {
+        // (diagnostics: the coverage report's recorder, off without WF_COVERAGE)
+        wf_view::coverage::commit(view);
         self.resize(w, h);
         self.ghost.clear();
         if !view.see_through.is_empty() {

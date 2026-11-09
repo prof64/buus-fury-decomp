@@ -839,6 +839,21 @@ fn field_from_ram(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     w.ents.extend(shots);
     import_effects(w, ram);
     let rows: std::collections::BTreeMap<u32, (i32, i32, i32, i32)> = ram.actor_rows.iter().map(|r| (r.0, (r.1, r.2, r.3, r.4))).collect();
+    // a map prop a script hid or showed since the load (the prop objects - vt 0x0804D1E4 the map's first, which
+    // owns the props' tiles, 0x0804BA78 the others: +0x14 u16 the index - the track lookup 0x0800D272 answers
+    // (8, index) with the object - and +0x1C the shown word the hide / show command 0x08019474 writes): HFIL 18-4's
+    // spikes, hidden by the area's load script once flag 181 is set (whole run 1 row 1,127,500: the rebuilt map
+    // showed them); 18-2's floor switch, prop 0 hidden and prop 1 shown once pressed (run 3 row 1,922,760)
+    // (a prop with no object in the list keeps the rebuilt map's state: hiding those lost 580 board frames)
+    for o in ram.objects() {
+        if matches!(ram.r32(o), 0x0804_D1E4 | 0x0804_BA78) {
+            let (id, shown) = (ram.r16(o + 0x14) as i32, ram.r32(o + 0x1C) != 0);
+            let cur = w.field.as_ref().and_then(|f| f.props.get(id as usize)).map(|p| p.visible);
+            if cur.is_some_and(|c| c != shown) {
+                wf_core::scene::set_prop_shown(w, id, shown);
+            }
+        }
+    }
     patch_leader(w, ram, notes);
     // the walk and enemy grids as they stand (map object +0xA8 / +0xB0: bitmaps, 32 bytes a row, bit = free)
     import_grids(w, ram);
@@ -1877,7 +1892,7 @@ fn import_waves(w: &mut World, ei: usize, ram: &GbaRam, o: u32) {
         // (+0x44: 0 growing, 1 pulling back after a wall / its life, 2 pulling back after a hit - both retract 4 a
         // frame from the tail, ours is mode 1: tour castle_ship_42, a wave in mode 2 from 0x20 gone at f8)
         let mode = if ram.s32(b + 0x44) != 0 { 1 } else { 0 };
-        let kind = wf_core::shots::ShotKind::EnergyWave { len: ram.s32(b + 0x40), mode, life: ram.s32(b + 0x1C) };
+        let kind = wf_core::shots::ShotKind::EnergyWave { len: ram.s32(b + 0x40), mode, life: ram.s32(b + 0x1C), depth: ram.s32(b + 4) };
         let mut s = wf_core::shots::Shot::new(me, ram.r8(b + 0x10) & 3, 0, ram.s32(b + 0x20) << 8, ram.s32(b + 0x24) << 8, kind);
         s.t = ram.s32(b + 0x14) as i64;
         wf_core::shots::add(w, s);

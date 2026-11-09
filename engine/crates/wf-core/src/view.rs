@@ -180,7 +180,11 @@ pub fn draw_key(w: &World, i: usize) -> (i32, i32, u32) {
                 || matches!(&s.kind, ShotKind::Straight(o) if o.name == SName::Star)
                 // (the Mercenary's rifle bullet too: the new bullet behind him at its muzzle - opponent audit
                 // oa_t4b_idle f61, OAM 16x16 after his body)
-                || matches!(&s.kind, ShotKind::Straight(o) if o.name == SName::Rifle);
+                || matches!(&s.kind, ShotKind::Straight(o) if o.name == SName::Rifle)
+                // (the gun bullet 0x08049F0C too: emulator sort keys layer 0x38, depth its y - behind the Assassin's
+                // muzzle on its first frame and under the player's halo; opponent audit oa_t02_idle f87, oa_t02_above
+                // f108 .. f110)
+                || matches!(&s.kind, ShotKind::Straight(o) if o.name == SName::Gun);
             // a Kamikaze ghost is an actor object (layer 0x38, depth y + 4 like an actor: skill audit sa_f31_skill13,
             // Gotenks' fist in front of the shadow of a ghost above him)
             let ghost = matches!(&s.kind, ShotKind::Ghost(_));
@@ -196,6 +200,15 @@ pub fn draw_key(w: &World, i: usize) -> (i32, i32, u32) {
             // (the robots' flame 0x080246B4 too: behind the player it burns - opponent audit oa_t01_left f7 ..: the
             // first flame hidden behind Goku's head, then his red hit flash over the flames)
             let ki = ki || matches!(&s.kind, ShotKind::Flame { .. });
+            // the energy wave 0x08049C98 (the soldiers' / turrets' growing beam): layer 0x38 too, its depth set once
+            // by its constructor (0x0802A340: +8 = 0x38, +4 = the start y, + 0x2C when fired down; emulator sort keys
+            // oa_t17_above f119 .. f128: 279 throughout = 235 + 44, oa_t16_below f42: 305) - under the player's halo
+            // it reaches, behind a soldier below
+            let wave_low = match &s.kind {
+                ShotKind::EnergyWave { depth, .. } => Some(*depth),
+                _ => None,
+            };
+            let ki = ki || wave_low.is_some();
             (
                 if matches!(s.kind, ShotKind::DarkSphere { .. }) {
                     2
@@ -207,6 +220,8 @@ pub fn draw_key(w: &World, i: usize) -> (i32, i32, u32) {
                 // (a star at its thrower's depth sorts behind it - the new object at an equal key: oa_t4e_above f128)
                 if matches!(&s.kind, ShotKind::Straight(o) if o.name == SName::Star) {
                     s.py() - 5
+                } else if let Some(y) = wave_low {
+                    y - 4
                 } else if ki {
                     s.py() - 4
                 } else {
@@ -401,7 +416,10 @@ fn actor_draw(
     let fp = crate::geom::Rect::new(a.px(), a.py(), a.px() + a.foot_w, a.py() + a.foot_h);
     let off_screen = !w.cameras.is_empty()
         && w.cameras.iter().all(|c| fp.x1 <= c.shown.x0 || fp.x0 >= c.shown.x1 || fp.y1 <= c.shown.y0 || fp.y0 >= c.shown.y1);
-    if let Some(sh) = sp.shadow.as_ref().filter(|sh| sh.as_str() != "shadow_0x0" && !off_screen) {
+    // (an actor a script took the shadow record from - `set_attachment(actor, 0, 0, ..)`, actor+0x5C = 0 - has none:
+    // s319's Dabura after his change of sprite, Babidi's ship 8-16 - pixel gate shipr_238_8-16 f5040 ..)
+    let detached = w.field.as_ref().and_then(|f| f.vram.as_ref()).is_some_and(|v| v.shadow_set.iter().any(|o| o.0 == id && o.1.is_none()));
+    if let Some(sh) = sp.shadow.as_ref().filter(|sh| sh.as_str() != "shadow_0x0" && !off_screen && !detached) {
         out.sprites.push(SpriteDraw {
             entity: id,
             sheet: format!("effects/{sh}"),
@@ -431,10 +449,12 @@ fn actor_draw(
 
 /// The shadow's offset from the sprite header's dx / dy bytes: an enemy's shadow object takes them signed (Dabura
 /// fought in a battle: his at (-8, -4) under his feet - opponent audit oa_t12_idle; Yamu's dy 0xF8 8 px up -
-/// oa_t94), every other actor's (players, scene NPCs) unsigned - the story's Dabura (an NPC) shows none: dx 248 puts
-/// it off screen (pixel gate shipr_238_8-16 f5040 .., his dy 0xFC). Only these two sprites have a byte >= 0x80.
+/// oa_t94), and so does an actor a script spawned (object vt 0x0804CEF4: Dabura in Rocky Canyon 8-70's scene, the
+/// game's OAM has his 32x16 shadow at (52, 53) with him at screen (60, 57) - whole run 1 row 568,216; Yamu at the
+/// tournament), every other actor's (players, a map's own NPCs) unsigned. Only these two sprites have a byte
+/// >= 0x80. (Dabura in s319, 8-16, shows none: the script detaches it - `render_actor`'s `detached`.)
 fn shadow_at(w: &World, id: u32, sp: &crate::content::Sprite) -> (i32, i32) {
-    let enemy = w.find(id).is_some_and(|k| matches!(w.ents[k].body, Body::Enemy(_)));
+    let enemy = w.find(id).is_some_and(|k| matches!(&w.ents[k].body, Body::Enemy(_)) || matches!(&w.ents[k].body, Body::Npc(n) if n.tag.is_none()));
     if enemy {
         (sp.shadow_off.0 as u8 as i8 as i32, sp.shadow_off.1 as u8 as i8 as i32)
     } else {
@@ -666,6 +686,8 @@ fn game_qsort<T>(a: &mut [T], lo: usize, hi: usize, before: &impl Fn(&T, &T) -> 
 fn render_view_with(w: &World, link: Option<&LinkDraw>, out: &mut RenderView) {
     out.clear();
     out.frame = w.frame as u64;
+    // (diagnostics: the coverage report's recorder, off without WF_COVERAGE)
+    crate::coverage::world(w);
     // (battle mode: the players show through foreground scenery - not the story, which is the game's picture)
     if w.field.is_none() {
         out.see_through.extend(w.players.iter().copied());

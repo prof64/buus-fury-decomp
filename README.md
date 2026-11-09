@@ -28,11 +28,26 @@ behaviors, while whole-game recordings catch changes that only show up after a l
   million logic iterations outside those exceptions.
 - **Known differences.** Some visual details, including scanline-level HUD effects and world-map drawing, differ.
   The [replay and coverage notes](engine/docs/segments.md) and [accuracy log](engine/docs/accuracy-log.md) describe
-  the evidence and remaining differences. The replays cover specific paths and inputs.
+  the evidence and remaining differences. Six existing menu-comparison cases also retain one or two mismatching frames
+  each; the published baseline and recovered version produce identical menu metrics. The replays cover specific
+  paths and inputs.
 
 To play, bring a Buu's Fury ROM. The engine extracts its game content locally. The repository contains decoded
 research tables, recorded test inputs, and test fixtures. ROMs, generated graphics and audio for the research site,
 and local emulator saves are kept outside Git.
+
+## Recovered research and validation
+
+The November 8, 2026 consolidation adds the compact opponent/skill regression audits, coverage instrumentation,
+and 201 additional visual-comparison scenes that were missing from the published repository. With the
+original USA ROM, the recovered audits pass all 1,000 recorded scenarios against their exact locks or documented
+remaining-difference limits. The pixel gate passes 46,705 locked frames across 691 segments. These checks use
+committed inputs and regenerate their extracted content locally; they do not require the retired working folder.
+
+Other HUD, sprite, world-map and boss-scene experiments remain preserved on `archive/2026-11-08/*` branches.
+Their combined graphics changes failed existing visual locks and were kept out of main. Sixteen uncommitted
+working files, including unresolved merge drafts, are preserved outside the active source tree on the relevant
+archive branches. See [the recovery record](engine/docs/recovered-research.md) for their status and the test commands.
 
 ## Research dashboard setup
 
