@@ -1,0 +1,52 @@
+[
+  {
+    "path": "engine/crates/wf-app/examples/pixels.rs",
+    "status": "UU",
+    "sha256": "604eebe30d3a57124802c0f1dea69751ed1df91098446feb0e32a597f4b12571"
+  },
+  {
+    "path": "engine/crates/wf-app/tests/pixels.rs",
+    "status": "UU",
+    "sha256": "8143518e20444fbea77aae209d3ba978986ef46997df9d54a515be734536cb3b"
+  },
+  {
+    "path": "engine/crates/wf-core/src/field.rs",
+    "status": "M ",
+    "sha256": "6581bfeafb61686df5ef27761e9b788d5facdcc889d67b3ae0c45f9d85d1a649"
+  },
+  {
+    "path": "engine/crates/wf-core/src/scene.rs",
+    "status": "M ",
+    "sha256": "325397c9ed5a2fec281366bda0874db658f906da9df85fe26ced67f1fd61af0f"
+  },
+  {
+    "path": "engine/crates/wf-core/src/view.rs",
+    "status": "M ",
+    "sha256": "56121da905c60d1159c9184ba7652da4b50e36e7afeda8b092fda6a448731113"
+  },
+  {
+    "path": "engine/crates/wf-render/src/lib.rs",
+    "status": "M ",
+    "sha256": "85a22a886bb9304ede72c1a62dc8869ba125f8bc1d01e4e722595dff500bc1d4"
+  },
+  {
+    "path": "engine/crates/wf-view/src/lib.rs",
+    "status": "M ",
+    "sha256": "1d9e2bd5aceb88285c33c6c37bd47499d8c25b0f14a31d67a7c96a1ce9d6b492"
+  },
+  {
+    "path": "engine/docs/accuracy-log.md",
+    "status": "UU",
+    "sha256": "afacde4b63d2940072f64cea3e53ee4e97319909bbea55d9f8c850ef89ed85be"
+  },
+  {
+    "path": "engine/docs/core.md",
+    "status": "M ",
+    "sha256": "1c54d0ad0552c45d8c39eae5cb250c0e5ea1ffbcc3cf80cd351b1e43cbbb066c"
+  },
+  {
+    "path": "engine/docs/segments.md",
+    "status": "UU",
+    "sha256": "4916bb5da9bc13bef6023128aaf348e90ef59c78368c5425a8cb32df0ad91cff"
+  }
+]
