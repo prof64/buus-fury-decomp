@@ -28,7 +28,9 @@ behaviors, while whole-game recordings catch changes that only show up after a l
   million logic iterations outside those exceptions.
 - **Known differences.** Some visual details, including scanline-level HUD effects and world-map drawing, differ.
   The [replay and coverage notes](engine/docs/segments.md) and [accuracy log](engine/docs/accuracy-log.md) describe
-  the evidence and remaining differences. The replays cover specific paths and inputs.
+  the evidence and remaining differences. Six existing menu-comparison cases also retain one or two mismatching frames
+  each; the published baseline and recovered version produce identical menu metrics. The replays cover specific
+  paths and inputs.
 
 To play, bring a Buu's Fury ROM. The engine extracts its game content locally. The repository contains decoded
 research tables, recorded test inputs, and test fixtures. ROMs, generated graphics and audio for the research site,

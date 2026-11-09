@@ -34,6 +34,11 @@ The compact audit gates compare 462 opponent scenarios / 215,555 frames and 538 
 limits on their known differences; the tests reject regressions beyond those limits. The pixel gate separately
 locks 46,705 frames across 691 segments. Passing these checks does not establish accuracy for every possible input.
 
+The broader suite has a pre-existing failure in `menus_match_emulator`: `link_trade_accept`, `link_trade_decline`,
+`link_trade_declined`, `link_trade_propose`, `title_dojo` and `title_trade` retain one or two mismatching frames each.
+The published baseline `e5c55b3` and the recovered version produce identical results for all 203 menu metric lines,
+including these failures. The recovered code does not change those results.
+
 ROM extraction caches, compiled binaries, raw screenshot/framebuffer dumps and old emulator saves were local
 working material. They were not added to GitHub. The compact audit inputs, source, hashes and replay key logs
 needed for the retained checks remain in Git. The historical whole-run measurements and their known exceptions
