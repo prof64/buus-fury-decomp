@@ -125,4 +125,3 @@ pub fn compose(ours: &mut [u32], spec: &[String], cand: &mut dyn FnMut(&str) -> 
         }
     }
 }
-

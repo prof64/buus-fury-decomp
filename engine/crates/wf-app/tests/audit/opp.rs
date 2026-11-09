@@ -1255,4 +1255,3 @@ pub fn audit(t: &Value, pics: &Pictures, packs: &wf_app::wf_content::Packs, out:
     }
     Audit { name, frames: n, tile_off, first: first.at, obj_frames, state: first.state.into_iter().collect(), picture: first.picture.into_iter().collect(), torn, summary }
 }
-
