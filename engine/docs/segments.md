@@ -7259,5 +7259,6 @@ What the 4,500 differing samples are (the board's classes; a frame counts once, 
 * **BG, ~950**: the world map's ground under the flyer (mode 7: a pixel of perspective), its place-name label a
   frame off, a map marker missing once (db5_040), the two boss scenes;
 * **text boxes, ~260**: small (median ~20 px), mostly in the same scenes.
-Not on this board at all: the skill audit (528 scenarios) and the opponent audit (463) compare every frame but live
-in `work/` and are run by hand, not gated.
+Not on this board: the skill audit (538 segments) and the opponent audit (462 scenarios) compare every frame and are
+gated on their own (`tests/audits.rs`: exact scenarios locked, the rest ratcheted - tools/battle/LOCKSTEP.md "The
+audit gates").

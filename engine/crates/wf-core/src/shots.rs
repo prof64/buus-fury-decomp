@@ -376,10 +376,12 @@ pub enum ShotKind {
     /// mummy bandage 0x0802D79C
     Wrap(Box<MummyWrap>),
     /// energy wave 0x08049C98: segment tail..head, grows 4/frame to 48 then moves 4 px/frame (`life` +0x1C)
+    /// (`depth`: its sort depth, set once by the constructor 0x0802A346 - the start y, + 0x2C fired down)
     EnergyWave {
         len: i32,
         mode: i32,
         life: i32,
+        depth: i32,
     },
     /// flame 0x0804BFCC: 16x16, 20 frames, one hit
     Flame {
@@ -637,6 +639,7 @@ pub fn energy_wave(w: &mut World, owner: EntityId, dir: Dir, x: i32, y: i32) -> 
             len: 8,
             mode: 0,
             life: 0,
+            depth: (y >> 8) + if dir == 0 { 0x2c } else { 0 },
         },
     )
 }
@@ -3023,7 +3026,7 @@ fn wave_update(w: &mut World, i: usize) {
     let dir = w.shot_ref(i).dir;
     let (dx, dy) = DIR_VEC[dir as usize];
     w.shot(i).t += 1;
-    let ShotKind::EnergyWave { len, mode, life } = w.shot_ref(i).kind else {
+    let ShotKind::EnergyWave { len, mode, life, depth } = w.shot_ref(i).kind else {
         return;
     };
     if mode == 1 {
@@ -3055,14 +3058,14 @@ fn wave_update(w: &mut World, i: usize) {
     let (hx, hy) = (px + dx * len, py + dy * len);
     let r = rect(w, i);
     if in_wall(w, i, &r) {
-        set_kind(w, i, ShotKind::EnergyWave { len, mode: 1, life });
+        set_kind(w, i, ShotKind::EnergyWave { len, mode: 1, life, depth });
         return;
     }
     // (the wave's message goes to every object, 0x08011C0C: a ki blast in its way bursts and the player behind it is
     // still hit - real route 14-2 f862)
     if hit(w, i, r, atk(1), 1024, false) {
         fx::puff_rng(w, hx, hy);
-        set_kind(w, i, ShotKind::EnergyWave { len, mode: 1, life });
+        set_kind(w, i, ShotKind::EnergyWave { len, mode: 1, life, depth });
         return;
     }
     let mut l = len;
@@ -3081,6 +3084,7 @@ fn wave_update(w: &mut World, i: usize) {
             len: l,
             mode: if life > 240 { 1 } else { 0 },
             life,
+            depth,
         },
     );
 }

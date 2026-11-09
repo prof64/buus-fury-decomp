@@ -1128,10 +1128,8 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
             kb_set(r, &kb);
         }
         // enter 0x08037A42 = SetAnimHold(4, 0): raw 5 under the hold state, frame 0 (no swing, no rand)
-        K::LungeStep => {
-            let h = w.data.anim.hold;
-            set_anim_r(w, i, &[an(4)], false, h);
-        }
+        // (the tick stays: opponent audit oa_t62_idle f69, tick 3 kept from the state before)
+        K::LungeStep => hold_pose(w, i, 5, 0),
         // RandomStep (create 0x08037C06, vtable 0x0804B1C0; the Skeleton's bones rattle before they rise): enter
         // 0x0804E824 keeps the position
         K::RandomStep => {
@@ -1262,7 +1260,9 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
         }
         // BeamDodge 0x08029778 (state 0x15A, pushed by IfInPlayerBeamLine): away from the player's line - the player
         // facing down / up: left when the player's x (24.8) is greater, else right; facing left / right: up when
-        // the player's y is greater, else down; SetAnim(0x12) under the controller vt 0x0804A758 (real run 14-2)
+        // the player's y is greater, else down; SetAnimRaw(0x12) (enter 0x080297FA: raw 19 - opponent audit oa_t16_ki
+        // f6, the Elite Majin Soldier's dodge cels; ours asked for raw 18 and showed the idle) under the controller vt
+        // 0x0804A758 (real run 14-2)
         K::BeamDodge => {
             if let Some(pi) = en::player(w, i) {
                 let pa = &w.pl_ref(pi).a;
@@ -1280,7 +1280,7 @@ fn leaf_enter(w: &mut World, c: &C, n: u16, r: &mut NodeRt) {
                 };
             }
             let h = w.data.anim.hold;
-            set_anim_r(w, i, &[an(17)], true, h);
+            set_anim_r(w, i, &[an(18)], true, h);
             r.d[6] = w.en_ref(i).anim_seq as i32;
         }
         // controller state 0x03003108 (enter 0x0802F6A8: face, SetAnimRaw(0x12))
@@ -3311,6 +3311,8 @@ fn leaf_update(w: &mut World, c: &C, n: u16, f: i32, r: &mut NodeRt) -> bool {
             hop_height(w, i, c0);
             r.d[0] = (r.d[0] + 8) & 0xff;
             let ph = r.d[0];
+            // (the counter is the object's animation tick, +0x12: opponent audit oa_t38_*, 8 16 .. 0xF8 0)
+            w.en(i).ea.pos.tick = ph;
             if ph == 0 && w.rng.chance(0x4000) {
                 mini_aim(w, i);
             }

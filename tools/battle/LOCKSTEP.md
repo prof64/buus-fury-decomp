@@ -327,7 +327,7 @@ replayed in the battle sim on the same map (8-3, arena rules off: the faithful c
   triptychs per scenario, 6; `OA_PNGAT=f,..` those frames too; `OA_NODN` leaves the damage numbers' boxes out of the
   pixel count; `OA_RNG=f,..` every generator call of those frames; `OA_SHOTS=f,..` our shots and draw order after
   them; the log's `obj_box` is each frame's OBJ-difference box; our animation raw is named by its first ROM slot like
-  the recorder's). One line per scenario: the first diverging frame of each category - `player` (the
+  the recorder's; `OA_PACK=dir` also writes the gate's data, below). One line per scenario: the first diverging frame of each category - `player` (the
   lockstep row: state / anim / position / HP / EP / sounds / RNG), `dmg` (ComputeDamage results), `enemy` (position /
   facing / HP), `anim` (raw / frame / tick / height), `ai` (AI state), `others` (the other enemy objects: parts,
   summons, Janemba's hand), `pix` (OBJ pixels: a difference within 48 px of a sprite's or the game's enemies'
@@ -337,3 +337,38 @@ replayed in the battle sim on the same map (8-3, arena rules off: the faithful c
   frame late), the game-over screen. Our side draws the map's props (the field's; a battle world has none) and runs
   the map's tile clock at the fitted offset. The damage the game computes on Janemba's parts is not an event here
   (the `dmg` category shows it as `-1:...` on the game's side only).
+
+### The audit gates (`cargo test -p wf-app --test audits`)
+
+Both frame-by-frame audits are gated tests (`engine/crates/wf-app/tests/audits.rs`, headless, muted, parallel workers,
+~20 s): the opponent audit above (462 scenarios, 215,555 frames) and the skill audit (538 segments, 180,160 frames:
+`work/skillaudit`, playtest.md "Skill audit").
+
+* **Data** (`data/audits/`, no pictures): per scenario one zlib'd JSON - `opp/NAME.json.z` = the recording's trace
+  (`rows`, `vis`, the scenario) + `pic`: the fitted tile clock, the FNV-1a 64 hash of the game's picture of every
+  frame, the torn frames' line specs; `skill/NAME.json.z` = the segment (without its `vram` rows: the audit runs
+  without the tile-allocator check) + `pic` likewise. Packed from the recordings in `work/` by the audits by hand:
+  `OA_PACK=data/audits/opp cargo run --release -p wf-app --example opp_audit -- work/ub/oa/oa_*.json` and
+  `SA_PACK=data/audits/skill cargo run --release -p wf-app --example skill_audit -- work/skillaudit/segs/sa_*.json`
+  (the comparers are shared with the gate: `tests/audit/{opp,skill,pack}.rs`). Re-pack after re-recording, or after
+  a change to what the tear rule accepts.
+* **Locked**: a scenario with no difference on any frame - state (the opponent audit's rows: player, damage, enemy,
+  animation, AI, other enemy objects; the skill audit's segment harness) and picture - is locked: any difference
+  fails the test.
+* **Ratchet** (`data/audits/opp.json`, `skill.json`): every other scenario with `[first frame with a state difference,
+  count, first frame whose picture differs, count]` (the skill audit's state count = the harness's differing
+  comparisons). The test fails when one gets worse (an earlier first difference or more differing frames) and prints
+  the ones that got better. Tighten it after a fix (read the printed changes first - it records what the run
+  measured): `AUDIT_RATCHET=write cargo test --release -p wf-app --test audits`.
+* **The tear rule** (as the pixel gate's, core.md): a differing frame counts as the game's when every line of the
+  game's picture is ours or ours with one of the previous frame's states - every BG's scroll, some BGs' scroll (the
+  registers are written one BG after the other: 8-3's frames show lines 0..8 all old, 9..33 BG2 / BG3 old), the map's
+  animated tiles (their VRAM copy, also pixel by pixel inside a running copy), the palette - and the lines only an old
+  state explains are all above the lines only the new picture explains (a picture old on every line would be a frame
+  late, not torn). The HUD's gauge (its tiles copied into sprite memory at scanline 26-27 on some frames: playtest.md)
+  is accepted old on lines above 27. `OA_NOTEAR` / `SA_NOTEAR` turn it off, `OA_TEARDBG` prints a frame's lines.
+* Known, kept in the ratchet: what a kill gives in the story (the XP's level-up - its rolls, the hold, the jingle -
+  the drop roll and the dropped item, the freed enemy object: a battle world has none of it, every `_ko` scenario and
+  the `_punch` / `_ki` / `_fight` ones that kill differ from the kill on); two objects at an equal sort key (the
+  game's unstable sort: the Worm Head and its first segment, a shield over the player); the beam charge's torn
+  fragment (skill audit f9 / f110).

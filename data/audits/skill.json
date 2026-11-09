@@ -1,0 +1,1648 @@
+{
+  "note": "audit gate (engine/crates/wf-app/tests/audits.rs): the scenarios that are not exact - [first frame with a state difference, count, first frame whose picture differs, count]; every other scenario is locked exact. Re-made by `AUDIT_RATCHET=write cargo test --release -p wf-app --test audits`",
+  "scenarios": 538,
+  "frames": 180160,
+  "exact": 265,
+  "state_differences": 6872,
+  "picture_frames": 6958,
+  "ratchet": {
+    "sa_defuse_f32_idle": [
+      null,
+      0,
+      108,
+      30
+    ],
+    "sa_defuse_f33_idle": [
+      null,
+      0,
+      108,
+      30
+    ],
+    "sa_defuse_f42_idle": [
+      null,
+      0,
+      108,
+      25
+    ],
+    "sa_defuse_f42_walk": [
+      null,
+      0,
+      108,
+      25
+    ],
+    "sa_defuse_f43_idle": [
+      null,
+      0,
+      108,
+      25
+    ],
+    "sa_f00_skill15_lv3_right": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f01_skill15_lv3_right": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f02_skill15_lv1_down": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f02_skill15_lv1_left": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f02_skill15_lv1_right": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f02_skill15_lv1_up": [
+      null,
+      0,
+      9,
+      10
+    ],
+    "sa_f02_skill15_lv2_down": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f02_skill15_lv2_left": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f02_skill15_lv2_right": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f02_skill15_lv2_up": [
+      null,
+      0,
+      9,
+      11
+    ],
+    "sa_f02_skill15_lv3_down": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f02_skill15_lv3_left": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f02_skill15_lv3_right": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f02_skill15_lv3_up": [
+      null,
+      0,
+      9,
+      11
+    ],
+    "sa_f02_skill7_lv1_up": [
+      null,
+      0,
+      22,
+      20
+    ],
+    "sa_f02_vs_punch_right": [
+      0,
+      528,
+      0,
+      156
+    ],
+    "sa_f02_vs_skill15_lv3_right": [
+      0,
+      936,
+      0,
+      386
+    ],
+    "sa_f03_skill15_lv3_right": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f03_skill22_transform_right": [
+      null,
+      0,
+      6,
+      4
+    ],
+    "sa_f04_skill15_lv3_right": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f04_skill22_transform_right": [
+      null,
+      0,
+      6,
+      4
+    ],
+    "sa_f05_punch_right": [
+      null,
+      0,
+      34,
+      2
+    ],
+    "sa_f05_skill14_lv3_right": [
+      null,
+      0,
+      35,
+      5
+    ],
+    "sa_f05_skill14_steer_right": [
+      null,
+      0,
+      35,
+      5
+    ],
+    "sa_f05_skill15_lv3_right": [
+      null,
+      0,
+      9,
+      34
+    ],
+    "sa_f05_skill20_transform_right": [
+      null,
+      0,
+      34,
+      8
+    ],
+    "sa_f05_skill7_lv1_right": [
+      null,
+      0,
+      5,
+      10
+    ],
+    "sa_f06_punch_right": [
+      null,
+      0,
+      34,
+      2
+    ],
+    "sa_f06_skill14_lv3_right": [
+      null,
+      0,
+      35,
+      5
+    ],
+    "sa_f06_skill14_steer_right": [
+      null,
+      0,
+      35,
+      5
+    ],
+    "sa_f06_skill15_lv3_right": [
+      null,
+      0,
+      9,
+      34
+    ],
+    "sa_f06_skill20_transform_right": [
+      null,
+      0,
+      34,
+      8
+    ],
+    "sa_f06_skill7_lv1_right": [
+      null,
+      0,
+      5,
+      10
+    ],
+    "sa_f07_skill15_lv3_right": [
+      null,
+      0,
+      9,
+      25
+    ],
+    "sa_f07_skill7_lv1_right": [
+      null,
+      0,
+      5,
+      2
+    ],
+    "sa_f08_skill15_lv3_right": [
+      null,
+      0,
+      9,
+      25
+    ],
+    "sa_f08_skill7_lv1_right": [
+      null,
+      0,
+      5,
+      2
+    ],
+    "sa_f09_skill17_lv3_right": [
+      null,
+      0,
+      6,
+      3
+    ],
+    "sa_f09_skill17_steer_right": [
+      null,
+      0,
+      85,
+      3
+    ],
+    "sa_f09_skill6_lv3_right": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f10_skill17_lv1_down": [
+      null,
+      0,
+      6,
+      7
+    ],
+    "sa_f10_skill17_lv1_left": [
+      null,
+      0,
+      6,
+      11
+    ],
+    "sa_f10_skill17_lv1_right": [
+      null,
+      0,
+      6,
+      11
+    ],
+    "sa_f10_skill17_lv1_up": [
+      null,
+      0,
+      6,
+      9
+    ],
+    "sa_f10_skill17_lv2_down": [
+      null,
+      0,
+      6,
+      7
+    ],
+    "sa_f10_skill17_lv2_left": [
+      null,
+      0,
+      6,
+      11
+    ],
+    "sa_f10_skill17_lv2_right": [
+      null,
+      0,
+      6,
+      11
+    ],
+    "sa_f10_skill17_lv2_up": [
+      null,
+      0,
+      6,
+      9
+    ],
+    "sa_f10_skill17_lv3_down": [
+      null,
+      0,
+      6,
+      3
+    ],
+    "sa_f10_skill17_lv3_left": [
+      null,
+      0,
+      6,
+      3
+    ],
+    "sa_f10_skill17_lv3_right": [
+      null,
+      0,
+      6,
+      3
+    ],
+    "sa_f10_skill17_lv3_up": [
+      null,
+      0,
+      6,
+      3
+    ],
+    "sa_f10_skill17_steer_right": [
+      null,
+      0,
+      85,
+      3
+    ],
+    "sa_f10_skill6_lv1_down": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f10_skill6_lv1_left": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f10_skill6_lv1_right": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f10_skill6_lv1_up": [
+      null,
+      0,
+      9,
+      11
+    ],
+    "sa_f10_skill6_lv2_down": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f10_skill6_lv2_left": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f10_skill6_lv2_right": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f10_skill6_lv2_up": [
+      null,
+      0,
+      9,
+      11
+    ],
+    "sa_f10_skill6_lv3_down": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f10_skill6_lv3_left": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f10_skill6_lv3_right": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f10_skill6_lv3_up": [
+      null,
+      0,
+      9,
+      11
+    ],
+    "sa_f10_skill7_lv1_up": [
+      null,
+      0,
+      22,
+      16
+    ],
+    "sa_f11_skill17_lv3_right": [
+      null,
+      0,
+      6,
+      3
+    ],
+    "sa_f11_skill17_steer_right": [
+      null,
+      0,
+      85,
+      3
+    ],
+    "sa_f11_skill6_lv3_right": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f12_skill17_lv3_right": [
+      null,
+      0,
+      6,
+      3
+    ],
+    "sa_f12_skill17_steer_right": [
+      null,
+      0,
+      85,
+      3
+    ],
+    "sa_f12_skill6_lv3_right": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f13_skill17_lv3_right": [
+      null,
+      0,
+      6,
+      3
+    ],
+    "sa_f13_skill17_steer_right": [
+      null,
+      0,
+      85,
+      3
+    ],
+    "sa_f13_skill6_lv3_right": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f14_skill17_lv3_right": [
+      null,
+      0,
+      6,
+      3
+    ],
+    "sa_f14_skill17_steer_right": [
+      null,
+      0,
+      6,
+      4
+    ],
+    "sa_f14_skill20_transform_right": [
+      5,
+      2,
+      6,
+      421
+    ],
+    "sa_f14_skill6_lv3_right": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f15_skill17_lv3_right": [
+      null,
+      0,
+      6,
+      3
+    ],
+    "sa_f15_skill17_steer_right": [
+      null,
+      0,
+      85,
+      3
+    ],
+    "sa_f15_skill6_lv3_right": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f16_skill17_lv3_right": [
+      null,
+      0,
+      6,
+      3
+    ],
+    "sa_f16_skill17_steer_right": [
+      null,
+      0,
+      85,
+      3
+    ],
+    "sa_f16_skill6_lv3_right": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f17_skill17_lv3_right": [
+      null,
+      0,
+      6,
+      3
+    ],
+    "sa_f17_skill17_steer_right": [
+      null,
+      0,
+      85,
+      3
+    ],
+    "sa_f17_skill6_lv3_right": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f18_skill17_lv3_right": [
+      null,
+      0,
+      6,
+      3
+    ],
+    "sa_f18_skill17_steer_right": [
+      null,
+      0,
+      85,
+      3
+    ],
+    "sa_f18_skill6_lv3_right": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f19_skill16_lv1_down": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f19_skill16_lv1_left": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f19_skill16_lv1_right": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f19_skill16_lv1_up": [
+      null,
+      0,
+      9,
+      5
+    ],
+    "sa_f19_skill16_lv2_down": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f19_skill16_lv2_left": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f19_skill16_lv2_right": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f19_skill16_lv2_up": [
+      null,
+      0,
+      9,
+      6
+    ],
+    "sa_f19_skill16_lv3_down": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f19_skill16_lv3_left": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f19_skill16_lv3_right": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f19_skill16_lv3_up": [
+      null,
+      0,
+      9,
+      9
+    ],
+    "sa_f19_skill7_lv1_up": [
+      null,
+      0,
+      22,
+      14
+    ],
+    "sa_f19_skill8_lv2_up": [
+      null,
+      0,
+      158,
+      228
+    ],
+    "sa_f19_skill8_lv3_down": [
+      null,
+      0,
+      162,
+      1
+    ],
+    "sa_f19_skill8_lv3_left": [
+      null,
+      0,
+      162,
+      1
+    ],
+    "sa_f19_skill8_lv3_right": [
+      null,
+      0,
+      162,
+      1
+    ],
+    "sa_f19_skill8_lv3_up": [
+      null,
+      0,
+      158,
+      228
+    ],
+    "sa_f20_skill16_lv3_right": [
+      null,
+      0,
+      9,
+      2
+    ],
+    "sa_f20_skill8_lv3_right": [
+      null,
+      0,
+      162,
+      1
+    ],
+    "sa_f21_skill11_lv1_down": [
+      null,
+      0,
+      13,
+      4
+    ],
+    "sa_f21_skill11_lv1_left": [
+      null,
+      0,
+      13,
+      7
+    ],
+    "sa_f21_skill11_lv1_right": [
+      null,
+      0,
+      13,
+      7
+    ],
+    "sa_f21_skill11_lv1_up": [
+      null,
+      0,
+      13,
+      81
+    ],
+    "sa_f21_skill11_lv2_down": [
+      null,
+      0,
+      13,
+      4
+    ],
+    "sa_f21_skill11_lv2_left": [
+      null,
+      0,
+      13,
+      8
+    ],
+    "sa_f21_skill11_lv2_right": [
+      null,
+      0,
+      13,
+      8
+    ],
+    "sa_f21_skill11_lv2_up": [
+      null,
+      0,
+      13,
+      74
+    ],
+    "sa_f21_skill11_lv3_down": [
+      null,
+      0,
+      13,
+      4
+    ],
+    "sa_f21_skill11_lv3_left": [
+      null,
+      0,
+      13,
+      9
+    ],
+    "sa_f21_skill11_lv3_right": [
+      null,
+      0,
+      13,
+      9
+    ],
+    "sa_f21_skill11_lv3_up": [
+      null,
+      0,
+      13,
+      66
+    ],
+    "sa_f21_skill4_lv1_down": [
+      null,
+      0,
+      22,
+      4
+    ],
+    "sa_f21_skill4_lv1_left": [
+      null,
+      0,
+      22,
+      2
+    ],
+    "sa_f21_skill4_lv1_right": [
+      null,
+      0,
+      22,
+      2
+    ],
+    "sa_f21_skill4_lv1_up": [
+      null,
+      0,
+      22,
+      2
+    ],
+    "sa_f21_skill4_lv2_down": [
+      null,
+      0,
+      22,
+      4
+    ],
+    "sa_f21_skill4_lv2_left": [
+      null,
+      0,
+      22,
+      2
+    ],
+    "sa_f21_skill4_lv2_right": [
+      null,
+      0,
+      22,
+      2
+    ],
+    "sa_f21_skill4_lv2_up": [
+      null,
+      0,
+      22,
+      2
+    ],
+    "sa_f21_skill4_lv3_down": [
+      null,
+      0,
+      22,
+      4
+    ],
+    "sa_f21_skill4_lv3_left": [
+      null,
+      0,
+      22,
+      2
+    ],
+    "sa_f21_skill4_lv3_right": [
+      null,
+      0,
+      22,
+      2
+    ],
+    "sa_f21_skill4_lv3_up": [
+      null,
+      0,
+      22,
+      2
+    ],
+    "sa_f21_skill7_lv1_up": [
+      null,
+      0,
+      22,
+      16
+    ],
+    "sa_f22_skill11_lv3_right": [
+      null,
+      0,
+      13,
+      9
+    ],
+    "sa_f22_skill4_lv3_right": [
+      null,
+      0,
+      22,
+      2
+    ],
+    "sa_f23_punch_right": [
+      6,
+      64,
+      6,
+      150
+    ],
+    "sa_f23_skill11_lv3_right": [
+      385,
+      1,
+      null,
+      0
+    ],
+    "sa_f23_skill4_lv3_right": [
+      null,
+      0,
+      6,
+      380
+    ],
+    "sa_f23_skill7_lv1_right": [
+      null,
+      0,
+      6,
+      380
+    ],
+    "sa_f24_punch_right": [
+      null,
+      0,
+      0,
+      120
+    ],
+    "sa_f24_skill11_lv3_right": [
+      null,
+      0,
+      0,
+      120
+    ],
+    "sa_f24_skill20_transform_right": [
+      null,
+      0,
+      0,
+      120
+    ],
+    "sa_f24_skill4_lv3_right": [
+      null,
+      0,
+      0,
+      120
+    ],
+    "sa_f24_skill7_lv1_right": [
+      null,
+      0,
+      0,
+      120
+    ],
+    "sa_f25_skill11_lv3_right": [
+      null,
+      0,
+      13,
+      30
+    ],
+    "sa_f25_skill20_transform_right": [
+      null,
+      0,
+      305,
+      1
+    ],
+    "sa_f25_skill4_lv3_right": [
+      null,
+      0,
+      22,
+      3
+    ],
+    "sa_f25_skill7_lv1_right": [
+      null,
+      0,
+      106,
+      1
+    ],
+    "sa_f26_skill10_lv1_down": [
+      null,
+      0,
+      131,
+      14
+    ],
+    "sa_f26_skill10_lv1_left": [
+      null,
+      0,
+      131,
+      14
+    ],
+    "sa_f26_skill10_lv1_right": [
+      null,
+      0,
+      131,
+      1
+    ],
+    "sa_f26_skill10_lv1_up": [
+      null,
+      0,
+      131,
+      1
+    ],
+    "sa_f26_skill10_lv2_down": [
+      null,
+      0,
+      131,
+      14
+    ],
+    "sa_f26_skill10_lv2_left": [
+      null,
+      0,
+      131,
+      14
+    ],
+    "sa_f26_skill10_lv2_right": [
+      null,
+      0,
+      131,
+      1
+    ],
+    "sa_f26_skill10_lv2_up": [
+      null,
+      0,
+      131,
+      1
+    ],
+    "sa_f26_skill10_lv3_down": [
+      null,
+      0,
+      131,
+      14
+    ],
+    "sa_f26_skill10_lv3_left": [
+      null,
+      0,
+      131,
+      14
+    ],
+    "sa_f26_skill10_lv3_right": [
+      null,
+      0,
+      131,
+      1
+    ],
+    "sa_f26_skill10_lv3_up": [
+      null,
+      0,
+      131,
+      1
+    ],
+    "sa_f26_skill7_lv1_up": [
+      null,
+      0,
+      22,
+      16
+    ],
+    "sa_f27_skill10_lv3_right": [
+      null,
+      0,
+      131,
+      1
+    ],
+    "sa_f28_skill10_lv3_right": [
+      null,
+      0,
+      131,
+      1
+    ],
+    "sa_f29_skill10_lv3_right": [
+      null,
+      0,
+      131,
+      1
+    ],
+    "sa_f30_skill10_lv3_right": [
+      null,
+      0,
+      131,
+      1
+    ],
+    "sa_f31_skill13_lv1_down": [
+      21,
+      254,
+      null,
+      0
+    ],
+    "sa_f31_skill13_lv1_left": [
+      21,
+      254,
+      null,
+      0
+    ],
+    "sa_f31_skill13_lv1_right": [
+      21,
+      254,
+      null,
+      0
+    ],
+    "sa_f31_skill13_lv1_up": [
+      21,
+      254,
+      null,
+      0
+    ],
+    "sa_f31_skill13_lv2_down": [
+      21,
+      254,
+      null,
+      0
+    ],
+    "sa_f31_skill13_lv2_left": [
+      21,
+      254,
+      null,
+      0
+    ],
+    "sa_f31_skill13_lv2_right": [
+      21,
+      254,
+      null,
+      0
+    ],
+    "sa_f31_skill13_lv2_up": [
+      21,
+      254,
+      null,
+      0
+    ],
+    "sa_f31_skill13_lv3_down": [
+      21,
+      254,
+      null,
+      0
+    ],
+    "sa_f31_skill13_lv3_left": [
+      21,
+      254,
+      null,
+      0
+    ],
+    "sa_f31_skill13_lv3_right": [
+      21,
+      254,
+      null,
+      0
+    ],
+    "sa_f31_skill13_lv3_up": [
+      21,
+      254,
+      null,
+      0
+    ],
+    "sa_f31_skill23_lv1_up": [
+      null,
+      0,
+      22,
+      2
+    ],
+    "sa_f31_skill23_lv2_up": [
+      null,
+      0,
+      22,
+      2
+    ],
+    "sa_f31_skill23_lv3_up": [
+      null,
+      0,
+      22,
+      2
+    ],
+    "sa_f31_skill7_lv1_up": [
+      null,
+      0,
+      22,
+      14
+    ],
+    "sa_f32_punch_right": [
+      null,
+      0,
+      108,
+      27
+    ],
+    "sa_f32_skill13_lv3_right": [
+      null,
+      0,
+      108,
+      30
+    ],
+    "sa_f32_skill20_transform_right": [
+      null,
+      0,
+      108,
+      30
+    ],
+    "sa_f32_skill23_lv3_right": [
+      null,
+      0,
+      108,
+      30
+    ],
+    "sa_f32_skill7_lv1_right": [
+      null,
+      0,
+      108,
+      30
+    ],
+    "sa_f33_punch_right": [
+      null,
+      0,
+      108,
+      27
+    ],
+    "sa_f33_skill13_lv3_right": [
+      null,
+      0,
+      108,
+      30
+    ],
+    "sa_f33_skill20_transform_right": [
+      null,
+      0,
+      108,
+      30
+    ],
+    "sa_f33_skill23_lv3_right": [
+      null,
+      0,
+      108,
+      30
+    ],
+    "sa_f33_skill7_lv1_right": [
+      null,
+      0,
+      108,
+      30
+    ],
+    "sa_f34_skill13_lv3_right": [
+      21,
+      254,
+      null,
+      0
+    ],
+    "sa_f34_skill22_transform_right": [
+      null,
+      0,
+      6,
+      4
+    ],
+    "sa_f35_punch_right": [
+      null,
+      0,
+      34,
+      2
+    ],
+    "sa_f35_skill13_lv3_right": [
+      21,
+      254,
+      5,
+      9
+    ],
+    "sa_f35_skill20_transform_right": [
+      null,
+      0,
+      34,
+      8
+    ],
+    "sa_f35_skill23_lv3_right": [
+      null,
+      0,
+      5,
+      4
+    ],
+    "sa_f35_skill7_lv1_right": [
+      null,
+      0,
+      5,
+      10
+    ],
+    "sa_f36_skill13_lv3_right": [
+      21,
+      254,
+      null,
+      0
+    ],
+    "sa_f37_skill13_lv3_right": [
+      21,
+      254,
+      null,
+      0
+    ],
+    "sa_f38_skill13_lv3_right": [
+      21,
+      254,
+      5,
+      4
+    ],
+    "sa_f38_skill23_lv3_right": [
+      null,
+      0,
+      5,
+      2
+    ],
+    "sa_f38_skill7_lv1_right": [
+      null,
+      0,
+      5,
+      2
+    ],
+    "sa_f39_skill1_lv1_down": [
+      null,
+      0,
+      13,
+      10
+    ],
+    "sa_f39_skill1_lv1_left": [
+      null,
+      0,
+      13,
+      10
+    ],
+    "sa_f39_skill1_lv1_right": [
+      null,
+      0,
+      13,
+      10
+    ],
+    "sa_f39_skill1_lv1_up": [
+      null,
+      0,
+      13,
+      16
+    ],
+    "sa_f39_skill1_lv2_down": [
+      null,
+      0,
+      13,
+      10
+    ],
+    "sa_f39_skill1_lv2_left": [
+      null,
+      0,
+      13,
+      10
+    ],
+    "sa_f39_skill1_lv2_right": [
+      null,
+      0,
+      13,
+      10
+    ],
+    "sa_f39_skill1_lv2_up": [
+      null,
+      0,
+      13,
+      16
+    ],
+    "sa_f39_skill1_lv3_down": [
+      null,
+      0,
+      13,
+      10
+    ],
+    "sa_f39_skill1_lv3_left": [
+      null,
+      0,
+      13,
+      10
+    ],
+    "sa_f39_skill1_lv3_right": [
+      null,
+      0,
+      13,
+      10
+    ],
+    "sa_f39_skill1_lv3_up": [
+      null,
+      0,
+      13,
+      16
+    ],
+    "sa_f39_skill7_lv1_up": [
+      null,
+      0,
+      22,
+      14
+    ],
+    "sa_f40_skill1_lv3_right": [
+      null,
+      0,
+      13,
+      10
+    ],
+    "sa_f40_skill9_steer_right": [
+      null,
+      0,
+      173,
+      112
+    ],
+    "sa_f41_skill3_lv1_down": [
+      null,
+      0,
+      9,
+      4
+    ],
+    "sa_f41_skill3_lv1_left": [
+      null,
+      0,
+      9,
+      3
+    ],
+    "sa_f41_skill3_lv1_right": [
+      null,
+      0,
+      9,
+      3
+    ],
+    "sa_f41_skill3_lv1_up": [
+      null,
+      0,
+      9,
+      9
+    ],
+    "sa_f41_skill3_lv2_down": [
+      null,
+      0,
+      9,
+      4
+    ],
+    "sa_f41_skill3_lv2_left": [
+      null,
+      0,
+      9,
+      3
+    ],
+    "sa_f41_skill3_lv2_right": [
+      null,
+      0,
+      9,
+      3
+    ],
+    "sa_f41_skill3_lv2_up": [
+      null,
+      0,
+      9,
+      9
+    ],
+    "sa_f41_skill3_lv3_down": [
+      null,
+      0,
+      9,
+      4
+    ],
+    "sa_f41_skill3_lv3_left": [
+      null,
+      0,
+      9,
+      3
+    ],
+    "sa_f41_skill3_lv3_right": [
+      null,
+      0,
+      9,
+      3
+    ],
+    "sa_f41_skill3_lv3_up": [
+      null,
+      0,
+      9,
+      9
+    ],
+    "sa_f41_skill5_lv1_left": [
+      null,
+      0,
+      207,
+      51
+    ],
+    "sa_f41_skill5_lv1_right": [
+      null,
+      0,
+      207,
+      51
+    ],
+    "sa_f41_skill5_lv1_up": [
+      null,
+      0,
+      167,
+      219
+    ],
+    "sa_f41_skill5_lv2_left": [
+      null,
+      0,
+      207,
+      51
+    ],
+    "sa_f41_skill5_lv2_right": [
+      null,
+      0,
+      207,
+      51
+    ],
+    "sa_f41_skill5_lv2_up": [
+      null,
+      0,
+      167,
+      219
+    ],
+    "sa_f41_skill5_lv3_left": [
+      null,
+      0,
+      207,
+      51
+    ],
+    "sa_f41_skill5_lv3_right": [
+      null,
+      0,
+      207,
+      51
+    ],
+    "sa_f41_skill5_lv3_up": [
+      null,
+      0,
+      167,
+      219
+    ],
+    "sa_f41_skill5_steer_right": [
+      null,
+      0,
+      161,
+      31
+    ],
+    "sa_f41_skill7_lv1_up": [
+      null,
+      0,
+      22,
+      16
+    ],
+    "sa_f41_vs_skill5_steer_right": [
+      0,
+      446,
+      0,
+      215
+    ],
+    "sa_f42_punch_right": [
+      null,
+      0,
+      108,
+      22
+    ],
+    "sa_f42_skill3_lv3_right": [
+      null,
+      0,
+      108,
+      25
+    ],
+    "sa_f42_skill5_lv3_right": [
+      null,
+      0,
+      108,
+      25
+    ],
+    "sa_f42_skill5_steer_right": [
+      null,
+      0,
+      108,
+      22
+    ],
+    "sa_f42_skill7_lv1_right": [
+      null,
+      0,
+      108,
+      25
+    ],
+    "sa_f43_punch_right": [
+      null,
+      0,
+      108,
+      22
+    ],
+    "sa_f43_skill3_lv3_right": [
+      null,
+      0,
+      108,
+      25
+    ],
+    "sa_f43_skill5_lv3_right": [
+      null,
+      0,
+      108,
+      25
+    ],
+    "sa_f43_skill5_steer_right": [
+      null,
+      0,
+      108,
+      22
+    ],
+    "sa_f43_skill7_lv1_right": [
+      null,
+      0,
+      108,
+      25
+    ],
+    "sa_f44_skill3_lv3_right": [
+      null,
+      0,
+      9,
+      3
+    ],
+    "sa_f44_skill5_lv3_right": [
+      null,
+      0,
+      207,
+      51
+    ],
+    "sa_f44_skill5_steer_right": [
+      null,
+      0,
+      161,
+      31
+    ],
+    "sa_f46_punch_down": [
+      6,
+      67,
+      7,
+      146
+    ],
+    "sa_f46_punch_left": [
+      6,
+      63,
+      7,
+      146
+    ],
+    "sa_f46_punch_right": [
+      6,
+      64,
+      7,
+      146
+    ],
+    "sa_f46_punch_up": [
+      6,
+      63,
+      7,
+      146
+    ],
+    "sa_f46_skill7_lv1_down": [
+      5,
+      80,
+      null,
+      0
+    ],
+    "sa_f46_skill7_lv1_left": [
+      5,
+      80,
+      null,
+      0
+    ],
+    "sa_f46_skill7_lv1_right": [
+      5,
+      80,
+      null,
+      0
+    ],
+    "sa_f46_skill7_lv1_up": [
+      5,
+      80,
+      null,
+      0
+    ],
+    "sa_pilot_f02_s15_lv2": [
+      null,
+      0,
+      9,
+      1
+    ],
+    "sa_pilot_f41_s5_steer": [
+      null,
+      0,
+      156,
+      31
+    ]
+  }
+}
