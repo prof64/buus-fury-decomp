@@ -20,6 +20,7 @@ use wf_view::Sim;
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let master = args.first().expect("MASTER.jsonl").clone();
+    wf_core::coverage::context(&std::env::var("WF_COVERAGE_CTX").unwrap_or_else(|_| "run".into()));
     let opt = |name: &str| args.iter().position(|a| a == name).and_then(|i| args.get(i + 1)).cloned();
     let limit: usize = opt("--frames").and_then(|v| v.parse().ok()).unwrap_or(usize::MAX);
     let sim_lag = opt("--lag").as_deref() == Some("sim");
@@ -254,6 +255,11 @@ fn main() {
             let mut ev = vec![];
             app.step(&[keys], &mut ev);
             stepped += 1;
+            // (diagnostics: the coverage report's recorder, off without WF_COVERAGE - every iteration is compared)
+            if wf_core::coverage::on() {
+                wf_core::coverage::at(k as u64);
+                wf_core::coverage::commit_world(app.world());
+            }
             // WR_INTERACT=1: every field interaction this iteration (trigger / talk / pickup / break / defeat runs)
             if std::env::var_os("WR_INTERACT").is_some() {
                 let w = app.world();
@@ -597,6 +603,7 @@ fn main() {
     for l in &lasting {
         println!("  first lasting {}: {:?}", l.0, l.3.as_ref().map(|(r, d)| (r, stretch_of(*r), d)));
     }
+    wf_core::coverage::flush_counts();
     if let Some(out) = opt("--report") {
         let rep = serde_json::json!({
             "lag": mode_name,

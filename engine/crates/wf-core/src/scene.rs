@@ -2943,6 +2943,12 @@ fn prop_mut(w: &mut World, id: i32) -> &mut Prop {
 
 /// the script props onto the area's map props (drawn and solid from `Field.props`): visibility, and the rect moved
 /// by the position change
+/// a map prop shown / hidden as the hide / show command leaves it (the importer: the game's prop object as it stands)
+pub fn set_prop_shown(w: &mut World, id: i32, on: bool) {
+    prop_mut(w, id).visible = on;
+    sync_props(w);
+}
+
 pub fn sync_props(w: &mut World) {
     let Some(f) = w.field.as_mut() else { return };
     for p in &w.scene.props {

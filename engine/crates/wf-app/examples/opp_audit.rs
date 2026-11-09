@@ -44,21 +44,4 @@ fn main() {
     let _ = opp::DATA.set(Arc::new((*d).clone()));
     let mut tile_hint = std::env::var("OA_TILE").ok().and_then(|v| v.parse().ok());
     for a in &args {
-        let path = std::path::Path::new(a);
-        let mut t: serde_json::Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
-        let name = t["name"].as_str().unwrap_or("?").to_string();
-        let Some(game) = opp::read_fb(&path.with_extension("fb")) else {
-            println!("{name}: no screen record (.fb)");
-            continue;
-        };
-        let hashes: String = game.iter().map(|g| format!("{:016x}", opp::hash(g))).collect();
-        let r = opp::audit(&t, &opp::Pictures::Game(game), &packs, Some((&out_dir, max_png)), &mut tile_hint);
-        println!("{}", r.summary);
-        if let Some(p) = &pack {
-            let torn: serde_json::Map<String, serde_json::Value> = r.torn.iter().map(|(f, s)| (f.to_string(), serde_json::json!(s))).collect();
-            t["pic"] = serde_json::json!({"tile_off": r.tile_off, "hash": hashes, "torn": torn});
-            let z = miniz_oxide::deflate::compress_to_vec_zlib(&serde_json::to_vec(&t).unwrap(), 9);
-            std::fs::write(p.join(format!("{name}.json.z")), z).unwrap();
-        }
-    }
-}
+        wf_core::coverage::context(std::path::Path::new(a).file_stem().and_then(|s| s.to_str()).unwrap_or("?"));

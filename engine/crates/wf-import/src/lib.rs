@@ -839,6 +839,21 @@ fn field_from_ram(w: &mut World, ram: &GbaRam, notes: &mut Vec<String>) {
     w.ents.extend(shots);
     import_effects(w, ram);
     let rows: std::collections::BTreeMap<u32, (i32, i32, i32, i32)> = ram.actor_rows.iter().map(|r| (r.0, (r.1, r.2, r.3, r.4))).collect();
+    // a map prop a script hid or showed since the load (the prop objects - vt 0x0804D1E4 the map's first, which
+    // owns the props' tiles, 0x0804BA78 the others: +0x14 u16 the index - the track lookup 0x0800D272 answers
+    // (8, index) with the object - and +0x1C the shown word the hide / show command 0x08019474 writes): HFIL 18-4's
+    // spikes, hidden by the area's load script once flag 181 is set (whole run 1 row 1,127,500: the rebuilt map
+    // showed them); 18-2's floor switch, prop 0 hidden and prop 1 shown once pressed (run 3 row 1,922,760)
+    // (a prop with no object in the list keeps the rebuilt map's state: hiding those lost 580 board frames)
+    for o in ram.objects() {
+        if matches!(ram.r32(o), 0x0804_D1E4 | 0x0804_BA78) {
+            let (id, shown) = (ram.r16(o + 0x14) as i32, ram.r32(o + 0x1C) != 0);
+            let cur = w.field.as_ref().and_then(|f| f.props.get(id as usize)).map(|p| p.visible);
+            if cur.is_some_and(|c| c != shown) {
+                wf_core::scene::set_prop_shown(w, id, shown);
+            }
+        }
+    }
     patch_leader(w, ram, notes);
     // the walk and enemy grids as they stand (map object +0xA8 / +0xB0: bitmaps, 32 bytes a row, bit = free)
     import_grids(w, ram);

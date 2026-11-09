@@ -154,6 +154,8 @@ fn hash(fb: &[u32]) -> String {
 
 /// result of one scenario: (frames compared, frames exact, sound mismatches)
 fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Option<(usize, usize, Vec<String>, Vec<usize>)> {
+    // (diagnostics: the coverage report's recorder, off without WF_COVERAGE)
+    wf_core::coverage::context(name);
     let d = dir().join(name);
     let tr: Value = serde_json::from_slice(&std::fs::read(traces().join(format!("{name}.json"))).ok()?).ok()?;
     let frames = &tr;
@@ -407,6 +409,7 @@ fn run(packs: &Packs, data: &Arc<wf_core::content::GameData>, name: &str) -> Opt
             // picture (the field under it is the field renderer's, tests/field_parity.rs); needs work/ PNGs
             let mut mr = wf_render::menu::MenuRenderer::load(packs);
             let pic = mr.render(packs, mv, None, 0);
+            wf_core::coverage::commit(&v);
             let Some(emu) = load_png(&d.join(format!("f{k:04}.png"))) else { continue };
             compared += 1;
             let diff = pic.iter().zip(&emu).filter(|(o, e)| **o >> 24 != 0 && (**o & 0xFF_FFFF) != (**e & 0xFF_FFFF)).count();

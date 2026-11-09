@@ -1,0 +1,59 @@
+{
+ "cov_enzyme": "Inside Buu 21-x, Enzymes (the most met enemy state): their walk's cel phase (the import re-starts the walk, the game's runs on: harness cel check f1), a latched Enzyme drawn over the player where the game hides it (f100), a hit flash / damage digit a frame apart (f190)",
+ "cov_grapple": "a Cyborg's grapple (effect fx_0876dff8): the state comparison stops at f932, the grab's first frame - the game takes a 28-tile block of object tiles a frame before ours and the 4-tile object first (tile allocator order); pictures before it differ in the HUD only",
+ "cov_hfil4_nosferatu": "HFIL 18-4, Nosferatu: exact pictures to f550; the state comparison stops at f1162 on the order of two small tile blocks (a 2-tile and a 1-tile object)",
+ "cov_sleep_mode": "the Options' sleep (native sleep_mode): exact to f914; from there the console sleeps inside one logic iteration (the logic counter stays at 409,066 for 31 video frames) - lag, not recreated - and the text box opens only after it",
+ "cov_sleep_after": "the scene after the sleep; last frame's HUD under the text box",
+ "cov_zmart": "Z-Mart 0-92: the shopkeeper's Buy / Sell / Exit choice box (f130 .. f260) - ours shows an empty text box in another place and hides the area banner",
+ "cov_vegeta28": "Rocky Canyon 8-70, Majin Vegeta's scene: Dabura's shadow (fixed here: a script-spawned actor's shadow offset is signed); the two frames left are single-frame sprite pieces",
+ "cov_dabura": "Dabura in Babidi's ship: the HUD under a text box / the boss bar (the HUD helper's class)",
+ "cov_spopovich": "World Tournament, Spopovich: the boss bar on most frames, a BG row on alternate frames (the HUD / boss-bar class)",
+ "cov_superball": "Super Buu's Super Ball: f20 - f30 ours shows the ball where the game shows him standing, f40 - f160 the stars over his head a few pixels off",
+ "cov_unequip": "the unequip_slot scene (9-15): the three frames left are the text box's",
+ "cov_videl": "Videl (form 52) at the tournament: text box frames while it types",
+ "cov_vegeta26_blast": "Vegeta's Energy Blast (form 26): a blast's spark for single frames",
+ "cov_vegeta29_blast": "Super Saiyan 2 Vegeta's Energy Blast in HFIL 18-2: HUD frames",
+ "cov_hfil2_living_dead": "HFIL 18-2, Living Dead: a dying enemy's cloud drawn over a coin (f470; the sprite-tail helper's class)",
+ "cov_ship49": "Babidi's ship: a death cloud's cel / place for single frames (f140 ..)",
+ "tour_earth_zmart_thieves": "as cov_zmart: the shop's choice box (f310 ..)",
+ "tour_kais_pad191": "the planet-select screen of a teleport pad: the destination's name bar at the bottom is missing in ours (f60 ..)",
+ "tour_kais_lookheaven": "as tour_kais_pad191 (f40 ..)",
+ "tour_castle_ship_26": "Babidi's ship 8-26: a door (map prop 7) the game has opened is drawn shut - its prop object is gone from the game's list; hiding every prop without an object was tried and lost 580 board frames",
+ "tour_castle_ship_38": "as tour_castle_ship_26",
+ "tour_kami_lookout20": "a save point: the Save Game screen with its 'Saving...' box stays up for the save's long iteration (12 sampled frames from f870), ours is already black - lag, not recreated",
+ "tour_desert_exp24": "the Diablo Desert Express (the countdown helper's scene)",
+ "tour_world_sub_rng3": "the world map (the world-map helper's scene)",
+ "tour_world_sub_fight": "the world map (the world-map helper's scene)",
+ "tour_kami_roshi": "the world map (the world-map helper's scene)",
+ "cov2_janemba": "Janemba (run 2): the state comparison stops at f168 - one of his parts (sprite 147) 2 px lower in the game; pictures before it: the boss bar's class",
+ "cov2_puipui_fight": "PuiPui in Babidi's ship: the state comparison stops at f273 on an 8-tile block of object tiles the game has taken and ours has not yet",
+ "cov2_hfil3_poltergeist": "HFIL 18-3, Poltergeists: the recording's last rows stand inside an area load (matched 612 of 620)",
+ "cov2_lich_states": "HFIL, Liches: a few HUD pixels at the stat mark on 52 sampled frames (the HUD helper's class)",
+ "cov2_spopovich_yamu": "World Tournament, Spopovich / Yamu: Yamu's shadow (fixed here, as Dabura's); left: a piece of Spopovich's grab pose and HUD frames",
+ "cov2_spopovich_r2": "World Tournament, Spopovich (run 2): the boss bar's end (the HUD helper's class)",
+ "cov2_gunman2": "HFIL (Van Zant and Smitty): the portrait text box stands at the top of the screen in the game, ours draws it lower and the two men above it (the text-box helper's class)",
+ "cov2_mechandoid_ball": "a Power Mechandoid's ball: its rolling cel differs on single frames; HUD frames in a fade",
+ "cov2_broly_r2": "Broly (run 2): a small piece under the player on 39 sampled frames (not looked into further)",
+ "_not_recorded": [
+  [
+   "open_shop_sell (the sell shop opened by a script; run 2 row 140,529)",
+   "five cuts tried (rows 139,600 .. 140,590): the import stops at its first frame on the shop scene's object tiles (three blocks ours has taken and the game has not), or 101 frames in on an NPC's animation; the Sell screen itself is covered by the menu scenarios"
+  ],
+  [
+   "Super Buu, enemy type 120 (run 1 row 1,357,782)",
+   "the cut replays in step for 800 frames but no sampled frame is exact (a text box, a BG row or the boss bar on every one): left off the board, the boss-bar helper's class"
+  ],
+  [
+   "Pilaf's Guardian's later states (run 1 row 755,436)",
+   "the cut leaves the game's actors after 80 frames; not looked into"
+  ],
+  [
+   "props of 11-24 (run 1 row 795,093)",
+   "every sampled frame differs in a text box (123 px): left off the board, the text-box helper's class"
+  ],
+  [
+   "Babidi's ship 8-24 (run 1 row 455,076), the opening's 0-4 / 0-5 (rows 1,070 / 1,280)",
+   "cuts inside a scene's load: the import matches 11 - 18 frames; the areas are met for a few seconds only"
+  ]
+ ]
+}

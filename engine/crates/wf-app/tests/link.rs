@@ -181,6 +181,8 @@ fn run(name: &str, kind: LinkKind, sa: &SaveData, sb: &SaveData, seed: u64) -> O
 }
 
 fn run_on(name: &str, kind: LinkKind, sa: &SaveData, sb: &SaveData, seed: u64, cond: Conditions) -> Option<Run> {
+    // (diagnostics: the coverage report's recorder, off without WF_COVERAGE)
+    wf_core::coverage::context(name);
     let dir = content_dir()?;
     let p = packs(&dir);
     let net = SimNet::new(cond, seed);

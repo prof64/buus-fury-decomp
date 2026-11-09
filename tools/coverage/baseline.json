@@ -1,0 +1,308 @@
+{
+ "native": {
+  "total": 183,
+  "by_level": {
+   "picture": 146,
+   "state": 6,
+   "audit": 0,
+   "board": 0,
+   "never": 31
+  },
+  "met_total": 152,
+  "met_by_level": {
+   "picture": 146,
+   "state": 6,
+   "audit": 0,
+   "board": 0,
+   "never": 0
+  }
+ },
+ "effect sheet": {
+  "total": 312,
+  "by_level": {
+   "picture": 30,
+   "state": 29,
+   "audit": 2,
+   "board": 0,
+   "never": 251
+  },
+  "met_total": 32,
+  "met_by_level": {
+   "picture": 29,
+   "state": 3,
+   "audit": 0,
+   "board": 0,
+   "never": 0
+  }
+ },
+ "prop sheet": {
+  "total": 209,
+  "by_level": {
+   "picture": 144,
+   "state": 58,
+   "audit": 0,
+   "board": 0,
+   "never": 7
+  },
+  "met_total": 163,
+  "met_by_level": {
+   "picture": 136,
+   "state": 27,
+   "audit": 0,
+   "board": 0,
+   "never": 0
+  }
+ },
+ "sprite sheet": {
+  "total": 297,
+  "by_level": {
+   "picture": 209,
+   "state": 48,
+   "audit": 6,
+   "board": 0,
+   "never": 34
+  },
+  "met_total": 240,
+  "met_by_level": {
+   "picture": 208,
+   "state": 32,
+   "audit": 0,
+   "board": 0,
+   "never": 0
+  }
+ },
+ "enemy": {
+  "total": 150,
+  "by_level": {
+   "picture": 91,
+   "state": 28,
+   "audit": 5,
+   "board": 0,
+   "never": 26
+  },
+  "met_total": 110,
+  "met_by_level": {
+   "picture": 89,
+   "state": 21,
+   "audit": 0,
+   "board": 0,
+   "never": 0
+  }
+ },
+ "enemy AI state": {
+  "total": 2319,
+  "by_level": {
+   "picture": 613,
+   "state": 341,
+   "audit": 92,
+   "board": 1,
+   "never": 1272
+  },
+  "met_total": 857,
+  "met_by_level": {
+   "picture": 597,
+   "state": 260,
+   "audit": 0,
+   "board": 0,
+   "never": 0
+  }
+ },
+ "form": {
+  "total": 54,
+  "by_level": {
+   "picture": 27,
+   "state": 27,
+   "audit": 0,
+   "board": 0,
+   "never": 0
+  },
+  "met_total": 37,
+  "met_by_level": {
+   "picture": 26,
+   "state": 11,
+   "audit": 0,
+   "board": 0,
+   "never": 0
+  }
+ },
+ "skill (per form)": {
+  "total": 123,
+  "by_level": {
+   "picture": 11,
+   "state": 111,
+   "audit": 1,
+   "board": 0,
+   "never": 0
+  },
+  "met_total": 13,
+  "met_by_level": {
+   "picture": 8,
+   "state": 5,
+   "audit": 0,
+   "board": 0,
+   "never": 0
+  }
+ },
+ "skill": {
+  "total": 23,
+  "by_level": {
+   "picture": 2,
+   "state": 14,
+   "audit": 0,
+   "board": 0,
+   "never": 7
+  },
+  "met_total": 2,
+  "met_by_level": {
+   "picture": 1,
+   "state": 1,
+   "audit": 0,
+   "board": 0,
+   "never": 0
+  }
+ },
+ "transformation": {
+  "total": 38,
+  "by_level": {
+   "picture": 0,
+   "state": 15,
+   "audit": 0,
+   "board": 0,
+   "never": 23
+  },
+  "met_total": 1,
+  "met_by_level": {
+   "picture": 0,
+   "state": 1,
+   "audit": 0,
+   "board": 0,
+   "never": 0
+  }
+ },
+ "area": {
+  "total": 452,
+  "by_level": {
+   "picture": 295,
+   "state": 146,
+   "audit": 0,
+   "board": 0,
+   "never": 11
+  },
+  "met_total": 347,
+  "met_by_level": {
+   "picture": 281,
+   "state": 66,
+   "audit": 0,
+   "board": 0,
+   "never": 0
+  }
+ },
+ "screen": {
+  "total": 27,
+  "by_level": {
+   "picture": 26,
+   "state": 0,
+   "audit": 0,
+   "board": 0,
+   "never": 1
+  },
+  "met_total": 18,
+  "met_by_level": {
+   "picture": 18,
+   "state": 0,
+   "audit": 0,
+   "board": 0,
+   "never": 0
+  }
+ },
+ "player state": {
+  "total": 10,
+  "by_level": {
+   "picture": 9,
+   "state": 1,
+   "audit": 0,
+   "board": 0,
+   "never": 0
+  },
+  "met_total": 10,
+  "met_by_level": {
+   "picture": 9,
+   "state": 1,
+   "audit": 0,
+   "board": 0,
+   "never": 0
+  }
+ },
+ "screen part": {
+  "total": 15,
+  "by_level": {
+   "picture": 15,
+   "state": 0,
+   "audit": 0,
+   "board": 0,
+   "never": 0
+  },
+  "met_total": 15,
+  "met_by_level": {
+   "picture": 15,
+   "state": 0,
+   "audit": 0,
+   "board": 0,
+   "never": 0
+  }
+ },
+ "object (shots, effects objects)": {
+  "total": 39,
+  "by_level": {
+   "picture": 18,
+   "state": 19,
+   "audit": 2,
+   "board": 0,
+   "never": 0
+  },
+  "met_total": 24,
+  "met_by_level": {
+   "picture": 18,
+   "state": 6,
+   "audit": 0,
+   "board": 0,
+   "never": 0
+  }
+ },
+ "held-by-enemy state": {
+  "total": 2,
+  "by_level": {
+   "picture": 0,
+   "state": 2,
+   "audit": 0,
+   "board": 0,
+   "never": 0
+  },
+  "met_total": 1,
+  "met_by_level": {
+   "picture": 0,
+   "state": 1,
+   "audit": 0,
+   "board": 0,
+   "never": 0
+  }
+ },
+ "script visual": {
+  "total": 7,
+  "by_level": {
+   "picture": 6,
+   "state": 1,
+   "audit": 0,
+   "board": 0,
+   "never": 0
+  },
+  "met_total": 7,
+  "met_by_level": {
+   "picture": 6,
+   "state": 1,
+   "audit": 0,
+   "board": 0,
+   "never": 0
+  }
+ }
+}

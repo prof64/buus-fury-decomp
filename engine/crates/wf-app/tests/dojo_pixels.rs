@@ -127,6 +127,8 @@ struct Side {
 
 /// (frames compared, exact, tears, first differing logic frames)
 fn run(packs: &Packs, data: &Arc<GameData>, name: &str) -> Vec<(u8, usize, usize, usize, Vec<i64>, usize)> {
+    // (diagnostics: the coverage report's recorder, off without WF_COVERAGE)
+    wf_core::coverage::context(name);
     let p = repo().join(format!("data/link/dojo_{name}.json"));
     let doc: serde_json::Value = serde_json::from_slice(&std::fs::read(&p).unwrap()).unwrap();
     let v = |x: &serde_json::Value| x.as_i64().unwrap();
